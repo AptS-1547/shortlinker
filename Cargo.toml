@@ -1,14 +1,18 @@
 [package]
 name = "shortlinker"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 description = "一个极简主义的短链接服务，支持 HTTP 302 跳转，使用 Rust 编写，部署便捷、响应快速，适用于自建短链系统。"
 readme = "README.md"
 repository = "https://github.com/AptS-1547/shortlinker"
 license = "MIT"
 
+authors = ["AptS:1547 <apts-1547@esaps.net>"]
+
 keywords = ["short links"]
 
 publish = false
 
 [dependencies]
+
+[build-dependencies]
