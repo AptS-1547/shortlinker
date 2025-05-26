@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
 
+# 添加权限配置
+permissions:
+  contents: write
+  packages: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -80,8 +85,7 @@ jobs:
     - name: Create release directory
       run: |
         mkdir -p release
-        find artifacts -type f -executable -exec cp {} release/ \;
-        find artifacts -name "*.exe" -exec cp {} release/ \;
+        find artifacts -type f -exec cp {} release/ \;
 
     - name: Generate checksums
       run: |
