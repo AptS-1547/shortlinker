@@ -187,9 +187,43 @@ async fn main() -> std::io::Result<()> {
     // Save Server PID to file (仅Unix系统需要)
     #[cfg(unix)]
     {
+        use std::path::Path;
+        use nix::sys::signal;
+        use nix::unistd::Pid;
+        
+        let pid_file = "shortlinker.pid";
+        
+        // 检查是否已有 PID 文件存在
+        if Path::new(pid_file).exists() {
+            match fs::read_to_string(pid_file) {
+                Ok(old_pid_str) => {
+                    if let Ok(old_pid) = old_pid_str.trim().parse::<u32>() {
+                        // 检查该 PID 的进程是否仍在运行
+                        if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
+                            error!("服务器已在运行 (PID: {})，请先停止现有进程", old_pid);
+                            error!("可以使用以下命令停止:");
+                            error!("  kill {}", old_pid);
+                            process::exit(1);
+                        } else {
+                            // 进程已停止，清理旧的 PID 文件
+                            info!("检测到孤立的 PID 文件，清理中...");
+                            let _ = fs::remove_file(pid_file);
+                        }
+                    }
+                }
+                Err(_) => {
+                    // PID 文件损坏，删除它
+                    let _ = fs::remove_file(pid_file);
+                }
+            }
+        }
+        
+        // 写入当前进程的 PID
         let pid = process::id();
-        if let Err(e) = fs::write("shortlinker.pid", pid.to_string()) {
+        if let Err(e) = fs::write(pid_file, pid.to_string()) {
             error!("无法写入PID文件: {}", e);
+        } else {
+            info!("服务器 PID: {}", pid);
         }
     }
     
