@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::thread;
 use std::process;
 use std::time::{Duration, SystemTime};
+use rand;
 
 // 条件编译：仅在Unix系统导入信号相关
 #[cfg(unix)]
@@ -153,22 +154,57 @@ fn setup_reload_mechanism(links: Arc<RwLock<HashMap<String, String>>>, links_fil
 fn run_cli() {
     let args: Vec<String> = env::args().collect();
     let links_file = env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string());
+    let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
+        .unwrap_or_else(|_| "6".to_string())
+        .parse()
+        .unwrap_or(6);
     let mut links = load_links(&links_file);
     
     match args[1].as_str() {
         "add" => {
-            if args.len() != 4 {
-                println!("用法: {} add <短码> <目标URL>", args[0]);
+            if args.len() != 3 && args.len() != 4 && args.len() != 5 {
+                println!("用法: {} add <短码> <目标URL> [--force]", args[0]);
+                println!("或使用随机短码: {} add <目标URL>", args[0]);
+                println!("  --force: 强制覆盖已存在的短码");
                 process::exit(1);
             }
-            
-            let short_code = &args[2];
-            let target_url = &args[3];
+
+            let mut force_overwrite = false;
+            let (short_code, target_url) = if args.len() == 3 {
+                // 使用随机短码
+                let random_code = generate_random_code(random_code_length);
+                (random_code, args[2].clone())
+            } else if args.len() == 4 && args[3] != "--force" {
+                // 使用指定短码
+                (args[2].clone(), args[3].clone())
+            } else if args.len() == 4 && args[3] == "--force" {
+                // 随机短码 + force
+                let random_code = generate_random_code(random_code_length);
+                force_overwrite = true;
+                (random_code, args[2].clone())
+            } else {
+                // 指定短码 + force
+                if args[4] == "--force" {
+                    force_overwrite = true;
+                }
+                (args[2].clone(), args[3].clone())
+            };
             
             // 验证 URL 格式
             if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
                 println!("错误: URL 必须以 http:// 或 https:// 开头");
                 process::exit(1);
+            }
+            
+            // 检查短码是否已存在
+            if links.contains_key(&short_code) {
+                if force_overwrite {
+                    println!("强制覆盖短码 '{}': {} -> {}", short_code, links[&short_code], target_url);
+                } else {
+                    println!("错误: 短码 '{}' 已存在，当前指向: {}", short_code, links[&short_code]);
+                    println!("如需覆盖，请使用 --force 参数");
+                    process::exit(1);
+                }
             }
             
             links.insert(short_code.clone(), target_url.clone());
@@ -222,6 +258,21 @@ fn run_cli() {
             process::exit(1);
         }
     }
+}
+
+// 生成随机短码
+fn generate_random_code(length: usize) -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    
+    let mut rng = rand::rng();
+    
+    (0..length)
+        .map(|_| {
+            let idx = rng.random_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
 }
 
 #[get("/{path}*")]
