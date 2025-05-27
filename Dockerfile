@@ -15,16 +15,8 @@ RUN rustup target add x86_64-unknown-linux-musl
 # 设置工作目录
 WORKDIR /app
 
-# 复制依赖文件
-COPY Cargo.toml Cargo.lock ./
-
-# 创建虚拟的src目录来利用Docker缓存
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl && \
-    rm -rf src
-
 # 复制源代码
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY links.json /app/links.json
 
@@ -42,10 +34,8 @@ LABEL version="1.0.0"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
-WORKDIR /app
-
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /app/shortlinker
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /shortlinker
 COPY --from=builder /app/links.json /data/links.json
 
 VOLUME ["/data"]
@@ -60,4 +50,4 @@ ENV LINKS_FILE=/data/links.json
 ENV RUST_LOG=info
 
 # 启动命令
-ENTRYPOINT ["/app/shortlinker"]
+ENTRYPOINT ["/shortlinker"]
