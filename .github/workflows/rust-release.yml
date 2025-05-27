@@ -1,4 +1,4 @@
-name: Release
+name: Generate Rust Binaries and Create Release
 
 on:
   push:
@@ -26,6 +26,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             name: shortlinker-linux-aarch64
+          - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
+            name: shortlinker-linux-i686
           - target: x86_64-pc-windows-gnu
             os: ubuntu-latest
             name: shortlinker-windows-x86_64.exe
@@ -106,17 +109,20 @@ jobs:
           
           ### 📦 下载
           
-          选择适合您系统的二进制文件：
+          点击下方链接直接下载适合您系统的二进制文件：
           
-          - **Linux x86_64**: `shortlinker-linux-x86_64`
-          - **Linux ARM64**: `shortlinker-linux-aarch64`  
-          - **Windows x86_64**: `shortlinker-windows-x86_64.exe`
-          - **macOS Intel**: `shortlinker-macos-x86_64`
-          - **macOS Apple Silicon**: `shortlinker-macos-aarch64`
+          | 平台 | 架构 | 下载链接 |
+          |------|------|----------|
+          | 🐧 Linux | x86_64 | [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64) |
+          | 🐧 Linux | ARM64 | [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-aarch64) |
+          | 🐧 Linux | i686 | [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-i686) |
+          | 🪟 Windows | x86_64 | [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-windows-x86_64.exe) |
+          | 🍎 macOS | Intel | [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-x86_64) |
+          | 🍎 macOS | Apple Silicon | [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-aarch64) |
           
           ### ✅ 校验
           
-          下载 `checksums.txt` 文件来验证二进制文件的完整性。
+          📋 [下载 checksums.txt](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt) 来验证二进制文件的完整性。
           
           ### 📚 使用说明
           

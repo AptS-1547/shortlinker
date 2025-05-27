@@ -22,9 +22,10 @@ fn main() {
     let targets = vec![
         "x86_64-pc-windows-gnu",
         "x86_64-apple-darwin",
-        "x86_64-unknown-linux-gnu",
         "aarch64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
+        "i686-unknown-linux-gnu",
     ];
 
     // 获取当前目标架构，避免重复编译
