@@ -121,10 +121,6 @@ jobs:
         body: |
           ## 🚀 Release ${{ steps.tag.outputs.tag }}
           
-          ### 📋 What's Changed
-          
-          ${{ steps.changelog.outputs.changelog }}
-          
           ### 📦 下载
           
           点击下方链接直接下载适合您系统的二进制文件：
@@ -147,35 +143,14 @@ jobs:
           sha256sum -c checksums.txt
           ```
           
-          ### 🚀 快速开始
-          
-          ```bash
-          # 下载并运行 (以 Linux x86_64 为例)
-          wget https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64
-          chmod +x shortlinker-linux-x86_64
-          ./shortlinker-linux-x86_64
-          ```
-          
           ### 📚 文档
-          
-          - 📖 [完整文档](https://github.com/AptS-1547/shortlinker/blob/master/README.md)
-          - 🔧 [配置说明](https://github.com/AptS-1547/shortlinker/blob/master/docs/configuration.md)
-          - 💡 [使用示例](https://github.com/AptS-1547/shortlinker/blob/master/docs/examples.md)
-          
+
+          请前往 `esap.cc/docs` 获取详细的使用文档和指南。
+
           ### 🤝 贡献者
-          
-          感谢所有为这个版本做出贡献的开发者！
-          
-          ### 🐛 问题反馈
-          
-          如果您遇到任何问题，请通过以下方式反馈：
-          - 📝 [提交 Issue](https://github.com/AptS-1547/shortlinker/issues/new)
-          - 💬 [讨论区](https://github.com/AptS-1547/shortlinker/discussions)
-          
-          ### 📈 统计信息
-          
-          - **Full Changelog**: https://github.com/AptS-1547/shortlinker/compare/v0.0.1...${{ steps.tag.outputs.tag }}
-          - **Docker Image**: `ghcr.io/apts-1547/shortlinker:${{ steps.tag.outputs.tag }}`
+
+          感谢所有为本项目做出贡献的开发者和社区成员！
+
         files: |
           release/*
         draft: false
