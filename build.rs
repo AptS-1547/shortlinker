@@ -2,9 +2,9 @@ use std::process::Command;
 use std::env;
 
 fn main() {
-    // 在 CI 环境中跳过 build.rs 的交叉编译
-    if env::var("CI").is_ok() {
-        println!("cargo:warning=Running in CI, skipping build.rs cross compilation");
+    // 在 Docker 或 CI 环境中跳过 build.rs 的交叉编译
+    if env::var("CI").is_ok() || env::var("DOCKER_BUILD").is_ok() {
+        println!("cargo:warning=Running in CI/Docker, skipping build.rs cross compilation");
         return;
     }
 

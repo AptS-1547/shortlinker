@@ -1,0 +1,63 @@
+# 多阶段构建 - 构建阶段
+FROM rust:1.82-slim AS builder
+
+# 安装构建依赖
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    musl-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# 添加musl目标
+RUN rustup target add x86_64-unknown-linux-musl
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖文件
+COPY Cargo.toml Cargo.lock ./
+
+# 创建虚拟的src目录来利用Docker缓存
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release --target x86_64-unknown-linux-musl && \
+    rm -rf src
+
+# 复制源代码
+COPY src ./src
+COPY links.json /app/links.json
+
+# 静态链接编译
+ENV RUSTFLAGS="-C link-arg=-s"
+RUN touch src/main.rs && \
+    cargo build --release --target x86_64-unknown-linux-musl
+
+# 运行阶段 - 使用scratch
+FROM scratch
+
+LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
+LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
+LABEL version="1.0.0"
+LABEL homepage="https://github.com/AptS-1547/shortlinker"
+LABEL license="MIT"
+
+WORKDIR /app
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /app/shortlinker
+COPY --from=builder /app/links.json /data/links.json
+
+VOLUME ["/data"]
+
+# 暴露端口
+EXPOSE 8080
+
+# 设置环境变量
+ENV SERVER_HOST=0.0.0.0
+ENV SERVER_PORT=8080
+ENV LINKS_FILE=/data/links.json
+ENV RUST_LOG=info
+
+# 启动命令
+ENTRYPOINT ["/app/shortlinker"]
