@@ -5,19 +5,15 @@ use log::{info, error};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::fs;
-use serde::{Deserialize, Serialize};
-use std::thread;
 use std::process;
-use std::time::{Duration, SystemTime};
-use rand;
 
-// 条件编译：仅在Unix系统导入信号相关
-#[cfg(unix)]
-use signal_hook::{consts::SIGUSR1, iterator::Signals};
-#[cfg(unix)]
-use nix::sys::signal::{self, Signal};
-#[cfg(unix)]
-use nix::unistd::Pid;
+mod reload;
+mod signal;
+mod storage;
+mod utils;
+
+use storage::{load_links, save_links};
+use utils::generate_random_code;
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -27,128 +23,7 @@ struct Config {
     links_file: String,
 }
 
-// 短链接数据结构
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct ShortLink {
-    short_code: String,
-    target_url: String,
-}
-
 type LinkStorage = Arc<RwLock<HashMap<String, String>>>;
-
-// 从文件加载短链接
-fn load_links(file_path: &str) -> HashMap<String, String> {
-    match fs::read_to_string(file_path) {
-        Ok(content) => {
-            match serde_json::from_str::<Vec<ShortLink>>(&content) {
-                Ok(links) => {
-                    let mut map = HashMap::new();
-                    for link in links {
-                        map.insert(link.short_code, link.target_url);
-                    }
-                    info!("加载了 {} 个短链接", map.len());
-                    map
-                }
-                Err(e) => {
-                    error!("解析链接文件失败: {}", e);
-                    HashMap::new()
-                }
-            }
-        }
-        Err(_) => {
-            info!("链接文件不存在，创建空的存储");
-            HashMap::new()
-        }
-    }
-}
-
-// 保存短链接到文件
-fn save_links(links: &HashMap<String, String>, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let links_vec: Vec<ShortLink> = links.iter()
-        .map(|(short_code, target_url)| ShortLink {
-            short_code: short_code.clone(),
-            target_url: target_url.clone(),
-        })
-        .collect();
-    
-    let json = serde_json::to_string_pretty(&links_vec)?;
-    fs::write(file_path, json)?;
-    Ok(())
-}
-
-#[cfg(unix)]
-fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
-    // Read the PID from file and send SIGUSR1 to the server process
-    match fs::read_to_string("shortlinker.pid") {
-        Ok(pid_str) => {
-            let pid: i32 = pid_str.trim().parse()?;
-            signal::kill(Pid::from_raw(pid), Signal::SIGUSR1)?;
-            println!("已通知服务器重新加载配置");
-            Ok(())
-        }
-        Err(_) => {
-            println!("警告: 无法找到服务器进程，请手动重启服务器");
-            Ok(())
-        }
-    }
-}
-
-#[cfg(windows)]
-fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
-    // Windows平台使用触发文件方式
-    match fs::write("shortlinker.reload", "") {
-        Ok(_) => {
-            println!("已通知服务器重新加载配置");
-            Ok(())
-        }
-        Err(e) => {
-            println!("通知服务器失败: {}", e);
-            Err(Box::new(e))
-        }
-    }
-}
-
-// Unix平台的信号监听
-#[cfg(unix)]
-fn setup_reload_mechanism(links: Arc<RwLock<HashMap<String, String>>>, links_file: String) {
-    thread::spawn(move || {
-        let mut signals = Signals::new(&[SIGUSR1]).unwrap();
-        for _ in signals.forever() {
-            info!("收到 SIGUSR1 信号，重新加载链接配置");
-            let new_links = load_links(&links_file);
-            let mut links_map = links.write().unwrap();
-            *links_map = new_links;
-        }
-    });
-}
-
-// Windows平台的文件监听
-#[cfg(windows)]
-fn setup_reload_mechanism(links: Arc<RwLock<HashMap<String, String>>>, links_file: String) {
-    thread::spawn(move || {
-        let reload_file = "shortlinker.reload";
-        let mut last_check = SystemTime::now();
-        
-        loop {
-            thread::sleep(Duration::from_millis(3000));
-            
-            if let Ok(metadata) = fs::metadata(reload_file) {
-                if let Ok(modified) = metadata.modified() {
-                    if modified > last_check {
-                        info!("检测到重新加载请求，重新加载链接配置");
-                        let new_links = load_links(&links_file);
-                        let mut links_map = links.write().unwrap();
-                        *links_map = new_links;
-                        last_check = SystemTime::now();
-                        
-                        // 删除触发文件
-                        let _ = fs::remove_file(reload_file);
-                    }
-                }
-            }
-        }
-    });
-}
 
 // CLI Mode
 fn run_cli() {
@@ -215,7 +90,7 @@ fn run_cli() {
             }
             
             println!("已添加短链接: {} -> {}", short_code, target_url);
-            let _ = notify_server();
+            let _ = signal::notify_server();
         }
         
         "remove" => {
@@ -232,7 +107,7 @@ fn run_cli() {
                     process::exit(1);
                 }
                 println!("已删除短链接: {}", short_code);
-                let _ = notify_server();
+                let _ = signal::notify_server();
             } else {
                 println!("短链接不存在: {}", short_code);
                 process::exit(1);
@@ -260,29 +135,15 @@ fn run_cli() {
     }
 }
 
-// 生成随机短码
-fn generate_random_code(length: usize) -> String {
-    use rand::Rng;
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    
-    let mut rng = rand::rng();
-    
-    (0..length)
-        .map(|_| {
-            let idx = rng.random_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect()
-}
-
 #[get("/{path}*")]
-async fn shortlinker(tail: web::Path<String>, links: web::Data<LinkStorage>) -> impl Responder {
-    let captured_path = tail.to_string();
+async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> impl Responder {
+    let captured_path = path.to_string();
 
     if captured_path == "" {
-        info!("跳转到主页");
+        let default_url = env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string());
+        info!("重定向到默认主页: {}", default_url);
         return HttpResponse::TemporaryRedirect()
-            .append_header(("Location", "https://www.esaps.net/"))
+            .append_header(("Location", default_url))
             .finish();
     } else {
         // Find the target URL in the links map
@@ -336,7 +197,7 @@ async fn main() -> std::io::Result<()> {
     let links = Arc::new(RwLock::new(load_links(&config.links_file)));
     
     // 设置重新加载机制（根据平台不同）
-    setup_reload_mechanism(links.clone(), config.links_file.clone());
+    reload::setup_reload_mechanism(links.clone(), config.links_file.clone());
     
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
