@@ -1,23 +1,14 @@
 [package]
 name = "shortlinker"
-version = "0.0.0"
-edition = "2024"
-description = "一个极简主义的短链接服务，支持 HTTP 302 跳转，使用 Rust 编写，部署便捷、响应快速，适用于自建短链系统。"
-readme = "README.md"
-repository = "https://github.com/AptS-1547/shortlinker"
-license = "MIT"
-
-authors = ["AptS:1547 <apts-1547@esaps.net>"]
-
-keywords = ["short links"]
-
-publish = false
+version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-actix-web = "4.11.0"
-dotenv = "0.15.0"
-env_logger = "0.11.8"
-log = "0.4.27"
-serde = { version = "1.0.219", features = ["derive"] }
-
-[build-dependencies]
+actix-web = "4.0"
+dotenv = "0.15"
+log = "0.4"
+env_logger = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+signal-hook = "0.3"
+nix = "0.26"
