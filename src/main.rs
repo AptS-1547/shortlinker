@@ -6,10 +6,16 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::fs;
 use serde::{Deserialize, Serialize};
-use signal_hook::{consts::SIGUSR1, iterator::Signals};
 use std::thread;
 use std::process;
+use std::time::{Duration, SystemTime};
+
+// 条件编译：仅在Unix系统导入信号相关
+#[cfg(unix)]
+use signal_hook::{consts::SIGUSR1, iterator::Signals};
+#[cfg(unix)]
 use nix::sys::signal::{self, Signal};
+#[cfg(unix)]
 use nix::unistd::Pid;
 
 // 配置结构体
@@ -69,6 +75,7 @@ fn save_links(links: &HashMap<String, String>, file_path: &str) -> Result<(), Bo
     Ok(())
 }
 
+#[cfg(unix)]
 fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
     // Read the PID from file and send SIGUSR1 to the server process
     match fs::read_to_string("shortlinker.pid") {
@@ -83,6 +90,63 @@ fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
             Ok(())
         }
     }
+}
+
+#[cfg(windows)]
+fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
+    // Windows平台使用触发文件方式
+    match fs::write("shortlinker.reload", "") {
+        Ok(_) => {
+            println!("已通知服务器重新加载配置");
+            Ok(())
+        }
+        Err(e) => {
+            println!("通知服务器失败: {}", e);
+            Err(Box::new(e))
+        }
+    }
+}
+
+// Unix平台的信号监听
+#[cfg(unix)]
+fn setup_reload_mechanism(links: Arc<RwLock<HashMap<String, String>>>, links_file: String) {
+    thread::spawn(move || {
+        let mut signals = Signals::new(&[SIGUSR1]).unwrap();
+        for _ in signals.forever() {
+            info!("收到 SIGUSR1 信号，重新加载链接配置");
+            let new_links = load_links(&links_file);
+            let mut links_map = links.write().unwrap();
+            *links_map = new_links;
+        }
+    });
+}
+
+// Windows平台的文件监听
+#[cfg(windows)]
+fn setup_reload_mechanism(links: Arc<RwLock<HashMap<String, String>>>, links_file: String) {
+    thread::spawn(move || {
+        let reload_file = "shortlinker.reload";
+        let mut last_check = SystemTime::now();
+        
+        loop {
+            thread::sleep(Duration::from_millis(3000));
+            
+            if let Ok(metadata) = fs::metadata(reload_file) {
+                if let Ok(modified) = metadata.modified() {
+                    if modified > last_check {
+                        info!("检测到重新加载请求，重新加载链接配置");
+                        let new_links = load_links(&links_file);
+                        let mut links_map = links.write().unwrap();
+                        *links_map = new_links;
+                        last_check = SystemTime::now();
+                        
+                        // 删除触发文件
+                        let _ = fs::remove_file(reload_file);
+                    }
+                }
+            }
+        }
+    });
 }
 
 // CLI Mode
@@ -206,50 +270,31 @@ async fn main() -> std::io::Result<()> {
         links_file: env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string()),
     };
     
-    // Save Server PID to file
-    let pid = process::id();
-    if let Err(e) = fs::write("shortlinker.pid", pid.to_string()) {
-        error!("无法写入PID文件: {}", e);
+    // Save Server PID to file (仅Unix系统需要)
+    #[cfg(unix)]
+    {
+        let pid = process::id();
+        if let Err(e) = fs::write("shortlinker.pid", pid.to_string()) {
+            error!("无法写入PID文件: {}", e);
+        }
     }
     
     // Load links from file
     let links = Arc::new(RwLock::new(load_links(&config.links_file)));
     
-    // Receive SIGUSR1 to reload links
-    let links_clone = links.clone();
-    let links_file = config.links_file.clone();
-    thread::spawn(move || {
-        let mut signals = Signals::new(&[SIGUSR1]).unwrap();
-        for _ in signals.forever() {
-            info!("Received SIGUSR1，Reloading links from file");
-            let new_links = load_links(&links_file);
-            let mut links_map = links_clone.write().unwrap();
-            *links_map = new_links;
-        }
-    });
+    // 设置重新加载机制（根据平台不同）
+    setup_reload_mechanism(links.clone(), config.links_file.clone());
     
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
     
     // Start the HTTP server
-    let exit_code = HttpServer::new(move || {
+    HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(links.clone()))
             .service(shortlinker)
     })
     .bind(bind_address)?
     .run()
-    .await;
-
-    if let Err(e) = exit_code {
-        error!("服务器启动失败: {}", e);
-        process::exit(1);
-    }
-
-    info!("服务器已停止");
-    // Clean up PID file
-    if let Err(e) = fs::remove_file("shortlinker.pid") {
-        error!("无法删除PID文件: {}", e);
-    }
-    return Ok(());
+    .await
 }
