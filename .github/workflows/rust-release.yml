@@ -99,6 +99,20 @@ jobs:
       id: tag
       run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+    - name: Get changelog
+      id: changelog
+      run: |
+        # 获取上一个标签到当前标签之间的提交
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "changelog=Initial release" >> $GITHUB_OUTPUT
+        fi
+
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -106,6 +120,10 @@ jobs:
         name: Release ${{ steps.tag.outputs.tag }}
         body: |
           ## 🚀 Release ${{ steps.tag.outputs.tag }}
+          
+          ### 📋 What's Changed
+          
+          ${{ steps.changelog.outputs.changelog }}
           
           ### 📦 下载
           
@@ -120,16 +138,48 @@ jobs:
           | 🍎 macOS | Intel | [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-x86_64) |
           | 🍎 macOS | Apple Silicon | [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-aarch64) |
           
-          ### ✅ 校验
+          ### ✅ 校验文件完整性
           
           📋 [下载 checksums.txt](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt) 来验证二进制文件的完整性。
           
-          ### 📚 使用说明
+          ```bash
+          # 验证示例 (Linux)
+          sha256sum -c checksums.txt
+          ```
           
-          详细使用说明请参考 [README.md](https://github.com/AptS-1547/shortlinker/blob/main/README.md)
+          ### 🚀 快速开始
+          
+          ```bash
+          # 下载并运行 (以 Linux x86_64 为例)
+          wget https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64
+          chmod +x shortlinker-linux-x86_64
+          ./shortlinker-linux-x86_64
+          ```
+          
+          ### 📚 文档
+          
+          - 📖 [完整文档](https://github.com/AptS-1547/shortlinker/blob/master/README.md)
+          - 🔧 [配置说明](https://github.com/AptS-1547/shortlinker/blob/master/docs/configuration.md)
+          - 💡 [使用示例](https://github.com/AptS-1547/shortlinker/blob/master/docs/examples.md)
+          
+          ### 🤝 贡献者
+          
+          感谢所有为这个版本做出贡献的开发者！
+          
+          ### 🐛 问题反馈
+          
+          如果您遇到任何问题，请通过以下方式反馈：
+          - 📝 [提交 Issue](https://github.com/AptS-1547/shortlinker/issues/new)
+          - 💬 [讨论区](https://github.com/AptS-1547/shortlinker/discussions)
+          
+          ### 📈 统计信息
+          
+          - **Full Changelog**: https://github.com/AptS-1547/shortlinker/compare/v0.0.1...${{ steps.tag.outputs.tag }}
+          - **Docker Image**: `ghcr.io/apts-1547/shortlinker:${{ steps.tag.outputs.tag }}`
         files: |
           release/*
         draft: false
         prerelease: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
