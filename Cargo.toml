@@ -15,3 +15,9 @@ rand = "0.9.1"
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }
 nix = { version = "0.26", features = ["signal", "process"] }
+
+[workspace]
+members = [
+  "shortlinker-worker",
+  ".",
+]

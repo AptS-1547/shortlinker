@@ -179,7 +179,7 @@ fn run_cli() {
                 (args[2].clone(), args[3].clone())
             } else if args.len() == 4 && args[3] == "--force" {
                 // 随机短码 + force
-                let random_code = generate_random_code(random_code_length);
+                let random_code: String = generate_random_code(random_code_length);
                 force_overwrite = true;
                 (random_code, args[2].clone())
             } else {
@@ -290,12 +290,14 @@ async fn shortlinker(tail: web::Path<String>, links: web::Data<LinkStorage>) -> 
         if let Some(target_url) = links_map.get(&captured_path) {
             info!("重定向 {} -> {}", captured_path, target_url);
             return HttpResponse::TemporaryRedirect()
+                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .append_header(("Location", target_url.as_str()))
                 .finish();
         } else {
-            return HttpResponse::Ok()
+            return HttpResponse::NotFound()
+                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .content_type("text/plain")
-                .body(format!("短链接不存在: {}", captured_path));
+                .body("Not Found");
         }
     }
 }
