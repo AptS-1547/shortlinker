@@ -16,9 +16,3 @@ human-panic = "2.0.2"
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }
 nix = { version = "0.26", features = ["signal", "process"] }
-
-[workspace]
-members = [
-  "shortlinker-worker",
-  ".",
-]

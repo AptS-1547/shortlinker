@@ -18,12 +18,11 @@ WORKDIR /app
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-COPY links.json /app/links.json
+COPY links.json ./
 
 # 静态链接编译
 ENV RUSTFLAGS="-C link-arg=-s"
-RUN touch src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
 # 运行阶段 - 使用scratch
 FROM scratch
