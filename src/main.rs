@@ -20,7 +20,6 @@ use storages::STORAGE;
 struct Config {
     server_host: String,
     server_port: u16,
-    links_file: String,
 }
 
 type LinkStorage = Arc<RwLock<HashMap<String, storages::ShortLink>>>;
@@ -39,6 +38,17 @@ async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> 
         // Find the target URL in the links map
         let links_map = links.read().unwrap();
         if let Some(link) = links_map.get(&captured_path) {
+            // Check if the link has expired
+            if let Some(expires_at) = link.expires_at {
+                if expires_at < chrono::Utc::now() {
+                    info!("链接已过期: {}", captured_path);
+                    return HttpResponse::NotFound()
+                        .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                        .content_type("text/plain")
+                        .body("Not Found");
+                }
+            }
+
             info!("重定向 {} -> {}", captured_path, link.target);
             return HttpResponse::TemporaryRedirect()
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
@@ -71,7 +81,6 @@ async fn main() -> std::io::Result<()> {
     let config = Config {
         server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
         server_port: env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string()).parse().unwrap(),
-        links_file: env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string()),
     };
     
     // Save Server PID to file (仅Unix系统需要)
