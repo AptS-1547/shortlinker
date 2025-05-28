@@ -15,11 +15,12 @@ WORKDIR /app
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-COPY links.json ./
+COPY links.json /app/links.json
 
 # 静态链接编译
 ENV RUSTFLAGS="-C link-arg=-s"
-RUN cargo build --release
+RUN touch src/main.rs && \
+    cargo build --release
 
 # 运行阶段 - 使用scratch
 FROM scratch
@@ -31,7 +32,7 @@ LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
 # 从构建阶段复制二进制文件
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /shortlinker
+COPY --from=builder /app/target/release/shortlinker /shortlinker
 COPY --from=builder /app/links.json /data/links.json
 
 VOLUME ["/data"]
@@ -42,7 +43,6 @@ EXPOSE 8080
 # 设置环境变量
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
-ENV STORAGE_BACKEND=file
 ENV LINKS_FILE=/data/links.json
 ENV RUST_LOG=info
 
