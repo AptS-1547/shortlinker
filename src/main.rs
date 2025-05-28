@@ -1,7 +1,7 @@
-use actix_web::{get, App, HttpResponse, HttpServer, Responder, web};
+use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use dotenv::dotenv;
 use std::env;
-use log::{info, error};
+use log::{debug, info, error};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::fs;
@@ -26,9 +26,11 @@ struct Config {
 
 type LinkStorage = Arc<RwLock<HashMap<String, storages::ShortLink>>>;
 
-#[get("/{path}*")]
+#[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
 async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> impl Responder {
     let captured_path = path.to_string();
+
+    debug!("捕获的路径: {}", captured_path);
 
     if captured_path == "" {
         let default_url = env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string());
@@ -45,8 +47,9 @@ async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> 
                 if expires_at < chrono::Utc::now() {
                     info!("链接已过期: {}", captured_path);
                     return HttpResponse::NotFound()
+                        .append_header(("Content-Type", "text/html; charset=utf-8"))
+                        .append_header(("Connection", "close"))
                         .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                        .content_type("text/plain")
                         .body("Not Found");
                 }
             }
@@ -58,8 +61,9 @@ async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> 
                 .finish();
         } else {
             return HttpResponse::NotFound()
+                .append_header(("Content-Type", "text/html; charset=utf-8"))
+                .append_header(("Connection", "close"))
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                .content_type("text/plain")
                 .body("Not Found");
         }
     }
