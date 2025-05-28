@@ -9,11 +9,11 @@ use std::process;
 
 mod reload;
 mod signal;
-mod storage;
+mod storages;
 mod utils;
+mod cli;
 
-use storage::{load_links, save_links};
-use utils::generate_random_code;
+use storages::STORAGE;
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -23,117 +23,7 @@ struct Config {
     links_file: String,
 }
 
-type LinkStorage = Arc<RwLock<HashMap<String, String>>>;
-
-// CLI Mode
-fn run_cli() {
-    let args: Vec<String> = env::args().collect();
-    let links_file = env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string());
-    let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
-        .unwrap_or_else(|_| "6".to_string())
-        .parse()
-        .unwrap_or(6);
-    let mut links = load_links(&links_file);
-    
-    match args[1].as_str() {
-        "add" => {
-            if args.len() != 3 && args.len() != 4 && args.len() != 5 {
-                println!("用法: {} add <短码> <目标URL> [--force]", args[0]);
-                println!("或使用随机短码: {} add <目标URL>", args[0]);
-                println!("  --force: 强制覆盖已存在的短码");
-                process::exit(1);
-            }
-
-            let mut force_overwrite = false;
-            let (short_code, target_url) = if args.len() == 3 {
-                // 使用随机短码
-                let random_code = generate_random_code(random_code_length);
-                (random_code, args[2].clone())
-            } else if args.len() == 4 && args[3] != "--force" {
-                // 使用指定短码
-                (args[2].clone(), args[3].clone())
-            } else if args.len() == 4 && args[3] == "--force" {
-                // 随机短码 + force
-                let random_code: String = generate_random_code(random_code_length);
-                force_overwrite = true;
-                (random_code, args[2].clone())
-            } else {
-                // 指定短码 + force
-                if args[4] == "--force" {
-                    force_overwrite = true;
-                }
-                (args[2].clone(), args[3].clone())
-            };
-            
-            // 验证 URL 格式
-            if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
-                println!("错误: URL 必须以 http:// 或 https:// 开头");
-                process::exit(1);
-            }
-            
-            // 检查短码是否已存在
-            if links.contains_key(&short_code) {
-                if force_overwrite {
-                    println!("强制覆盖短码 '{}': {} -> {}", short_code, links[&short_code], target_url);
-                } else {
-                    println!("错误: 短码 '{}' 已存在，当前指向: {}", short_code, links[&short_code]);
-                    println!("如需覆盖，请使用 --force 参数");
-                    process::exit(1);
-                }
-            }
-            
-            links.insert(short_code.clone(), target_url.clone());
-            
-            if let Err(e) = save_links(&links, &links_file) {
-                println!("保存失败: {}", e);
-                process::exit(1);
-            }
-            
-            println!("已添加短链接: {} -> {}", short_code, target_url);
-            let _ = signal::notify_server();
-        }
-        
-        "remove" => {
-            if args.len() != 3 {
-                println!("用法: {} remove <短码>", args[0]);
-                process::exit(1);
-            }
-            
-            let short_code = &args[2];
-            
-            if links.remove(short_code).is_some() {
-                if let Err(e) = save_links(&links, &links_file) {
-                    error!("保存失败: {}", e);
-                    process::exit(1);
-                }
-                println!("已删除短链接: {}", short_code);
-                let _ = signal::notify_server();
-            } else {
-                println!("短链接不存在: {}", short_code);
-                process::exit(1);
-            }
-        }
-
-        "list" => {
-            if links.is_empty() {
-                println!("没有短链接");
-            } else {
-                println!("短链接列表:");
-                for (short_code, target_url) in &links {
-                    println!("  {} -> {}", short_code, target_url);
-                }
-            }
-        }
-
-        _ => {
-            println!("CLI 用法:");
-            println!("  {} add <短码> <目标URL>", args[0]);
-            println!("  {} remove <短码>", args[0]);
-            println!("  {} list", args[0]);
-            process::exit(1);
-        }
-    }
-}
+type LinkStorage = Arc<RwLock<HashMap<String, storages::ShortLink>>>;
 
 #[get("/{path}*")]
 async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> impl Responder {
@@ -148,11 +38,11 @@ async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> 
     } else {
         // Find the target URL in the links map
         let links_map = links.read().unwrap();
-        if let Some(target_url) = links_map.get(&captured_path) {
-            info!("重定向 {} -> {}", captured_path, target_url);
+        if let Some(link) = links_map.get(&captured_path) {
+            info!("重定向 {} -> {}", captured_path, link.target);
             return HttpResponse::TemporaryRedirect()
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                .append_header(("Location", target_url.as_str()))
+                .append_header(("Location", link.target.as_str()))
                 .finish();
         } else {
             return HttpResponse::NotFound()
@@ -169,7 +59,7 @@ async fn main() -> std::io::Result<()> {
 
     // CLI Mode
     if args.len() > 1 {
-        run_cli();
+        cli::run_cli().await;
         return Ok(());
     }
 
@@ -226,12 +116,13 @@ async fn main() -> std::io::Result<()> {
             info!("服务器 PID: {}", pid);
         }
     }
-    
+
     // Load links from file
-    let links = Arc::new(RwLock::new(load_links(&config.links_file)));
+    let links_data = STORAGE.load_all().await;
+    let cache = Arc::new(RwLock::new(links_data));
     
     // 设置重新加载机制（根据平台不同）
-    reload::setup_reload_mechanism(links.clone(), config.links_file.clone());
+    reload::setup_reload_mechanism(cache.clone());
     
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
@@ -239,10 +130,11 @@ async fn main() -> std::io::Result<()> {
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(links.clone()))
+            .app_data(web::Data::new(cache.clone()))
             .service(shortlinker)
     })
     .bind(bind_address)?
     .run()
     .await
 }
+// DONE
