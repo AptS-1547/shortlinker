@@ -2,8 +2,16 @@ name: Rust CI
 
 on:
   push:
+    paths:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
     branches: [ "master" ]
   pull_request:
+    paths:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
     branches: [ "master" ]
 
 env:
