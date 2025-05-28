@@ -9,9 +9,6 @@ RUN apt-get update && apt-get install -y \
     musl-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# 添加musl目标
-RUN rustup target add x86_64-unknown-linux-musl
-
 # 设置工作目录
 WORKDIR /app
 
@@ -22,7 +19,7 @@ COPY links.json ./
 
 # 静态链接编译
 ENV RUSTFLAGS="-C link-arg=-s"
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release
 
 # 运行阶段 - 使用scratch
 FROM scratch

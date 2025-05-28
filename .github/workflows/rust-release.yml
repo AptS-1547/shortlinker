@@ -119,37 +119,153 @@ jobs:
         tag_name: ${{ steps.tag.outputs.tag }}
         name: Release ${{ steps.tag.outputs.tag }}
         body: |
-          ## 🚀 Release ${{ steps.tag.outputs.tag }}
+          <div align="center">
           
-          ### 📦 下载
+          # 🚀 ShortLinker ${{ steps.tag.outputs.tag }}
           
-          点击下方链接直接下载适合您系统的二进制文件：
+          [![Downloads](https://img.shields.io/github/downloads/AptS-1547/shortlinker/${{ steps.tag.outputs.tag }}/total?style=for-the-badge&color=blue)](https://github.com/AptS-1547/shortlinker/releases/tag/${{ steps.tag.outputs.tag }})
+          [![License](https://img.shields.io/github/license/AptS-1547/shortlinker?style=for-the-badge)](LICENSE)
+          [![Build Status](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/release.yml?style=for-the-badge)](https://github.com/AptS-1547/shortlinker/actions)
           
-          | 平台 | 架构 | 下载链接 |
-          |------|------|----------|
-          | 🐧 Linux | x86_64 | [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64) |
-          | 🐧 Linux | ARM64 | [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-aarch64) |
-          | 🐧 Linux | i686 | [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-i686) |
-          | 🪟 Windows | x86_64 | [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-windows-x86_64.exe) |
-          | 🍎 macOS | Intel | [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-x86_64) |
-          | 🍎 macOS | Apple Silicon | [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-aarch64) |
+          **高性能的链接缩短服务，使用 Rust 构建** ⚡
           
-          ### ✅ 校验文件完整性
+          </div>
           
-          📋 [下载 checksums.txt](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt) 来验证二进制文件的完整性。
+          ---
           
+          ## ✨ 新特性 & 改进
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ---
+          
+          ## 📦 快速下载
+          
+          > 💡 **提示**：选择与您系统匹配的版本，下载后可直接运行！
+          
+          <table>
+          <tr>
+          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg" width="32" height="32"><br><b>Linux</b></td>
+          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/windows8/windows8-original.svg" width="32" height="32"><br><b>Windows</b></td>
+          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/apple/apple-original.svg" width="32" height="32"><br><b>macOS</b></td>
+          </tr>
+          <tr>
+          <td>
+          
+          **x86_64** (Intel/AMD 64位)  
+          📥 [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64)
+          
+          **ARM64** (树莓派4/服务器)  
+          📥 [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-aarch64)
+          
+          **i686** (32位老设备)  
+          📥 [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-i686)
+          
+          </td>
+          <td>
+          
+          **x86_64** (64位 Windows)  
+          📥 [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-windows-x86_64.exe)
+          
+          <br><br><br><br>
+          
+          </td>
+          <td>
+          
+          **Intel** (Intel Mac)  
+          📥 [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-x86_64)
+          
+          **Apple Silicon** (M1/M2/M3)  
+          📥 [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-aarch64)
+          
+          <br><br>
+          
+          </td>
+          </tr>
+          </table>
+          
+          ---
+          
+          ## 🚀 快速开始
+          
+          ### Linux / macOS
           ```bash
-          # 验证示例 (Linux)
-          sha256sum -c checksums.txt
+          # 下载并赋予执行权限
+          chmod +x shortlinker-*
+          
+          # 直接运行
+          ./shortlinker-*
           ```
           
-          ### 📚 文档
-
-          请前往 `esap.cc/docs` 获取详细的使用文档和指南。
-
-          ### 🤝 贡献者
-
-          感谢所有为本项目做出贡献的开发者和社区成员！
+          ### Windows
+          ```powershell
+          # 直接双击运行或在命令行中执行
+          .\shortlinker-windows-x86_64.exe
+          ```
+          
+          ---
+          
+          ## 🔐 安全验证
+          
+          为确保下载文件的完整性和安全性，请验证 SHA256 校验和：
+          
+          ```bash
+          # 下载校验文件
+          curl -LO https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt
+          
+          # 验证文件完整性
+          sha256sum -c checksums.txt
+          
+          # 或单独验证某个文件
+          sha256sum shortlinker-linux-x86_64
+          ```
+          
+          📋 **校验文件下载**：[checksums.txt](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt)
+          
+          ---
+          
+          ## 📖 文档 & 帮助
+          
+          | 资源 | 链接 | 描述 |
+          |------|------|------|
+          | 📚 **完整文档** | [esap.cc/docs](https://esap.cc/docs) | 详细使用指南和API文档 |
+          | 🐛 **问题反馈** | [Issues](https://github.com/AptS-1547/shortlinker/issues) | 报告bug或提出功能请求 |
+          | 💬 **讨论区** | [Discussions](https://github.com/AptS-1547/shortlinker/discussions) | 社区交流和问答 |
+          | 🔧 **贡献指南** | [CONTRIBUTING.md](CONTRIBUTING.md) | 参与项目开发 |
+          
+          ---
+          
+          ## 🎯 主要特性
+          
+          - ⚡ **高性能**：基于 Rust，内存安全且极速响应
+          - 🛡️ **安全可靠**：内置防护机制，数据加密存储
+          - 🌐 **跨平台**：支持 Linux、Windows、macOS 多平台
+          - 📊 **实时统计**：点击统计、访问分析等功能
+          - 🔧 **易于部署**：单文件部署，配置简单
+          - 📱 **现代化UI**：响应式设计，移动端友好
+          
+          ---
+          
+          ## 💝 支持项目
+          
+          如果这个项目对您有帮助，请考虑：
+          
+          - ⭐ **给项目点星**
+          - 🐛 **报告问题**
+          - 🔧 **提交PR**
+          - 📢 **分享给朋友**
+          
+          ---
+          
+          <div align="center">
+          
+          **感谢所有贡献者和用户的支持！** ❤️
+          
+          ![Contributors](https://img.shields.io/github/contributors/AptS-1547/shortlinker?style=for-the-badge)
+          ![Stars](https://img.shields.io/github/stars/AptS-1547/shortlinker?style=for-the-badge)
+          ![Forks](https://img.shields.io/github/forks/AptS-1547/shortlinker?style=for-the-badge)
+          
+          </div>
 
         files: |
           release/*
