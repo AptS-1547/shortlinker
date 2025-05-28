@@ -4,7 +4,10 @@ use std::env;
 use log::{info, error};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+#[cfg(unix)]
 use std::fs;
+#[cfg(unix)]
 use std::process;
 
 mod reload;
@@ -116,13 +119,33 @@ async fn main() -> std::io::Result<()> {
                 }
             }
         }
-        
+
         // 写入当前进程的 PID
         let pid = process::id();
         if let Err(e) = fs::write(pid_file, pid.to_string()) {
             error!("无法写入PID文件: {}", e);
         } else {
             info!("服务器 PID: {}", pid);
+        }
+    }
+
+    // Windows 系统写入 .shortlinker.lock 防止重复启动
+    #[cfg(windows)]
+    {
+        use std::fs::File;
+        use std::io::{self, Write};
+        
+        let lock_file = ".shortlinker.lock";
+        match File::create(lock_file) {
+            Ok(mut file) => {
+                if let Err(e) = writeln!(file, "Server is running") {
+                    error!("无法写入锁文件: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("无法创建锁文件: {}", e);
+                return Err(io::Error::new(io::ErrorKind::Other, "Failed to create lock file"));
+            }
         }
     }
 
@@ -144,6 +167,29 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(bind_address)?
     .run()
-    .await
+    .await?;
+
+    
+    // Clean up PID file on exit
+    #[cfg(unix)]
+    {
+        let pid_file = "shortlinker.pid";
+        if let Err(e) = fs::remove_file(pid_file) {
+            error!("无法删除PID文件: {}", e);
+        } else {
+            info!("已清理PID文件: {}", pid_file);
+        }
+    }
+    #[cfg(windows)]
+    {
+        let lock_file = ".shortlinker.lock";
+        if let Err(e) = fs::remove_file(lock_file) {
+            error!("无法删除锁文件: {}", e);
+        } else {
+            info!("已清理锁文件: {}", lock_file);
+        }
+    }
+
+    Ok(())
 }
 // DONE
