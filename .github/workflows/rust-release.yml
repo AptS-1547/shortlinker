@@ -137,11 +137,19 @@ jobs:
           <div align="center">
           
           # 🚀 ShortLinker ${{ steps.tag.outputs.tag }}
-          
-          [![Downloads](https://img.shields.io/github/downloads/AptS-1547/shortlinker/${{ steps.tag.outputs.tag }}/total?style=for-the-badge&color=blue)](https://github.com/AptS-1547/shortlinker/releases/tag/${{ steps.tag.outputs.tag }})
-          [![License](https://img.shields.io/github/license/AptS-1547/shortlinker?style=for-the-badge)](LICENSE)
-          [![Build Status](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/release.yml?style=for-the-badge)](https://github.com/AptS-1547/shortlinker/actions)
-          
+
+          <p>
+            <a href="https://github.com/AptS-1547/shortlinker/releases/tag/${{ steps.tag.outputs.tag }}">
+              <img src="https://img.shields.io/github/downloads/AptS-1547/shortlinker/${{ steps.tag.outputs.tag }}/total?style=for-the-badge&amp;color=blue" alt="Downloads">
+            </a>
+            <a href="LICENSE">
+              <img src="https://img.shields.io/github/license/AptS-1547/shortlinker?style=for-the-badge" alt="License">
+            </a>
+            <a href="https://github.com/AptS-1547/shortlinker/actions">
+              <img src="https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/rust-release.yml?style=for-the-badge" alt="Build Status">
+            </a>
+          </p>
+
           **高性能的链接缩短服务，使用 Rust 构建** ⚡
           
           </div>
@@ -275,11 +283,11 @@ jobs:
           <div align="center">
           
           **感谢所有贡献者和用户的支持！** ❤️
-          
-          ![Contributors](https://img.shields.io/github/contributors/AptS-1547/shortlinker?style=for-the-badge)
-          ![Stars](https://img.shields.io/github/stars/AptS-1547/shortlinker?style=for-the-badge)
-          ![Forks](https://img.shields.io/github/forks/AptS-1547/shortlinker?style=for-the-badge)
-          
+          <p>
+            <img src="https://img.shields.io/github/contributors/AptS-1547/shortlinker?style=for-the-badge" alt="Contributors">
+            <img src="https://img.shields.io/github/stars/AptS-1547/shortlinker?style=for-the-badge" alt="Stars">
+            <img src="https://img.shields.io/github/forks/AptS-1547/shortlinker?style=for-the-badge" alt="Forks">
+          </p>
           </div>
 
         files: |
