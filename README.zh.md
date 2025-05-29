@@ -1,6 +1,19 @@
 # shortlinker
 
-一个极简主义的短链接服务，支持 HTTP 302 跳转，使用 Rust 编写，部署便捷、响应快速。
+<div align="center">
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/AptS-1547/shortlinker)](https://github.com/AptS-1547/shortlinker/releases)
+[![Docker Image Version (latest by date)](https://img.shields.io/docker/v/e1saps/shortlinker?label=docker)](https://hub.docker.com/r/e1saps/shortlinker)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/rust-release.yml)](https://github.com/AptS-1547/shortlinker/actions)
+[![CodeFactor](https://www.codefactor.io/repository/github/apts-1547/shortlinker/badge)](https://www.codefactor.io/repository/github/apts-1547/shortlinker)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker Pulls](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
+
+**一个极简主义的短链接服务，支持 HTTP 302 跳转，使用 Rust 编写，部署便捷、响应快速。**
+
+[English](README.md) • [中文](README.zh.md)
+
+</div>
 
 ## ✨ 功能特性
 
