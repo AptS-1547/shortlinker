@@ -100,8 +100,14 @@ async fn main() -> std::io::Result<()> {
             match fs::read_to_string(pid_file) {
                 Ok(old_pid_str) => {
                     if let Ok(old_pid) = old_pid_str.trim().parse::<u32>() {
-                        // 检查该 PID 的进程是否仍在运行
-                        if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
+                        // 在 Docker 容器中，如果是 PID 1 且文件存在，可能是重启后的残留
+                        let current_pid = process::id();
+                        
+                        // 如果当前进程是 PID 1 且旧 PID 也是 1，说明是容器重启
+                        if current_pid == 1 && old_pid == 1 {
+                            info!("检测到容器重启，清理旧的 PID 文件");
+                            let _ = fs::remove_file(pid_file);
+                        } else if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
                             error!("服务器已在运行 (PID: {})，请先停止现有进程", old_pid);
                             error!("可以使用以下命令停止:");
                             error!("  kill {}", old_pid);
