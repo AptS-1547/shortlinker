@@ -114,9 +114,9 @@ git remote add upstream https://github.com/AptS-1547/shortlinker.git
 ### 2. 创建功能分支
 
 ```bash
-# 从 main 分支创建新分支
-git checkout main
-git pull upstream main
+# 从 master 分支创建新分支
+git checkout master
+git pull upstream master
 git checkout -b feature/your-feature-name
 ```
 

@@ -69,7 +69,7 @@ body:
         - v0.0.3
         - v0.0.2
         - v0.0.1
-        - main 分支 (开发版)
+        - master 分支 (开发版)
         - 其他 (请在下方说明)
     validations:
       required: true
