@@ -1,8 +1,8 @@
+use crate::signal;
+use crate::storages::{ShortLink, STORAGE};
+use crate::utils::generate_random_code;
 use std::env;
 use std::process;
-use crate::utils::generate_random_code;
-use crate::storages::{STORAGE, ShortLink};
-use crate::signal;
 
 // ANSI 颜色码
 const RESET: &str = "\x1b[0m";
@@ -53,7 +53,7 @@ pub async fn run_cli() {
         .parse()
         .unwrap_or(6);
     let links = STORAGE.load_all().await;
-    
+
     match args[1].as_str() {
         "help" | "--help" | "-h" => {
             show_help(&args[0]);
@@ -74,8 +74,14 @@ pub async fn run_cli() {
         "add" => {
             if args.len() < 3 {
                 print_usage!("用法:");
-                print_usage!("  {} add <短码> <目标URL> [--force] [--expire <时间>]", args[0]);
-                print_usage!("  {} add <目标URL> [--force] [--expire <时间>]  # 使用随机短码", args[0]);
+                print_usage!(
+                    "  {} add <短码> <目标URL> [--force] [--expire <时间>]",
+                    args[0]
+                );
+                print_usage!(
+                    "  {} add <目标URL> [--force] [--expire <时间>]  # 使用随机短码",
+                    args[0]
+                );
                 println!("{}选项:{}", BOLD, RESET);
                 println!("  {}--force{}   强制覆盖已存在的短码", YELLOW, RESET);
                 println!("  {}--expire{}  设置过期时间", YELLOW, RESET);
@@ -85,7 +91,7 @@ pub async fn run_cli() {
             let mut force_overwrite = false;
             let mut expire_time: Option<String> = None;
             let mut positional_args = Vec::new();
-            
+
             // 使用for循环解析参数
             let mut i = 2;
             while i < args.len() {
@@ -109,7 +115,7 @@ pub async fn run_cli() {
                     }
                 }
             }
-            
+
             let (short_code, target_url) = if positional_args.len() == 1 {
                 // 使用随机短码
                 let random_code = generate_random_code(random_code_length);
@@ -121,31 +127,49 @@ pub async fn run_cli() {
             } else {
                 print_error!("参数数量不正确");
                 print_usage!("用法:");
-                print_usage!("  {} add <短码> <目标URL> [--force] [--expire <时间>]", args[0]);
+                print_usage!(
+                    "  {} add <短码> <目标URL> [--force] [--expire <时间>]",
+                    args[0]
+                );
                 print_usage!("  {} add <目标URL> [--force] [--expire <时间>]", args[0]);
                 process::exit(1);
             };
-            
+
             // 验证 URL 格式
             if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
                 print_error!("URL 必须以 http:// 或 https:// 开头");
                 process::exit(1);
             }
-            
+
             // 检查短码是否已存在
             if links.contains_key(&short_code) {
                 if force_overwrite {
-                    print_warning!("强制覆盖短码 '{}{}{}': {}{}{} -> {}{}{}", 
-                        CYAN, short_code, RESET,
-                        DIM, links[&short_code].target, RESET,
-                        BLUE, target_url, RESET
+                    print_warning!(
+                        "强制覆盖短码 '{}{}{}': {}{}{} -> {}{}{}",
+                        CYAN,
+                        short_code,
+                        RESET,
+                        DIM,
+                        links[&short_code].target,
+                        RESET,
+                        BLUE,
+                        target_url,
+                        RESET
                     );
                 } else {
-                    print_error!("短码 '{}{}{}' 已存在，当前指向: {}{}{}", 
-                        CYAN, short_code, RESET,
-                        BLUE, links[&short_code].target, RESET
+                    print_error!(
+                        "短码 '{}{}{}' 已存在，当前指向: {}{}{}",
+                        CYAN,
+                        short_code,
+                        RESET,
+                        BLUE,
+                        links[&short_code].target,
+                        RESET
                     );
-                    println!("{}如需覆盖，请使用 {}--force{} 参数{}", DIM, YELLOW, DIM, RESET);
+                    println!(
+                        "{}如需覆盖，请使用 {}--force{} 参数{}",
+                        DIM, YELLOW, DIM, RESET
+                    );
                     process::exit(1);
                 }
             }
@@ -154,14 +178,16 @@ pub async fn run_cli() {
                 match chrono::DateTime::parse_from_rfc3339(&expire) {
                     Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
                     Err(_) => {
-                        print_error!("过期时间格式不正确，应为 RFC3339 格式，如 2023-10-01T12:00:00Z");
+                        print_error!(
+                            "过期时间格式不正确，应为 RFC3339 格式，如 2023-10-01T12:00:00Z"
+                        );
                         process::exit(1);
                     }
                 }
             } else {
                 None
             };
-            
+
             // 创建ShortLink结构
             let link = ShortLink {
                 code: short_code.clone(),
@@ -169,35 +195,47 @@ pub async fn run_cli() {
                 created_at: chrono::Utc::now(),
                 expires_at: expire_time,
             };
-            
+
             if let Err(e) = STORAGE.set(link).await {
                 print_error!("保存失败: {}", e);
                 process::exit(1);
             }
-            
+
             if let Some(expire) = expire_time {
-                print_success!("已添加短链接: {}{}{} -> {}{}{} (过期时间: {}{}{})", 
-                    CYAN, short_code, RESET,
-                    BLUE, target_url, RESET,
-                    YELLOW, expire.format("%Y-%m-%d %H:%M:%S UTC"), RESET
+                print_success!(
+                    "已添加短链接: {}{}{} -> {}{}{} (过期时间: {}{}{})",
+                    CYAN,
+                    short_code,
+                    RESET,
+                    BLUE,
+                    target_url,
+                    RESET,
+                    YELLOW,
+                    expire.format("%Y-%m-%d %H:%M:%S UTC"),
+                    RESET
                 );
             } else {
-                print_success!("已添加短链接: {}{}{} -> {}{}{}", 
-                    CYAN, short_code, RESET,
-                    BLUE, target_url, RESET
+                print_success!(
+                    "已添加短链接: {}{}{} -> {}{}{}",
+                    CYAN,
+                    short_code,
+                    RESET,
+                    BLUE,
+                    target_url,
+                    RESET
                 );
             }
             let _ = signal::notify_server();
         }
-        
+
         "remove" => {
             if args.len() != 3 {
                 print_usage!("用法: {} remove <短码>", args[0]);
                 process::exit(1);
             }
-            
+
             let short_code = &args[2];
-            
+
             if links.contains_key(short_code) {
                 match STORAGE.remove(short_code).await {
                     Ok(_) => {
@@ -223,15 +261,24 @@ pub async fn run_cli() {
                 println!();
                 for (short_code, link) in &links {
                     if let Some(expires_at) = link.expires_at {
-                        println!("  {}{}{} -> {}{}{} {}(过期: {}{}{}){}", 
-                            CYAN, short_code, RESET,
-                            BLUE, link.target, RESET,
-                            DIM, YELLOW, expires_at.format("%Y-%m-%d %H:%M:%S UTC"), DIM, RESET
+                        println!(
+                            "  {}{}{} -> {}{}{} {}(过期: {}{}{}){}",
+                            CYAN,
+                            short_code,
+                            RESET,
+                            BLUE,
+                            link.target,
+                            RESET,
+                            DIM,
+                            YELLOW,
+                            expires_at.format("%Y-%m-%d %H:%M:%S UTC"),
+                            DIM,
+                            RESET
                         );
                     } else {
-                        println!("  {}{}{} -> {}{}{}", 
-                            CYAN, short_code, RESET,
-                            BLUE, link.target, RESET
+                        println!(
+                            "  {}{}{} -> {}{}{}",
+                            CYAN, short_code, RESET, BLUE, link.target, RESET
                         );
                     }
                 }
@@ -260,14 +307,26 @@ fn show_help(program_name: &str) {
     print_usage!("  {} help                     # 显示帮助信息", program_name);
     println!();
     println!("{}链接管理:{}", BOLD, RESET);
-    print_usage!("  {} add <短码> <目标URL> [选项]   # 添加短链接", program_name);
-    print_usage!("  {} add <目标URL> [选项]         # 使用随机短码添加", program_name);
+    print_usage!(
+        "  {} add <短码> <目标URL> [选项]   # 添加短链接",
+        program_name
+    );
+    print_usage!(
+        "  {} add <目标URL> [选项]         # 使用随机短码添加",
+        program_name
+    );
     print_usage!("  {} remove <短码>              # 删除短链接", program_name);
-    print_usage!("  {} list                      # 列出所有短链接", program_name);
+    print_usage!(
+        "  {} list                      # 列出所有短链接",
+        program_name
+    );
     println!();
     println!("{}选项:{}", BOLD, RESET);
     println!("  {}--force{}     强制覆盖已存在的短码", YELLOW, RESET);
-    println!("  {}--expires{}   设置过期时间 (RFC3339格式)", YELLOW, RESET);
+    println!(
+        "  {}--expires{}   设置过期时间 (RFC3339格式)",
+        YELLOW, RESET
+    );
     println!();
     println!("{}示例:{}", BOLD, RESET);
     println!("  {}启动服务器:{}", DIM, RESET);
@@ -275,7 +334,10 @@ fn show_help(program_name: &str) {
     println!();
     println!("  {}添加短链接:{}", DIM, RESET);
     print_usage!("    {} add github https://github.com", program_name);
-    print_usage!("    {} add https://example.com --expires \"2024-12-31T23:59:59Z\"", program_name);
+    print_usage!(
+        "    {} add https://example.com --expires \"2024-12-31T23:59:59Z\"",
+        program_name
+    );
     println!();
     println!("  {}重启服务器:{}", DIM, RESET);
     print_usage!("    {} restart", program_name);
@@ -286,14 +348,14 @@ fn show_help(program_name: &str) {
 
 fn start_server() {
     print_info!("正在启动 shortlinker 服务器...");
-    
+
     #[cfg(unix)]
     {
         use std::fs;
         use std::path::Path;
-        
+
         let pid_file = "shortlinker.pid";
-        
+
         // 检查是否已有服务器在运行
         if Path::new(pid_file).exists() {
             match fs::read_to_string(pid_file) {
@@ -301,7 +363,7 @@ fn start_server() {
                     if let Ok(old_pid) = old_pid_str.trim().parse::<u32>() {
                         use nix::sys::signal;
                         use nix::unistd::Pid;
-                        
+
                         // 检查该 PID 的进程是否仍在运行
                         if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
                             print_warning!("服务器已在运行 (PID: {})", old_pid);
@@ -320,26 +382,26 @@ fn start_server() {
                 }
             }
         }
-        
+
         print_info!("使用以下命令启动服务器:");
         print_usage!("  ./shortlinker");
         print_info!("或在后台运行:");
         print_usage!("  nohup ./shortlinker > shortlinker.log 2>&1 &");
     }
-    
+
     #[cfg(windows)]
     {
         use std::path::Path;
-        
+
         let lock_file = ".shortlinker.lock";
-        
+
         if Path::new(lock_file).exists() {
             print_warning!("服务器可能已在运行");
             print_info!("如确认服务器未运行，请删除锁文件: {}", lock_file);
             print_info!("然后重新启动服务器");
             return;
         }
-        
+
         print_info!("使用以下命令启动服务器:");
         print_usage!("  shortlinker.exe");
     }
@@ -347,42 +409,42 @@ fn start_server() {
 
 fn stop_server() {
     print_info!("正在停止 shortlinker 服务器...");
-    
+
     #[cfg(unix)]
     {
         use std::fs;
         use std::path::Path;
-        
+
         let pid_file = "shortlinker.pid";
-        
+
         if !Path::new(pid_file).exists() {
             print_warning!("未找到 PID 文件，服务器可能未运行");
             return;
         }
-        
+
         match fs::read_to_string(pid_file) {
             Ok(pid_str) => {
                 if let Ok(pid) = pid_str.trim().parse::<u32>() {
                     use nix::sys::signal::{self, Signal};
                     use nix::unistd::Pid;
-                    
+
                     let server_pid = Pid::from_raw(pid as i32);
-                    
+
                     // 首先检查进程是否存在
                     if signal::kill(server_pid, None).is_err() {
                         print_warning!("进程 {} 不存在，清理 PID 文件", pid);
                         let _ = fs::remove_file(pid_file);
                         return;
                     }
-                    
+
                     // 发送 SIGTERM 信号
                     match signal::kill(server_pid, Signal::SIGTERM) {
                         Ok(_) => {
                             print_success!("已向服务器进程 {} 发送停止信号", pid);
-                            
+
                             // 等待一段时间检查进程是否结束
                             std::thread::sleep(std::time::Duration::from_secs(2));
-                            
+
                             // 再次检查进程是否还在运行
                             if signal::kill(server_pid, None).is_ok() {
                                 print_warning!("服务器进程仍在运行，尝试强制终止...");
@@ -393,7 +455,7 @@ fn stop_server() {
                             } else {
                                 print_success!("服务器已正常停止");
                             }
-                            
+
                             // 清理 PID 文件
                             let _ = fs::remove_file(pid_file);
                         }
@@ -411,18 +473,18 @@ fn stop_server() {
             }
         }
     }
-    
+
     #[cfg(windows)]
     {
         use std::path::Path;
-        
+
         let lock_file = ".shortlinker.lock";
-        
+
         if !Path::new(lock_file).exists() {
             print_warning!("未找到锁文件，服务器可能未运行");
             return;
         }
-        
+
         print_warning!("Windows 平台不支持自动停止服务器");
         print_info!("请手动停止服务器进程，然后删除锁文件:");
         print_usage!("  del {}", lock_file);
@@ -432,14 +494,14 @@ fn stop_server() {
 
 fn restart_server() {
     print_info!("正在重启 shortlinker 服务器...");
-    
+
     #[cfg(unix)]
     {
         use std::fs;
         use std::path::Path;
-        
+
         let pid_file = "shortlinker.pid";
-        
+
         // 首先检查服务器是否在运行
         if Path::new(pid_file).exists() {
             match fs::read_to_string(pid_file) {
@@ -447,18 +509,18 @@ fn restart_server() {
                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
                         use nix::sys::signal::{self, Signal};
                         use nix::unistd::Pid;
-                        
+
                         let server_pid = Pid::from_raw(pid as i32);
-                        
+
                         // 检查进程是否存在
                         if signal::kill(server_pid, None).is_ok() {
                             print_info!("停止现有服务器进程 (PID: {})...", pid);
-                            
+
                             // 发送 SIGTERM 信号
                             match signal::kill(server_pid, Signal::SIGTERM) {
                                 Ok(_) => {
                                     print_info!("已发送停止信号，等待进程结束...");
-                                    
+
                                     // 等待进程结束，最多等待 5 秒
                                     for i in 0..10 {
                                         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -467,7 +529,9 @@ fn restart_server() {
                                             break;
                                         }
                                         if i == 9 {
-                                            print_warning!("服务器未在预期时间内停止，尝试强制终止...");
+                                            print_warning!(
+                                                "服务器未在预期时间内停止，尝试强制终止..."
+                                            );
                                             match signal::kill(server_pid, Signal::SIGKILL) {
                                                 Ok(_) => print_success!("服务器已强制停止"),
                                                 Err(e) => {
@@ -486,7 +550,7 @@ fn restart_server() {
                         } else {
                             print_info!("进程 {} 不存在，清理 PID 文件", pid);
                         }
-                        
+
                         // 清理 PID 文件
                         let _ = fs::remove_file(pid_file);
                     }
@@ -499,22 +563,22 @@ fn restart_server() {
         } else {
             print_info!("未发现运行中的服务器");
         }
-        
+
         // 等待一小段时间确保端口释放
         std::thread::sleep(std::time::Duration::from_millis(1000));
-        
+
         print_info!("启动新的服务器进程...");
         print_usage!("  ./shortlinker");
         print_info!("或在后台运行:");
         print_usage!("  nohup ./shortlinker > shortlinker.log 2>&1 &");
     }
-    
+
     #[cfg(windows)]
     {
         use std::path::Path;
-        
+
         let lock_file = ".shortlinker.lock";
-        
+
         if Path::new(lock_file).exists() {
             print_warning!("检测到锁文件，服务器可能正在运行");
             print_info!("Windows 平台需要手动重启服务器:");

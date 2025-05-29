@@ -13,7 +13,6 @@ impl RedisStorage {
 
 #[async_trait]
 impl Storage for RedisStorage {
-
     async fn get(&self, code: &str) -> Option<ShortLink> {
         println!("FileStorage::get called with {}", code);
         let link = ShortLink {

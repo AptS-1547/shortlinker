@@ -1,5 +1,5 @@
-use std::thread;
 use log::info;
+use std::thread;
 
 use crate::storages::STORAGE;
 
@@ -7,9 +7,9 @@ use crate::storages::STORAGE;
 #[cfg(unix)]
 pub fn setup_reload_mechanism() {
     use signal_hook::{consts::SIGUSR1, iterator::Signals};
-    
+
     thread::spawn(move || {
-        let mut signals = Signals::new(&[SIGUSR1]).unwrap();
+        let mut signals = Signals::new([SIGUSR1]).unwrap();
         for _ in signals.forever() {
             info!("收到 SIGUSR1，正在从 Storage 重载链接");
             if let Err(e) = futures::executor::block_on(STORAGE.reload()) {
@@ -24,16 +24,16 @@ pub fn setup_reload_mechanism() {
 // Windows平台的文件监听
 #[cfg(windows)]
 pub fn setup_reload_mechanism() {
-    use std::time::{Duration, SystemTime};
     use std::fs;
-    
+    use std::time::{Duration, SystemTime};
+
     thread::spawn(move || {
         let reload_file = "shortlinker.reload";
         let mut last_check = SystemTime::now();
-        
+
         loop {
             thread::sleep(Duration::from_millis(3000));
-            
+
             if let Ok(metadata) = fs::metadata(reload_file) {
                 if let Ok(modified) = metadata.modified() {
                     if modified > last_check {
@@ -45,7 +45,7 @@ pub fn setup_reload_mechanism() {
                         }
                         last_check = SystemTime::now();
                         log::info!("链接配置已重载");
-                        
+
                         // 删除触发文件
                         let _ = fs::remove_file(reload_file);
                     }

@@ -4,7 +4,7 @@ use std::fs;
 pub fn notify_server() -> Result<(), Box<dyn std::error::Error>> {
     use nix::sys::signal::{self, Signal};
     use nix::unistd::Pid;
-    
+
     // Read the PID from file and send SIGUSR1 to the server process
     match fs::read_to_string("shortlinker.pid") {
         Ok(pid_str) => {

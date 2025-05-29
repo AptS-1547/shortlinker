@@ -1,17 +1,17 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, web};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use dotenv::dotenv;
+use log::{debug, error, info};
 use std::env;
-use log::{debug, info, error};
 use std::fs;
 
 #[cfg(unix)]
 use std::process;
 
+mod cli;
 mod reload;
 mod signal;
 mod storages;
 mod utils;
-mod cli;
 
 mod admin;
 
@@ -30,12 +30,13 @@ async fn shortlinker(path: web::Path<String>) -> impl Responder {
 
     debug!("捕获的路径: {}", captured_path);
 
-    if captured_path == "" {
-        let default_url = env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string());
+    if captured_path.is_empty() {
+        let default_url =
+            env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string());
         info!("重定向到默认主页: {}", default_url);
-        return HttpResponse::TemporaryRedirect()
+        HttpResponse::TemporaryRedirect()
             .append_header(("Location", default_url))
-            .finish();
+            .finish()
     } else {
         // 使用 STORAGE 获取链接
         if let Some(link) = STORAGE.get(&captured_path).await {
@@ -52,16 +53,16 @@ async fn shortlinker(path: web::Path<String>) -> impl Responder {
             }
 
             info!("重定向 {} -> {}", captured_path, link.target);
-            return HttpResponse::TemporaryRedirect()
+            HttpResponse::TemporaryRedirect()
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .append_header(("Location", link.target.as_str()))
-                .finish();
+                .finish()
         } else {
-            return HttpResponse::NotFound()
+            HttpResponse::NotFound()
                 .append_header(("Content-Type", "text/html; charset=utf-8"))
                 .append_header(("Connection", "close"))
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                .body("Not Found");
+                .body("Not Found")
         }
     }
 }
@@ -79,22 +80,25 @@ async fn main() -> std::io::Result<()> {
     // Server Mode
     dotenv().ok();
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
-    
+
     // Load env configurations
     let config = Config {
         server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
-        server_port: env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string()).parse().unwrap(),
+        server_port: env::var("SERVER_PORT")
+            .unwrap_or_else(|_| "8080".to_string())
+            .parse()
+            .unwrap(),
     };
-    
+
     // Save Server PID to file (仅Unix系统需要)
     #[cfg(unix)]
     {
-        use std::path::Path;
         use nix::sys::signal;
         use nix::unistd::Pid;
-        
+        use std::path::Path;
+
         let pid_file = "shortlinker.pid";
-        
+
         // 检查是否已有 PID 文件存在
         if Path::new(pid_file).exists() {
             match fs::read_to_string(pid_file) {
@@ -102,7 +106,7 @@ async fn main() -> std::io::Result<()> {
                     if let Ok(old_pid) = old_pid_str.trim().parse::<u32>() {
                         // 在 Docker 容器中，如果是 PID 1 且文件存在，可能是重启后的残留
                         let current_pid = process::id();
-                        
+
                         // 如果当前进程是 PID 1 且旧 PID 也是 1，说明是容器重启
                         if current_pid == 1 && old_pid == 1 {
                             info!("检测到容器重启，清理旧的 PID 文件");
@@ -140,13 +144,16 @@ async fn main() -> std::io::Result<()> {
     {
         use std::io::{self, Write};
         use std::path::Path;
-        
+
         let lock_file = ".shortlinker.lock";
         // 检查是否已有锁文件存在
         if Path::new(lock_file).exists() {
             error!("服务器已在运行，请先停止现有进程");
             error!("如果确认服务器没有运行，可以删除锁文件: {}", lock_file);
-            return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Server is already running"));
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "Server is already running",
+            ));
         }
 
         match fs::File::create(lock_file) {
@@ -157,7 +164,10 @@ async fn main() -> std::io::Result<()> {
             }
             Err(e) => {
                 error!("无法创建锁文件: {}", e);
-                return Err(io::Error::new(io::ErrorKind::Other, "Failed to create lock file"));
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to create lock file",
+                ));
             }
         }
     }
@@ -169,10 +179,10 @@ async fn main() -> std::io::Result<()> {
     // 获取 admin 路由前缀
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
     let admin_prefix_clone = admin_prefix.clone();
-    
+
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
-    
+
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
     if admin_token.is_empty() {
@@ -180,7 +190,7 @@ async fn main() -> std::io::Result<()> {
     } else {
         info!("Admin API available at: {}", admin_prefix);
     }
-    
+
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
@@ -191,7 +201,7 @@ async fn main() -> std::io::Result<()> {
                     .service(admin::post_link)
                     .service(admin::get_link)
                     .service(admin::delete_link)
-                    .service(admin::update_link)
+                    .service(admin::update_link),
             )
             .service(shortlinker)
     })
