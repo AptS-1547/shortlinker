@@ -41,10 +41,7 @@ fn check_auth(req: &HttpRequest) -> Result<bool, HttpResponse> {
             .append_header(("Content-Type", "application/json; charset=utf-8"))
             .append_header(("Connection", "close"))
             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-            .json(ApiResponse {
-                code: 404,
-                data: serde_json::json!({ "error": "Admin API is disabled. Please set ADMIN_TOKEN environment variable." }),
-            }));
+            .body("Not Found"));
     }
     
     if let Some(auth_header) = req.headers().get("Authorization") {
