@@ -60,7 +60,6 @@ jobs:
         tags: |
           type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
           type=ref,event=tag
-          type=sha,format=short,prefix={{branch}}-
         labels: |
           org.opencontainers.image.title=Shortlinker
           org.opencontainers.image.description=A simple, fast, and secure URL shortener written in Rust
@@ -94,7 +93,7 @@ jobs:
       run: |
         echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Version**: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platforms**: linux/amd64, linux/arm64, linux/386" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
         echo "- **Images**:" >> $GITHUB_STEP_SUMMARY
         echo "  - Docker Hub: ${{ env.REGISTRY_IMAGE_DOCKERHUB }}" >> $GITHUB_STEP_SUMMARY
         echo "  - GitHub CR: ${{ env.REGISTRY_IMAGE_GHCR }}" >> $GITHUB_STEP_SUMMARY
