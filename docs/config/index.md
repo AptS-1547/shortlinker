@@ -42,6 +42,13 @@ SERVER_PORT=3000 ./shortlinker
 | `DEFAULT_URL` | String | `https://esap.cc/repo` | 根路径重定向地址 |
 | `RANDOM_CODE_LENGTH` | Integer | `6` | 随机短码长度 |
 
+### Admin API 配置 (v0.0.5+)
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `ADMIN_TOKEN` | String | `default_admin_token` | Admin API 鉴权令牌 |
+| `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API 路由前缀 |
+
 ### 存储配置
 
 | 参数 | 类型 | 默认值 | 说明 |

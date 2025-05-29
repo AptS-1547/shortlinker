@@ -12,6 +12,7 @@
 - 🔄 **跨平台**：支持 Windows、Linux、macOS
 - 🔐 **进程管理**：智能进程锁，防止重复启动
 - 🐳 **容器化**：优化的 Docker 镜像部署
+- 🛡️ **Admin API**：HTTP API 管理接口（v0.0.5+）
 
 ## 快速开始
 
@@ -62,6 +63,59 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data shortlinker
 ./shortlinker remove github           # 删除指定
 ```
 
+## Admin API (v0.0.5+)
+
+从 v0.0.5 版本开始，支持通过 HTTP API 管理短链接。
+
+### 鉴权设置
+
+```bash
+# 设置 Admin Token
+export ADMIN_TOKEN=your_secret_token
+
+# 自定义 Admin 路由前缀（可选，默认为 /admin）
+export ADMIN_ROUTE_PREFIX=/api/admin
+```
+
+### API 接口
+
+#### 获取所有短链接
+```bash
+curl -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link
+```
+
+#### 创建短链接
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com"}' \
+     http://localhost:8080/admin/link
+```
+
+#### 获取指定短链接
+```bash
+curl -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link/github
+```
+
+#### 更新短链接
+```bash
+curl -X PUT \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com/new"}' \
+     http://localhost:8080/admin/link/github
+```
+
+#### 删除短链接
+```bash
+curl -X DELETE \
+     -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link/github
+```
+
 ## 配置选项
 
 可以通过环境变量或 `.env` 文件进行配置。程序会自动读取项目根目录下的 `.env` 文件。
@@ -74,6 +128,8 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data shortlinker
 | `DEFAULT_URL` | `https://esap.cc/repo` | 根路径默认跳转地址 |
 | `RANDOM_CODE_LENGTH` | `6` | 随机码长度 |
 | `RUST_LOG` | `info` | 日志级别 (`error`, `warn`, `info`, `debug`, `trace`) |
+| `ADMIN_TOKEN` | `default_admin_token` | Admin API 鉴权令牌 (v0.0.5+) |
+| `ADMIN_ROUTE_PREFIX` | `/admin` | Admin API 路由前缀 (v0.0.5+) |
 
 ### .env 文件示例
 
@@ -95,6 +151,10 @@ RANDOM_CODE_LENGTH=8
 
 # 日志级别
 RUST_LOG=debug
+
+# Admin API 配置 (v0.0.5+)
+ADMIN_TOKEN=your_secure_admin_token
+ADMIN_ROUTE_PREFIX=/api/admin
 ```
 
 **注意**：环境变量的优先级高于 `.env` 文件中的配置。

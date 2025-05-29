@@ -15,6 +15,8 @@ mod storages;
 mod utils;
 mod cli;
 
+mod admin;
+
 use storages::STORAGE;
 
 // 配置结构体
@@ -173,6 +175,11 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(cache.clone()))
+            .service(admin::get_all_links)
+            .service(admin::post_link)
+            .service(admin::get_link)
+            .service(admin::delete_link)
+            .service(admin::update_link)
             .service(shortlinker)
     })
     .bind(bind_address)?

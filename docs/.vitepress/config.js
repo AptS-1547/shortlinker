@@ -63,7 +63,8 @@ export default {
         {
           text: 'API 文档',
           items: [
-            { text: 'HTTP 接口', link: '/api/' }
+            { text: 'HTTP 接口', link: '/api/' },
+            { text: 'Admin API', link: '/api/admin' }
           ]
         }
       ]

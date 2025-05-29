@@ -12,6 +12,7 @@ A minimalist URL shortener service supporting HTTP 302 redirection, built with R
 * 🔄 **Cross-Platform**: Works on Windows, Linux, and macOS
 * 🔐 **Process Management**: Smart process locking to prevent duplicate instances
 * 🐳 **Containerized**: Optimized Docker image for easy deployment
+* 🛡️ **Admin API**: HTTP API for link management (v0.0.5+)
 
 ## Quick Start
 
@@ -62,6 +63,59 @@ Once your domain (e.g. `esap.cc`) is bound:
 ./shortlinker remove github           # Remove specific link
 ```
 
+## Admin API (v0.0.5+)
+
+Starting from v0.0.5, HTTP API support for link management is available.
+
+### Authentication Setup
+
+```bash
+# Set Admin Token
+export ADMIN_TOKEN=your_secret_token
+
+# Custom Admin Route Prefix (optional, defaults to /admin)
+export ADMIN_ROUTE_PREFIX=/api/admin
+```
+
+### API Endpoints
+
+#### Get All Links
+```bash
+curl -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link
+```
+
+#### Create Link
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com"}' \
+     http://localhost:8080/admin/link
+```
+
+#### Get Specific Link
+```bash
+curl -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link/github
+```
+
+#### Update Link
+```bash
+curl -X PUT \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com/new"}' \
+     http://localhost:8080/admin/link/github
+```
+
+#### Delete Link
+```bash
+curl -X DELETE \
+     -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/link/github
+```
+
 ## Configuration Options
 
 You can configure the service using environment variables or a `.env` file. The program automatically reads the `.env` file from the project root directory.
@@ -74,6 +128,8 @@ You can configure the service using environment variables or a `.env` file. The 
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL for root path |
 | `RANDOM_CODE_LENGTH` | `6`           | Random code length |
 | `RUST_LOG`           | `info`        | Logging level (`error`, `warn`, `info`, `debug`, `trace`) |
+| `ADMIN_TOKEN`        | `default_admin_token` | Admin API authentication token (v0.0.5+) |
+| `ADMIN_ROUTE_PREFIX` | `/admin`      | Admin API route prefix (v0.0.5+) |
 
 ### .env File Example
 
@@ -95,6 +151,10 @@ RANDOM_CODE_LENGTH=8
 
 # Log level
 RUST_LOG=debug
+
+# Admin API configuration (v0.0.5+)
+ADMIN_TOKEN=your_secure_admin_token
+ADMIN_ROUTE_PREFIX=/api/admin
 ```
 
 **Note**: Environment variables take precedence over `.env` file settings.
