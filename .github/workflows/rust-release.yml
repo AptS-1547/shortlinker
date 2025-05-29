@@ -117,14 +117,24 @@ jobs:
     - name: Get changelog
       id: changelog
       run: |
-        # 获取上一个标签
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        # 获取当前标签
+        CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+        echo "Current tag: $CURRENT_TAG"
+        
+        # 获取上一个标签（排除当前标签）
+        PREV_TAG=$(git tag --sort=-version:refname | grep -v "^$CURRENT_TAG$" | head -n 1)
         
         if [ -n "$PREV_TAG" ]; then
           echo "Found previous tag: $PREV_TAG"
           
-          # 获取提交信息并分类
-          COMMITS=$(git log --pretty=format:"%s|%h|%an" $PREV_TAG..HEAD --no-merges)
+          # 获取两个标签之间的提交信息
+          COMMITS=$(git log --pretty=format:"%s|%h|%an" $PREV_TAG..$CURRENT_TAG --no-merges)
+          
+          # 如果没有新提交，获取当前标签的提交
+          if [ -z "$COMMITS" ]; then
+            echo "No commits between tags, getting current tag commit"
+            COMMITS=$(git log --pretty=format:"%s|%h|%an" -n 1 $CURRENT_TAG)
+          fi
           
           # 初始化各类别
           FEATURES=""
@@ -187,7 +197,7 @@ jobs:
           fi
           
           # 添加比较链接
-          CHANGELOG="$CHANGELOG---\n\n**完整更改**: [$PREV_TAG...${{ steps.tag.outputs.tag }}](https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.tag.outputs.tag }})"
+          CHANGELOG="$CHANGELOG---\n\n**完整更改**: [$PREV_TAG...$CURRENT_TAG](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$CURRENT_TAG)"
           
         else
           echo "No previous tag found, this is the initial release"
