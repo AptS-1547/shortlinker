@@ -34,6 +34,10 @@ struct PostNewLink {
 // 鉴权函数
 fn check_auth(req: &HttpRequest) -> bool {
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "default_admin_token".to_string());
+    if admin_token.is_empty() {
+        info!("Admin token is not set, Admin routes are disabled.");
+        return false;
+    }
     
     if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
