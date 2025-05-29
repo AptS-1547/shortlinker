@@ -174,7 +174,14 @@ async fn main() -> std::io::Result<()> {
     
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
-    info!("Admin API available at: {}", admin_prefix);
+    
+    // 检查 Admin API 是否启用
+    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
+    if admin_token.is_empty() {
+        info!("Admin API is disabled (ADMIN_TOKEN not set)");
+    } else {
+        info!("Admin API available at: {}/link", admin_prefix);
+    }
     
     // Start the HTTP server
     HttpServer::new(move || {

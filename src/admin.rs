@@ -32,28 +32,38 @@ struct PostNewLink {
 }
 
 // 鉴权函数
-fn check_auth(req: &HttpRequest) -> bool {
-    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "default_admin_token".to_string());
+fn check_auth(req: &HttpRequest) -> Result<bool, HttpResponse> {
+    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
+    
+    // 如果 token 为空，认为 Admin API 被禁用
     if admin_token.is_empty() {
-        info!("Admin token is not set, Admin routes are disabled.");
-        return false;
+        return Err(HttpResponse::NotFound()
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .append_header(("Connection", "close"))
+            .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+            .json(ApiResponse {
+                code: 404,
+                data: serde_json::json!({ "error": "Admin API is disabled. Please set ADMIN_TOKEN environment variable." }),
+            }));
     }
     
     if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             if auth_str.starts_with("Bearer ") {
                 let token = &auth_str[7..];
-                return token == admin_token;
+                return Ok(token == admin_token);
             }
         }
     }
-    false
+    Ok(false)
 }
 
 #[actix_web::route("/link", method = "GET", method = "HEAD")]
 async fn get_all_links(req: HttpRequest) -> impl Responder {
-    if !check_auth(&req) {
-        return auth_error();
+    match check_auth(&req) {
+        Err(response) => return response, // Admin API 被禁用，返回 404
+        Ok(false) => return auth_error(), // 鉴权失败，返回 401
+        Ok(true) => {} // 鉴权成功，继续执行
     }
     
     let links = STORAGE.load_all().await;
@@ -80,8 +90,10 @@ async fn get_all_links(req: HttpRequest) -> impl Responder {
 
 #[actix_web::route("/link", method = "POST")]
 async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Responder {
-    if !check_auth(&req) {
-        return auth_error();
+    match check_auth(&req) {
+        Err(response) => return response,
+        Ok(false) => return auth_error(),
+        Ok(true) => {}
     }
     
     let new_link = ShortLink {
@@ -119,8 +131,10 @@ async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Respo
 
 #[actix_web::route("/link/{code}", method = "GET", method = "HEAD")]
 async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
-    if !check_auth(&req) {
-        return auth_error();
+    match check_auth(&req) {
+        Err(response) => return response,
+        Ok(false) => return auth_error(),
+        Ok(true) => {}
     }
     
     match STORAGE.get(&code).await {
@@ -148,8 +162,10 @@ async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
 
 #[actix_web::route("/link/{code}", method = "DELETE")]
 async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
-    if !check_auth(&req) {
-        return auth_error();
+    match check_auth(&req) {
+        Err(response) => return response,
+        Ok(false) => return auth_error(),
+        Ok(true) => {}
     }
     
     match STORAGE.remove(&code).await {
@@ -168,8 +184,10 @@ async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responde
 
 #[actix_web::route("/link/{code}", method = "PUT")]
 async fn update_link(req: HttpRequest, code: web::Path<String>, link: web::Json<PostNewLink>) -> impl Responder {
-    if !check_auth(&req) {
-        return auth_error();
+    match check_auth(&req) {
+        Err(response) => return response,
+        Ok(false) => return auth_error(),
+        Ok(true) => {}
     }
     
     let updated_link = ShortLink {

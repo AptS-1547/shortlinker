@@ -128,7 +128,7 @@ curl -X DELETE \
 | `DEFAULT_URL` | `https://esap.cc/repo` | 根路径默认跳转地址 |
 | `RANDOM_CODE_LENGTH` | `6` | 随机码长度 |
 | `RUST_LOG` | `info` | 日志级别 (`error`, `warn`, `info`, `debug`, `trace`) |
-| `ADMIN_TOKEN` | `default_admin_token` | Admin API 鉴权令牌 (v0.0.5+) |
+| `ADMIN_TOKEN` | *(空字符串)* | Admin API 鉴权令牌，为空时禁用 Admin API (v0.0.5+) |
 | `ADMIN_ROUTE_PREFIX` | `/admin` | Admin API 路由前缀 (v0.0.5+) |
 
 ### .env 文件示例

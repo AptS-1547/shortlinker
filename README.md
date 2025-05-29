@@ -128,7 +128,7 @@ You can configure the service using environment variables or a `.env` file. The 
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL for root path |
 | `RANDOM_CODE_LENGTH` | `6`           | Random code length |
 | `RUST_LOG`           | `info`        | Logging level (`error`, `warn`, `info`, `debug`, `trace`) |
-| `ADMIN_TOKEN`        | `default_admin_token` | Admin API authentication token (v0.0.5+) |
+| `ADMIN_TOKEN`        | *(empty string)* | Admin API authentication token, Admin API is disabled when empty (v0.0.5+) |
 | `ADMIN_ROUTE_PREFIX` | `/admin`      | Admin API route prefix (v0.0.5+) |
 
 ### .env File Example

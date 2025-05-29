@@ -46,8 +46,13 @@ SERVER_PORT=3000 ./shortlinker
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `ADMIN_TOKEN` | String | `default_admin_token` | Admin API 鉴权令牌 |
+| `ADMIN_TOKEN` | String | *(空字符串)* | Admin API 鉴权令牌，**为空时禁用 Admin API** |
 | `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API 路由前缀 |
+
+**重要说明**：
+- 默认情况下 Admin API 是**禁用**的，以确保安全性
+- 只有设置了 `ADMIN_TOKEN` 环境变量后，Admin API 才会启用
+- 未设置 token 时访问 Admin 路由将返回 404 Not Found
 
 ### 存储配置
 
@@ -74,8 +79,9 @@ SERVER_PORT=3000 ./shortlinker
 
 ```bash
 [INFO] Starting server at http://127.0.0.1:8080
-[INFO] Storage: links.json
-[INFO] Default URL: https://example.com
+[INFO] Admin API is disabled (ADMIN_TOKEN not set)
+# 或者
+[INFO] Admin API available at: /admin/link
 ```
 
 ## 常用配置场景
@@ -86,6 +92,9 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 RUST_LOG=debug
 RANDOM_CODE_LENGTH=4
+
+# 启用 Admin API（开发环境）
+ADMIN_TOKEN=dev_token_123
 ```
 
 ### 生产环境
@@ -94,6 +103,9 @@ SERVER_HOST=127.0.0.1  # 通过反向代理访问
 SERVER_PORT=8080
 RUST_LOG=info
 RANDOM_CODE_LENGTH=8
+
+# 生产环境强烈建议设置强密码
+ADMIN_TOKEN=very_secure_production_token_456
 ```
 
 ### Docker 环境
@@ -101,6 +113,9 @@ RANDOM_CODE_LENGTH=8
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 LINKS_FILE=/data/links.json
+
+# 可选：启用 Admin API
+ADMIN_TOKEN=docker_admin_token_789
 ```
 
 ## 配置更新
@@ -109,6 +124,7 @@ LINKS_FILE=/data/links.json
 - ✅ 存储文件内容变更
 - ❌ 服务器地址和端口
 - ❌ 日志级别
+- ❌ Admin API 配置（需要重启服务器）
 
 ### 重载方法
 ```bash
@@ -122,3 +138,4 @@ kill -HUP $(cat shortlinker.pid)
 
 - 📋 查看 [配置示例](/config/examples) 了解不同场景配置
 - 🚀 学习 [部署配置](/deployment/) 生产环境设置
+- 🛡️ 了解 [Admin API](/api/admin) 管理接口使用方法
