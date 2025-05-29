@@ -1,0 +1,50 @@
+labels: ["show-and-tell"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        🎉 **展示您的作品！**
+        
+        分享您使用 Shortlinker 构建的有趣项目、部署经验或创新用法！
+
+  - type: textarea
+    id: project-description
+    attributes:
+      label: 🚀 项目描述
+      description: 介绍一下您的项目或用例
+      placeholder: 我用 Shortlinker 构建了...
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: 🔧 技术细节
+      description: 分享一些技术实现细节
+      placeholder: |
+        - 使用的功能:
+        - 部署方式:
+        - 性能表现:
+        - 遇到的挑战:
+
+  - type: textarea
+    id: lessons-learned
+    attributes:
+      label: 📚 经验分享
+      description: 您学到了什么？有什么建议给其他用户？
+      placeholder: 在这个过程中，我学到了...
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 截图或链接
+      description: 如果可以的话，分享一些截图、链接或演示
+      placeholder: |
+        [可选] 您可以拖拽图片到这里，或者提供相关链接
+
+  - type: textarea
+    id: feedback
+    attributes:
+      label: 💭 反馈建议
+      description: 基于您的使用经验，对项目有什么建议吗？
+      placeholder: 希望能够增加... 或者改进...

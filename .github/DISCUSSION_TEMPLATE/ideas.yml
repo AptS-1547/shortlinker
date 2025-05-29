@@ -1,0 +1,37 @@
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        💡 **分享您的想法！**
+        
+        这里是分享创意、建议和想法的地方。与社区一起讨论如何让 Shortlinker 变得更好！
+
+  - type: textarea
+    id: idea-description
+    attributes:
+      label: 💭 您的想法
+      description: 详细描述您的想法或建议
+      placeholder: 我觉得可以...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 🎯 动机和目标
+      description: 为什么您认为这是一个好想法？这将解决什么问题或带来什么价值？
+      placeholder: 这个想法很有价值，因为...
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: 🔍 示例或参考
+      description: 有类似的实现吗？或者您能提供一些示例吗？
+      placeholder: 比如 XXX 项目就有类似的功能...
+
+  - type: textarea
+    id: additional-thoughts
+    attributes:
+      label: 💭 其他想法
+      description: 还有什么想补充的吗？

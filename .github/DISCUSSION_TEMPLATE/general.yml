@@ -1,0 +1,46 @@
+labels: ["discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        💬 **开始一个讨论！**
+        
+        欢迎分享您的想法、经验或与 Shortlinker 相关的任何话题。
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: 📝 讨论主题
+      description: 您想讨论什么？
+      placeholder: 我想和大家聊聊...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 🏷️ 讨论类别
+      description: 这个讨论属于什么类别？
+      options:
+        - 使用经验分享
+        - 部署实践
+        - 性能优化
+        - 安全建议
+        - 功能讨论
+        - 生态系统
+        - 其他
+      default: 0
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 📋 详细内容
+      description: 详细描述您想讨论的内容
+      placeholder: 详细说明...
+
+  - type: textarea
+    id: questions
+    attributes:
+      label: ❓ 问题
+      description: 您有什么具体的问题想要讨论吗？
+      placeholder: 我想了解...

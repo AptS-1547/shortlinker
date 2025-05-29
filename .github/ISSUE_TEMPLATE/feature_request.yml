@@ -1,0 +1,115 @@
+name: 🚀 功能请求
+description: 建议为这个项目添加一个新功能
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees:
+  - AptS-1547
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您提出功能建议！我们重视您的反馈。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 您的功能请求是否与问题相关？请清楚而简洁地描述问题是什么。
+      placeholder: 例如：当我想要... 时，我感到很沮丧
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 解决方案
+      description: 清晰而简洁地描述您想要实现的功能。
+      placeholder: 例如：我希望能够...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 清晰而简洁地描述您考虑过的任何替代解决方案或功能。
+      placeholder: 例如：我也考虑过...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      description: 这个功能对您有多重要？
+      options:
+        - 低 - 有了更好，没有也可以
+        - 中 - 会显著改善用户体验
+        - 高 - 没有这个功能很难使用
+        - 关键 - 阻碍了基本使用
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 功能类别
+      description: 这个功能属于哪个类别？
+      options:
+        - CLI 工具增强
+        - HTTP API 功能
+        - 性能优化
+        - 用户界面改进
+        - 安全性增强
+        - 部署/运维功能
+        - 文档改进
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景
+      description: 详细描述您会如何使用这个功能。
+      placeholder: |
+        作为一个 [用户类型]，
+        我想要 [功能描述]，
+        这样我就可以 [达成目标]。
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: 实现建议
+      description: 如果您有关于如何实现这个功能的想法，请在这里分享。
+      placeholder: 例如：可以通过添加一个新的命令行参数...
+
+  - type: checkboxes
+    id: willingness
+    attributes:
+      label: 贡献意愿
+      description: 您是否愿意帮助实现这个功能？
+      options:
+        - label: 我愿意尝试实现这个功能
+          required: false
+        - label: 我可以提供测试和反馈
+          required: false
+        - label: 我可以帮助编写文档
+          required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 额外信息
+      description: 在此处添加有关功能请求的任何其他信息或截图。
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 检查清单
+      description: 在提交之前，请确认：
+      options:
+        - label: 我已经搜索了现有的 issues，没有发现类似的功能请求
+          required: true
+        - label: 我已经查看了项目路线图和文档
+          required: true
+        - label: 这个功能符合项目的目标和范围
+          required: true

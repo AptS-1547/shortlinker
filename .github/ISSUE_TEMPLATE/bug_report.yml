@@ -1,0 +1,146 @@
+name: 🐛 Bug 报告
+description: 报告一个 bug 以帮助我们改进
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees:
+  - AptS-1547
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您花时间填写这个 bug 报告！
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 描述 bug
+      description: 简短而清晰地描述这个 bug 是什么。
+      placeholder: 告诉我们发生了什么！
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重现步骤
+      description: 重现此行为的步骤
+      placeholder: |
+        1. 运行命令 '...'
+        2. 访问链接 '...'
+        3. 看到错误
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 清晰而简洁地描述您期望发生的情况。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 清晰而简洁地描述实际发生的情况。
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误信息/日志
+      description: 如果适用，请添加错误信息或日志来帮助解释您的问题。
+      render: shell
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Shortlinker 版本
+      description: 您使用的是哪个版本？
+      options:
+        - v0.0.5 (最新)
+        - v0.0.4
+        - v0.0.3
+        - v0.0.2
+        - v0.0.1
+        - main 分支 (开发版)
+        - 其他 (请在下方说明)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      description: 您在什么操作系统上运行？
+      options:
+        - Ubuntu
+        - Debian
+        - CentOS/RHEL
+        - Arch Linux
+        - macOS
+        - Windows 10
+        - Windows 11
+        - Docker (请在下方说明基础镜像)
+        - 其他 (请在下方说明)
+    validations:
+      required: true
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust 版本
+      description: 如果从源码编译，您使用的 Rust 版本是什么？
+      placeholder: 例如：1.82.0
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: 安装方式
+      description: 您是如何安装 Shortlinker 的？
+      options:
+        - 预编译二进制
+        - Docker
+        - 源码编译
+        - 其他 (请在下方说明)
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 配置信息
+      description: 您的配置文件内容（请移除敏感信息如 token）
+      render: bash
+      placeholder: |
+        SERVER_HOST=127.0.0.1
+        SERVER_PORT=8080
+        # ... 其他配置
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 额外信息
+      description: |
+        在此处添加有关问题的任何其他信息。
+        
+        提示：您可以通过点击此区域来附加图像或日志文件。
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 检查清单
+      description: 在提交之前，请确认：
+      options:
+        - label: 我已经搜索了现有的 issues，没有发现重复的问题
+          required: true
+        - label: 我已经查看了文档和 FAQ
+          required: true
+        - label: 我已经提供了足够的信息来重现这个问题
+          required: true
