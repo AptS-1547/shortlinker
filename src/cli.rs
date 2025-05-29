@@ -42,7 +42,7 @@ macro_rules! print_warning {
 
 macro_rules! print_usage {
     ($($arg:tt)*) => {
-        println!("{}{}{}", CYAN, format!($($arg)*), RESET)
+        println!("{}{}{}", CYAN, format!($($arg)*), RESET);
     };
 }
 
