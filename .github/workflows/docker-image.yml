@@ -12,7 +12,7 @@ permissions:
 
 env:
   REGISTRY_IMAGE_DOCKERHUB: e1saps/shortlinker
-  REGISTRY_IMAGE_GHCR: ghcr.io/${{ github.repository }}
+  REGISTRY_IMAGE_GHCR: ghcr.io/apts-1547/shortlinker
 
 jobs:
   build-and-push:
