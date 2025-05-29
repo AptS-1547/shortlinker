@@ -16,7 +16,14 @@ impl Storage for RedisStorage {
 
     async fn get(&self, code: &str) -> Option<ShortLink> {
         println!("FileStorage::get called with {}", code);
-        None
+        let link = ShortLink {
+            code: "example_code".to_string(),
+            target: "http://example.com".to_string(),
+            expires_at: None,
+            created_at: chrono::Utc::now(),
+        };
+
+        Some(link)
     }
 
     async fn load_all(&self) -> HashMap<String, ShortLink> {
