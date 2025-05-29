@@ -178,7 +178,7 @@ async fn main() -> std::io::Result<()> {
     if admin_token.is_empty() {
         info!("Admin API is disabled (ADMIN_TOKEN not set)");
     } else {
-        info!("Admin API available at: {}/link", admin_prefix);
+        info!("Admin API available at: {}", admin_prefix);
     }
     
     // Start the HTTP server
