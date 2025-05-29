@@ -31,11 +31,6 @@ struct PostNewLink {
     expires_at: Option<String>,
 }
 
-// 获取 admin 路由前缀
-fn get_admin_prefix() -> String {
-    env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string())
-}
-
 // 鉴权函数
 fn check_auth(req: &HttpRequest) -> bool {
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "default_admin_token".to_string());
@@ -51,7 +46,7 @@ fn check_auth(req: &HttpRequest) -> bool {
     false
 }
 
-#[actix_web::route("/admin/link", method = "GET", method = "HEAD")]
+#[actix_web::route("/link", method = "GET", method = "HEAD")]
 async fn get_all_links(req: HttpRequest) -> impl Responder {
     if !check_auth(&req) {
         return auth_error();
@@ -79,7 +74,7 @@ async fn get_all_links(req: HttpRequest) -> impl Responder {
 }
 
 
-#[actix_web::route("/admin/link", method = "POST")]
+#[actix_web::route("/link", method = "POST")]
 async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Responder {
     if !check_auth(&req) {
         return auth_error();
@@ -118,7 +113,7 @@ async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Respo
 }
 
 
-#[actix_web::route("/admin/link/{code}", method = "GET", method = "HEAD")]
+#[actix_web::route("/link/{code}", method = "GET", method = "HEAD")]
 async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
     if !check_auth(&req) {
         return auth_error();
@@ -147,7 +142,7 @@ async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
 }
 
 
-#[actix_web::route("/admin/link/{code}", method = "DELETE")]
+#[actix_web::route("/link/{code}", method = "DELETE")]
 async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
     if !check_auth(&req) {
         return auth_error();
@@ -167,7 +162,7 @@ async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responde
     }
 }
 
-#[actix_web::route("/admin/link/{code}", method = "PUT")]
+#[actix_web::route("/link/{code}", method = "PUT")]
 async fn update_link(req: HttpRequest, code: web::Path<String>, link: web::Json<PostNewLink>) -> impl Responder {
     if !check_auth(&req) {
         return auth_error();

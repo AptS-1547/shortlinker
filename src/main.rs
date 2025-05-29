@@ -168,25 +168,33 @@ async fn main() -> std::io::Result<()> {
     // 设置重新加载机制（根据平台不同）
     reload::setup_reload_mechanism(cache.clone());
     
+    // 获取 admin 路由前缀
+    let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
+    let admin_prefix_clone = admin_prefix.clone();
+    
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
+    info!("Admin API available at: {}", admin_prefix);
     
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(cache.clone()))
-            .service(admin::get_all_links)
-            .service(admin::post_link)
-            .service(admin::get_link)
-            .service(admin::delete_link)
-            .service(admin::update_link)
+            // 使用 scope 设置 admin 路由前缀
+            .service(
+                web::scope(&admin_prefix_clone)
+                    .service(admin::get_all_links)
+                    .service(admin::post_link)
+                    .service(admin::get_link)
+                    .service(admin::delete_link)
+                    .service(admin::update_link)
+            )
             .service(shortlinker)
     })
     .bind(bind_address)?
     .run()
     .await?;
 
-    
     // Clean up PID file on exit
     #[cfg(unix)]
     {
