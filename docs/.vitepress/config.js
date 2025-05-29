@@ -1,7 +1,52 @@
 export default {
   title: "Shortlinker",
   description: "基于 Rust 构建的极简 URL 短链接服务，支持 HTTP 302 重定向，易于部署且性能卓越",
-  lang: 'zh-CN',
+  
+  locales: {
+    root: {
+      label: '简体中文',
+      lang: 'zh-CN',
+      title: "Shortlinker",
+      description: "基于 Rust 构建的极简 URL 短链接服务，支持 HTTP 302 重定向，易于部署且性能卓越",
+      themeConfig: {
+        nav: [
+          { text: '首页', link: '/' },
+          { text: '项目介绍', link: '/guide/' },
+          { text: '快速开始', link: '/guide/getting-started' },
+          { text: 'CLI 工具', link: '/cli/' },
+          { text: '配置说明', link: '/config/' },
+          { text: '部署指南', link: '/deployment/' },
+          { text: 'API 文档', link: '/api/' }
+        ],
+        footer: {
+          message: '基于 MIT 许可证发布',
+          copyright: 'Copyright © 2025 AptS:1547'
+        }
+      }
+    },
+    en: {
+      label: 'English',
+      lang: 'en-US',
+      title: "Shortlinker",
+      description: "A minimalist URL shortening service built with Rust, supporting HTTP 302 redirects with easy deployment and excellent performance",
+      themeConfig: {
+        nav: [
+          { text: 'Home', link: '/en/' },
+          { text: 'Guide', link: '/en/guide/' },
+          { text: 'Quick Start', link: '/en/guide/getting-started' },
+          { text: 'CLI Tools', link: '/en/cli/' },
+          { text: 'Configuration', link: '/en/config/' },
+          { text: 'Deployment', link: '/en/deployment/' },
+          { text: 'API Docs', link: '/en/api/' }
+        ],
+        footer: {
+          message: 'Released under the MIT License',
+          copyright: 'Copyright © 2025 AptS:1547'
+        }
+      }
+    }
+  },
+  
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }]
   ],
@@ -9,16 +54,6 @@ export default {
   themeConfig: {
     logo: '/logo.svg',
     
-    nav: [
-      { text: '首页', link: '/' },
-      { text: '项目介绍', link: '/guide/' },
-      { text: '快速开始', link: '/guide/getting-started' },
-      { text: 'CLI 工具', link: '/cli/' },
-      { text: '配置说明', link: '/config/' },
-      { text: '部署指南', link: '/deployment/' },
-      { text: 'API 文档', link: '/api/' }
-    ],
-
     sidebar: {
       '/guide/': [
         {
@@ -67,17 +102,71 @@ export default {
             { text: 'Admin API', link: '/api/admin' }
           ]
         }
+      ],
+      
+      // English sidebar
+      '/en/': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'Introduction', link: '/en/' },
+            { text: 'Quick Start', link: '/en/getting-started' }
+          ]
+        }
+      ],
+      '/en/guide/': [
+        {
+          text: 'Getting Started',
+          items: [
+            { text: 'Introduction', link: '/en/guide/' },
+            { text: 'Installation', link: '/en/guide/installation' },
+            { text: 'Quick Start', link: '/en/guide/getting-started' }
+          ]
+        }
+      ],
+      '/en/cli/': [
+        {
+          text: 'CLI Tools',
+          items: [
+            { text: 'CLI Overview', link: '/en/cli/' },
+            { text: 'Command Reference', link: '/en/cli/commands' }
+          ]
+        }
+      ],
+      '/en/config/': [
+        {
+          text: 'Configuration',
+          items: [
+            { text: 'Environment Variables', link: '/en/config/' },
+            { text: 'Configuration Examples', link: '/en/config/examples' }
+          ]
+        }
+      ],
+      '/en/deployment/': [
+        {
+          text: 'Deployment',
+          items: [
+            { text: 'Deployment Overview', link: '/en/deployment/' },
+            { text: 'Docker Deployment', link: '/en/deployment/docker' },
+            { text: 'Reverse Proxy', link: '/en/deployment/proxy' },
+            { text: 'System Service', link: '/en/deployment/systemd' }
+          ]
+        }
+      ],
+      '/en/api/': [
+        {
+          text: 'API Documentation',
+          items: [
+            { text: 'HTTP Interface', link: '/en/api/' },
+            { text: 'Admin API', link: '/en/api/admin' }
+          ]
+        }
       ]
     },
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/AptS-1547/shortlinker' }
     ],
-
-    footer: {
-      message: '基于 MIT 许可证发布',
-      copyright: 'Copyright © 2024-present AptS:1547'
-    },
 
     search: {
       provider: 'local'
