@@ -2,8 +2,6 @@ use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use dotenv::dotenv;
 use std::env;
 use log::{debug, info, error};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::fs;
 
 #[cfg(unix)]
@@ -26,10 +24,8 @@ struct Config {
     server_port: u16,
 }
 
-type LinkStorage = Arc<RwLock<HashMap<String, storages::ShortLink>>>;
-
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> impl Responder {
+async fn shortlinker(path: web::Path<String>) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);
@@ -41,10 +37,9 @@ async fn shortlinker(path: web::Path<String>, links: web::Data<LinkStorage>) -> 
             .append_header(("Location", default_url))
             .finish();
     } else {
-        // Find the target URL in the links map
-        let links_map = links.read().unwrap();
-        if let Some(link) = links_map.get(&captured_path) {
-            // Check if the link has expired
+        // 使用 STORAGE 获取链接
+        if let Some(link) = STORAGE.get(&captured_path).await {
+            // 检查链接是否过期
             if let Some(expires_at) = link.expires_at {
                 if expires_at < chrono::Utc::now() {
                     info!("链接已过期: {}", captured_path);
@@ -161,13 +156,10 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    // Load links from file
-    let links_data = STORAGE.load_all().await;
-    let cache = Arc::new(RwLock::new(links_data));
-    
-    // 设置重新加载机制（根据平台不同）
-    reload::setup_reload_mechanism(cache.clone());
-    
+    // 设置重载机制
+    debug!("Setting up reload mechanism");
+    reload::setup_reload_mechanism();
+
     // 获取 admin 路由前缀
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
     let admin_prefix_clone = admin_prefix.clone();
@@ -186,7 +178,6 @@ async fn main() -> std::io::Result<()> {
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(cache.clone()))
             // 使用 scope 设置 admin 路由前缀
             .service(
                 web::scope(&admin_prefix_clone)

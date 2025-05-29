@@ -19,6 +19,7 @@ pub trait Storage: Send + Sync {
     async fn load_all(&self) -> HashMap<String, ShortLink>;
     async fn set(&self, link: ShortLink) -> Result<(), String>;
     async fn remove(&self, code: &str) -> Result<(), String>;
+    async fn reload(&self) -> Result<(), String>;
 }
 
 pub mod file;

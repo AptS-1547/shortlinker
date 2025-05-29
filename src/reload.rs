@@ -1,22 +1,21 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::thread;
 use log::info;
 
-use crate::storages::{STORAGE, ShortLink};
+use crate::storages::STORAGE;
 
 // Unix平台的信号监听
 #[cfg(unix)]
-pub fn setup_reload_mechanism(cache: Arc<RwLock<HashMap<String, ShortLink>>>) {
+pub fn setup_reload_mechanism() {
     use signal_hook::{consts::SIGUSR1, iterator::Signals};
     
     thread::spawn(move || {
         let mut signals = Signals::new(&[SIGUSR1]).unwrap();
         for _ in signals.forever() {
             info!("收到 SIGUSR1，正在从 Storage 重载链接");
-            let new_links = futures::executor::block_on(STORAGE.load_all());
-            let mut cache_guard = cache.write().unwrap();
-            *cache_guard = new_links;
+            if let Err(e) = futures::executor::block_on(STORAGE.reload()) {
+                log::error!("重载链接配置失败: {}", e);
+                continue;
+            }
             log::info!("链接配置已重载");
         }
     });
@@ -24,7 +23,7 @@ pub fn setup_reload_mechanism(cache: Arc<RwLock<HashMap<String, ShortLink>>>) {
 
 // Windows平台的文件监听
 #[cfg(windows)]
-pub fn setup_reload_mechanism(cache: Arc<RwLock<HashMap<String, ShortLink>>>) {
+pub fn setup_reload_mechanism() {
     use std::time::{Duration, SystemTime};
     use std::fs;
     
@@ -38,10 +37,12 @@ pub fn setup_reload_mechanism(cache: Arc<RwLock<HashMap<String, ShortLink>>>) {
             if let Ok(metadata) = fs::metadata(reload_file) {
                 if let Ok(modified) = metadata.modified() {
                     if modified > last_check {
-                        info!("检测到重新加载请求，重新加载链接配置");
-                        let new_links = futures::executor::block_on(STORAGE.load_all());
-                        let mut cache_guard = cache.write().unwrap();
-                        *cache_guard = new_links;
+                        info!("检测到重新加载请求，正在从 Storage 重载链接");
+                        if let Err(e) = futures::executor::block_on(STORAGE.reload()) {
+                            log::error!("重载链接配置失败: {}", e);
+                            last_check = SystemTime::now();
+                            continue;
+                        }
                         last_check = SystemTime::now();
                         log::info!("链接配置已重载");
                         

@@ -44,4 +44,8 @@ impl Storage for RedisStorage {
         println!("RedisStorage::remove called with {}", code);
         Ok(())
     }
+
+    async fn reload(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
