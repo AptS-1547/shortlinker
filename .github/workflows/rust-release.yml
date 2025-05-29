@@ -117,16 +117,91 @@ jobs:
     - name: Get changelog
       id: changelog
       run: |
-        # 获取上一个标签到当前标签之间的提交
+        # 获取上一个标签
         PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
         if [ -n "$PREV_TAG" ]; then
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Found previous tag: $PREV_TAG"
+          
+          # 获取提交信息并分类
+          COMMITS=$(git log --pretty=format:"%s|%h|%an" $PREV_TAG..HEAD --no-merges)
+          
+          # 初始化各类别
+          FEATURES=""
+          FIXES=""
+          DOCS=""
+          CHORES=""
+          OTHERS=""
+          
+          # 处理每个提交
+          while IFS='|' read -r message hash author; do
+            # 跳过空行
+            [ -z "$message" ] && continue
+            
+            # 根据 conventional commits 分类
+            case "$message" in
+              feat*|feature*)
+                FEATURES="$FEATURES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
+                ;;
+              fix*|bugfix*)
+                FIXES="$FIXES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
+                ;;
+              docs*)
+                DOCS="$DOCS\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
+                ;;
+              chore*|build*|ci*|style*|refactor*|perf*|test*)
+                CHORES="$CHORES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
+                ;;
+              *)
+                OTHERS="$OTHERS\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
+                ;;
+            esac
+          done <<< "$COMMITS"
+          
+          # 构建 changelog
+          CHANGELOG=""
+          
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="$CHANGELOG### 🚀 新功能\n$FEATURES\n\n"
+          fi
+          
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="$CHANGELOG### 🐛 Bug 修复\n$FIXES\n\n"
+          fi
+          
+          if [ -n "$DOCS" ]; then
+            CHANGELOG="$CHANGELOG### 📚 文档更新\n$DOCS\n\n"
+          fi
+          
+          if [ -n "$OTHERS" ]; then
+            CHANGELOG="$CHANGELOG### 🔄 其他改进\n$OTHERS\n\n"
+          fi
+          
+          if [ -n "$CHORES" ]; then
+            CHANGELOG="$CHANGELOG### 🛠️ 开发相关\n$CHORES\n\n"
+          fi
+          
+          # 如果没有分类的提交，显示默认信息
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="### 🔄 更新内容\n\n本次更新包含多项改进和优化。"
+          fi
+          
+          # 添加比较链接
+          CHANGELOG="$CHANGELOG---\n\n**完整更改**: [$PREV_TAG...${{ steps.tag.outputs.tag }}](https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.tag.outputs.tag }})"
+          
         else
-          echo "changelog=Initial release" >> $GITHUB_OUTPUT
+          echo "No previous tag found, this is the initial release"
+          CHANGELOG="### 🎉 首次发布\n\n这是 Shortlinker 的首个正式版本，包含以下核心功能：\n\n- ⚡ 高性能的短链接重定向服务\n- 🛠️ 完整的命令行管理工具\n- 🐳 Docker 容器化支持\n- 📱 跨平台兼容（Linux、macOS、Windows）\n- 🔧 简单易用的配置管理\n- 📊 JSON 文件存储，支持热重载"
         fi
+        
+        # 输出到 GitHub Actions
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        # 调试输出
+        echo "Generated changelog:"
+        echo -e "$CHANGELOG"
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
