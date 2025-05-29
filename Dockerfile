@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     musl-tools \
     && rm -rf /var/lib/apt/lists/*
 
+# 添加 musl 目标
+RUN rustup target add x86_64-unknown-linux-musl
+
 # 设置工作目录
 WORKDIR /app
 
@@ -17,10 +20,10 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY links.json /app/links.json
 
-# 静态链接编译
+# 静态链接编译 - 使用 musl 目标
 ENV RUSTFLAGS="-C link-arg=-s"
 RUN touch src/main.rs && \
-    cargo build --release
+    cargo build --release --target x86_64-unknown-linux-musl
 
 # 运行阶段 - 使用scratch
 FROM scratch
@@ -31,8 +34,8 @@ LABEL version="1.0.0"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
-# 从构建阶段复制二进制文件
-COPY --from=builder /app/target/release/shortlinker /shortlinker
+# 从构建阶段复制二进制文件 (使用 musl 目标路径)
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /shortlinker
 COPY --from=builder /app/links.json /data/links.json
 
 VOLUME ["/data"]
