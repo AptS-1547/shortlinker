@@ -46,7 +46,7 @@ EXPOSE 8080
 # 设置环境变量
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
-ENV LINKS_FILE=/data/links.json
+ENV LINKS_FILE=/data/links
 ENV RUST_LOG=info
 
 # 启动命令

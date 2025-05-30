@@ -21,7 +21,7 @@
 * 🎯 **Dynamic Management**: Add or remove links at runtime without restarting
 * 🎲 **Smart Short Codes**: Supports both custom and randomly generated codes
 * ⏰ **Expiration Support**: Set expiration times for links with automatic cleanup
-* 💾 **Persistent Storage**: Stores data in a JSON file with hot-reloading support
+* 💾 **Multiple Storage Backends**: SQLite database, JSON file storage and Sled embedded database
 * 🔄 **Cross-Platform**: Works on Windows, Linux, and macOS
 * 🔐 **Process Management**: Smart process locking to prevent duplicate instances
 * 🐳 **Containerized**: Optimized Docker image for easy deployment
@@ -129,6 +129,84 @@ curl -X DELETE \
      http://localhost:8080/admin/link/github
 ```
 
+## Storage Backends
+
+shortlinker supports multiple storage backends, allowing you to choose the right storage solution for your needs.
+
+### SQLite Database Storage (Default)
+
+Uses SQLite lightweight relational database for optimal performance and reliability.
+
+**Pros**:
+- High-performance SQL queries
+- ACID transaction support
+- Mature and stable, production-proven
+- Concurrent read support
+- Data integrity guarantees
+- Lightweight, no additional services required
+
+**Cons**:
+- Data not directly editable (requires SQL tools)
+- Limited high-concurrency writes
+
+**Configuration**:
+```bash
+# SQLite storage is used by default
+STORAGE_TYPE=sqlite        # Optional, defaults to sqlite
+SQLITE_DB_PATH=links.db    # Database file path
+```
+
+### File Storage
+
+Stores short link data in JSON files. Simple to use and easy to backup.
+
+**Pros**:
+- Simple configuration, no additional dependencies
+- Human-readable data format, easy to debug
+- Hot-reloading support
+- Easy to backup and version control
+
+**Cons**:
+- Lower write performance under high concurrency
+- Slower loading with large datasets
+- No transaction support
+
+**Configuration**:
+```bash
+STORAGE_TYPE=file          # Enable file storage
+LINKS_FILE=links.json      # Storage file path
+```
+
+### Sled Database Storage
+
+Uses Sled embedded database for high concurrency performance.
+
+**Pros**:
+- High concurrent read/write performance
+- Built-in transaction support
+- Data compression, smaller storage footprint
+- Crash recovery capabilities
+
+**Cons**:
+- Data not directly editable
+- Higher memory usage
+- Newer technology, ecosystem less mature than SQLite
+
+**Configuration**:
+```bash
+STORAGE_TYPE=sled          # Enable Sled storage
+SLED_DB_PATH=links.sled    # Database file path
+```
+
+### Recommendations
+
+- **Production environments**: SQLite storage recommended (default)
+- **High concurrency scenarios**: SQLite or Sled storage recommended
+- **Small deployments** (< 1,000 links): Any storage backend works
+- **Medium to large deployments** (> 10,000 links): SQLite storage recommended
+- **Frequent backups needed**: File storage recommended
+- **Development/debugging**: File storage recommended
+
 ## Configuration Options
 
 You can configure the service using environment variables or a `.env` file. The program automatically reads the `.env` file from the project root directory.
@@ -137,7 +215,10 @@ You can configure the service using environment variables or a `.env` file. The 
 | -------------------- | ------------- | ------------------ |
 | `SERVER_HOST`        | `127.0.0.1`   | Listen address     |
 | `SERVER_PORT`        | `8080`        | Listen port        |
-| `LINKS_FILE`         | `links.json`  | Storage file path  |
+| `STORAGE_TYPE`       | `sqlite`      | Storage backend type (`sqlite`, `file` or `sled`) |
+| `SQLITE_DB_PATH`     | `links.db`    | SQLite database path (SQLite storage only) |
+| `LINKS_FILE`         | `links.json`  | File storage path (file storage only) |
+| `SLED_DB_PATH`       | `links.sled`  | Sled database path (Sled storage only) |
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL for root path |
 | `RANDOM_CODE_LENGTH` | `6`           | Random code length |
 | `RUST_LOG`           | `info`        | Logging level (`error`, `warn`, `info`, `debug`, `trace`) |
@@ -153,8 +234,18 @@ Create a `.env` file in the project root directory:
 SERVER_HOST=0.0.0.0
 SERVER_PORT=3000
 
-# Storage configuration
-LINKS_FILE=data/links.json
+# Storage configuration - choose one
+# SQLite storage (default)
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=data/links.db
+
+# Or use file storage
+# STORAGE_TYPE=file
+# LINKS_FILE=data/links.json
+
+# Or use Sled storage
+# STORAGE_TYPE=sled
+# SLED_DB_PATH=data/links.sled
 
 # Default redirect URL
 DEFAULT_URL=https://example.com
@@ -302,6 +393,61 @@ cargo clippy
 - Minimal memory footprint and CPU usage
 - Async I/O handling for high concurrency
 
+## Data Migration
+
+### Migrating from File Storage to SQLite
+
+```bash
+# 1. Stop the service
+./shortlinker stop
+
+# 2. Backup existing data
+cp links.json links.json.backup
+
+# 3. Update configuration
+export STORAGE_TYPE=sqlite
+export SQLITE_DB_PATH=links.db
+
+# 4. Start service (will automatically load data from file to SQLite)
+./shortlinker
+```
+
+### Migrating from Sled to SQLite
+
+```bash
+# 1. Export data (via Admin API)
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/link > links_export.json
+
+# 2. Stop the service
+./shortlinker stop
+
+# 3. Update configuration
+export STORAGE_TYPE=sqlite
+export SQLITE_DB_PATH=links.db
+
+# 4. Convert data format and start service
+./shortlinker import links_export.json
+```
+
+### Migrating from SQLite to File Storage
+
+```bash
+# 1. Export data (via Admin API)
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/link > links_export.json
+
+# 2. Stop the service
+./shortlinker stop
+
+# 3. Update configuration
+export STORAGE_TYPE=file
+export LINKS_FILE=links.json
+
+# 4. Convert data format and start service
+./shortlinker import links_export.json
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -320,10 +466,38 @@ cargo clippy
    chown user:group links.json
    ```
 
-3. **Corrupted Configuration File**
+3. **Corrupted Configuration File (File Storage)**
    ```bash
    # Validate JSON format
    jq . links.json
+   ```
+
+4. **SQLite Database Issues**
+   ```bash
+   # Check database file permissions
+   ls -la links.db
+   
+   # Use sqlite3 tool to check database
+   sqlite3 links.db ".tables"
+   sqlite3 links.db "SELECT COUNT(*) FROM links;"
+   ```
+
+5. **Sled Database Lock**
+   ```bash
+   # Check if other processes are using the database
+   ps aux | grep shortlinker
+   
+   # If no other processes exist, try removing lock files
+   rm -rf links.sled/db
+   ```
+
+6. **Storage Backend Switching Issues**
+   ```bash
+   # Ensure configuration is correct
+   echo $STORAGE_TYPE
+   
+   # Check file permissions
+   ls -la links.json links.db links.sled/
    ```
 
 ## License
