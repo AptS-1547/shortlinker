@@ -170,9 +170,10 @@ impl Storage for SqliteStorage {
 
         // 先检查记录是否存在
         let exists = {
-            let mut stmt = conn.prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
+            let mut stmt = conn
+                .prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
                 .map_err(|e| format!("准备查询语句失败: {}", e))?;
-            
+
             stmt.exists(params![link.code])
                 .map_err(|e| format!("检查记录存在性失败: {}", e))?
         };
@@ -184,7 +185,7 @@ impl Storage for SqliteStorage {
                 params![link.code, link.target, expires_at],
             )
             .map_err(|e| format!("更新短链接失败: {}", e))?;
-            
+
             info!("短链接已更新: {}", link.code);
         } else {
             conn.execute(
@@ -193,7 +194,7 @@ impl Storage for SqliteStorage {
                 params![link.code, link.target, created_at, expires_at],
             )
             .map_err(|e| format!("插入短链接失败: {}", e))?;
-            
+
             info!("短链接已创建: {}", link.code);
         }
 

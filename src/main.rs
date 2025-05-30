@@ -70,6 +70,7 @@ async fn shortlinker(path: web::Path<String>) -> impl Responder {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
+    dotenv().ok();
 
     // CLI Mode
     if args.len() > 1 {
@@ -78,7 +79,6 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Server Mode
-    dotenv().ok();
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
     // Load env configurations

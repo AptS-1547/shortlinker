@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 use async_trait::async_trait;
 use once_cell::sync::Lazy;
 
@@ -11,6 +13,14 @@ pub struct ShortLink {
     pub target: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct SerializableShortLink {
+    short_code: String,
+    target_url: String,
+    created_at: String,
+    expires_at: Option<String>,
 }
 
 #[async_trait]
@@ -23,18 +33,16 @@ pub trait Storage: Send + Sync {
 }
 
 pub mod file;
+pub mod sled;
 pub mod sqlite;
-mod sled;
 
 pub static STORAGE: Lazy<Arc<dyn Storage>> = Lazy::new(|| {
-    let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "file".into());
+    let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
 
     let boxed: Box<dyn Storage> = match backend.as_str() {
-        "sqlite" => {
-            Box::new(sqlite::SqliteStorage::new().expect("Failed to initialize SQLite storage"))
-        }
         "sled" => Box::new(sled::SledStorage::new()),
-        _ => Box::new(file::FileStorage::new()),
+        "file" => Box::new(file::FileStorage::new()),
+        _ => Box::new(sqlite::SqliteStorage::new().expect("Failed to initialize SQLite storage")),
     };
 
     Arc::from(boxed)

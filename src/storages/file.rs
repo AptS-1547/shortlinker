@@ -1,5 +1,4 @@
 use log::{error, info};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -8,13 +7,7 @@ use std::sync::{Arc, RwLock};
 use super::{ShortLink, Storage};
 use async_trait::async_trait;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct SerializableShortLink {
-    short_code: String,
-    target_url: String,
-    created_at: String,
-    expires_at: Option<String>,
-}
+use crate::storages::SerializableShortLink;
 
 pub struct FileStorage {
     file_path: String,
@@ -124,7 +117,7 @@ impl Storage for FileStorage {
         // 更新缓存
         {
             let mut cache_guard = self.cache.write().unwrap();
-            
+
             // 检查是否已存在，如果存在则保持原始创建时间
             let final_link = if let Some(existing_link) = cache_guard.get(&link.code) {
                 ShortLink {
@@ -136,7 +129,7 @@ impl Storage for FileStorage {
             } else {
                 link
             };
-            
+
             cache_guard.insert(final_link.code.clone(), final_link);
         }
 
