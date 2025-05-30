@@ -124,7 +124,20 @@ impl Storage for FileStorage {
         // 更新缓存
         {
             let mut cache_guard = self.cache.write().unwrap();
-            cache_guard.insert(link.code.clone(), link);
+            
+            // 检查是否已存在，如果存在则保持原始创建时间
+            let final_link = if let Some(existing_link) = cache_guard.get(&link.code) {
+                ShortLink {
+                    code: link.code.clone(),
+                    target: link.target,
+                    created_at: existing_link.created_at, // 保持原始创建时间
+                    expires_at: link.expires_at,
+                }
+            } else {
+                link
+            };
+            
+            cache_guard.insert(final_link.code.clone(), final_link);
         }
 
         // 保存到文件

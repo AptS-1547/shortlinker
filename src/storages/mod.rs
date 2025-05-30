@@ -23,13 +23,17 @@ pub trait Storage: Send + Sync {
 }
 
 pub mod file;
-pub mod redis;
+pub mod sqlite;
+mod sled;
 
 pub static STORAGE: Lazy<Arc<dyn Storage>> = Lazy::new(|| {
     let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "file".into());
 
     let boxed: Box<dyn Storage> = match backend.as_str() {
-        "redis" => Box::new(redis::RedisStorage::new()),
+        "sqlite" => {
+            Box::new(sqlite::SqliteStorage::new().expect("Failed to initialize SQLite storage"))
+        }
+        "sled" => Box::new(sled::SledStorage::new()),
         _ => Box::new(file::FileStorage::new()),
     };
 
