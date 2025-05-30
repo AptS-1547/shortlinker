@@ -30,8 +30,8 @@ features:
     title: Expiration Time
     details: Support setting link expiration time with automatic invalidation and cleanup
   - icon: 💾
-    title: Persistent Storage
-    details: JSON file storage with hot reload and automatic configuration file detection
+    title: Multiple Storage Backends
+    details: Support SQLite database (default), JSON file storage and Sled embedded database (v0.1.0+)
   - icon: 🔄
     title: Cross Platform
     details: Support Windows, Linux, macOS with intelligent process locks to prevent duplicate startup
@@ -45,35 +45,20 @@ features:
 ## Why Choose Shortlinker
 
 ### 💡 Minimalist Design
-
 Focus on core functionality, no extra features, simple configuration, fast deployment
 
 ### ⚡ Superior Performance
-
-Rust native performance, millisecond response, supports high concurrent access
+Rust native performance, millisecond response, supports high concurrent access, SQLite provides production-grade database performance
 
 ### 🛠️ Operations Friendly
-
 Single binary, Docker support, systemd integration, comprehensive monitoring
 
 ## Quick Experience
 
-### Three Deployment Methods
-
 ```bash
-# 1. One-click Docker startup
+# One-click Docker startup
 docker run -d -p 8080:8080 e1saps/shortlinker
 
-# 2. Download precompiled version
-wget https://github.com/AptS-1547/shortlinker/releases/latest/download/shortlinker-linux-x86_64
-
-# 3. Source code compilation
-git clone https://github.com/AptS-1547/shortlinker && cd shortlinker && cargo run
-```
-
-### Basic Usage
-
-```bash
 # Add short link
 ./shortlinker add github https://github.com
 

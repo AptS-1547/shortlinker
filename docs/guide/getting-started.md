@@ -11,10 +11,14 @@
 创建配置文件 `.env`：
 
 ```bash
-# 最小配置
+# 最小配置（SQLite 默认）
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
+
+# 可选：自定义存储配置
+# STORAGE_TYPE=sqlite      # 默认值，可省略
+# SQLITE_DB_PATH=links.db  # 默认值，可省略
 ```
 
 ## 第二步：启动服务
@@ -25,6 +29,7 @@ DEFAULT_URL=https://example.com
 
 # 看到以下输出表示成功：
 # [INFO] Starting server at http://127.0.0.1:8080
+# [INFO] SQLite storage initialized with 0 links
 ```
 
 ## 第三步：添加短链接
@@ -88,6 +93,22 @@ kill -HUP $(cat shortlinker.pid)
 ```
 
 ## 生产环境建议
+
+### 存储后端选择
+
+```bash
+# 生产环境推荐 SQLite（默认）
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=/data/links.db
+
+# 开发环境可使用文件存储
+# STORAGE_TYPE=file
+# LINKS_FILE=/data/links.json
+
+# 高并发场景可考虑 Sled
+# STORAGE_TYPE=sled
+# SLED_DB_PATH=/data/links.sled
+```
 
 ### 反向代理
 建议使用 Nginx 或 Caddy 作为反向代理：

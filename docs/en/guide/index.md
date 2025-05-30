@@ -6,12 +6,12 @@ Shortlinker is a minimalist URL shortening service built with Rust, focusing on 
 
 ### Minimalism
 - Single function: Focus on short link redirection
-- Zero dependencies: No database required, no complex configuration
+- Flexible storage: Support multiple backend storage solutions (v0.1.0+)
 - Lightweight: Minimal resource usage
 
 ### High Performance
 - Rust native performance guarantee
-- Memory-mapped storage access
+- SQLite provides production-grade database performance (v0.1.0+)
 - Asynchronous concurrent processing
 
 ### Easy to Use
@@ -39,24 +39,31 @@ Configuration and data files support runtime reload without server restart.
 - Performance metrics statistics
 - Health status checks
 
-### 🛡️ Admin API (v0.0.5+)
-- Complete CRUD operations for short links
-- Bearer token authentication
-- Customizable route prefix
-- Disabled by default for security
+### 💾 Multiple Storage Backends (v0.1.0+)
+- SQLite database (default): Production-grade performance and reliability
+- JSON file storage: Simple and easy to use, convenient for debugging
+- Sled embedded database: High concurrency performance
 
 ## Technical Architecture
 
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│ User Request │───▶│  HTTP Server │───▶│Storage Engine│
-└─────────────┘    └──────────────┘    └─────────────┘
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+│ User Request │───▶│  HTTP Server │───▶│ Storage Engine  │
+└─────────────┘    └──────────────┘    └─────────────────┘
                           │                     │
                           ▼                     ▼
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│  CLI Tools  │───▶│Management API│───▶│ JSON Files  │
-└─────────────┘    └──────────────┘    └─────────────┘
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+│  CLI Tools  │───▶│Management API│───▶│ SQLite (default)│
+└─────────────┘    └──────────────┘    │ JSON Files      │
+                                       │ Sled Database   │
+                                       └─────────────────┘
 ```
+
+## Version History
+
+- **v0.1.0+**: Multiple storage backend support, SQLite as default
+- **v0.0.5+**: Admin API support with authentication
+- **< v0.1.0**: JSON file storage only
 
 ## Use Cases
 

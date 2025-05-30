@@ -35,21 +35,10 @@ Location: https://example.com
 Cache-Control: no-cache, no-store, must-revalidate
 ```
 
-#### 短码不存在 (404)
+#### 短码不存在/已过期 (404)
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: text/html; charset=utf-8
-Connection: close
-Cache-Control: no-cache, no-store, must-revalidate
-
-Not Found
-```
-
-#### 短链接已过期 (404)
-```http
-HTTP/1.1 404 Not Found
-Content-Type: text/html; charset=utf-8
-Connection: close
 Cache-Control: no-cache, no-store, must-revalidate
 
 Not Found
@@ -73,9 +62,9 @@ HTTP/1.1 307 Temporary Redirect
 Location: https://esap.cc/repo
 ```
 
-## 示例
+## 使用示例
 
-### 使用 curl
+### curl 示例
 
 ```bash
 # 重定向请求
@@ -85,17 +74,15 @@ curl -I http://localhost:8080/example
 
 # 跟随重定向
 curl -L http://localhost:8080/example
-# (返回目标网站内容)
 
 # 不存在的短码
 curl -I http://localhost:8080/nonexistent
 # HTTP/1.1 404 Not Found
 ```
 
-### 使用 JavaScript
+### JavaScript 示例
 
 ```javascript
-// 检查短链接是否存在
 async function checkShortLink(shortCode) {
     try {
         const response = await fetch(`http://localhost:8080/${shortCode}`, {
@@ -113,18 +100,9 @@ async function checkShortLink(shortCode) {
         return null;
     }
 }
-
-// 使用示例
-checkShortLink('example').then(targetUrl => {
-    if (targetUrl) {
-        console.log('目标 URL:', targetUrl);
-    } else {
-        console.log('短链接不存在或已过期');
-    }
-});
 ```
 
-### 使用 Python
+### Python 示例
 
 ```python
 import requests
@@ -136,21 +114,9 @@ def check_short_link(base_url, short_code):
             f"{base_url}/{short_code}",
             allow_redirects=False
         )
-        
-        if response.status_code == 307:
-            return response.headers.get('Location')
-        else:
-            return None
-    except requests.RequestException as e:
-        print(f"请求失败: {e}")
+        return response.headers.get('Location') if response.status_code == 307 else None
+    except requests.RequestException:
         return None
-
-# 使用示例
-target_url = check_short_link("http://localhost:8080", "example")
-if target_url:
-    print(f"目标 URL: {target_url}")
-else:
-    print("短链接不存在或已过期")
 ```
 
 ## 缓存策略
@@ -173,10 +139,9 @@ else:
 - 重定向操作日志
 - 404 错误日志
 - 过期链接访问日志
-- 性能统计信息
 
 日志示例：
 ```
-[2024-01-01T12:00:00Z INFO] 重定向 example -> https://www.example.com
-[2024-01-01T12:00:01Z INFO] 链接已过期: temp
+[INFO] 重定向 example -> https://www.example.com
+[INFO] 链接已过期: temp
 ```

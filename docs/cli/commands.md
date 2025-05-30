@@ -40,23 +40,6 @@
 
 # 强制覆盖
 ./shortlinker add google https://www.google.com --force
-
-# 复杂示例
-./shortlinker add promo https://shop.com/sale --expire 2024-12-25T00:00:00Z
-```
-
-### 输出
-
-```bash
-# 成功添加
-✓ 已添加短链接: google -> https://www.google.com
-
-# 随机短码成功
-✓ 已添加短链接: aB3dF1 -> https://www.example.com
-
-# 已存在错误
-❌ 错误: 短码 'google' 已存在，当前指向: https://www.google.com
-如需覆盖，请使用 --force 参数
 ```
 
 ## remove - 删除短链接
@@ -69,28 +52,11 @@
 ./shortlinker remove <短码>
 ```
 
-### 参数
-
-- `<短码>` (必需): 要删除的短链接代码
-
 ### 示例
 
 ```bash
 # 删除短链接
 ./shortlinker remove google
-
-# 删除随机生成的短码
-./shortlinker remove aB3dF1
-```
-
-### 输出
-
-```bash
-# 成功删除
-✓ 已删除短链接: google
-
-# 不存在错误
-❌ 错误: 短链接不存在: nonexistent
 ```
 
 ## list - 列出短链接
@@ -111,17 +77,8 @@
   google -> https://www.google.com
   github -> https://github.com
   temp -> https://example.com (过期: 2024-12-31 23:59:59 UTC)
-  aB3dF1 -> https://random-example.com
 
-ℹ 共 4 个短链接
-```
-
-### 空列表
-
-```bash
-短链接列表:
-
-ℹ 暂无短链接
+ℹ 共 3 个短链接
 ```
 
 ## 时间格式
@@ -136,11 +93,6 @@
 
 # 带时区
 2024-12-31T23:59:59+08:00
-
-# 其他示例
-2024-01-01T00:00:00Z        # 新年
-2024-06-15T12:00:00Z        # 中午
-2024-12-25T00:00:00-05:00   # 圣诞节（EST）
 ```
 
 ### 常用时间示例
@@ -151,9 +103,6 @@
 
 # 一周后过期
 ./shortlinker add weekly https://example.com --expire 2024-01-08T00:00:00Z
-
-# 一个月后过期
-./shortlinker add monthly https://example.com --expire 2024-02-01T00:00:00Z
 
 # 一年后过期
 ./shortlinker add yearly https://example.com --expire 2025-01-01T00:00:00Z
@@ -178,38 +127,27 @@ CLI 工具会读取以下环境变量：
 # 随机短码长度
 RANDOM_CODE_LENGTH=6
 
-# 存储文件路径
-LINKS_FILE=./links.json
+# 存储配置
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=links.db
 
-# 其他配置
+# 日志级别
 RUST_LOG=info
 ```
 
-## 输出颜色
+## 输出控制
 
-CLI 支持彩色输出，可以通过环境变量控制：
+### 颜色输出
 
 ```bash
 # 禁用颜色输出
 NO_COLOR=1 ./shortlinker list
 
-# 强制启用颜色（即使在非 TTY 环境）
+# 强制启用颜色
 FORCE_COLOR=1 ./shortlinker list
 ```
 
-## 脚本友好模式
-
-### 静默模式
-
-```bash
-# 减少输出信息（计划中的功能）
-./shortlinker add google https://www.google.com --quiet
-
-# 仅输出结果
-./shortlinker list --format=json
-```
-
-### 返回码检查
+### 脚本友好模式
 
 ```bash
 #!/bin/bash

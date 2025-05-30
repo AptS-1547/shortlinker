@@ -54,11 +54,18 @@ SERVER_PORT=3000 ./shortlinker
 - 只有设置了 `ADMIN_TOKEN` 环境变量后，Admin API 才会启用
 - 未设置 token 时访问 Admin 路由将返回 404 Not Found
 
-### 存储配置
+### 存储配置 (v0.1.0+)
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `LINKS_FILE` | String | `links.json` | 存储文件路径 |
+| `STORAGE_TYPE` | String | `sqlite` | 存储后端类型（`sqlite`、`file` 或 `sled`），v0.1.0+ 支持多后端 |
+| `SQLITE_DB_PATH` | String | `links.db` | SQLite 数据库文件路径（仅 SQLite 存储，v0.1.0+） |
+| `LINKS_FILE` | String | `links.json` | JSON 文件存储路径（仅文件存储，全版本支持） |
+| `SLED_DB_PATH` | String | `links.sled` | Sled 数据库文件路径（仅 Sled 存储，v0.1.0+） |
+
+**版本说明**：
+- **v0.1.0+**: 支持多种存储后端，SQLite 为默认选择
+- **< v0.1.0**: 仅支持文件存储，无需配置 `STORAGE_TYPE`
 
 ### 日志配置
 
@@ -93,6 +100,10 @@ SERVER_PORT=8080
 RUST_LOG=debug
 RANDOM_CODE_LENGTH=4
 
+# 存储配置 - 开发环境可选择文件存储便于调试
+STORAGE_TYPE=file
+LINKS_FILE=dev-links.json
+
 # 启用 Admin API（开发环境）
 ADMIN_TOKEN=dev_token_123
 ```
@@ -104,6 +115,10 @@ SERVER_PORT=8080
 RUST_LOG=info
 RANDOM_CODE_LENGTH=8
 
+# 存储配置 - 生产环境推荐 SQLite（v0.1.0+）
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=/data/links.db
+
 # 生产环境强烈建议设置强密码
 ADMIN_TOKEN=very_secure_production_token_456
 ```
@@ -112,10 +127,33 @@ ADMIN_TOKEN=very_secure_production_token_456
 ```bash
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
-LINKS_FILE=/data/links.json
+
+# SQLite 存储（推荐，v0.1.0+）
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=/data/links.db
+
+# 或者文件存储（兼容旧版本）
+# STORAGE_TYPE=file
+# LINKS_FILE=/data/links.json
 
 # 可选：启用 Admin API
 ADMIN_TOKEN=docker_admin_token_789
+```
+
+### 版本兼容配置
+
+#### v0.1.0+ 配置
+```bash
+# 明确指定存储类型（推荐）
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=data/links.db
+```
+
+#### v0.0.x 兼容配置
+```bash
+# 旧版本升级时，继续使用文件存储
+STORAGE_TYPE=file
+LINKS_FILE=links.json
 ```
 
 ## 配置更新

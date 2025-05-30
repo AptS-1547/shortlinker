@@ -30,8 +30,8 @@ features:
     title: 过期时间
     details: 支持设置链接过期时间，自动失效和清理
   - icon: 💾
-    title: 持久化存储
-    details: JSON 文件存储，支持热重载和配置文件自动检测
+    title: 多后端存储
+    details: 支持 SQLite 数据库（默认）、JSON 文件存储和 Sled 嵌入式数据库 (v0.1.0+)
   - icon: 🔄
     title: 跨平台
     details: 支持 Windows、Linux、macOS，智能进程锁防止重复启动
@@ -45,35 +45,20 @@ features:
 ## 为什么选择 Shortlinker
 
 ### 💡 极简设计
-
 专注于核心功能，无多余特性，配置简单，部署快速
 
 ### ⚡ 性能优越
-
-Rust 原生性能，毫秒级响应，支持高并发访问
+Rust 原生性能，毫秒级响应，支持高并发访问，SQLite 提供生产级数据库性能
 
 ### 🛠️ 运维友好
-
 单一二进制，Docker 支持，systemd 集成，监控完备
 
 ## 快速体验
 
-### 三种部署方式
-
 ```bash
-# 1. Docker 一键启动
+# Docker 一键启动
 docker run -d -p 8080:8080 e1saps/shortlinker
 
-# 2. 下载预编译版本
-wget https://github.com/AptS-1547/shortlinker/releases/latest/download/shortlinker-linux-x86_64
-
-# 3. 源码编译
-git clone https://github.com/AptS-1547/shortlinker && cd shortlinker && cargo run
-```
-
-### 基本使用
-
-```bash
 # 添加短链接
 ./shortlinker add github https://github.com
 

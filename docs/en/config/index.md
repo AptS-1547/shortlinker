@@ -54,11 +54,18 @@ SERVER_PORT=3000 ./shortlinker
 - Admin API is only enabled when `ADMIN_TOKEN` environment variable is set
 - Accessing Admin routes without token returns 404 Not Found
 
-### Storage Configuration
+### Storage Configuration (v0.1.0+)
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `LINKS_FILE` | String | `links.json` | Storage file path |
+| `STORAGE_TYPE` | String | `sqlite` | Storage backend type (`sqlite`, `file`, or `sled`), multiple backends supported since v0.1.0+ |
+| `SQLITE_DB_PATH` | String | `links.db` | SQLite database file path (SQLite storage only, v0.1.0+) |
+| `LINKS_FILE` | String | `links.json` | JSON file storage path (file storage only, all versions) |
+| `SLED_DB_PATH` | String | `links.sled` | Sled database file path (Sled storage only, v0.1.0+) |
+
+**Version Notes**:
+- **v0.1.0+**: Supports multiple storage backends, SQLite as default
+- **< v0.1.0**: Only supports file storage, no need to configure `STORAGE_TYPE`
 
 ### Log Configuration
 
@@ -93,6 +100,10 @@ SERVER_PORT=8080
 RUST_LOG=debug
 RANDOM_CODE_LENGTH=4
 
+# Storage configuration - file storage for easy debugging
+STORAGE_TYPE=file
+LINKS_FILE=dev-links.json
+
 # Enable Admin API (development environment)
 ADMIN_TOKEN=dev_token_123
 ```
@@ -104,6 +115,10 @@ SERVER_PORT=8080
 RUST_LOG=info
 RANDOM_CODE_LENGTH=8
 
+# Storage configuration - SQLite recommended for production (v0.1.0+)
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=/data/links.db
+
 # Production environment strongly recommends strong password
 ADMIN_TOKEN=very_secure_production_token_456
 ```
@@ -112,10 +127,33 @@ ADMIN_TOKEN=very_secure_production_token_456
 ```bash
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
-LINKS_FILE=/data/links.json
+
+# SQLite storage (recommended, v0.1.0+)
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=/data/links.db
+
+# Or file storage (compatible with older versions)
+# STORAGE_TYPE=file
+# LINKS_FILE=/data/links.json
 
 # Optional: Enable Admin API
 ADMIN_TOKEN=docker_admin_token_789
+```
+
+### Version Compatibility Configuration
+
+#### v0.1.0+ Configuration
+```bash
+# Explicitly specify storage type (recommended)
+STORAGE_TYPE=sqlite
+SQLITE_DB_PATH=data/links.db
+```
+
+#### v0.0.x Compatibility Configuration
+```bash
+# When upgrading from older versions, continue using file storage
+STORAGE_TYPE=file
+LINKS_FILE=links.json
 ```
 
 ## Configuration Updates

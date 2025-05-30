@@ -70,18 +70,6 @@ $ ./shortlinker add github https://gitlab.com
 💡 如需覆盖，请使用 --force 参数
 ```
 
-## 环境变量支持
-
-CLI 工具读取与服务器相同的环境变量：
-
-```bash
-# 自定义存储路径
-LINKS_FILE=./custom-links.json ./shortlinker list
-
-# 自定义随机码长度
-RANDOM_CODE_LENGTH=8 ./shortlinker add https://example.com
-```
-
 ## 脚本集成
 
 ### 批量操作

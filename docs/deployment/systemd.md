@@ -29,7 +29,8 @@ TimeoutStopSec=5
 # 环境变量
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=LINKS_FILE=/opt/shortlinker/data/links.json
+Environment=STORAGE_TYPE=sqlite
+Environment=SQLITE_DB_PATH=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RUST_LOG=info
 
@@ -68,111 +69,14 @@ sudo systemctl start shortlinker
 # 查看状态
 sudo systemctl status shortlinker
 
-# 启动服务
+# 启动/停止/重启服务
 sudo systemctl start shortlinker
-
-# 停止服务
 sudo systemctl stop shortlinker
-
-# 重启服务
 sudo systemctl restart shortlinker
 
 # 查看日志
 sudo journalctl -u shortlinker -f
-
-# 查看最近日志
 sudo journalctl -u shortlinker --since "1 hour ago"
-```
-
-## SysV Init（CentOS 6/RHEL 6）
-
-### 创建启动脚本
-
-创建 `/etc/init.d/shortlinker`：
-
-```bash
-#!/bin/bash
-# shortlinker        Shortlinker URL Shortening Service
-# chkconfig: 35 99 99
-# description: Shortlinker daemon
-
-. /etc/rc.d/init.d/functions
-
-USER="www-data"
-DAEMON="shortlinker"
-ROOT_DIR="/opt/shortlinker"
-
-DAEMON_PATH="$ROOT_DIR/$DAEMON"
-LOCK_FILE="/var/lock/subsys/shortlinker"
-
-start() {
-    if [ -f $LOCK_FILE ] ; then
-        echo "$DAEMON is locked."
-        return
-    fi
-    
-    echo -n $"Starting $DAEMON: "
-    runuser -l "$USER" -c "$DAEMON_PATH" && echo_success || echo_failure
-    RETVAL=$?
-    echo
-    [ $RETVAL -eq 0 ] && touch $LOCK_FILE
-    return $RETVAL
-}
-
-stop() {
-    echo -n $"Shutting down $DAEMON: "
-    pid=`ps -aefw | grep "$DAEMON" | grep -v " grep " | awk '{print $2}'`
-    kill -9 $pid > /dev/null 2>&1
-    [ $? -eq 0 ] && echo_success || echo_failure
-    echo
-    [ $? -eq 0 ] && rm -f $LOCK_FILE
-}
-
-restart() {
-    stop
-    start
-}
-
-status() {
-    if [ -f $LOCK_FILE ]; then
-        echo "$DAEMON is running."
-    else
-        echo "$DAEMON is stopped."
-    fi
-}
-
-case "$1" in
-    start)
-        start
-        ;;
-    stop)
-        stop
-        ;;
-    status)
-        status
-        ;;
-    restart)
-        restart
-        ;;
-    *)
-        echo "Usage: {start|stop|status|restart}"
-        exit 1
-        ;;
-esac
-
-exit $?
-```
-
-### 安装和配置
-
-```bash
-# 安装启动脚本
-sudo chmod +x /etc/init.d/shortlinker
-sudo chkconfig --add shortlinker
-sudo chkconfig shortlinker on
-
-# 启动服务
-sudo service shortlinker start
 ```
 
 ## Docker Compose 服务
@@ -191,15 +95,14 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./data:/data
-      - ./logs:/logs
     environment:
       - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
-      - LINKS_FILE=/data/links.json
+      - STORAGE_TYPE=sqlite
+      - SQLITE_DB_PATH=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - RUST_LOG=info
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -217,20 +120,16 @@ services:
 # 启动服务
 docker-compose up -d
 
-# 查看状态
+# 查看状态和日志
 docker-compose ps
-
-# 查看日志
 docker-compose logs -f shortlinker
 
-# 停止服务
+# 停止和重启
 docker-compose down
-
-# 重启服务
 docker-compose restart shortlinker
 ```
 
-## 监控和告警
+## 监控和日志
 
 ### 服务监控脚本
 
@@ -260,8 +159,6 @@ restart_service() {
         echo "$(date): $SERVICE_NAME restarted successfully" >> $LOG_FILE
     else
         echo "$(date): Failed to restart $SERVICE_NAME" >> $LOG_FILE
-        # 发送告警通知
-        echo "$SERVICE_NAME restart failed on $(hostname)" | mail -s "Service Alert" admin@example.com
     fi
 }
 
@@ -271,16 +168,14 @@ if ! check_service; then
 fi
 ```
 
-### 添加到 crontab
+### 定时监控
 
 ```bash
-# 每分钟检查一次服务状态
+# 添加到 crontab
 * * * * * /usr/local/bin/monitor.sh
 ```
 
-## 日志轮转
-
-### logrotate 配置
+### 日志轮转
 
 创建 `/etc/logrotate.d/shortlinker`：
 
@@ -298,9 +193,9 @@ fi
 }
 ```
 
-## 安全加固
+## 安全配置
 
-### 防火墙配置
+### 防火墙设置
 
 ```bash
 # 只允许本地访问
@@ -316,6 +211,35 @@ sudo ufw allow from 10.0.0.100 to any port 8080
 # 设置正确的权限
 sudo chown -R www-data:www-data /opt/shortlinker
 sudo chmod 755 /opt/shortlinker
-sudo chmod 600 /opt/shortlinker/data/links.json
+sudo chmod 600 /opt/shortlinker/data/links.db
 sudo chmod 644 /opt/shortlinker/shortlinker
+```
+
+## SysV Init（兼容性）
+
+对于不支持 systemd 的系统，可以使用传统的 init 脚本：
+
+```bash
+#!/bin/bash
+# /etc/init.d/shortlinker
+
+case "$1" in
+    start)
+        echo "Starting shortlinker..."
+        sudo -u www-data /opt/shortlinker/shortlinker &
+        ;;
+    stop)
+        echo "Stopping shortlinker..."
+        pkill -f shortlinker
+        ;;
+    restart)
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
 ```

@@ -79,7 +79,8 @@ export default {
           text: '配置说明',
           items: [
             { text: '环境变量', link: '/config/' },
-            { text: '配置示例', link: '/config/examples' }
+            { text: '配置示例', link: '/config/examples' },
+            { text: '存储后端', link: '/config/storage' }
           ]
         }
       ],
@@ -138,7 +139,8 @@ export default {
           text: 'Configuration',
           items: [
             { text: 'Environment Variables', link: '/en/config/' },
-            { text: 'Configuration Examples', link: '/en/config/examples' }
+            { text: 'Configuration Examples', link: '/en/config/examples' },
+            { text: 'Storage Backends', link: '/en/config/storage' }
           ]
         }
       ],

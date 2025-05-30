@@ -54,9 +54,9 @@ cargo build --release
 ```
 用户请求 → 反向代理 → Shortlinker 服务 → 数据存储
     ↓           ↓              ↓           ↓
-  浏览器      Nginx         Docker      JSON文件
-  curl        Caddy         systemd     
-  API         Apache        Binary
+  浏览器      Nginx         Docker      SQLite(默认)
+  curl        Caddy         systemd     JSON文件
+  API         Apache        Binary      Sled数据库
 ```
 
 ## 安全建议
@@ -64,14 +64,14 @@ cargo build --release
 1. **网络安全**：通过反向代理暴露服务
 2. **文件权限**：合理设置数据文件权限
 3. **进程管理**：使用系统服务管理器
-4. **数据备份**：定期备份链接数据
+4. **数据备份**：定期备份链接数据（SQLite 可直接备份 .db 文件）
 
 ## 性能特征
 
-- **响应时间**: < 1ms（本地存储）
+- **响应时间**: < 1ms（SQLite 本地存储）
 - **并发支持**: 数千个并发连接
 - **内存使用**: 极低内存占用
-- **存储格式**: JSON 文件，支持热重载
+- **存储格式**: SQLite 数据库（默认），支持 JSON 文件和 Sled 数据库
 
 ## 下一步
 
