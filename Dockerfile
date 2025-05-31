@@ -36,7 +36,6 @@ LABEL license="MIT"
 
 # 从构建阶段复制二进制文件 (使用 musl 目标路径)
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /shortlinker
-COPY --from=builder /app/links.json /data/links.json
 
 VOLUME ["/data"]
 
@@ -47,8 +46,7 @@ EXPOSE 8080
 ENV DOCKER_ENV=1
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
-ENV LINKS_FILE=/data/links
-ENV SQLITE_DB_PATH=/data/shortlinker.db
+ENV DB_FILE_NAME=/data/shortlinker.data
 ENV RUST_LOG=info
 
 # 启动命令

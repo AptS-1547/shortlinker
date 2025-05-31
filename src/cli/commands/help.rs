@@ -39,6 +39,10 @@ pub fn show_help() {
         CYAN, program_name, RESET
     );
     println!(
+        "{}  {} update <短码> <目标URL> [选项] # 更新现有短链接{}",
+        CYAN, program_name, RESET
+    );
+    println!(
         "{}  {} remove <短码>              # 删除短链接{}",
         CYAN, program_name, RESET
     );

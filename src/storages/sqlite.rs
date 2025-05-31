@@ -14,7 +14,7 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub fn new() -> Result<Self> {
-        let db_path = env::var("SQLITE_DB_PATH").unwrap_or_else(|_| "links.db".to_string());
+        let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
         let conn = Connection::open(&db_path)
             .map_err(|e| ShortlinkerError::database_connection(format!("无法打开数据库: {}", e)))?;

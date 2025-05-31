@@ -28,6 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     // CLI Mode
     if args.len() > 1 {
+        env::set_var("CLI_MODE", "true");
         cli::run_cli().await;
         return Ok(());
     }

@@ -17,7 +17,7 @@ pub struct FileStorage {
 
 impl FileStorage {
     pub fn new() -> Result<Self> {
-        let file_path = env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string());
+        let file_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.json".to_string());
         let storage = FileStorage {
             file_path,
             cache: Arc::new(RwLock::new(HashMap::new())),

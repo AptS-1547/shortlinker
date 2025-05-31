@@ -29,6 +29,7 @@ impl CliParser {
             "list" => Ok(Command::List),
             "add" => self.parse_add_command(&args[2..]),
             "remove" => self.parse_remove_command(&args[2..]),
+            "update" => self.parse_update_command(&args[2..]),
             _ => Err(CliError::ParseError(format!(
                 "Unknown command: {}",
                 args[1]
@@ -98,6 +99,47 @@ impl CliParser {
 
         Ok(Command::Remove {
             short_code: args[0].clone(),
+        })
+    }
+
+    pub fn parse_update_command(&self, args: &[String]) -> Result<Command, CliError> {
+        if args.len() < 2 {
+            return Err(CliError::ParseError(
+                "Update command requires at least two arguments".to_string(),
+            ));
+        }
+
+        let short_code = args[0].clone();
+        let target_url = args[1].clone();
+        let mut expire_time = None;
+
+        // Parse optional expire time argument
+        let mut i = 2;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--expire" => {
+                    if i + 1 < args.len() {
+                        expire_time = Some(args[i + 1].clone());
+                        i += 2;
+                    } else {
+                        return Err(CliError::ParseError(
+                            "--expire requires a time argument".to_string(),
+                        ));
+                    }
+                }
+                _ => {
+                    return Err(CliError::ParseError(format!(
+                        "Unknown parameter: {}",
+                        args[i]
+                    )));
+                }
+            }
+        }
+
+        Ok(Command::Update {
+            short_code,
+            target_url,
+            expire_time,
         })
     }
 }

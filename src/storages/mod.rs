@@ -16,11 +16,11 @@ pub struct ShortLink {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct SerializableShortLink {
-    short_code: String,
-    target_url: String,
-    created_at: String,
-    expires_at: Option<String>,
+pub struct SerializableShortLink {
+    pub short_code: String,
+    pub target_url: String,
+    pub created_at: String,
+    pub expires_at: Option<String>,
 }
 
 #[async_trait]

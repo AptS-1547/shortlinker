@@ -268,15 +268,31 @@ impl AdminService {
             code, link.target
         );
 
+        // 先获取现有链接以保持创建时间
+        let existing_link = match storage.get(&code).await {
+            Some(link) => link,
+            None => {
+                info!("Admin API: 尝试更新不存在的链接 - {}", code);
+                return HttpResponse::NotFound()
+                    .append_header(("Content-Type", "application/json; charset=utf-8"))
+                    .append_header(("Connection", "close"))
+                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                    .json(ApiResponse {
+                        code: 1,
+                        data: serde_json::json!({ "error": "Link not found" }),
+                    });
+            }
+        };
+
         let updated_link = ShortLink {
             code: code.clone(),
             target: link.target.clone(),
-            created_at: chrono::Utc::now(),
+            created_at: existing_link.created_at, // 保持原有的创建时间
             expires_at: link.expires_at.as_ref().map(|s| {
                 chrono::DateTime::parse_from_rfc3339(s)
                     .unwrap()
                     .with_timezone(&chrono::Utc)
-            }),
+            }).or(existing_link.expires_at), // 如果没有提供新的过期时间，保持原有的
         };
 
         match storage.set(updated_link.clone()).await {
@@ -291,7 +307,7 @@ impl AdminService {
                         data: PostNewLink {
                             code: Some(updated_link.code),
                             target: updated_link.target,
-                            expires_at: link.expires_at.clone(),
+                            expires_at: updated_link.expires_at.map(|dt| dt.to_rfc3339()),
                         },
                     })
             }

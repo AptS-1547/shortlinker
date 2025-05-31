@@ -192,3 +192,75 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
 
     Ok(())
 }
+
+pub async fn update_link(
+    storage: Arc<dyn Storage>,
+    short_code: String,
+    target_url: String,
+    expire_time: Option<String>,
+) -> Result<(), CliError> {
+    // 验证 URL 格式
+    if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
+        return Err(CliError::CommandError(
+            "URL 必须以 http:// 或 https:// 开头".to_string(),
+        ));
+    }
+
+    // 检查短码是否存在
+    let old_link = match storage.get(&short_code).await {
+        Some(link) => link,
+        None => {
+            return Err(CliError::CommandError(format!(
+                "短链接不存在: {}",
+                short_code
+            )));
+        }
+    };
+
+    let expires_at = if let Some(expire) = expire_time {
+        match chrono::DateTime::parse_from_rfc3339(&expire) {
+            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+            Err(_) => {
+                return Err(CliError::CommandError(
+                    "过期时间格式不正确，应为 RFC3339 格式，如 2023-10-01T12:00:00Z".to_string(),
+                ));
+            }
+        }
+    } else {
+        old_link.expires_at // 保持原有的过期时间
+    };
+
+    let updated_link = ShortLink {
+        code: short_code.clone(),
+        target: target_url.clone(),
+        created_at: old_link.created_at, // 保持原有的创建时间
+        expires_at,
+    };
+
+    storage
+        .set(updated_link)
+        .await
+        .map_err(|e| CliError::CommandError(format!("更新失败: {}", e)))?;
+
+    println!(
+        "{}{}✓{} 短链接已从 {}{}{} 更新为 {}{}{}",
+        BOLD, GREEN, RESET,
+        DIM, old_link.target, RESET,
+        BLUE, target_url, RESET
+    );
+
+    if let Some(expire) = expires_at {
+        println!(
+            "{}{}ℹ{} 过期时间: {}{}{}",
+            BOLD, BLUE, RESET,
+            YELLOW, expire.format("%Y-%m-%d %H:%M:%S UTC"), RESET
+        );
+    }
+
+    // 通知服务器重载
+    if let Err(e) = crate::system::notify_server() {
+        println!("{}{}⚠{} 通知服务器失败: {}", BOLD, YELLOW, RESET, e);
+    }
+
+    Ok(())
+}
