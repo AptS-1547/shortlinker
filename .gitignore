@@ -21,3 +21,6 @@ target/
 /target
 
 .DS_Store
+
+links.db
+shortlinker.pid
