@@ -11,6 +11,7 @@ use std::env;
 use std::sync::Arc;
 
 use crate::storages::{ShortLink, Storage};
+use crate::utils::generate_random_code;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SerializableShortLink {
@@ -28,7 +29,7 @@ pub struct ApiResponse<T> {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PostNewLink {
-    pub code: String,
+    pub code: Option<String>,
     pub target: String,
     pub expires_at: Option<String>,
 }
@@ -119,16 +120,30 @@ impl AdminService {
 
     pub async fn post_link(
         _req: HttpRequest,
-        link: web::Json<PostNewLink>,
+        mut link: web::Json<PostNewLink>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
+        // 检查是否提供了有效的 code，如果没有随机生成
+        if link.code.is_none() || link.code.as_ref().unwrap().is_empty() {
+            debug!("Admin API: 未提供 code，随机生成新的短链接代码");
+            let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
+                .unwrap_or_else(|_| "6".to_string())
+                .parse()
+                .unwrap_or(6);
+            let random_code = generate_random_code(random_code_length);
+            link.code = Some(random_code);
+        } else {
+            info!("Admin API: 使用提供的 code: {}", link.code.as_ref().unwrap());
+        }
+
         info!(
             "Admin API: 创建链接请求 - code: {}, target: {}",
-            link.code, link.target
+            link.code.as_ref().unwrap_or(&"None".to_string()), 
+            link.target
         );
 
         let new_link = ShortLink {
-            code: link.code.clone(),
+            code: link.code.clone().unwrap(),
             target: link.target.clone(),
             created_at: chrono::Utc::now(),
             expires_at: link.expires_at.as_ref().map(|s| {
@@ -140,7 +155,7 @@ impl AdminService {
 
         match storage.set(new_link.clone()).await {
             Ok(_) => {
-                info!("Admin API: 成功创建链接 - {}", link.code);
+                info!("Admin API: 成功创建链接 - {}", new_link.code);
                 HttpResponse::Created()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .append_header(("Connection", "close"))
@@ -148,14 +163,14 @@ impl AdminService {
                     .json(ApiResponse {
                         code: 0,
                         data: PostNewLink {
-                            code: new_link.code,
+                            code: Some(new_link.code),
                             target: new_link.target,
                             expires_at: link.expires_at.clone(),
                         },
                     })
             }
             Err(e) => {
-                error!("Admin API: 创建链接失败 - {}: {}", link.code, e);
+                error!("Admin API: 创建链接失败 - {}: {}", new_link.code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .append_header(("Connection", "close"))
@@ -274,7 +289,7 @@ impl AdminService {
                     .json(ApiResponse {
                         code: 0,
                         data: PostNewLink {
-                            code: updated_link.code,
+                            code: Some(updated_link.code),
                             target: updated_link.target,
                             expires_at: link.expires_at.clone(),
                         },

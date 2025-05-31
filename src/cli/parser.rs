@@ -36,7 +36,7 @@ impl CliParser {
         }
     }
 
-    fn parse_add_command(&self, args: &[String]) -> Result<Command, CliError> {
+    pub fn parse_add_command(&self, args: &[String]) -> Result<Command, CliError> {
         if args.is_empty() {
             return Err(CliError::ParseError(
                 "Add command requires arguments".to_string(),
@@ -89,7 +89,7 @@ impl CliParser {
         })
     }
 
-    fn parse_remove_command(&self, args: &[String]) -> Result<Command, CliError> {
+    pub fn parse_remove_command(&self, args: &[String]) -> Result<Command, CliError> {
         if args.len() != 1 {
             return Err(CliError::ParseError(
                 "Remove command requires exactly one argument".to_string(),
