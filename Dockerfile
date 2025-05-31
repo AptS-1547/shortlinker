@@ -18,7 +18,6 @@ WORKDIR /app
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-COPY links.json /app/links.json
 
 # 静态链接编译 - 使用 musl 目标
 ENV RUSTFLAGS="-C link-arg=-s"
