@@ -1,7 +1,7 @@
-use shortlinker::storages::{ShortLink, Storage, StorageFactory, SerializableShortLink};
 use shortlinker::storages::file::FileStorage;
-use shortlinker::storages::sqlite::SqliteStorage;
 use shortlinker::storages::sled::SledStorage;
+use shortlinker::storages::sqlite::SqliteStorage;
+use shortlinker::storages::{SerializableShortLink, ShortLink, Storage, StorageFactory};
 use std::env;
 use std::fs;
 use tempfile::TempDir;
@@ -156,11 +156,11 @@ mod file_storage_tests {
     fn create_temp_file_storage() -> (FileStorage, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test_links.json");
-        
+
         env::set_var("DB_FILE_NAME", file_path.to_str().unwrap());
         let storage = FileStorage::new().unwrap();
         env::remove_var("DB_FILE_NAME");
-        
+
         (storage, temp_dir)
     }
 
@@ -189,7 +189,7 @@ mod file_storage_tests {
         // 获取链接
         let retrieved = storage.get("file_test").await;
         assert!(retrieved.is_some());
-        
+
         let retrieved_link = retrieved.unwrap();
         assert_eq!(retrieved_link.code, "file_test");
         assert_eq!(retrieved_link.target, "https://file-test.com");
@@ -230,7 +230,7 @@ mod file_storage_tests {
 
         // 添加链接
         storage.set(link).await.unwrap();
-        
+
         // 验证链接存在
         assert!(storage.get("remove_test").await.is_some());
 
@@ -279,7 +279,10 @@ mod file_storage_tests {
         assert_eq!(retrieved.target, "https://updated.com");
         assert!(retrieved.expires_at.is_some());
         // 创建时间应该保持原始值
-        assert_eq!(retrieved.created_at.timestamp(), original_link.created_at.timestamp());
+        assert_eq!(
+            retrieved.created_at.timestamp(),
+            original_link.created_at.timestamp()
+        );
     }
 
     #[tokio::test]
@@ -332,14 +335,14 @@ mod sqlite_storage_tests {
     fn create_temp_sqlite_storage() -> SqliteStorage {
         let temp_db = TempDir::new().unwrap();
         let db_path = temp_db.path().join("test.db");
-        
+
         env::set_var("DB_FILE_NAME", db_path.to_str().unwrap());
         let storage = SqliteStorage::new().unwrap();
         env::remove_var("DB_FILE_NAME");
-        
+
         // 确保 temp_db 在测试期间不被删除
         std::mem::forget(temp_db);
-        
+
         storage
     }
 
@@ -368,7 +371,7 @@ mod sqlite_storage_tests {
         // 获取链接
         let retrieved = storage.get("sqlite_test").await;
         assert!(retrieved.is_some());
-        
+
         let retrieved_link = retrieved.unwrap();
         assert_eq!(retrieved_link.code, "sqlite_test");
         assert_eq!(retrieved_link.target, "https://sqlite-test.com");
@@ -409,7 +412,7 @@ mod sqlite_storage_tests {
 
         // 添加链接
         storage.set(link).await.unwrap();
-        
+
         // 验证链接存在
         assert!(storage.get("sqlite_remove").await.is_some());
 
@@ -475,9 +478,11 @@ mod sqlite_storage_tests {
 
         let retrieved = storage.get("sqlite_expiry").await.unwrap();
         assert!(retrieved.expires_at.is_some());
-        
+
         // 验证过期时间在合理范围内（允许一些时间差）
-        let time_diff = (retrieved.expires_at.unwrap() - expires_at).num_seconds().abs();
+        let time_diff = (retrieved.expires_at.unwrap() - expires_at)
+            .num_seconds()
+            .abs();
         assert!(time_diff < 2);
     }
 
@@ -515,7 +520,7 @@ mod sled_storage_tests {
         // 测试 get 方法（当前返回示例数据）
         let result = storage.get("any_code").await;
         assert!(result.is_some());
-        
+
         let link = result.unwrap();
         assert_eq!(link.code, "example_code");
         assert_eq!(link.target, "http://example.com");
@@ -591,11 +596,7 @@ mod storage_factory_tests {
     #[tokio::test]
     async fn test_storage_factory_backend_names() {
         // 测试不同后端的名称
-        let backends = vec![
-            ("file", "file"),
-            ("sqlite", "sqlite"),
-            ("sled", "sled"),
-        ];
+        let backends = vec![("file", "file"), ("sqlite", "sqlite"), ("sled", "sled")];
 
         for (backend_env, expected_name) in backends {
             env::set_var("STORAGE_BACKEND", backend_env);
@@ -670,11 +671,11 @@ mod integration_tests {
     fn create_temp_file_storage() -> (FileStorage, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test_links.json");
-        
+
         env::set_var("DB_FILE_NAME", file_path.to_str().unwrap());
         let storage = FileStorage::new().unwrap();
         env::remove_var("DB_FILE_NAME");
-        
+
         (storage, temp_dir)
     }
 
@@ -730,7 +731,10 @@ mod integration_tests {
 
         // 测试特殊字符的处理
         let special_cases = vec![
-            ("special-123", "https://example.com/path?param=value&other=test"),
+            (
+                "special-123",
+                "https://example.com/path?param=value&other=test",
+            ),
             ("special_456", "https://example.com/中文路径"),
             ("special.789", "https://example.com/emoji🎉"),
             ("special@abc", "https://example.com/with@symbol"),
@@ -748,8 +752,12 @@ mod integration_tests {
             assert!(set_result.is_ok(), "Failed to set link with code: {}", code);
 
             let get_result = storage.get(code).await;
-            assert!(get_result.is_some(), "Failed to get link with code: {}", code);
-            
+            assert!(
+                get_result.is_some(),
+                "Failed to get link with code: {}",
+                code
+            );
+
             let retrieved_link = get_result.unwrap();
             assert_eq!(retrieved_link.target, url);
         }

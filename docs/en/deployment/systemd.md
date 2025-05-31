@@ -29,7 +29,8 @@ TimeoutStopSec=5
 # Environment variables
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=LINKS_FILE=/opt/shortlinker/data/links.json
+Environment=STORAGE_BACKEND=sqlite
+Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RUST_LOG=info
 Environment=ADMIN_TOKEN=your_secure_production_token
@@ -111,7 +112,7 @@ start() {
         echo "$DAEMON is locked."
         return
     fi
-    
+  
     echo -n $"Starting $DAEMON: "
     runuser -l "$USER" -c "$DAEMON_PATH" && echo_success || echo_failure
     RETVAL=$?
@@ -196,7 +197,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - LINKS_FILE=/data/links.json
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - RUST_LOG=info
       - ADMIN_TOKEN=${ADMIN_TOKEN}
@@ -206,7 +208,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
     deploy:
       resources:
         limits:
@@ -282,7 +283,7 @@ restart_service() {
     echo "$(date): Restarting $SERVICE_NAME" >> $LOG_FILE
     systemctl restart $SERVICE_NAME
     sleep 5
-    
+  
     if check_service && check_admin_api; then
         echo "$(date): $SERVICE_NAME restarted successfully" >> $LOG_FILE
     else
@@ -427,8 +428,6 @@ Create `/etc/apparmor.d/shortlinker`:
   deny /root/** r,
 }
 ```
-
-### SELinux Policy (RHEL/CentOS)
 
 ```bash
 # Create SELinux policy for Shortlinker

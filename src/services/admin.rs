@@ -133,12 +133,15 @@ impl AdminService {
             let random_code = generate_random_code(random_code_length);
             link.code = Some(random_code);
         } else {
-            info!("Admin API: 使用提供的 code: {}", link.code.as_ref().unwrap());
+            info!(
+                "Admin API: 使用提供的 code: {}",
+                link.code.as_ref().unwrap()
+            );
         }
 
         info!(
             "Admin API: 创建链接请求 - code: {}, target: {}",
-            link.code.as_ref().unwrap_or(&"None".to_string()), 
+            link.code.as_ref().unwrap_or(&"None".to_string()),
             link.target
         );
 
@@ -288,11 +291,15 @@ impl AdminService {
             code: code.clone(),
             target: link.target.clone(),
             created_at: existing_link.created_at, // 保持原有的创建时间
-            expires_at: link.expires_at.as_ref().map(|s| {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc)
-            }).or(existing_link.expires_at), // 如果没有提供新的过期时间，保持原有的
+            expires_at: link
+                .expires_at
+                .as_ref()
+                .map(|s| {
+                    chrono::DateTime::parse_from_rfc3339(s)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc)
+                })
+                .or(existing_link.expires_at), // 如果没有提供新的过期时间，保持原有的
         };
 
         match storage.set(updated_link.clone()).await {

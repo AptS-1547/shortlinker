@@ -83,3 +83,7 @@ pub fn bold(text: &str) -> String {
 pub fn dim(text: &str) -> String {
     format!("{}{}{}", DIM, text, RESET)
 }
+
+pub fn underline(text: &str) -> String {
+    format!("{}{}{}", UNDERLINE, text, RESET)
+}

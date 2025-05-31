@@ -1,10 +1,10 @@
 use actix_web::{test as actix_test, web, App, HttpResponse};
-use shortlinker::services::admin::{AdminService, PostNewLink, SerializableShortLink, ApiResponse};
+use serde_json;
+use shortlinker::services::admin::{AdminService, ApiResponse, PostNewLink, SerializableShortLink};
 use shortlinker::storages::{ShortLink, Storage};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
-use serde_json;
 
 // 模拟存储实现用于测试
 #[derive(Default)]
@@ -20,11 +20,11 @@ impl MockStorage {
             should_fail: std::sync::Mutex::new(true),
         }
     }
-    
+
     fn set_should_fail(&self, fail: bool) {
         *self.should_fail.lock().unwrap() = fail;
     }
-    
+
     fn insert_test_data(&self) {
         let mut data = self.data.lock().unwrap();
         let test_link = ShortLink {
@@ -49,7 +49,9 @@ impl Storage for MockStorage {
 
     async fn set(&self, link: ShortLink) -> Result<(), shortlinker::errors::ShortlinkerError> {
         if *self.should_fail.lock().unwrap() {
-            return Err(shortlinker::errors::ShortlinkerError::file_operation("Mock storage error"));
+            return Err(shortlinker::errors::ShortlinkerError::file_operation(
+                "Mock storage error",
+            ));
         }
         let mut data = self.data.lock().unwrap();
         data.insert(link.code.clone(), link);
@@ -58,7 +60,9 @@ impl Storage for MockStorage {
 
     async fn remove(&self, code: &str) -> Result<(), shortlinker::errors::ShortlinkerError> {
         if *self.should_fail.lock().unwrap() {
-            return Err(shortlinker::errors::ShortlinkerError::file_operation("Mock storage error"));
+            return Err(shortlinker::errors::ShortlinkerError::file_operation(
+                "Mock storage error",
+            ));
         }
         let mut data = self.data.lock().unwrap();
         data.remove(code);
@@ -74,7 +78,9 @@ impl Storage for MockStorage {
 
     async fn reload(&self) -> Result<(), shortlinker::errors::ShortlinkerError> {
         if *self.should_fail.lock().unwrap() {
-            return Err(shortlinker::errors::ShortlinkerError::file_operation("Mock reload error"));
+            return Err(shortlinker::errors::ShortlinkerError::file_operation(
+                "Mock reload error",
+            ));
         }
         Ok(())
     }
@@ -97,8 +103,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::get().to(AdminService::get_all_links))
-        ).await;
+                .route("/admin/links", web::get().to(AdminService::get_all_links)),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/links")
@@ -107,7 +114,7 @@ mod admin_service_tests {
         let resp = actix_test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> = 
+        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> =
             actix_test::read_body_json(resp).await;
         assert_eq!(body.code, 0);
         assert!(body.data.is_some());
@@ -122,8 +129,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::get().to(AdminService::get_all_links))
-        ).await;
+                .route("/admin/links", web::get().to(AdminService::get_all_links)),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/links")
@@ -132,7 +140,7 @@ mod admin_service_tests {
         let resp = actix_test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> = 
+        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> =
             actix_test::read_body_json(resp).await;
         assert_eq!(body.code, 0);
         assert!(body.data.is_some());
@@ -147,8 +155,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::post().to(AdminService::post_link))
-        ).await;
+                .route("/admin/links", web::post().to(AdminService::post_link)),
+        )
+        .await;
 
         let new_link = PostNewLink {
             code: Some("testcode".to_string()),
@@ -178,8 +187,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::post().to(AdminService::post_link))
-        ).await;
+                .route("/admin/links", web::post().to(AdminService::post_link)),
+        )
+        .await;
 
         let new_link = PostNewLink {
             code: None,
@@ -210,8 +220,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::post().to(AdminService::post_link))
-        ).await;
+                .route("/admin/links", web::post().to(AdminService::post_link)),
+        )
+        .await;
 
         let new_link = PostNewLink {
             code: Some("expiry_test".to_string()),
@@ -229,7 +240,10 @@ mod admin_service_tests {
 
         let body: ApiResponse<PostNewLink> = actix_test::read_body_json(resp).await;
         assert_eq!(body.code, 0);
-        assert_eq!(body.data.expires_at, Some("2025-12-31T23:59:59Z".to_string()));
+        assert_eq!(
+            body.data.expires_at,
+            Some("2025-12-31T23:59:59Z".to_string())
+        );
     }
 
     #[actix_web::test]
@@ -239,8 +253,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links", web::post().to(AdminService::post_link))
-        ).await;
+                .route("/admin/links", web::post().to(AdminService::post_link)),
+        )
+        .await;
 
         let new_link = PostNewLink {
             code: Some("fail_test".to_string()),
@@ -269,8 +284,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::get().to(AdminService::get_link))
-        ).await;
+                .route("/admin/links/{code}", web::get().to(AdminService::get_link)),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/links/test123")
@@ -293,8 +309,9 @@ mod admin_service_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::get().to(AdminService::get_link))
-        ).await;
+                .route("/admin/links/{code}", web::get().to(AdminService::get_link)),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/links/nonexistent")
@@ -313,11 +330,11 @@ mod admin_service_tests {
         storage.set_should_fail(false);
         storage.insert_test_data();
 
-        let app = actix_test::init_service(
-            App::new()
-                .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::delete().to(AdminService::delete_link))
-        ).await;
+        let app = actix_test::init_service(App::new().app_data(web::Data::new(storage)).route(
+            "/admin/links/{code}",
+            web::delete().to(AdminService::delete_link),
+        ))
+        .await;
 
         let req = actix_test::TestRequest::delete()
             .uri("/admin/links/test123")
@@ -334,11 +351,11 @@ mod admin_service_tests {
     async fn test_delete_link_storage_failure() {
         let storage = Arc::new(MockStorage::new_failing());
 
-        let app = actix_test::init_service(
-            App::new()
-                .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::delete().to(AdminService::delete_link))
-        ).await;
+        let app = actix_test::init_service(App::new().app_data(web::Data::new(storage)).route(
+            "/admin/links/{code}",
+            web::delete().to(AdminService::delete_link),
+        ))
+        .await;
 
         let req = actix_test::TestRequest::delete()
             .uri("/admin/links/test123")
@@ -357,11 +374,11 @@ mod admin_service_tests {
         storage.set_should_fail(false);
         storage.insert_test_data();
 
-        let app = actix_test::init_service(
-            App::new()
-                .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::put().to(AdminService::update_link))
-        ).await;
+        let app = actix_test::init_service(App::new().app_data(web::Data::new(storage)).route(
+            "/admin/links/{code}",
+            web::put().to(AdminService::update_link),
+        ))
+        .await;
 
         let update_data = PostNewLink {
             code: None, // 这个字段在更新时不使用
@@ -380,18 +397,21 @@ mod admin_service_tests {
         let body: ApiResponse<PostNewLink> = actix_test::read_body_json(resp).await;
         assert_eq!(body.code, 0);
         assert_eq!(body.data.target, "https://updated.com");
-        assert_eq!(body.data.expires_at, Some("2025-01-01T00:00:00Z".to_string()));
+        assert_eq!(
+            body.data.expires_at,
+            Some("2025-01-01T00:00:00Z".to_string())
+        );
     }
 
     #[actix_web::test]
     async fn test_update_link_storage_failure() {
         let storage = Arc::new(MockStorage::new_failing());
 
-        let app = actix_test::init_service(
-            App::new()
-                .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::put().to(AdminService::update_link))
-        ).await;
+        let app = actix_test::init_service(App::new().app_data(web::Data::new(storage)).route(
+            "/admin/links/{code}",
+            web::put().to(AdminService::update_link),
+        ))
+        .await;
 
         let update_data = PostNewLink {
             code: None,
@@ -425,8 +445,12 @@ mod auth_middleware_tests {
         let app = actix_test::init_service(
             App::new()
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/test", web::get().to(|| async { HttpResponse::Ok().json("success") }))
-        ).await;
+                .route(
+                    "/admin/test",
+                    web::get().to(|| async { HttpResponse::Ok().json("success") }),
+                ),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/test")
@@ -444,8 +468,12 @@ mod auth_middleware_tests {
         let app = actix_test::init_service(
             App::new()
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/test", web::get().to(|| async { HttpResponse::Ok().json("success") }))
-        ).await;
+                .route(
+                    "/admin/test",
+                    web::get().to(|| async { HttpResponse::Ok().json("success") }),
+                ),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/test")
@@ -467,8 +495,12 @@ mod auth_middleware_tests {
         let app = actix_test::init_service(
             App::new()
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/test", web::get().to(|| async { HttpResponse::Ok().json("success") }))
-        ).await;
+                .route(
+                    "/admin/test",
+                    web::get().to(|| async { HttpResponse::Ok().json("success") }),
+                ),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/test")
@@ -490,8 +522,12 @@ mod auth_middleware_tests {
         let app = actix_test::init_service(
             App::new()
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/test", web::get().to(|| async { HttpResponse::Ok().json("success") }))
-        ).await;
+                .route(
+                    "/admin/test",
+                    web::get().to(|| async { HttpResponse::Ok().json("success") }),
+                ),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/test")
@@ -512,8 +548,12 @@ mod auth_middleware_tests {
         let app = actix_test::init_service(
             App::new()
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/test", web::get().to(|| async { HttpResponse::Ok().json("success") }))
-        ).await;
+                .route(
+                    "/admin/test",
+                    web::get().to(|| async { HttpResponse::Ok().json("success") }),
+                ),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/test")
@@ -570,7 +610,8 @@ mod data_structures_tests {
 
     #[test]
     fn test_post_new_link_with_expiry() {
-        let json = r#"{"code":null,"target":"https://example.com","expires_at":"2023-12-31T23:59:59Z"}"#;
+        let json =
+            r#"{"code":null,"target":"https://example.com","expires_at":"2023-12-31T23:59:59Z"}"#;
         let link: PostNewLink = serde_json::from_str(json).unwrap();
 
         assert!(link.code.is_none());
@@ -616,7 +657,7 @@ mod integration_tests {
     async fn test_full_admin_workflow() {
         // 设置认证 token
         env::set_var("ADMIN_TOKEN", "integration_test_token");
-        
+
         let storage = Arc::new(MockStorage::default());
         storage.set_should_fail(false);
 
@@ -630,9 +671,10 @@ mod integration_tests {
                         .route("/links", web::post().to(AdminService::post_link))
                         .route("/links/{code}", web::get().to(AdminService::get_link))
                         .route("/links/{code}", web::put().to(AdminService::update_link))
-                        .route("/links/{code}", web::delete().to(AdminService::delete_link))
-                )
-        ).await;
+                        .route("/links/{code}", web::delete().to(AdminService::delete_link)),
+                ),
+        )
+        .await;
 
         let auth_header = ("Authorization", "Bearer integration_test_token");
 
@@ -661,7 +703,7 @@ mod integration_tests {
         let resp = actix_test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> = 
+        let body: ApiResponse<Option<HashMap<String, SerializableShortLink>>> =
             actix_test::read_body_json(resp).await;
         assert_eq!(body.data.unwrap().len(), 1);
 
@@ -715,7 +757,7 @@ mod integration_tests {
     #[actix_web::test]
     async fn test_concurrent_requests() {
         env::set_var("ADMIN_TOKEN", "concurrent_test_token");
-        
+
         let storage = Arc::new(MockStorage::default());
         storage.set_should_fail(false);
 
@@ -723,8 +765,9 @@ mod integration_tests {
             App::new()
                 .app_data(web::Data::new(storage))
                 .wrap(from_fn(AdminService::auth_middleware))
-                .route("/admin/links", web::post().to(AdminService::post_link))
-        ).await;
+                .route("/admin/links", web::post().to(AdminService::post_link)),
+        )
+        .await;
 
         let auth_header = ("Authorization", "Bearer concurrent_test_token");
 
@@ -759,8 +802,9 @@ mod integration_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .route("/admin/links/{code}", web::get().to(AdminService::get_link))
-        ).await;
+                .route("/admin/links/{code}", web::get().to(AdminService::get_link)),
+        )
+        .await;
 
         let req = actix_test::TestRequest::get()
             .uri("/admin/links/nonexistent")

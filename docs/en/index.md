@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Shortlinker"
   text: "Minimalist URL Shortening Service"
-  tagline: "Supports HTTP 302 redirects, built with Rust, easy to deploy and blazingly fast"
+  tagline: "Supports HTTP 307 redirects, built with Rust, easy to deploy and blazingly fast"
   image:
     src: /logo.svg
     alt: Shortlinker
@@ -31,7 +31,7 @@ features:
     details: Support setting link expiration time with automatic invalidation and cleanup
   - icon: 💾
     title: Multiple Storage Backends
-    details: Support SQLite database (default), JSON file storage and Sled embedded database (v0.1.0+)
+    details: Support SQLite database (default, links.db), JSON file storage (links.json) and Sled embedded database (links.sled, coming soon)
   - icon: 🔄
     title: Cross Platform
     details: Support Windows, Linux, macOS with intelligent process locks to prevent duplicate startup

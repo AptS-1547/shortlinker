@@ -22,8 +22,8 @@ SQLite is a lightweight relational database that provides excellent performance 
 
 ### Configuration Parameters
 ```bash
-STORAGE_TYPE=sqlite        # Enable SQLite storage
-SQLITE_DB_PATH=links.db    # Database file path
+STORAGE_BACKEND=sqlite       # Enable SQLite storage
+DB_FILE_NAME=links.db        # Database file path
 ```
 
 ### Advantages
@@ -40,16 +40,16 @@ SQLITE_DB_PATH=links.db    # Database file path
 ### Configuration Examples
 ```bash
 # Basic configuration
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=data/links.db
 
 # Production environment
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/var/lib/shortlinker/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/var/lib/shortlinker/links.db
 
 # Docker environment
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 ```
 
 ## File Storage (All Versions)
@@ -59,8 +59,8 @@ Uses JSON files to store data, simple and intuitive, suitable for development an
 
 ### Configuration Parameters
 ```bash
-STORAGE_TYPE=file          # Enable file storage
-LINKS_FILE=links.json      # JSON file path
+STORAGE_BACKEND=file         # Enable file storage
+DB_FILE_NAME=links.json      # JSON file path
 ```
 
 ### Advantages
@@ -81,8 +81,8 @@ Sled is a modern embedded database designed for high-concurrency scenarios, supp
 
 ### Configuration Parameters
 ```bash
-STORAGE_TYPE=sled          # Enable Sled storage
-SLED_DB_PATH=links.sled    # Database directory path
+STORAGE_BACKEND=sled         # Enable Sled storage
+DB_FILE_NAME=links.sled      # Database directory path
 ```
 
 ### Advantages
@@ -103,22 +103,22 @@ SLED_DB_PATH=links.sled    # Database directory path
 #### Small Scale (< 1,000 links)
 ```bash
 # Recommended: File storage (development-friendly)
-STORAGE_TYPE=file
-LINKS_FILE=links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=links.json
 ```
 
 #### Medium Scale (1,000 - 10,000 links)
 ```bash
 # Recommended: SQLite (balanced performance and ease of use)
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 ```
 
 #### Large Scale (> 10,000 links)
 ```bash
 # Recommended: SQLite or Sled
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 ```
 
 ### By Use Case
@@ -126,23 +126,23 @@ SQLITE_DB_PATH=links.db
 #### Development Environment
 ```bash
 # File storage - easy to debug
-STORAGE_TYPE=file
-LINKS_FILE=dev-links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=dev-links.json
 RUST_LOG=debug
 ```
 
 #### Production Environment
 ```bash
 # SQLite - stable and reliable
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 ```
 
 #### High Concurrency Scenarios
 ```bash
 # Sled - high-performance concurrency
-STORAGE_TYPE=sled
-SLED_DB_PATH=/data/links.sled
+STORAGE_BACKEND=sled
+DB_FILE_NAME=/data/links.sled
 ```
 
 ## Version Migration Guide
@@ -156,12 +156,12 @@ If you're upgrading from an earlier version, the default storage method has chan
 # No configuration needed, automatically uses links.json
 
 # v0.1.0+ default configuration (automatically uses SQLite)
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 
 # To continue using file storage, explicitly configure
-STORAGE_TYPE=file
-LINKS_FILE=links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=links.json
 ```
 
 ### Data Migration
@@ -172,8 +172,8 @@ LINKS_FILE=links.json
 cp links.json links.json.backup
 
 # 2. Set new storage configuration
-export STORAGE_TYPE=sqlite
-export SQLITE_DB_PATH=links.db
+export STORAGE_BACKEND=sqlite
+export DB_FILE_NAME=links.db
 
 # 3. Restart service, system will automatically detect and migrate data
 ./shortlinker

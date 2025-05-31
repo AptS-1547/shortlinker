@@ -63,9 +63,7 @@ impl Command {
                 short_code,
                 target_url,
                 expire_time,
-            } => {
-                update_link(storage, short_code, target_url, expire_time).await
-            }
+            } => update_link(storage, short_code, target_url, expire_time).await,
             Command::Remove { short_code } => remove_link(storage, short_code).await,
         }
     }

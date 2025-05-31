@@ -22,7 +22,7 @@
 # 基础运行
 docker run -d -p 8080:8080 e1saps/shortlinker
 
-# 数据持久化
+# 数据持久化（推荐）
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
 ```
 

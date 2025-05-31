@@ -15,6 +15,10 @@ Create configuration file `.env`:
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
+
+# Storage configuration (v0.1.0+, optional)
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 ```
 
 ## Step 2: Start Service

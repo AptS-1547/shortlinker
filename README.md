@@ -180,7 +180,7 @@ Configure using environment variables or a `.env` file:
 | `SERVER_HOST`        | `127.0.0.1`   | Listen address     |
 | `SERVER_PORT`        | `8080`        | Listen port        |
 | `STORAGE_BACKEND`    | `sqlite`      | Storage backend type |
-| `DB_FILE_NAME`       | `links.db`    | Database file path (common for all backends) |
+| `DB_FILE_NAME`       | `links.db` (SQLite), `links.json` (File), `links.sled` (Sled) | Database file path (varies by backend) |
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL |
 | `RANDOM_CODE_LENGTH` | `6`           | Random code length |
 | `ADMIN_TOKEN`        | *(empty)*     | Admin API authentication token |

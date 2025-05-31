@@ -40,7 +40,7 @@ Configuration and data files support runtime reload without server restart.
 - Health status checks
 
 ### 💾 Multiple Storage Backends (v0.1.0+)
-- SQLite database (default): Production-grade performance and reliability
+- SQLite database (default): Production-grade performance and reliability  
 - JSON file storage: Simple and easy to use, convenient for debugging
 - Sled embedded database: High concurrency performance
 

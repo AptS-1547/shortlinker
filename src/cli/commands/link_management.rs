@@ -16,11 +16,12 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
         for (short_code, link) in &links {
             if let Some(expires_at) = link.expires_at {
                 println!(
-                    "  {}{}{} -> {}{}{} {}(过期: {}{}{}){}",
+                    "  {}{}{} -> {}{}{}{} {}(过期: {}{}{}){}",
                     CYAN,
                     short_code,
                     RESET,
                     BLUE,
+                    UNDERLINE,
                     link.target,
                     RESET,
                     DIM,
@@ -31,8 +32,8 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
                 );
             } else {
                 println!(
-                    "  {}{}{} -> {}{}{}",
-                    CYAN, short_code, RESET, BLUE, link.target, RESET
+                    "  {}{}{} -> {}{}{}{}",
+                    CYAN, short_code, RESET, BLUE, UNDERLINE, link.target, RESET
                 );
             }
         }
@@ -136,7 +137,7 @@ pub async fn add_link(
 
     if let Some(expire) = expires_at {
         println!(
-            "{}{}✓{} 已添加短链接: {}{}{} -> {}{}{} (过期时间: {}{}{})",
+            "{}{}✓{} 已添加短链接: {}{}{} -> {}{}{}{} (过期时间: {}{}{})",
             BOLD,
             GREEN,
             RESET,
@@ -144,6 +145,7 @@ pub async fn add_link(
             final_short_code,
             RESET,
             BLUE,
+            UNDERLINE,
             target_url,
             RESET,
             YELLOW,
@@ -152,8 +154,8 @@ pub async fn add_link(
         );
     } else {
         println!(
-            "{}{}✓{} 已添加短链接: {}{}{} -> {}{}{}",
-            BOLD, GREEN, RESET, CYAN, final_short_code, RESET, BLUE, target_url, RESET
+            "{}{}✓{} 已添加短链接: {}{}{} -> {}{}{}{}",
+            BOLD, GREEN, RESET, CYAN, final_short_code, RESET, BLUE, UNDERLINE, target_url, RESET
         );
     }
 
@@ -243,17 +245,29 @@ pub async fn update_link(
         .map_err(|e| CliError::CommandError(format!("更新失败: {}", e)))?;
 
     println!(
-        "{}{}✓{} 短链接已从 {}{}{} 更新为 {}{}{}",
-        BOLD, GREEN, RESET,
-        DIM, old_link.target, RESET,
-        BLUE, target_url, RESET
+        "{}{}✓{} 短链接已从 {}{}{}{} 更新为 {}{}{}{}",
+        BOLD,
+        GREEN,
+        RESET,
+        DIM,
+        UNDERLINE,
+        old_link.target,
+        RESET,
+        BLUE,
+        UNDERLINE,
+        target_url,
+        RESET
     );
 
     if let Some(expire) = expires_at {
         println!(
             "{}{}ℹ{} 过期时间: {}{}{}",
-            BOLD, BLUE, RESET,
-            YELLOW, expire.format("%Y-%m-%d %H:%M:%S UTC"), RESET
+            BOLD,
+            BLUE,
+            RESET,
+            YELLOW,
+            expire.format("%Y-%m-%d %H:%M:%S UTC"),
+            RESET
         );
     }
 

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Shortlinker"
   text: "极简主义短链接服务"
-  tagline: "支持 HTTP 302 跳转，使用 Rust 编写，部署便捷、响应快速"
+  tagline: "支持 HTTP 307 跳转，使用 Rust 编写，部署便捷、响应快速"
   image:
     src: /logo.svg
     alt: Shortlinker
@@ -31,7 +31,7 @@ features:
     details: 支持设置链接过期时间，自动失效和清理
   - icon: 💾
     title: 多后端存储
-    details: 支持 SQLite 数据库（默认）、JSON 文件存储和 Sled 嵌入式数据库 (v0.1.0+)
+    details: 支持 SQLite 数据库（默认，links.db）、JSON 文件存储（links.json）和 Sled 嵌入式数据库（links.sled，即将支持）
   - icon: 🔄
     title: 跨平台
     details: 支持 Windows、Linux、macOS，智能进程锁防止重复启动
@@ -45,12 +45,15 @@ features:
 ## 为什么选择 Shortlinker
 
 ### 💡 极简设计
+
 专注于核心功能，无多余特性，配置简单，部署快速
 
 ### ⚡ 性能优越
+
 Rust 原生性能，毫秒级响应，支持高并发访问，SQLite 提供生产级数据库性能
 
 ### 🛠️ 运维友好
+
 单一二进制，Docker 支持，systemd 集成，监控完备
 
 ## 快速体验

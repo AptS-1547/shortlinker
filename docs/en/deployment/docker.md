@@ -53,7 +53,8 @@ docker run -d \
   -v $(pwd)/data:/data \
   -e SERVER_HOST=0.0.0.0 \
   -e SERVER_PORT=8080 \
-  -e LINKS_FILE=/data/links.json \
+  -e STORAGE_BACKEND=sqlite \
+  -e DB_FILE_NAME=/data/shortlinker.data \
   -e DEFAULT_URL=https://example.com \
   -e RANDOM_CODE_LENGTH=8 \
   -e RUST_LOG=info \
@@ -80,7 +81,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - LINKS_FILE=/data/links.json
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/shortlinker.data
       - DEFAULT_URL=https://example.com
       - RUST_LOG=info
       - ADMIN_TOKEN=dev_token_123
@@ -105,7 +107,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - LINKS_FILE=/data/links.json
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - RANDOM_CODE_LENGTH=8
       - RUST_LOG=info
@@ -189,7 +192,8 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # Storage configuration  
-LINKS_FILE=/data/links.json
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 
 # Feature configuration
 DEFAULT_URL=https://example.com

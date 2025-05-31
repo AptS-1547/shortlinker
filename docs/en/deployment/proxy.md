@@ -354,3 +354,16 @@ add_header Strict-Transport-Security "max-age=63072000" always;
 ssl_stapling on;
 ssl_stapling_verify on;
 ```
+
+## File Permissions
+
+```bash
+# Set correct permissions
+sudo chown -R www-data:www-data /opt/shortlinker
+sudo chmod 755 /opt/shortlinker
+sudo chmod 600 /opt/shortlinker/data/links.db  # SQLite database
+sudo chmod 755 /opt/shortlinker/shortlinker
+
+# Secure Admin API token in environment
+sudo chmod 600 /opt/shortlinker/.env
+```

@@ -14,8 +14,8 @@ DEFAULT_URL=https://localhost:3000
 RANDOM_CODE_LENGTH=4  # 短一些便于测试
 
 # 存储配置 - 开发环境推荐文件存储便于调试
-STORAGE_TYPE=file
-LINKS_FILE=./dev-links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=./dev-links.json
 
 # 日志配置
 RUST_LOG=debug  # 开发时启用详细日志
@@ -32,8 +32,8 @@ SERVER_HOST=127.0.0.1  # 通过反向代理暴露
 SERVER_PORT=8080
 
 # 存储配置 - 生产环境推荐 SQLite
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 
 # 功能配置
 DEFAULT_URL=https://your-company.com
@@ -56,8 +56,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - STORAGE_TYPE=sqlite
-      - SQLITE_DB_PATH=/data/links.db
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - RANDOM_CODE_LENGTH=8
       - RUST_LOG=info
@@ -73,8 +73,8 @@ services:
 # .env
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 DEFAULT_URL=https://your-site.com
 RANDOM_CODE_LENGTH=8
 RUST_LOG=info
@@ -90,8 +90,8 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # 存储配置（使用持久化存储）
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/mnt/persistent/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/mnt/persistent/links.db
 
 # 功能配置
 DEFAULT_URL=https://your-cloud-site.com
@@ -107,8 +107,8 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # 存储优化 - 使用 SQLite 或 Sled
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/fast-ssd/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/fast-ssd/links.db
 
 # 性能优化
 RANDOM_CODE_LENGTH=6  # 平衡性能和唯一性
@@ -134,8 +134,8 @@ ExecStart=/opt/shortlinker/shortlinker
 # 环境变量
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=STORAGE_TYPE=sqlite
-Environment=SQLITE_DB_PATH=/opt/shortlinker/data/links.db
+Environment=STORAGE_BACKEND=sqlite
+Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RANDOM_CODE_LENGTH=8
 Environment=RUST_LOG=info
@@ -166,7 +166,7 @@ if netstat -tuln | grep -q ":${SERVER_PORT:-8080} "; then
 fi
 
 # 检查存储目录权限
-STORAGE_DIR=$(dirname "${SQLITE_DB_PATH:-links.db}")
+STORAGE_DIR=$(dirname "${DB_FILE_NAME:-links.db}")
 if [ ! -w "$STORAGE_DIR" ]; then
     echo "错误: 存储目录 $STORAGE_DIR 没有写权限"
     exit 1

@@ -29,8 +29,8 @@ TimeoutStopSec=5
 # 环境变量
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=STORAGE_TYPE=sqlite
-Environment=SQLITE_DB_PATH=/opt/shortlinker/data/links.db
+Environment=STORAGE_BACKEND=sqlite
+Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RUST_LOG=info
 
@@ -97,8 +97,8 @@ services:
       - ./data:/data
     environment:
       - SERVER_HOST=0.0.0.0
-      - STORAGE_TYPE=sqlite
-      - SQLITE_DB_PATH=/data/links.db
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/shortlinker.data
       - DEFAULT_URL=https://your-domain.com
       - RUST_LOG=info
     healthcheck:

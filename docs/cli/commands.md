@@ -128,8 +128,8 @@ CLI 工具会读取以下环境变量：
 RANDOM_CODE_LENGTH=6
 
 # 存储配置
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 
 # 日志级别
 RUST_LOG=info

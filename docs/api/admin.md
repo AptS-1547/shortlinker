@@ -20,6 +20,10 @@ ADMIN_TOKEN=your_secure_admin_token
 
 # 可选：自定义路由前缀
 ADMIN_ROUTE_PREFIX=/api/admin
+
+# 存储配置示例
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 ```
 
 ### 请求头
@@ -201,6 +205,21 @@ curl -X DELETE \
 
 ## 使用示例
 
+### 配置示例
+
+```bash
+# 完整的环境变量配置
+export SERVER_HOST=127.0.0.1
+export SERVER_PORT=8080
+export STORAGE_BACKEND=sqlite
+export DB_FILE_NAME=/data/links.db
+export ADMIN_TOKEN=your_secure_admin_token
+export ADMIN_ROUTE_PREFIX=/api/admin
+
+# 启动服务
+./shortlinker
+```
+
 ### Python 示例
 
 ```python
@@ -302,6 +321,29 @@ const admin = new ShortlinkerAdmin('http://localhost:8080', 'your_token');
 // 创建链接
 admin.createLink('test', 'https://example.com')
     .then(result => console.log(result));
+```
+
+## 环境变量参考
+
+完整的环境变量配置：
+
+```bash
+# 服务器配置
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+
+# 存储配置
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
+
+# Admin API 配置
+ADMIN_TOKEN=your_secure_admin_token
+ADMIN_ROUTE_PREFIX=/admin
+
+# 功能配置
+DEFAULT_URL=https://example.com
+RANDOM_CODE_LENGTH=8
+RUST_LOG=info
 ```
 
 ## 安全建议

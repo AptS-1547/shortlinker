@@ -30,8 +30,8 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/data \
-  -e STORAGE_TYPE=sqlite \
-  -e SQLITE_DB_PATH=/data/links.db \
+  -e STORAGE_BACKEND=sqlite \
+  -e DB_FILE_NAME=/data/shortlinker.data \
   e1saps/shortlinker
 ```
 
@@ -53,8 +53,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - STORAGE_TYPE=sqlite
-      - SQLITE_DB_PATH=/data/links.db
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/shortlinker.data
       - DEFAULT_URL=https://example.com
       - RUST_LOG=info
     restart: unless-stopped
@@ -74,8 +74,8 @@ services:
       - ./data:/data
     environment:
       - SERVER_HOST=0.0.0.0
-      - STORAGE_TYPE=sqlite
-      - SQLITE_DB_PATH=/data/links.db
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - ADMIN_TOKEN=${ADMIN_TOKEN}  # 从环境变量读取
     restart: unless-stopped

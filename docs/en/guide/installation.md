@@ -77,6 +77,11 @@ curl -I http://localhost:8080/
 # Should return 307 redirect
 ```
 
+The service supports multiple storage backends (v0.1.0+):
+- SQLite (default): Production-grade performance
+- File storage: Simple and convenient for development
+- Sled: High concurrency performance (coming soon)
+
 ## Common Issues
 
 ### Rust Version Too Old

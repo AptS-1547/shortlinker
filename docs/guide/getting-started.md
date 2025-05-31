@@ -17,8 +17,8 @@ SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
 # 可选：自定义存储配置
-# STORAGE_TYPE=sqlite      # 默认值，可省略
-# SQLITE_DB_PATH=links.db  # 默认值，可省略
+# STORAGE_BACKEND=sqlite       # 默认值，可省略
+# DB_FILE_NAME=links.db        # SQLite 默认值，可省略
 ```
 
 ## 第二步：启动服务
@@ -98,16 +98,16 @@ kill -HUP $(cat shortlinker.pid)
 
 ```bash
 # 生产环境推荐 SQLite（默认）
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 
 # 开发环境可使用文件存储
-# STORAGE_TYPE=file
-# LINKS_FILE=/data/links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=/data/links.json
 
-# 高并发场景可考虑 Sled
-# STORAGE_TYPE=sled
-# SLED_DB_PATH=/data/links.sled
+# 高并发场景可考虑 Sled（即将支持）
+# STORAGE_BACKEND=sled
+# DB_FILE_NAME=/data/links.sled
 ```
 
 ### 反向代理

@@ -178,8 +178,9 @@ CLI tools read the following environment variables:
 # Random short code length
 RANDOM_CODE_LENGTH=6
 
-# Storage file path
-LINKS_FILE=./links.json
+# Storage configuration
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 
 # Other configuration
 RUST_LOG=info

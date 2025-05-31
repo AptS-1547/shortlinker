@@ -22,8 +22,8 @@ SQLite 是一个轻量级的关系数据库，提供了出色的性能和可靠�
 
 ### 配置参数
 ```bash
-STORAGE_TYPE=sqlite        # 启用 SQLite 存储
-SQLITE_DB_PATH=links.db    # 数据库文件路径
+STORAGE_BACKEND=sqlite       # 启用 SQLite 存储
+DB_FILE_NAME=links.db        # 数据库文件路径
 ```
 
 ### 优势
@@ -40,16 +40,16 @@ SQLITE_DB_PATH=links.db    # 数据库文件路径
 ### 配置示例
 ```bash
 # 基础配置
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=data/links.db
 
 # 生产环境
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/var/lib/shortlinker/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/var/lib/shortlinker/links.db
 
 # Docker 环境
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 ```
 
 ### 数据库操作
@@ -74,8 +74,8 @@ cp links.db links.db.backup
 
 ### 配置参数
 ```bash
-STORAGE_TYPE=file          # 启用文件存储
-LINKS_FILE=links.json      # JSON 文件路径
+STORAGE_BACKEND=file         # 启用文件存储
+DB_FILE_NAME=links.json      # JSON 文件路径
 ```
 
 ### 优势
@@ -92,16 +92,16 @@ LINKS_FILE=links.json      # JSON 文件路径
 ### 配置示例
 ```bash
 # 开发环境
-STORAGE_TYPE=file
-LINKS_FILE=dev-links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=dev-links.json
 
 # 生产环境
-STORAGE_TYPE=file
-LINKS_FILE=/var/lib/shortlinker/links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=/var/lib/shortlinker/links.json
 
 # 相对路径
-STORAGE_TYPE=file
-LINKS_FILE=data/links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=data/links.json
 ```
 
 ### 文件格式
@@ -129,8 +129,8 @@ Sled 是一个现代的嵌入式数据库，专为高并发场景设计，从 v0
 
 ### 配置参数
 ```bash
-STORAGE_TYPE=sled          # 启用 Sled 存储
-SLED_DB_PATH=links.sled    # 数据库目录路径
+STORAGE_BACKEND=sled         # 启用 Sled 存储
+DB_FILE_NAME=links.sled      # 数据库目录路径
 ```
 
 ### 优势
@@ -147,16 +147,16 @@ SLED_DB_PATH=links.sled    # 数据库目录路径
 ### 配置示例
 ```bash
 # 基础配置
-STORAGE_TYPE=sled
-SLED_DB_PATH=data/links.sled
+STORAGE_BACKEND=sled
+DB_FILE_NAME=data/links.sled
 
 # 高并发环境
-STORAGE_TYPE=sled
-SLED_DB_PATH=/fast-ssd/links.sled
+STORAGE_BACKEND=sled
+DB_FILE_NAME=/fast-ssd/links.sled
 
 # 临时目录
-STORAGE_TYPE=sled
-SLED_DB_PATH=/tmp/links.sled
+STORAGE_BACKEND=sled
+DB_FILE_NAME=/tmp/links.sled
 ```
 
 ## 存储后端选择指南
@@ -166,22 +166,22 @@ SLED_DB_PATH=/tmp/links.sled
 #### 小规模（< 1,000 链接）
 ```bash
 # 推荐：文件存储（开发友好）
-STORAGE_TYPE=file
-LINKS_FILE=links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=links.json
 ```
 
 #### 中等规模（1,000 - 10,000 链接）
 ```bash
 # 推荐：SQLite（平衡性能和易用性）
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 ```
 
 #### 大规模（> 10,000 链接）
 ```bash
 # 推荐：SQLite 或 Sled
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 ```
 
 ### 按使用场景选择
@@ -189,30 +189,30 @@ SQLITE_DB_PATH=links.db
 #### 开发环境
 ```bash
 # 文件存储 - 便于调试
-STORAGE_TYPE=file
-LINKS_FILE=dev-links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=dev-links.json
 RUST_LOG=debug
 ```
 
 #### 测试环境
 ```bash
 # SQLite - 接近生产环境
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=test-links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=test-links.db
 ```
 
 #### 生产环境
 ```bash
 # SQLite - 稳定可靠
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 ```
 
 #### 高并发场景
 ```bash
 # Sled - 高性能并发
-STORAGE_TYPE=sled
-SLED_DB_PATH=/data/links.sled
+STORAGE_BACKEND=sled
+DB_FILE_NAME=/data/links.sled
 ```
 
 ## 版本迁移指南
@@ -226,12 +226,12 @@ SLED_DB_PATH=/data/links.sled
 # 无需配置，自动使用 links.json
 
 # v0.1.0+ 默认配置（自动使用 SQLite）
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=links.db
 
 # 如需继续使用文件存储，请显式配置
-STORAGE_TYPE=file
-LINKS_FILE=links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=links.json
 ```
 
 ### 数据迁移
@@ -242,8 +242,8 @@ LINKS_FILE=links.json
 cp links.json links.json.backup
 
 # 2. 设置新的存储配置
-export STORAGE_TYPE=sqlite
-export SQLITE_DB_PATH=links.db
+export STORAGE_BACKEND=sqlite
+export DB_FILE_NAME=links.db
 
 # 3. 重启服务，系统会自动检测并迁移数据
 ./shortlinker

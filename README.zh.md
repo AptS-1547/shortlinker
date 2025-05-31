@@ -176,7 +176,7 @@ curl -X DELETE \
 shortlinker 从 v0.1.0 版本开始支持多种存储后端：
 
 - **SQLite**（默认，v0.1.0+）：生产级性能，推荐用于生产环境
-- **文件存储**（默认，< v0.1.0）：简单易用，便于调试和备份
+- **文件存储**（v0.1.0 前的默认方式）：简单易用，便于调试和备份
 - **Sled**（即将支持）：高并发性能，适合高负载场景
 
 ```bash
@@ -202,7 +202,7 @@ DB_FILE_NAME=links.json
 | `SERVER_HOST` | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | `8080` | 监听端口 |
 | `STORAGE_BACKEND` | `sqlite` | 存储后端类型 |
-| `DB_FILE_NAME` | `links.db` | 数据库文件路径（所有后端通用） |
+| `DB_FILE_NAME` | `links.db`（SQLite），`links.json`（文件），`links.sled`（Sled） | 数据库文件路径（根据后端而定） |
 | `DEFAULT_URL` | `https://esap.cc/repo` | 根路径默认跳转地址 |
 | `RANDOM_CODE_LENGTH` | `6` | 随机码长度 |
 | `ADMIN_TOKEN` | *(空)* | Admin API 鉴权令牌 |

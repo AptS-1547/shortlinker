@@ -69,10 +69,10 @@ User Request → Reverse Proxy → Shortlinker Service → Data Storage
 
 ## Performance Characteristics
 
-- **Response Time**: < 1ms (local storage)
+- **Response Time**: < 1ms (SQLite/file storage)
 - **Concurrency Support**: Thousands of concurrent connections
 - **Memory Usage**: Extremely low memory footprint
-- **Storage Format**: JSON files with hot reload support
+- **Storage Backends**: SQLite, file, Sled multiple storage options
 
 ## Admin API Security (v0.0.5+)
 

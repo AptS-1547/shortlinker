@@ -14,8 +14,8 @@ DEFAULT_URL=https://localhost:3000
 RANDOM_CODE_LENGTH=4  # Shorter for testing convenience
 
 # Storage configuration - file storage recommended for development debugging
-STORAGE_TYPE=file
-LINKS_FILE=./dev-links.json
+STORAGE_BACKEND=file
+DB_FILE_NAME=./dev-links.json
 
 # Logging configuration
 RUST_LOG=debug  # Enable verbose logging for development
@@ -32,8 +32,8 @@ SERVER_HOST=127.0.0.1  # Expose through reverse proxy
 SERVER_PORT=8080
 
 # Storage configuration - SQLite recommended for production
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 
 # Feature configuration
 DEFAULT_URL=https://your-company.com
@@ -56,8 +56,8 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - STORAGE_TYPE=sqlite
-      - SQLITE_DB_PATH=/data/links.db
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
       - RANDOM_CODE_LENGTH=8
       - RUST_LOG=info
@@ -73,8 +73,8 @@ services:
 # .env
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/data/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
 DEFAULT_URL=https://your-site.com
 RANDOM_CODE_LENGTH=8
 RUST_LOG=info
@@ -90,8 +90,8 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # Storage configuration (using persistent storage)
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/mnt/persistent/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/mnt/persistent/links.db
 
 # Feature configuration
 DEFAULT_URL=https://your-cloud-site.com
@@ -107,8 +107,8 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # Storage optimization - use SQLite or Sled
-STORAGE_TYPE=sqlite
-SQLITE_DB_PATH=/fast-ssd/links.db
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/fast-ssd/links.db
 
 # Performance optimization
 RANDOM_CODE_LENGTH=6  # Balance performance and uniqueness
@@ -134,8 +134,8 @@ ExecStart=/opt/shortlinker/shortlinker
 # Environment variables
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=STORAGE_TYPE=sqlite
-Environment=SQLITE_DB_PATH=/opt/shortlinker/data/links.db
+Environment=STORAGE_BACKEND=sqlite
+Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RANDOM_CODE_LENGTH=8
 Environment=RUST_LOG=info
@@ -166,7 +166,7 @@ if netstat -tuln | grep -q ":${SERVER_PORT:-8080} "; then
 fi
 
 # Check storage directory permissions
-STORAGE_DIR=$(dirname "${SQLITE_DB_PATH:-links.db}")
+STORAGE_DIR=$(dirname "${DB_FILE_NAME:-links.db}")
 if [ ! -w "$STORAGE_DIR" ]; then
     echo "Error: Storage directory $STORAGE_DIR has no write permission"
     exit 1
