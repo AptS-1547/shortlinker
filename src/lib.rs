@@ -4,6 +4,7 @@
 
 pub mod admin;
 pub mod cli;
+pub mod errors;
 pub mod reload;
 pub mod signal;
 pub mod storages;
@@ -19,7 +20,10 @@ use storages::Storage;
 
 /// 短链接重定向处理函数
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-pub async fn handle_redirect(path: web::Path<String>, storage: web::Data<Arc<dyn Storage>>) -> impl Responder {
+pub async fn handle_redirect(
+    path: web::Path<String>,
+    storage: web::Data<Arc<dyn Storage>>,
+) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);

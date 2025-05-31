@@ -5,6 +5,7 @@ use std::env;
 use std::sync::{Arc, Mutex};
 
 use super::{ShortLink, Storage};
+use crate::errors::{Result, ShortlinkerError};
 use async_trait::async_trait;
 
 pub struct SqliteStorage {
@@ -12,10 +13,11 @@ pub struct SqliteStorage {
 }
 
 impl SqliteStorage {
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> Result<Self> {
         let db_path = env::var("SQLITE_DB_PATH").unwrap_or_else(|_| "links.db".to_string());
 
-        let conn = Connection::open(&db_path).map_err(|e| format!("无法打开数据库: {}", e))?;
+        let conn = Connection::open(&db_path)
+            .map_err(|e| ShortlinkerError::database_connection(format!("无法打开数据库: {}", e)))?;
 
         let storage = SqliteStorage {
             connection: Arc::new(Mutex::new(conn)),
@@ -28,7 +30,7 @@ impl SqliteStorage {
         Ok(storage)
     }
 
-    fn init_db(&self) -> Result<(), String> {
+    fn init_db(&self) -> Result<()> {
         let conn = self.connection.lock().unwrap();
 
         conn.execute(
@@ -40,7 +42,7 @@ impl SqliteStorage {
             )",
             [],
         )
-        .map_err(|e| format!("创建表失败: {}", e))?;
+        .map_err(|e| ShortlinkerError::database_operation(format!("创建表失败: {}", e)))?;
 
         Ok(())
     }
@@ -50,7 +52,7 @@ impl SqliteStorage {
         target_url: String,
         created_at: String,
         expires_at: Option<String>,
-    ) -> Result<ShortLink, String> {
+    ) -> Result<ShortLink> {
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
             .unwrap_or_else(|_| chrono::Utc::now().into())
             .with_timezone(&chrono::Utc);
@@ -162,7 +164,7 @@ impl Storage for SqliteStorage {
         links
     }
 
-    async fn set(&self, link: ShortLink) -> Result<(), String> {
+    async fn set(&self, link: ShortLink) -> Result<()> {
         let conn = self.connection.lock().unwrap();
 
         let created_at = link.created_at.to_rfc3339();
@@ -172,10 +174,13 @@ impl Storage for SqliteStorage {
         let exists = {
             let mut stmt = conn
                 .prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
-                .map_err(|e| format!("准备查询语句失败: {}", e))?;
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
+                })?;
 
-            stmt.exists(params![link.code])
-                .map_err(|e| format!("检查记录存在性失败: {}", e))?
+            stmt.exists(params![link.code]).map_err(|e| {
+                ShortlinkerError::database_operation(format!("检查记录存在性失败: {}", e))
+            })?
         };
 
         if exists {
@@ -184,7 +189,7 @@ impl Storage for SqliteStorage {
                  WHERE short_code = ?1",
                 params![link.code, link.target, expires_at],
             )
-            .map_err(|e| format!("更新短链接失败: {}", e))?;
+            .map_err(|e| ShortlinkerError::database_operation(format!("更新短链接失败: {}", e)))?;
 
             info!("短链接已更新: {}", link.code);
         } else {
@@ -193,7 +198,7 @@ impl Storage for SqliteStorage {
                  VALUES (?1, ?2, ?3, ?4)",
                 params![link.code, link.target, created_at, expires_at],
             )
-            .map_err(|e| format!("插入短链接失败: {}", e))?;
+            .map_err(|e| ShortlinkerError::database_operation(format!("插入短链接失败: {}", e)))?;
 
             info!("短链接已创建: {}", link.code);
         }
@@ -201,7 +206,7 @@ impl Storage for SqliteStorage {
         Ok(())
     }
 
-    async fn remove(&self, code: &str) -> Result<(), String> {
+    async fn remove(&self, code: &str) -> Result<()> {
         let conn = self.connection.lock().unwrap();
 
         let rows_affected = conn
@@ -209,17 +214,20 @@ impl Storage for SqliteStorage {
                 "DELETE FROM short_links WHERE short_code = ?1",
                 params![code],
             )
-            .map_err(|e| format!("删除短链接失败: {}", e))?;
+            .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
 
         if rows_affected == 0 {
-            return Err(format!("短链接不存在: {}", code));
+            return Err(ShortlinkerError::not_found(format!(
+                "短链接不存在: {}",
+                code
+            )));
         }
 
         info!("短链接已删除: {}", code);
         Ok(())
     }
 
-    async fn reload(&self) -> Result<(), String> {
+    async fn reload(&self) -> Result<()> {
         Ok(())
     }
 

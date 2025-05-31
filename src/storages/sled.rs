@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use super::{ShortLink, Storage};
+use crate::errors::Result;
 use async_trait::async_trait;
 
 pub struct SledStorage;
 
 impl SledStorage {
-    pub fn new() -> Self {
-        SledStorage
+    pub fn new() -> Result<Self> {
+        Ok(SledStorage)
     }
 }
 
@@ -41,17 +42,17 @@ impl Storage for SledStorage {
         links
     }
 
-    async fn set(&self, link: ShortLink) -> Result<(), String> {
+    async fn set(&self, link: ShortLink) -> Result<()> {
         println!("SledStorage::save called with {:?}", link);
         Ok(())
     }
 
-    async fn remove(&self, code: &str) -> Result<(), String> {
+    async fn remove(&self, code: &str) -> Result<()> {
         println!("SledStorage::remove called with {}", code);
         Ok(())
     }
 
-    async fn reload(&self) -> Result<(), String> {
+    async fn reload(&self) -> Result<()> {
         Ok(())
     }
 

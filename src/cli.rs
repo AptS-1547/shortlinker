@@ -238,7 +238,12 @@ pub async fn run_cli_with_storage(storage: Arc<dyn Storage>) {
                     RESET
                 );
             }
-            let _ = signal::notify_server();
+            match signal::notify_server() {
+                Ok(_) => {}
+                Err(e) => {
+                    print_warning!("通知服务器失败: {}", e);
+                }
+            }
         }
 
         "remove" => {
@@ -253,7 +258,12 @@ pub async fn run_cli_with_storage(storage: Arc<dyn Storage>) {
                 match storage.remove(short_code).await {
                     Ok(_) => {
                         print_success!("已删除短链接: {}{}{}", CYAN, short_code, RESET);
-                        let _ = signal::notify_server();
+                        match signal::notify_server() {
+                            Ok(_) => {}
+                            Err(e) => {
+                                print_warning!("通知服务器失败: {}", e);
+                            }
+                        }
                     }
                     Err(e) => {
                         print_error!("删除失败: {}", e);

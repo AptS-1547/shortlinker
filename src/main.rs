@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::process;
 
 mod cli;
+mod errors;
 mod reload;
 mod signal;
 mod storages;
@@ -26,7 +27,10 @@ struct Config {
 }
 
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-async fn handle_redirect(path: web::Path<String>, storage: web::Data<Arc<dyn Storage>>) -> impl Responder {
+async fn handle_redirect(
+    path: web::Path<String>,
+    storage: web::Data<Arc<dyn Storage>>,
+) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);
@@ -175,7 +179,10 @@ async fn main() -> std::io::Result<()> {
 
     // 检查存储后端
     let storage = StorageFactory::create().expect("Failed to create storage");
-    info!("Using storage backend: {}", storage.get_backend_name().await);
+    info!(
+        "Using storage backend: {}",
+        storage.get_backend_name().await
+    );
 
     // 设置重载机制
     debug!("Setting up reload mechanism");
@@ -214,7 +221,6 @@ async fn main() -> std::io::Result<()> {
     .bind(bind_address)?
     .run()
     .await?;
-
     // Clean up PID file on exit
     #[cfg(unix)]
     {

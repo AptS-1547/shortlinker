@@ -7,6 +7,7 @@ use std::sync::{Arc, RwLock};
 use super::{ShortLink, Storage};
 use async_trait::async_trait;
 
+use crate::errors::{Result, ShortlinkerError};
 use crate::storages::SerializableShortLink;
 
 pub struct FileStorage {
@@ -15,7 +16,7 @@ pub struct FileStorage {
 }
 
 impl FileStorage {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let file_path = env::var("LINKS_FILE").unwrap_or_else(|_| "links.json".to_string());
         let storage = FileStorage {
             file_path,
@@ -23,7 +24,8 @@ impl FileStorage {
         };
 
         // 初始化时加载数据到缓存
-        if let Ok(links) = storage.load_from_file() {
+        let links = storage.load_from_file()?;
+        {
             let mut cache_guard = storage.cache.write().unwrap();
             *cache_guard = links;
             info!(
@@ -32,10 +34,10 @@ impl FileStorage {
             );
         }
 
-        storage
+        Ok(storage)
     }
 
-    fn load_from_file(&self) -> Result<HashMap<String, ShortLink>, String> {
+    fn load_from_file(&self) -> Result<HashMap<String, ShortLink>> {
         match fs::read_to_string(&self.file_path) {
             Ok(content) => match serde_json::from_str::<Vec<SerializableShortLink>>(&content) {
                 Ok(links) => {
@@ -66,14 +68,20 @@ impl FileStorage {
                 }
                 Err(e) => {
                     error!("解析链接文件失败: {}", e);
-                    Err(format!("解析链接文件失败: {}", e))
+                    Err(ShortlinkerError::serialization(format!(
+                        "解析链接文件失败: {}",
+                        e
+                    )))
                 }
             },
             Err(_) => {
                 info!("链接文件不存在，创建空的存储");
                 if let Err(e) = fs::write(&self.file_path, "[]") {
                     error!("创建链接文件失败: {}", e);
-                    return Err(format!("创建链接文件失败: {}", e));
+                    return Err(ShortlinkerError::file_operation(format!(
+                        "创建链接文件失败: {}",
+                        e
+                    )));
                 }
                 info!("已创建空的链接文件: {}", self.file_path);
                 Ok(HashMap::new())
@@ -81,7 +89,7 @@ impl FileStorage {
         }
     }
 
-    fn save_to_file(&self, links: &HashMap<String, ShortLink>) -> Result<(), String> {
+    fn save_to_file(&self, links: &HashMap<String, ShortLink>) -> Result<()> {
         let links_vec: Vec<SerializableShortLink> = links
             .iter()
             .map(|(_, link)| SerializableShortLink {
@@ -92,11 +100,8 @@ impl FileStorage {
             })
             .collect();
 
-        let json =
-            serde_json::to_string_pretty(&links_vec).map_err(|e| format!("序列化失败: {}", e))?;
-
-        fs::write(&self.file_path, json).map_err(|e| format!("写入文件失败: {}", e))?;
-
+        let json = serde_json::to_string_pretty(&links_vec)?;
+        fs::write(&self.file_path, json)?;
         Ok(())
     }
 }
@@ -113,7 +118,7 @@ impl Storage for FileStorage {
         cache_guard.clone()
     }
 
-    async fn set(&self, link: ShortLink) -> Result<(), String> {
+    async fn set(&self, link: ShortLink) -> Result<()> {
         // 更新缓存
         {
             let mut cache_guard = self.cache.write().unwrap();
@@ -140,7 +145,7 @@ impl Storage for FileStorage {
         Ok(())
     }
 
-    async fn remove(&self, code: &str) -> Result<(), String> {
+    async fn remove(&self, code: &str) -> Result<()> {
         // 从缓存中移除
         let removed = {
             let mut cache_guard = self.cache.write().unwrap();
@@ -148,7 +153,10 @@ impl Storage for FileStorage {
         };
 
         if !removed {
-            return Err(format!("短链接不存在: {}", code));
+            return Err(ShortlinkerError::not_found(format!(
+                "短链接不存在: {}",
+                code
+            )));
         }
 
         // 保存到文件
@@ -158,7 +166,7 @@ impl Storage for FileStorage {
         Ok(())
     }
 
-    async fn reload(&self) -> Result<(), String> {
+    async fn reload(&self) -> Result<()> {
         match self.load_from_file() {
             Ok(new_links) => {
                 let mut cache_guard = self.cache.write().unwrap();
