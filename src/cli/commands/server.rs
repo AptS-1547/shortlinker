@@ -1,4 +1,4 @@
-use super::super::{CliError, process_manager::ProcessManager};
+use super::super::{process_manager::ProcessManager, CliError};
 
 pub fn start_server() -> Result<(), CliError> {
     ProcessManager::start_server()

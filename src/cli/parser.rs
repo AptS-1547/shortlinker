@@ -1,7 +1,13 @@
-use super::{CliError, commands::Command};
+use super::{commands::Command, CliError};
 use std::env;
 
 pub struct CliParser;
+
+impl Default for CliParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CliParser {
     pub fn new() -> Self {
@@ -10,7 +16,7 @@ impl CliParser {
 
     pub fn parse(&self) -> Result<Command, CliError> {
         let args: Vec<String> = env::args().collect();
-        
+
         if args.len() < 2 {
             return Err(CliError::ParseError("No command provided".to_string()));
         }
@@ -23,13 +29,18 @@ impl CliParser {
             "list" => Ok(Command::List),
             "add" => self.parse_add_command(&args[2..]),
             "remove" => self.parse_remove_command(&args[2..]),
-            _ => Err(CliError::ParseError(format!("Unknown command: {}", args[1]))),
+            _ => Err(CliError::ParseError(format!(
+                "Unknown command: {}",
+                args[1]
+            ))),
         }
     }
 
     fn parse_add_command(&self, args: &[String]) -> Result<Command, CliError> {
         if args.is_empty() {
-            return Err(CliError::ParseError("Add command requires arguments".to_string()));
+            return Err(CliError::ParseError(
+                "Add command requires arguments".to_string(),
+            ));
         }
 
         let mut force_overwrite = false;
@@ -48,7 +59,9 @@ impl CliParser {
                         expire_time = Some(args[i + 1].clone());
                         i += 2;
                     } else {
-                        return Err(CliError::ParseError("--expire requires a time argument".to_string()));
+                        return Err(CliError::ParseError(
+                            "--expire requires a time argument".to_string(),
+                        ));
                     }
                 }
                 _ => {
@@ -61,7 +74,11 @@ impl CliParser {
         let (short_code, target_url) = match positional_args.len() {
             1 => (None, positional_args[0].clone()), // Random code
             2 => (Some(positional_args[0].clone()), positional_args[1].clone()),
-            _ => return Err(CliError::ParseError("Invalid number of arguments for add command".to_string())),
+            _ => {
+                return Err(CliError::ParseError(
+                    "Invalid number of arguments for add command".to_string(),
+                ))
+            }
         };
 
         Ok(Command::Add {
@@ -74,7 +91,9 @@ impl CliParser {
 
     fn parse_remove_command(&self, args: &[String]) -> Result<Command, CliError> {
         if args.len() != 1 {
-            return Err(CliError::ParseError("Remove command requires exactly one argument".to_string()));
+            return Err(CliError::ParseError(
+                "Remove command requires exactly one argument".to_string(),
+            ));
         }
 
         Ok(Command::Remove {

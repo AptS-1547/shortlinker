@@ -20,10 +20,10 @@ pub const UNDERLINE: &str = "\x1b[4m";
 #[macro_export]
 macro_rules! print_error {
     ($($arg:tt)*) => {
-        println!("{}{}错误:{} {}", 
-            $crate::utils::colors::BOLD, 
-            $crate::utils::colors::RED, 
-            $crate::utils::colors::RESET, 
+        println!("{}{}错误:{} {}",
+            $crate::utils::colors::BOLD,
+            $crate::utils::colors::RED,
+            $crate::utils::colors::RESET,
             format!($($arg)*))
     };
 }
@@ -31,10 +31,10 @@ macro_rules! print_error {
 #[macro_export]
 macro_rules! print_success {
     ($($arg:tt)*) => {
-        println!("{}{}✓{} {}", 
-            $crate::utils::colors::BOLD, 
-            $crate::utils::colors::GREEN, 
-            $crate::utils::colors::RESET, 
+        println!("{}{}✓{} {}",
+            $crate::utils::colors::BOLD,
+            $crate::utils::colors::GREEN,
+            $crate::utils::colors::RESET,
             format!($($arg)*))
     };
 }
@@ -42,10 +42,10 @@ macro_rules! print_success {
 #[macro_export]
 macro_rules! print_info {
     ($($arg:tt)*) => {
-        println!("{}{}ℹ{} {}", 
-            $crate::utils::colors::BOLD, 
-            $crate::utils::colors::BLUE, 
-            $crate::utils::colors::RESET, 
+        println!("{}{}ℹ{} {}",
+            $crate::utils::colors::BOLD,
+            $crate::utils::colors::BLUE,
+            $crate::utils::colors::RESET,
             format!($($arg)*))
     };
 }
@@ -53,10 +53,10 @@ macro_rules! print_info {
 #[macro_export]
 macro_rules! print_warning {
     ($($arg:tt)*) => {
-        println!("{}{}⚠{} {}", 
-            $crate::utils::colors::BOLD, 
-            $crate::utils::colors::YELLOW, 
-            $crate::utils::colors::RESET, 
+        println!("{}{}⚠{} {}",
+            $crate::utils::colors::BOLD,
+            $crate::utils::colors::YELLOW,
+            $crate::utils::colors::RESET,
             format!($($arg)*))
     };
 }
@@ -64,9 +64,9 @@ macro_rules! print_warning {
 #[macro_export]
 macro_rules! print_usage {
     ($($arg:tt)*) => {
-        println!("{}{}{}", 
-            $crate::utils::colors::CYAN, 
-            format!($($arg)*), 
+        println!("{}{}{}",
+            $crate::utils::colors::CYAN,
+            format!($($arg)*),
             $crate::utils::colors::RESET)
     };
 }
