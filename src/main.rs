@@ -25,7 +25,7 @@ struct Config {
 }
 
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-async fn shortlinker(path: web::Path<String>) -> impl Responder {
+async fn handle_redirect(path: web::Path<String>) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);
@@ -203,7 +203,7 @@ async fn main() -> std::io::Result<()> {
                     .service(admin::delete_link)
                     .service(admin::update_link),
             )
-            .service(shortlinker)
+            .service(handle_redirect)
     })
     .bind(bind_address)?
     .run()

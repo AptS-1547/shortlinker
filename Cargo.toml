@@ -1,7 +1,17 @@
 [package]
 name = "shortlinker"
-version = "0.0.6"
+version = "0.1.0"
 edition = "2021"
+
+# 添加库配置
+[lib]
+name = "shortlinker"
+path = "src/lib.rs"
+
+# 二进制配置
+[[bin]]
+name = "shortlinker"
+path = "src/main.rs"
 
 [dependencies]
 actix-web = "4.0"
@@ -23,3 +33,12 @@ sled = "0.34.7"
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }
 nix = { version = "0.26", features = ["signal", "process"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+actix-rt = "2.9"
+tempfile = "3.8"
+serde_json = "1.0"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1.45.1", features = ["full"] }

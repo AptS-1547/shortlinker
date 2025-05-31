@@ -37,7 +37,7 @@ fn check_auth(req: &HttpRequest) -> Result<bool, HttpResponse> {
     if admin_token.is_empty() {
         info!("Admin API 访问被拒绝: API 已禁用 (未设置 ADMIN_TOKEN)");
         return Err(HttpResponse::NotFound()
-            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .append_header(("Content-Type", "text/html; charset=utf-8"))
             .append_header(("Connection", "close"))
             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
             .body("Not Found"));
