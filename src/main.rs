@@ -1,75 +1,28 @@
-use actix_web::{middleware::from_fn, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
 use log::{debug, error, info};
 use std::env;
 use std::fs;
-use std::sync::Arc;
 
 #[cfg(unix)]
 use std::process;
 
 mod cli;
 mod errors;
-mod reload;
-mod signal;
+mod services;
 mod storages;
+mod system;
 mod utils;
 
-mod admin;
-
-use crate::storages::{Storage, StorageFactory};
+use crate::services::{AdminService, RedirectService};
+use crate::storages::StorageFactory;
+use crate::system::setup_reload_mechanism;
 
 // 配置结构体
 #[derive(Clone, Debug)]
 struct Config {
     server_host: String,
     server_port: u16,
-}
-
-#[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-async fn handle_redirect(
-    path: web::Path<String>,
-    storage: web::Data<Arc<dyn Storage>>,
-) -> impl Responder {
-    let captured_path = path.to_string();
-
-    debug!("捕获的路径: {}", captured_path);
-
-    if captured_path.is_empty() {
-        let default_url =
-            env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string());
-        info!("重定向到默认主页: {}", default_url);
-        HttpResponse::TemporaryRedirect()
-            .append_header(("Location", default_url))
-            .finish()
-    } else {
-        // 使用注入的 storage 获取链接
-        if let Some(link) = storage.get(&captured_path).await {
-            // 检查链接是否过期
-            if let Some(expires_at) = link.expires_at {
-                if expires_at < chrono::Utc::now() {
-                    info!("链接已过期: {}", captured_path);
-                    return HttpResponse::NotFound()
-                        .append_header(("Content-Type", "text/html; charset=utf-8"))
-                        .append_header(("Connection", "close"))
-                        .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                        .body("Not Found");
-                }
-            }
-
-            info!("重定向 {} -> {}", captured_path, link.target);
-            HttpResponse::TemporaryRedirect()
-                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                .append_header(("Location", link.target.as_str()))
-                .finish()
-        } else {
-            HttpResponse::NotFound()
-                .append_header(("Content-Type", "text/html; charset=utf-8"))
-                .append_header(("Connection", "close"))
-                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                .body("Not Found")
-        }
-    }
 }
 
 #[actix_web::main]
@@ -186,7 +139,7 @@ async fn main() -> std::io::Result<()> {
 
     // 设置重载机制
     debug!("Setting up reload mechanism");
-    reload::setup_reload_mechanism(storage.clone());
+    setup_reload_mechanism(storage.clone());
 
     // 获取 admin 路由前缀
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
@@ -209,18 +162,22 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(storage.clone()))
             .service(
                 web::scope(&admin_prefix_clone)
-                    .wrap(from_fn(admin::auth_middleware))
-                    .service(admin::get_all_links)
-                    .service(admin::post_link)
-                    .service(admin::get_link)
-                    .service(admin::delete_link)
-                    .service(admin::update_link),
+                    .wrap(from_fn(AdminService::auth_middleware))
+                    .route("/link", web::get().to(AdminService::get_all_links))
+                    .route("/link", web::head().to(AdminService::get_all_links))
+                    .route("/link", web::post().to(AdminService::post_link))
+                    .route("/link/{code}", web::get().to(AdminService::get_link))
+                    .route("/link/{code}", web::head().to(AdminService::get_link))
+                    .route("/link/{code}", web::delete().to(AdminService::delete_link))
+                    .route("/link/{code}", web::put().to(AdminService::update_link)),
             )
-            .service(handle_redirect)
+            .route("/{path}*", web::get().to(RedirectService::handle_redirect))
+            .route("/{path}*", web::head().to(RedirectService::handle_redirect))
     })
     .bind(bind_address)?
     .run()
     .await?;
+
     // Clean up PID file on exit
     #[cfg(unix)]
     {

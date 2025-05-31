@@ -2,12 +2,11 @@
 //!
 //! 这是一个高性能的短链接服务，支持命令行管理和Web API。
 
-pub mod admin;
 pub mod cli;
-pub mod errors;
-pub mod reload;
-pub mod signal;
+pub mod services;
 pub mod storages;
+pub mod system;
+pub mod errors;
 pub mod utils;
 
 // 重新导出主要的处理函数以供测试使用

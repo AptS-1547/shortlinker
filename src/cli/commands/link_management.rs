@@ -122,7 +122,7 @@ pub async fn add_link(
     }
 
     // 通知服务器重载
-    if let Err(e) = crate::signal::notify_server() {
+    if let Err(e) = crate::system::notify_server() {
         println!("{}{}⚠{} 通知服务器失败: {}", BOLD, YELLOW, RESET, e);
     }
 
@@ -142,7 +142,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
     println!("{}{}✓{} 已删除短链接: {}{}{}", BOLD, GREEN, RESET, CYAN, short_code, RESET);
 
     // 通知服务器重载
-    if let Err(e) = crate::signal::notify_server() {
+    if let Err(e) = crate::system::notify_server() {
         println!("{}{}⚠{} 通知服务器失败: {}", BOLD, YELLOW, RESET, e);
     }
 
