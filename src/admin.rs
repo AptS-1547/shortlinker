@@ -1,4 +1,9 @@
-use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use actix_web::middleware::Next;
+use actix_web::{
+    body::BoxBody,
+    dev::{ServiceRequest, ServiceResponse},
+    web, Error, HttpRequest, HttpResponse, Responder,
+};
 use log::{debug, error, info};
 use std::collections::HashMap;
 use std::env;
@@ -29,46 +34,57 @@ struct PostNewLink {
     expires_at: Option<String>,
 }
 
-// 鉴权函数
-fn check_auth(req: &HttpRequest) -> Result<bool, HttpResponse> {
+// 身份验证中间件
+pub async fn auth_middleware(
+    req: ServiceRequest,
+    next: Next<BoxBody>,
+) -> Result<ServiceResponse<BoxBody>, Error> {
+    // 在每次请求时重新读取环境变量，而不是在启动时缓存
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
+    debug!(
+        "Auth middleware: ADMIN_TOKEN 环境变量结果: {:?}",
+        admin_token
+    );
 
     // 如果 token 为空，认为 Admin API 被禁用
     if admin_token.is_empty() {
         info!("Admin API 访问被拒绝: API 已禁用 (未设置 ADMIN_TOKEN)");
-        return Err(HttpResponse::NotFound()
-            .append_header(("Content-Type", "text/html; charset=utf-8"))
-            .append_header(("Connection", "close"))
-            .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-            .body("Not Found"));
+        return Ok(req.into_response(
+            HttpResponse::NotFound()
+                .append_header(("Content-Type", "text/html; charset=utf-8"))
+                .append_header(("Connection", "close"))
+                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                .body("Not Found"),
+        ));
     }
 
     if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                let is_valid = token == admin_token;
-                if is_valid {
+                if token == admin_token {
                     debug!("Admin API 鉴权成功");
-                } else {
-                    info!("Admin API 鉴权失败: 无效的 token");
+                    return next.call(req).await;
                 }
-                return Ok(is_valid);
             }
         }
     }
-    info!("Admin API 鉴权失败: 缺少或格式错误的 Authorization header");
-    Ok(false)
+
+    info!("Admin API 鉴权失败: token不匹配或缺少Authorization header");
+    Ok(req.into_response(
+        HttpResponse::Unauthorized()
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .append_header(("Connection", "close"))
+            .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+            .json(ApiResponse {
+                code: 401,
+                data: serde_json::json!({ "error": "Unauthorized: Invalid or missing token" }),
+            }),
+    ))
 }
 
 #[actix_web::route("/link", method = "GET", method = "HEAD")]
-async fn get_all_links(req: HttpRequest) -> impl Responder {
+async fn get_all_links(_req: HttpRequest) -> impl Responder {
     info!("Admin API: 获取所有链接请求");
-
-    match check_auth(&req) {
-        Err(response) => return response, // Admin API 被禁用，返回 404
-        Ok(false) => return auth_error(), // 鉴权失败，返回 401
-        Ok(true) => {}                    // 鉴权成功，继续执行
-    }
 
     let links = STORAGE.load_all().await;
     info!("Admin API: 成功获取 {} 个链接", links.len());
@@ -97,17 +113,11 @@ async fn get_all_links(req: HttpRequest) -> impl Responder {
 }
 
 #[actix_web::route("/link", method = "POST")]
-async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Responder {
+async fn post_link(_req: HttpRequest, link: web::Json<PostNewLink>) -> impl Responder {
     info!(
         "Admin API: 创建链接请求 - code: {}, target: {}",
         link.code, link.target
     );
-
-    match check_auth(&req) {
-        Err(response) => return response,
-        Ok(false) => return auth_error(),
-        Ok(true) => {}
-    }
 
     let new_link = ShortLink {
         code: link.code.clone(),
@@ -153,14 +163,8 @@ async fn post_link(req: HttpRequest, link: web::Json<PostNewLink>) -> impl Respo
 }
 
 #[actix_web::route("/link/{code}", method = "GET", method = "HEAD")]
-async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
+async fn get_link(_req: HttpRequest, code: web::Path<String>) -> impl Responder {
     info!("Admin API: 获取链接请求 - code: {}", code);
-
-    match check_auth(&req) {
-        Err(response) => return response,
-        Ok(false) => return auth_error(),
-        Ok(true) => {}
-    }
 
     match STORAGE.get(&code).await {
         Some(link) => {
@@ -195,14 +199,8 @@ async fn get_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
 }
 
 #[actix_web::route("/link/{code}", method = "DELETE")]
-async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responder {
+async fn delete_link(_req: HttpRequest, code: web::Path<String>) -> impl Responder {
     info!("Admin API: 删除链接请求 - code: {}", code);
-
-    match check_auth(&req) {
-        Err(response) => return response,
-        Ok(false) => return auth_error(),
-        Ok(true) => {}
-    }
 
     match STORAGE.remove(&code).await {
         Ok(_) => {
@@ -232,7 +230,7 @@ async fn delete_link(req: HttpRequest, code: web::Path<String>) -> impl Responde
 
 #[actix_web::route("/link/{code}", method = "PUT")]
 async fn update_link(
-    req: HttpRequest,
+    _req: HttpRequest,
     code: web::Path<String>,
     link: web::Json<PostNewLink>,
 ) -> impl Responder {
@@ -240,12 +238,6 @@ async fn update_link(
         "Admin API: 更新链接请求 - code: {}, target: {}",
         code, link.target
     );
-
-    match check_auth(&req) {
-        Err(response) => return response,
-        Ok(false) => return auth_error(),
-        Ok(true) => {}
-    }
 
     let updated_link = ShortLink {
         code: code.clone(),
@@ -288,16 +280,4 @@ async fn update_link(
                 })
         }
     }
-}
-
-// 鉴权错误响应
-fn auth_error() -> HttpResponse {
-    HttpResponse::Unauthorized()
-        .append_header(("Content-Type", "application/json; charset=utf-8"))
-        .append_header(("Connection", "close"))
-        .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
-        .json(ApiResponse {
-            code: 401,
-            data: serde_json::json!({ "error": "Unauthorized: Invalid or missing token" }),
-        })
 }

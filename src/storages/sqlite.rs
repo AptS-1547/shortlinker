@@ -222,4 +222,8 @@ impl Storage for SqliteStorage {
     async fn reload(&self) -> Result<(), String> {
         Ok(())
     }
+
+    async fn get_backend_name(&self) -> String {
+        "sqlite".to_string()
+    }
 }

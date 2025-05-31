@@ -30,6 +30,7 @@ pub trait Storage: Send + Sync {
     async fn set(&self, link: ShortLink) -> Result<(), String>;
     async fn remove(&self, code: &str) -> Result<(), String>;
     async fn reload(&self) -> Result<(), String>;
+    async fn get_backend_name(&self) -> String;
 }
 
 pub mod file;

@@ -1,4 +1,4 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware::from_fn, web, App, HttpResponse, HttpServer, Responder};
 use dotenv::dotenv;
 use log::{debug, error, info};
 use std::env;
@@ -183,6 +183,9 @@ async fn main() -> std::io::Result<()> {
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
 
+    // 检查存储后端
+    info!("Using storage backend: {}", STORAGE.get_backend_name().await);
+
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
     if admin_token.is_empty() {
@@ -194,9 +197,10 @@ async fn main() -> std::io::Result<()> {
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
-            // 使用 scope 设置 admin 路由前缀
+            // 使用 scope 设置 admin 路由前缀，并添加身份验证中间件
             .service(
                 web::scope(&admin_prefix_clone)
+                    .wrap(from_fn(admin::auth_middleware))
                     .service(admin::get_all_links)
                     .service(admin::post_link)
                     .service(admin::get_link)

@@ -172,4 +172,8 @@ impl Storage for FileStorage {
             }
         }
     }
+
+    async fn get_backend_name(&self) -> String {
+        "file".to_string()
+    }
 }

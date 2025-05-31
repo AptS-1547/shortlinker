@@ -1,5 +1,5 @@
 //! shortlinker - 短链接服务
-//! 
+//!
 //! 这是一个高性能的短链接服务，支持命令行管理和Web API。
 
 pub mod admin;

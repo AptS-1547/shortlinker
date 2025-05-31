@@ -47,6 +47,7 @@ EXPOSE 8080
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
 ENV LINKS_FILE=/data/links
+ENV SQLITE_DB_PATH=/data/shortlinker.db
 ENV RUST_LOG=info
 
 # 启动命令

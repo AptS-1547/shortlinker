@@ -54,4 +54,8 @@ impl Storage for SledStorage {
     async fn reload(&self) -> Result<(), String> {
         Ok(())
     }
+
+    async fn get_backend_name(&self) -> String {
+        "sled".to_string()
+    }
 }
