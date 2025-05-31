@@ -3,6 +3,7 @@ use dotenv::dotenv;
 use log::{debug, error, info};
 use std::env;
 use std::fs;
+use std::sync::Arc;
 
 #[cfg(unix)]
 use std::process;
@@ -15,7 +16,7 @@ mod utils;
 
 mod admin;
 
-use storages::STORAGE;
+use crate::storages::{Storage, StorageFactory};
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -25,7 +26,7 @@ struct Config {
 }
 
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-async fn handle_redirect(path: web::Path<String>) -> impl Responder {
+async fn handle_redirect(path: web::Path<String>, storage: web::Data<Arc<dyn Storage>>) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);
@@ -38,8 +39,8 @@ async fn handle_redirect(path: web::Path<String>) -> impl Responder {
             .append_header(("Location", default_url))
             .finish()
     } else {
-        // 使用 STORAGE 获取链接
-        if let Some(link) = STORAGE.get(&captured_path).await {
+        // 使用注入的 storage 获取链接
+        if let Some(link) = storage.get(&captured_path).await {
             // 检查链接是否过期
             if let Some(expires_at) = link.expires_at {
                 if expires_at < chrono::Utc::now() {
@@ -172,9 +173,13 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // 检查存储后端
+    let storage = StorageFactory::create().expect("Failed to create storage");
+    info!("Using storage backend: {}", storage.get_backend_name().await);
+
     // 设置重载机制
     debug!("Setting up reload mechanism");
-    reload::setup_reload_mechanism();
+    reload::setup_reload_mechanism(storage.clone());
 
     // 获取 admin 路由前缀
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
@@ -182,9 +187,6 @@ async fn main() -> std::io::Result<()> {
 
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     info!("Starting server at http://{}", bind_address);
-
-    // 检查存储后端
-    info!("Using storage backend: {}", STORAGE.get_backend_name().await);
 
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
@@ -197,7 +199,7 @@ async fn main() -> std::io::Result<()> {
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
-            // 使用 scope 设置 admin 路由前缀，并添加身份验证中间件
+            .app_data(web::Data::new(storage.clone()))
             .service(
                 web::scope(&admin_prefix_clone)
                     .wrap(from_fn(admin::auth_middleware))

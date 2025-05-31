@@ -1,18 +1,18 @@
+use crate::storages;
 use log::info;
+use std::sync::Arc;
 use std::thread;
-
-use crate::storages::STORAGE;
 
 // Unix平台的信号监听
 #[cfg(unix)]
-pub fn setup_reload_mechanism() {
+pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
     use signal_hook::{consts::SIGUSR1, iterator::Signals};
 
     thread::spawn(move || {
         let mut signals = Signals::new([SIGUSR1]).unwrap();
         for _ in signals.forever() {
             info!("收到 SIGUSR1，正在从 Storage 重载链接");
-            if let Err(e) = futures::executor::block_on(STORAGE.reload()) {
+            if let Err(e) = futures::executor::block_on(storage.reload()) {
                 log::error!("重载链接配置失败: {}", e);
                 continue;
             }
@@ -23,7 +23,7 @@ pub fn setup_reload_mechanism() {
 
 // Windows平台的文件监听
 #[cfg(windows)]
-pub fn setup_reload_mechanism() {
+pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
     use std::fs;
     use std::time::{Duration, SystemTime};
 
@@ -38,7 +38,7 @@ pub fn setup_reload_mechanism() {
                 if let Ok(modified) = metadata.modified() {
                     if modified > last_check {
                         info!("检测到重新加载请求，正在从 Storage 重载链接");
-                        if let Err(e) = futures::executor::block_on(STORAGE.reload()) {
+                        if let Err(e) = futures::executor::block_on(storage.reload()) {
                             log::error!("重载链接配置失败: {}", e);
                             last_check = SystemTime::now();
                             continue;

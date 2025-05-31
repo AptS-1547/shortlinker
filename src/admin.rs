@@ -7,10 +7,11 @@ use actix_web::{
 use log::{debug, error, info};
 use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::storages::{ShortLink, STORAGE};
+use crate::storages::{ShortLink, Storage};
 
 // 配置结构体
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -83,10 +84,10 @@ pub async fn auth_middleware(
 }
 
 #[actix_web::route("/link", method = "GET", method = "HEAD")]
-async fn get_all_links(_req: HttpRequest) -> impl Responder {
+async fn get_all_links(_req: HttpRequest, storage: web::Data<Arc<dyn Storage>>) -> impl Responder {
     info!("Admin API: 获取所有链接请求");
 
-    let links = STORAGE.load_all().await;
+    let links = storage.load_all().await;
     info!("Admin API: 成功获取 {} 个链接", links.len());
 
     let serializable_links: HashMap<String, SerializableShortLink> = links
@@ -113,7 +114,11 @@ async fn get_all_links(_req: HttpRequest) -> impl Responder {
 }
 
 #[actix_web::route("/link", method = "POST")]
-async fn post_link(_req: HttpRequest, link: web::Json<PostNewLink>) -> impl Responder {
+async fn post_link(
+    _req: HttpRequest,
+    link: web::Json<PostNewLink>,
+    storage: web::Data<Arc<dyn Storage>>,
+) -> impl Responder {
     info!(
         "Admin API: 创建链接请求 - code: {}, target: {}",
         link.code, link.target
@@ -130,7 +135,7 @@ async fn post_link(_req: HttpRequest, link: web::Json<PostNewLink>) -> impl Resp
         }),
     };
 
-    match STORAGE.set(new_link.clone()).await {
+    match storage.set(new_link.clone()).await {
         Ok(_) => {
             info!("Admin API: 成功创建链接 - {}", link.code);
             HttpResponse::Created()
@@ -163,10 +168,14 @@ async fn post_link(_req: HttpRequest, link: web::Json<PostNewLink>) -> impl Resp
 }
 
 #[actix_web::route("/link/{code}", method = "GET", method = "HEAD")]
-async fn get_link(_req: HttpRequest, code: web::Path<String>) -> impl Responder {
+async fn get_link(
+    _req: HttpRequest,
+    code: web::Path<String>,
+    storage: web::Data<Arc<dyn Storage>>,
+) -> impl Responder {
     info!("Admin API: 获取链接请求 - code: {}", code);
 
-    match STORAGE.get(&code).await {
+    match storage.get(&code).await {
         Some(link) => {
             info!("Admin API: 成功获取链接 - {}", code);
             let serializable_link = SerializableShortLink {
@@ -199,10 +208,14 @@ async fn get_link(_req: HttpRequest, code: web::Path<String>) -> impl Responder 
 }
 
 #[actix_web::route("/link/{code}", method = "DELETE")]
-async fn delete_link(_req: HttpRequest, code: web::Path<String>) -> impl Responder {
+async fn delete_link(
+    _req: HttpRequest,
+    code: web::Path<String>,
+    storage: web::Data<Arc<dyn Storage>>,
+) -> impl Responder {
     info!("Admin API: 删除链接请求 - code: {}", code);
 
-    match STORAGE.remove(&code).await {
+    match storage.remove(&code).await {
         Ok(_) => {
             info!("Admin API: 成功删除链接 - {}", code);
             HttpResponse::Ok()
@@ -233,6 +246,7 @@ async fn update_link(
     _req: HttpRequest,
     code: web::Path<String>,
     link: web::Json<PostNewLink>,
+    storage: web::Data<Arc<dyn Storage>>,
 ) -> impl Responder {
     info!(
         "Admin API: 更新链接请求 - code: {}, target: {}",
@@ -250,7 +264,7 @@ async fn update_link(
         }),
     };
 
-    match STORAGE.set(updated_link.clone()).await {
+    match storage.set(updated_link.clone()).await {
         Ok(_) => {
             info!("Admin API: 成功更新链接 - {}", code);
             HttpResponse::Ok()

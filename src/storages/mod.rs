@@ -5,7 +5,6 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
-use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone)]
 pub struct ShortLink {
@@ -37,14 +36,21 @@ pub mod file;
 pub mod sled;
 pub mod sqlite;
 
-pub static STORAGE: Lazy<Arc<dyn Storage>> = Lazy::new(|| {
-    let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
+pub struct StorageFactory;
 
-    let boxed: Box<dyn Storage> = match backend.as_str() {
-        "sled" => Box::new(sled::SledStorage::new()),
-        "file" => Box::new(file::FileStorage::new()),
-        _ => Box::new(sqlite::SqliteStorage::new().expect("Failed to initialize SQLite storage")),
-    };
+impl StorageFactory {
+    pub fn create() -> Result<Arc<dyn Storage>, String> {
+        let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
 
-    Arc::from(boxed)
-});
+        let boxed: Box<dyn Storage> = match backend.as_str() {
+            "sled" => Box::new(sled::SledStorage::new()),
+            "file" => Box::new(file::FileStorage::new()),
+            _ => Box::new(
+                sqlite::SqliteStorage::new()
+                    .map_err(|e| format!("Failed to initialize SQLite storage: {}", e))?,
+            ),
+        };
+
+        Ok(Arc::from(boxed))
+    }
+}

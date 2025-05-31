@@ -13,12 +13,13 @@ pub mod utils;
 use actix_web::{web, HttpResponse, Responder};
 use log::{debug, info};
 use std::env;
+use std::sync::Arc;
 
-use storages::STORAGE;
+use storages::Storage;
 
 /// 短链接重定向处理函数
 #[actix_web::route("/{path}*", method = "GET", method = "HEAD")]
-pub async fn handle_redirect(path: web::Path<String>) -> impl Responder {
+pub async fn handle_redirect(path: web::Path<String>, storage: web::Data<Arc<dyn Storage>>) -> impl Responder {
     let captured_path = path.to_string();
 
     debug!("捕获的路径: {}", captured_path);
@@ -31,8 +32,8 @@ pub async fn handle_redirect(path: web::Path<String>) -> impl Responder {
             .append_header(("Location", default_url))
             .finish()
     } else {
-        // 使用 STORAGE 获取链接
-        if let Some(link) = STORAGE.get(&captured_path).await {
+        // 使用注入的 storage 获取链接
+        if let Some(link) = storage.get(&captured_path).await {
             // 检查链接是否过期
             if let Some(expires_at) = link.expires_at {
                 if expires_at < chrono::Utc::now() {

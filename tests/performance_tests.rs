@@ -4,7 +4,7 @@ use std::time::Instant;
 use tempfile::TempDir;
 
 // 导入实际的项目代码
-use shortlinker::storages::{STORAGE, ShortLink};
+use shortlinker::storages::{ShortLink, STORAGE};
 use shortlinker::utils::generate_random_code;
 
 fn setup_test_env() -> TempDir {

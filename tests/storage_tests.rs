@@ -4,7 +4,7 @@ use std::env;
 use tempfile::TempDir;
 
 // 导入实际的存储代码
-use shortlinker::storages::{STORAGE, ShortLink};
+use shortlinker::storages::{ShortLink, STORAGE};
 
 fn setup_test_env() -> TempDir {
     let temp_dir = TempDir::new().unwrap();

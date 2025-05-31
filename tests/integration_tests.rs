@@ -50,9 +50,9 @@ async fn test_shortlink_redirect_empty_path() {
 async fn test_shortlink_redirect_existing_code() {
     cleanup_env();
     let _temp_dir = setup_test_env();
-    
+
     // 直接使用FileStorage而不是全局STORAGE
-    use shortlinker::storages::{ShortLink, file::FileStorage, Storage};
+    use shortlinker::storages::{file::FileStorage, ShortLink, Storage};
     let storage = FileStorage::new();
 
     // 创建一个测试链接
@@ -349,9 +349,9 @@ async fn test_admin_api_update_link() {
 async fn test_shortlink_with_actual_storage() {
     cleanup_env();
     let _temp_dir = setup_test_env();
-    
+
     // 直接使用FileStorage而不是全局STORAGE
-    use shortlinker::storages::{ShortLink, file::FileStorage, Storage};
+    use shortlinker::storages::{file::FileStorage, ShortLink, Storage};
     let storage = FileStorage::new();
 
     // 创建一个测试链接
@@ -384,9 +384,9 @@ async fn test_shortlink_with_actual_storage() {
 async fn test_expired_link() {
     cleanup_env();
     let _temp_dir = setup_test_env();
-    
+
     // 直接使用FileStorage而不是全局STORAGE
-    use shortlinker::storages::{ShortLink, file::FileStorage, Storage};
+    use shortlinker::storages::{file::FileStorage, ShortLink, Storage};
     let storage = FileStorage::new();
 
     // 创建一个过期的链接

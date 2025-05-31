@@ -1,8 +1,9 @@
 use crate::signal;
-use crate::storages::{ShortLink, STORAGE};
+use crate::storages::{ShortLink, Storage, StorageFactory};
 use crate::utils::generate_random_code;
 use std::env;
 use std::process;
+use std::sync::Arc;
 
 // ANSI 颜色码
 const RESET: &str = "\x1b[0m";
@@ -47,12 +48,24 @@ macro_rules! print_usage {
 }
 
 pub async fn run_cli() {
+    let storage = match StorageFactory::create() {
+        Ok(storage) => storage,
+        Err(e) => {
+            print_error!("初始化存储失败: {}", e);
+            process::exit(1);
+        }
+    };
+
+    run_cli_with_storage(storage).await;
+}
+
+pub async fn run_cli_with_storage(storage: Arc<dyn Storage>) {
     let args: Vec<String> = env::args().collect();
     let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
         .unwrap_or_else(|_| "6".to_string())
         .parse()
         .unwrap_or(6);
-    let links = STORAGE.load_all().await;
+    let links = storage.load_all().await;
 
     match args[1].as_str() {
         "help" | "--help" | "-h" => {
@@ -196,7 +209,7 @@ pub async fn run_cli() {
                 expires_at: expire_time,
             };
 
-            if let Err(e) = STORAGE.set(link).await {
+            if let Err(e) = storage.set(link).await {
                 print_error!("保存失败: {}", e);
                 process::exit(1);
             }
@@ -237,7 +250,7 @@ pub async fn run_cli() {
             let short_code = &args[2];
 
             if links.contains_key(short_code) {
-                match STORAGE.remove(short_code).await {
+                match storage.remove(short_code).await {
                     Ok(_) => {
                         print_success!("已删除短链接: {}{}{}", CYAN, short_code, RESET);
                         let _ = signal::notify_server();
