@@ -21,6 +21,9 @@ pub struct SerializableShortLink {
     pub target_url: String,
     pub created_at: String,
     pub expires_at: Option<String>,
+
+    #[serde(default)]
+    pub click: usize,
 }
 
 #[async_trait]
@@ -31,6 +34,9 @@ pub trait Storage: Send + Sync {
     async fn remove(&self, code: &str) -> Result<()>;
     async fn reload(&self) -> Result<()>;
     async fn get_backend_name(&self) -> String;
+
+    /// 增加点击量计数器
+    async fn increment_click(&self, code: &str) -> Result<()>;
 }
 
 pub mod file;

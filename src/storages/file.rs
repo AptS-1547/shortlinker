@@ -97,6 +97,7 @@ impl FileStorage {
                 target_url: link.target.clone(),
                 created_at: link.created_at.to_rfc3339(),
                 expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+                click: 0, // 点击量暂时不存储
             })
             .collect();
 
@@ -183,5 +184,9 @@ impl Storage for FileStorage {
 
     async fn get_backend_name(&self) -> String {
         "file".to_string()
+    }
+
+    async fn increment_click(&self, code: &str) -> Result<()> {
+        Ok(())
     }
 }

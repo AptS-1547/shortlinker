@@ -302,4 +302,8 @@ impl Storage for SqliteStorage {
     async fn get_backend_name(&self) -> String {
         "sqlite".to_string()
     }
+
+    async fn increment_click(&self, code: &str) -> Result<()> {
+        Ok(())
+    }
 }

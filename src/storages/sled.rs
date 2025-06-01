@@ -59,4 +59,8 @@ impl Storage for SledStorage {
     async fn get_backend_name(&self) -> String {
         "sled".to_string()
     }
+
+    async fn increment_click(&self, code: &str) -> Result<()> {
+        Ok(())
+    }
 }
