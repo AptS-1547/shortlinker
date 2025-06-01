@@ -1,7 +1,7 @@
 use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
-use log::{debug, info};
 use std::env;
+use tracing::{debug, info};
 
 mod cli;
 mod errors;

@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
-use log::{debug, info};
 use std::env;
 use std::sync::Arc;
+use tracing::{debug, info};
 
 use crate::storages::Storage;
 

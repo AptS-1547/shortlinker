@@ -1,27 +1,27 @@
-use log::{error, info};
-use rusqlite::{params, Connection};
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use std::collections::HashMap;
 use std::env;
-use std::sync::{Arc, Mutex};
+use tracing::{error, info};
 
 use super::{ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 use async_trait::async_trait;
 
 pub struct SqliteStorage {
-    connection: Arc<Mutex<Connection>>,
+    pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteStorage {
     pub fn new() -> Result<Self> {
         let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
-        let conn = Connection::open(&db_path)
-            .map_err(|e| ShortlinkerError::database_connection(format!("无法打开数据库: {}", e)))?;
+        let manager = SqliteConnectionManager::file(&db_path);
+        let pool = Pool::new(manager)
+            .map_err(|e| ShortlinkerError::database_connection(format!("无法创建连接池: {}", e)))?;
 
-        let storage = SqliteStorage {
-            connection: Arc::new(Mutex::new(conn)),
-        };
+        let storage = SqliteStorage { pool };
 
         // 初始化数据库表
         storage.init_db()?;
@@ -30,8 +30,14 @@ impl SqliteStorage {
         Ok(storage)
     }
 
+    fn get_connection(&self) -> Result<PooledConnection<SqliteConnectionManager>> {
+        self.pool.get().map_err(|e| {
+            ShortlinkerError::database_connection(format!("获取数据库连接失败: {}", e))
+        })
+    }
+
     fn init_db(&self) -> Result<()> {
-        let conn = self.connection.lock().unwrap();
+        let conn = self.get_connection()?;
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS short_links (
@@ -43,6 +49,22 @@ impl SqliteStorage {
             [],
         )
         .map_err(|e| ShortlinkerError::database_operation(format!("创建表失败: {}", e)))?;
+
+        // 为过期时间添加索引，用于快速查找过期链接
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_expires_at ON short_links(expires_at)",
+            [],
+        )
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("创建过期时间索引失败: {}", e))
+        })?;
+
+        // 为创建时间添加索引，用于按时间排序查询
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_created_at ON short_links(created_at)",
+            [],
+        )
+        .map_err(|e| ShortlinkerError::database_operation(format!("创建时间索引失败: {}", e)))?;
 
         Ok(())
     }
@@ -75,7 +97,13 @@ impl SqliteStorage {
 #[async_trait]
 impl Storage for SqliteStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
-        let conn = self.connection.lock().unwrap();
+        let conn = match self.get_connection() {
+            Ok(conn) => conn,
+            Err(e) => {
+                error!("获取数据库连接失败: {}", e);
+                return None;
+            }
+        };
 
         let mut stmt = conn.prepare(
             "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = ?1"
@@ -109,7 +137,14 @@ impl Storage for SqliteStorage {
     }
 
     async fn load_all(&self) -> HashMap<String, ShortLink> {
-        let conn = self.connection.lock().unwrap();
+        let conn = match self.get_connection() {
+            Ok(conn) => conn,
+            Err(e) => {
+                error!("获取数据库连接失败: {}", e);
+                return HashMap::new();
+            }
+        };
+
         let mut links = HashMap::new();
 
         let mut stmt = match conn
@@ -165,14 +200,19 @@ impl Storage for SqliteStorage {
     }
 
     async fn set(&self, link: ShortLink) -> Result<()> {
-        let conn = self.connection.lock().unwrap();
+        let mut conn = self.get_connection()?;
 
         let created_at = link.created_at.to_rfc3339();
         let expires_at = link.expires_at.map(|dt| dt.to_rfc3339());
 
+        // 开始事务
+        let transaction = conn
+            .transaction()
+            .map_err(|e| ShortlinkerError::database_operation(format!("开始事务失败: {}", e)))?;
+
         // 先检查记录是否存在
         let exists = {
-            let mut stmt = conn
+            let mut stmt = transaction
                 .prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
                 .map_err(|e| {
                     ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
@@ -183,33 +223,55 @@ impl Storage for SqliteStorage {
             })?
         };
 
-        if exists {
-            conn.execute(
-                "UPDATE short_links SET target_url = ?2, expires_at = ?3 
+        let result = if exists {
+            transaction
+                .execute(
+                    "UPDATE short_links SET target_url = ?2, expires_at = ?3 
                  WHERE short_code = ?1",
-                params![link.code, link.target, expires_at],
-            )
-            .map_err(|e| ShortlinkerError::database_operation(format!("更新短链接失败: {}", e)))?;
-
-            info!("短链接已更新: {}", link.code);
+                    params![link.code, link.target, expires_at],
+                )
+                .map_err(|e| ShortlinkerError::database_operation(format!("更新短链接失败: {}", e)))
+                .map(|_| {
+                    info!("短链接已更新: {}", link.code);
+                })
         } else {
-            conn.execute(
-                "INSERT INTO short_links (short_code, target_url, created_at, expires_at) 
+            transaction
+                .execute(
+                    "INSERT INTO short_links (short_code, target_url, created_at, expires_at) 
                  VALUES (?1, ?2, ?3, ?4)",
-                params![link.code, link.target, created_at, expires_at],
-            )
-            .map_err(|e| ShortlinkerError::database_operation(format!("插入短链接失败: {}", e)))?;
+                    params![link.code, link.target, created_at, expires_at],
+                )
+                .map_err(|e| ShortlinkerError::database_operation(format!("插入短链接失败: {}", e)))
+                .map(|_| {
+                    info!("短链接已创建: {}", link.code);
+                })
+        };
 
-            info!("短链接已创建: {}", link.code);
+        // 处理操作结果
+        match result {
+            Ok(_) => {
+                // 提交事务
+                transaction.commit().map_err(|e| {
+                    ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
+                })?;
+                Ok(())
+            }
+            Err(e) => {
+                // 事务会自动回滚
+                Err(e)
+            }
         }
-
-        Ok(())
     }
 
     async fn remove(&self, code: &str) -> Result<()> {
-        let conn = self.connection.lock().unwrap();
+        let mut conn = self.get_connection()?;
 
-        let rows_affected = conn
+        // 开始事务
+        let transaction = conn
+            .transaction()
+            .map_err(|e| ShortlinkerError::database_operation(format!("开始事务失败: {}", e)))?;
+
+        let rows_affected = transaction
             .execute(
                 "DELETE FROM short_links WHERE short_code = ?1",
                 params![code],
@@ -217,11 +279,17 @@ impl Storage for SqliteStorage {
             .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
 
         if rows_affected == 0 {
+            // 事务会自动回滚
             return Err(ShortlinkerError::not_found(format!(
                 "短链接不存在: {}",
                 code
             )));
         }
+
+        // 提交事务
+        transaction
+            .commit()
+            .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
 
         info!("短链接已删除: {}", code);
         Ok(())

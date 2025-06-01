@@ -1,5 +1,4 @@
 use crate::storages;
-use log::info;
 use std::sync::Arc;
 use std::thread;
 
@@ -11,12 +10,12 @@ pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
     thread::spawn(move || {
         let mut signals = Signals::new([SIGUSR1]).unwrap();
         for _ in signals.forever() {
-            info!("收到 SIGUSR1，正在从 Storage 重载链接");
+            tracing::info!("收到 SIGUSR1，正在从 Storage 重载链接");
             if let Err(e) = futures::executor::block_on(storage.reload()) {
-                log::error!("重载链接配置失败: {}", e);
+                tracing::error!("重载链接配置失败: {}", e);
                 continue;
             }
-            log::info!("链接配置已重载");
+            tracing::info!("链接配置已重载");
         }
     });
 }
@@ -37,14 +36,14 @@ pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
             if let Ok(metadata) = fs::metadata(reload_file) {
                 if let Ok(modified) = metadata.modified() {
                     if modified > last_check {
-                        info!("检测到重新加载请求，正在从 Storage 重载链接");
+                        tracing::info!("检测到重新加载请求，正在从 Storage 重载链接");
                         if let Err(e) = futures::executor::block_on(storage.reload()) {
-                            log::error!("重载链接配置失败: {}", e);
+                            tracing::error!("重载链接配置失败: {}", e);
                             last_check = SystemTime::now();
                             continue;
                         }
                         last_check = SystemTime::now();
-                        log::info!("链接配置已重载");
+                        tracing::info!("链接配置已重载");
 
                         // 删除触发文件
                         let _ = fs::remove_file(reload_file);

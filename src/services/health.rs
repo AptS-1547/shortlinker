@@ -1,8 +1,8 @@
 use actix_web::{web, HttpResponse, Responder};
-use log::{debug, error, info};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tracing::{debug, error, info};
 
 use crate::storages::Storage;
 use crate::utils::TimeParser;

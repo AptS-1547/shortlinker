@@ -1,8 +1,8 @@
-use log::{error, info};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::sync::{Arc, RwLock};
+use tracing::{error, info};
 
 use super::{ShortLink, Storage};
 use async_trait::async_trait;

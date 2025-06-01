@@ -1,9 +1,9 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use tracing::{debug, error, info};
 
 use crate::storages::{ShortLink, Storage};
 use crate::utils::{generate_random_code, TimeParser};

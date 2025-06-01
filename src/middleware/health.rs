@@ -4,8 +4,8 @@ use actix_web::{
     dev::{ServiceRequest, ServiceResponse},
     Error, HttpResponse,
 };
-use log::{debug, info};
 use std::env;
+use tracing::{debug, info};
 
 pub struct HealthMiddleware;
 

@@ -16,7 +16,6 @@ path = "src/main.rs"
 [dependencies]
 actix-web = "4.0"
 dotenv = "0.15"
-log = "0.4"
 env_logger = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -27,6 +26,9 @@ futures = "0.3.31"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 sled = "0.34.7"
 tokio = "1.45.1"
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.29.0"
+tracing = "0.1.41"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }

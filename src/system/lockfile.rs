@@ -1,5 +1,5 @@
-use log::{error, info};
 use std::fs;
+use tracing::{error, info};
 
 // Unix平台的PID文件管理
 #[cfg(unix)]
