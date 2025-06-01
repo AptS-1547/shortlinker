@@ -30,17 +30,17 @@ impl AuthMiddleware {
             ));
         }
 
-            // 检查 Authorization header
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                        if token == admin_token {
-                            debug!("Admin API 鉴权成功");
-                            return next.call(req).await;
-                        }
+        // 检查 Authorization header
+        if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                    if token == admin_token {
+                        debug!("Admin API 鉴权成功");
+                        return next.call(req).await;
                     }
                 }
             }
+        }
 
         info!("Admin API 鉴权失败: token不匹配或缺少Authorization header");
         Ok(req.into_response(

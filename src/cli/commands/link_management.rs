@@ -1,7 +1,7 @@
 use super::super::CliError;
 use crate::storages::{ShortLink, Storage};
-use crate::utils::colors::*;
 use crate::utils::generate_random_code;
+use crate::utils::{colors::*, TimeParser};
 use std::env;
 use std::sync::Arc;
 
@@ -111,12 +111,24 @@ pub async fn add_link(
     }
 
     let expires_at = if let Some(expire) = expire_time {
-        match chrono::DateTime::parse_from_rfc3339(&expire) {
-            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
-            Err(_) => {
-                return Err(CliError::CommandError(
-                    "过期时间格式不正确，应为 RFC3339 格式，如 2023-10-01T12:00:00Z".to_string(),
-                ));
+        match TimeParser::parse_expire_time(&expire) {
+            Ok(dt) => {
+                println!(
+                    "{}{}ℹ{} 过期时间解析为: {}{}{}",
+                    BOLD,
+                    BLUE,
+                    RESET,
+                    YELLOW,
+                    dt.format("%Y-%m-%d %H:%M:%S UTC"),
+                    RESET
+                );
+                Some(dt)
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!(
+                    "过期时间格式错误: {}。支持的格式：\n  - RFC3339: 2023-10-01T12:00:00Z\n  - 相对时间: 1d, 2w, 1y, 1d2h30m",
+                    e
+                )));
             }
         }
     } else {
@@ -220,12 +232,24 @@ pub async fn update_link(
     };
 
     let expires_at = if let Some(expire) = expire_time {
-        match chrono::DateTime::parse_from_rfc3339(&expire) {
-            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
-            Err(_) => {
-                return Err(CliError::CommandError(
-                    "过期时间格式不正确，应为 RFC3339 格式，如 2023-10-01T12:00:00Z".to_string(),
-                ));
+        match TimeParser::parse_expire_time(&expire) {
+            Ok(dt) => {
+                println!(
+                    "{}{}ℹ{} 过期时间解析为: {}{}{}",
+                    BOLD,
+                    BLUE,
+                    RESET,
+                    YELLOW,
+                    dt.format("%Y-%m-%d %H:%M:%S UTC"),
+                    RESET
+                );
+                Some(dt)
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!(
+                    "过期时间格式错误: {}。支持的格式：\n  - RFC3339: 2023-10-01T12:00:00Z\n  - 相对时间: 1d, 2w, 1y, 1d2h30m",
+                    e
+                )));
             }
         }
     } else {

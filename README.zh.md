@@ -68,10 +68,19 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data ghcr.io/apts-1547/shortlinker
 ./shortlinker add github https://github.com           # 自定义短码
 ./shortlinker add https://github.com                  # 随机短码
 ./shortlinker add github https://new-url.com --force  # 强制覆盖
-./shortlinker add temp https://example.com --expires "2025-12-31T23:59:59Z"  # 带过期时间
+
+# 使用简便的相对时间格式（推荐）
+./shortlinker add daily https://example.com --expire 1d      # 1天后过期
+./shortlinker add weekly https://example.com --expire 1w     # 1周后过期
+./shortlinker add monthly https://example.com --expire 1M    # 1个月后过期
+./shortlinker add yearly https://example.com --expire 1y     # 1年后过期
+./shortlinker add complex https://example.com --expire 1d2h30m  # 1天2小时30分钟后过期
+
+# 使用传统 RFC3339 格式
+./shortlinker add temp https://example.com --expire "2025-12-31T23:59:59Z"
 
 # 管理短链
-./shortlinker update github https://new-github.com    # 更新现有链接
+./shortlinker update github https://new-github.com --expire 30d    # 更新现有链接
 ./shortlinker list                    # 列出所有
 ./shortlinker remove github           # 删除指定
 
@@ -83,7 +92,7 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data ghcr.io/apts-1547/shortlinker
 
 ## Admin API (v0.0.5+)
 
-从 v0.0.5 版本开始，支持通过 HTTP API 管理短链接。
+从 v0.0.5 版本开始，支持通过 HTTP API 管理短链接。Admin API 也支持新的相对时间格式。
 
 ### 鉴权设置
 
@@ -109,6 +118,21 @@ curl -H "Authorization: Bearer your_secret_token" \
 创建新的短链接。
 
 ```bash
+# 使用相对时间格式（推荐）
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
+     http://localhost:8080/admin/link
+
+# 使用组合时间格式
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"sale","target":"https://shop.com/sale","expires_at":"2w3d"}' \
+     http://localhost:8080/admin/link
+
+# 使用传统 RFC3339 格式
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
@@ -151,24 +175,55 @@ curl -X DELETE \
 curl -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link
 
-# 创建自动生成短码的链接
+# 使用相对时间创建链接
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com"}' \
+     -d '{"target":"https://github.com","expires_at":"30d"}' \
      http://localhost:8080/admin/link
 
-# 更新短链接
+# 使用组合时间格式更新链接
 curl -X PUT \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
-     -d '{"target":"https://new-url.com"}' \
+     -d '{"target":"https://new-url.com","expires_at":"1w2d"}' \
      http://localhost:8080/admin/link/github
 
 # 删除短链接
 curl -X DELETE \
      -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link/github
+```
+
+## 时间格式支持
+
+shortlinker 支持两种过期时间格式：
+
+### 相对时间格式（推荐）
+
+简洁易用的相对时间格式，从当前时间开始计算：
+
+```bash
+# 单个时间单位
+1s, 5m, 2h, 1d, 1w, 1M, 1y
+
+# 组合时间格式
+1d2h30m     # 1天2小时30分钟后过期
+2w3d        # 2周3天后过期
+1y30d       # 1年30天后过期
+```
+
+支持的时间单位：
+- `s` (秒), `m` (分钟), `h` (小时), `d` (天)
+- `w` (周), `M` (月，30天), `y` (年，365天)
+
+### RFC3339 格式（兼容）
+
+传统的 ISO 8601 时间格式：
+
+```bash
+2024-12-31T23:59:59Z        # UTC 时间
+2024-12-31T23:59:59+08:00   # 带时区
 ```
 
 ## 存储后端

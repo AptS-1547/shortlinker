@@ -1,4 +1,7 @@
 pub mod colors;
+pub mod time_parser;
+
+pub use time_parser::TimeParser;
 
 pub fn generate_random_code(length: usize) -> String {
     use std::iter;

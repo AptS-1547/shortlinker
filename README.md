@@ -68,10 +68,19 @@ Once your domain (e.g. `esap.cc`) is bound:
 ./shortlinker add github https://github.com           # Custom code
 ./shortlinker add https://github.com                  # Random code
 ./shortlinker add github https://new-url.com --force  # Overwrite existing
-./shortlinker add temp https://example.com --expires "2024-12-31T23:59:59Z"  # With expiration
+
+# Using convenient relative time format (recommended)
+./shortlinker add daily https://example.com --expire 1d      # Expires in 1 day
+./shortlinker add weekly https://example.com --expire 1w     # Expires in 1 week
+./shortlinker add monthly https://example.com --expire 1M    # Expires in 1 month
+./shortlinker add yearly https://example.com --expire 1y     # Expires in 1 year
+./shortlinker add complex https://example.com --expire 1d2h30m  # Expires in 1 day 2 hours 30 minutes
+
+# Using traditional RFC3339 format
+./shortlinker add temp https://example.com --expire "2025-12-31T23:59:59Z"
 
 # Manage links
-./shortlinker update github https://new-github.com    # Update existing link
+./shortlinker update github https://new-github.com --expire 30d    # Update existing link
 ./shortlinker list                    # List all links
 ./shortlinker remove github           # Remove specific link
 
@@ -83,7 +92,7 @@ Once your domain (e.g. `esap.cc`) is bound:
 
 ## Admin API (v0.0.5+)
 
-Starting from v0.0.5, HTTP API support for link management is available.
+Starting from v0.0.5, HTTP API support for link management is available. The Admin API also supports the new relative time format.
 
 ### Authentication Setup
 
@@ -109,6 +118,21 @@ curl -H "Authorization: Bearer your_secret_token" \
 Create a new short link.
 
 ```bash
+# Using relative time format (recommended)
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
+     http://localhost:8080/admin/link
+
+# Using combined time format
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"code":"sale","target":"https://shop.com/sale","expires_at":"2w3d"}' \
+     http://localhost:8080/admin/link
+
+# Using traditional RFC3339 format
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
@@ -151,24 +175,55 @@ curl -X DELETE \
 curl -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link
 
-# Create Link with auto-generated code
+# Create Link with relative time
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com"}' \
+     -d '{"target":"https://github.com","expires_at":"30d"}' \
      http://localhost:8080/admin/link
 
-# Update Link
+# Update Link with combined time format
 curl -X PUT \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
-     -d '{"target":"https://new-url.com"}' \
+     -d '{"target":"https://new-url.com","expires_at":"1w2d"}' \
      http://localhost:8080/admin/link/github
 
 # Delete Link
 curl -X DELETE \
      -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link/github
+```
+
+## Time Format Support
+
+shortlinker supports two expiration time formats:
+
+### Relative Time Format (Recommended)
+
+Concise and user-friendly relative time format, calculated from current time:
+
+```bash
+# Single time units
+1s, 5m, 2h, 1d, 1w, 1M, 1y
+
+# Combined time format
+1d2h30m     # Expires in 1 day 2 hours 30 minutes
+2w3d        # Expires in 2 weeks 3 days
+1y30d       # Expires in 1 year 30 days
+```
+
+Supported time units:
+- `s` (seconds), `m` (minutes), `h` (hours), `d` (days)
+- `w` (weeks), `M` (months, 30 days), `y` (years, 365 days)
+
+### RFC3339 Format (Compatible)
+
+Traditional ISO 8601 time format:
+
+```bash
+2024-12-31T23:59:59Z        # UTC time
+2024-12-31T23:59:59+08:00   # With timezone
 ```
 
 ## Configuration Options

@@ -24,7 +24,7 @@ Add a new short link with support for custom short codes or random generation.
 ### Options
 
 - `--force`: Force overwrite existing short code
-- `--expire <time>`: Set expiration time (RFC3339 format)
+- `--expire <time>`: Set expiration time (multiple formats supported)
 
 ### Examples
 
@@ -35,14 +35,21 @@ Add a new short link with support for custom short codes or random generation.
 # Random short code
 ./shortlinker add https://www.example.com
 
-# Set expiration time
+# Using relative time format (recommended)
+./shortlinker add daily https://example.com --expire 1d
+./shortlinker add weekly https://example.com --expire 1w
+./shortlinker add monthly https://example.com --expire 1M
+./shortlinker add yearly https://example.com --expire 1y
+
+# Combined time format
+./shortlinker add complex https://example.com --expire 1d2h30m
+./shortlinker add sale https://shop.com --expire 2w3d
+
+# Using RFC3339 format (traditional)
 ./shortlinker add temp https://example.com --expire 2024-12-31T23:59:59Z
 
 # Force overwrite
 ./shortlinker add google https://www.google.com --force
-
-# Complex example
-./shortlinker add promo https://shop.com/sale --expire 2024-12-25T00:00:00Z
 ```
 
 ### Output
@@ -83,16 +90,6 @@ Delete the specified short link.
 ./shortlinker remove aB3dF1
 ```
 
-### Output
-
-```bash
-# Success
-✓ Deleted short link: google
-
-# Not found error
-❌ Error: Short link does not exist: nonexistent
-```
-
 ## list - List Short Links
 
 Display all created short links.
@@ -116,19 +113,72 @@ Short Link List:
 ℹ Total 4 short links
 ```
 
-### Empty List
+## update - Update Short Link
+
+Update the target URL and expiration time of an existing short link.
+
+### Syntax
 
 ```bash
-Short Link List:
+./shortlinker update <short_code> <new_target_url> [options]
+```
 
-ℹ No short links
+### Options
+
+- `--expire <time>`: Update expiration time (multiple formats supported)
+
+### Examples
+
+```bash
+# Update target URL
+./shortlinker update github https://new-github.com
+
+# Update URL and expiration (relative time format)
+./shortlinker update github https://new-github.com --expire 30d
+
+# Using combined time format
+./shortlinker update temp https://example.com --expire 1w2d12h
 ```
 
 ## Time Format
 
-### RFC3339 Format
+### Relative Time Format (Recommended)
 
-Expiration time must use RFC3339 format:
+Supports concise relative time format, calculated from current time:
+
+#### Single Time Units
+```bash
+1s   # Expires in 1 second
+5m   # Expires in 5 minutes
+2h   # Expires in 2 hours
+1d   # Expires in 1 day
+1w   # Expires in 1 week
+1M   # Expires in 1 month (30 days)
+1y   # Expires in 1 year (365 days)
+```
+
+#### Combined Time Format
+```bash
+1d2h30m     # Expires in 1 day, 2 hours, 30 minutes
+2w3d        # Expires in 2 weeks, 3 days
+1y30d       # Expires in 1 year, 30 days
+1h30m15s    # Expires in 1 hour, 30 minutes, 15 seconds
+```
+
+#### Supported Time Units
+| Unit | Full Forms | Description |
+|------|------------|-------------|
+| `s` | `sec`, `second`, `seconds` | Seconds |
+| `m` | `min`, `minute`, `minutes` | Minutes |
+| `h` | `hour`, `hours` | Hours |
+| `d` | `day`, `days` | Days |
+| `w` | `week`, `weeks` | Weeks |
+| `M` | `month`, `months` | Months (30 days) |
+| `y` | `year`, `years` | Years (365 days) |
+
+### RFC3339 Format (Compatible)
+
+Still supports traditional RFC3339 format:
 
 ```bash
 # Complete format
@@ -136,27 +186,25 @@ Expiration time must use RFC3339 format:
 
 # With timezone
 2024-12-31T23:59:59+08:00
-
-# Other examples
-2024-01-01T00:00:00Z        # New Year
-2024-06-15T12:00:00Z        # Noon
-2024-12-25T00:00:00-05:00   # Christmas (EST)
 ```
 
 ### Common Time Examples
 
 ```bash
-# Expire in one day
-./shortlinker add daily https://example.com --expire 2024-01-02T00:00:00Z
+# Short-term links
+./shortlinker add flash https://example.com --expire 1h      # 1 hour
+./shortlinker add daily https://example.com --expire 1d     # 1 day
 
-# Expire in one week
-./shortlinker add weekly https://example.com --expire 2024-01-08T00:00:00Z
+# Medium-term links  
+./shortlinker add weekly https://example.com --expire 1w    # 1 week
+./shortlinker add monthly https://example.com --expire 1M   # 1 month
 
-# Expire in one month
-./shortlinker add monthly https://example.com --expire 2024-02-01T00:00:00Z
+# Long-term links
+./shortlinker add yearly https://example.com --expire 1y    # 1 year
 
-# Expire in one year
-./shortlinker add yearly https://example.com --expire 2025-01-01T00:00:00Z
+# Precise timing
+./shortlinker add meeting https://zoom.us/j/123 --expire 2h30m  # 2 hours 30 minutes
+./shortlinker add sale https://shop.com --expire 2w3d          # 2 weeks 3 days
 ```
 
 ## Error Codes
@@ -200,22 +248,12 @@ FORCE_COLOR=1 ./shortlinker list
 
 ## Script-Friendly Mode
 
-### Silent Mode
-
-```bash
-# Reduce output information (planned feature)
-./shortlinker add google https://www.google.com --quiet
-
-# Output results only
-./shortlinker list --format=json
-```
-
 ### Return Code Checking
 
 ```bash
 #!/bin/bash
 # Check if command succeeded
-if ./shortlinker add test https://example.com; then
+if ./shortlinker add test https://example.com --expire 1d; then
     echo "Add successful"
 else
     echo "Add failed"

@@ -2,7 +2,6 @@ use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
 use log::{debug, info};
 use std::env;
-use std::time::Instant;
 
 mod cli;
 mod errors;
@@ -13,7 +12,7 @@ mod system;
 mod utils;
 
 use crate::middleware::{AuthMiddleware, HealthMiddleware};
-use crate::services::{AdminService, HealthService, RedirectService, AppStartTime};
+use crate::services::{AdminService, AppStartTime, HealthService, RedirectService};
 use crate::storages::StorageFactory;
 use crate::system::{cleanup_lockfile, init_lockfile};
 
@@ -24,12 +23,11 @@ struct Config {
     server_port: u16,
 }
 
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // 记录程序启动时间
     let app_start_time = AppStartTime {
-        start_time: Instant::now(),
+        start_datetime: chrono::Utc::now(),
     };
 
     let args: Vec<String> = env::args().collect();
@@ -84,7 +82,6 @@ async fn main() -> std::io::Result<()> {
     let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
     if health_token.is_empty() {
         info!("Health API is disabled (HEALTH_TOKEN is empty)");
-
     } else {
         info!("Health API available at: {}", health_prefix);
     }

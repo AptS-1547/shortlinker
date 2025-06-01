@@ -6,7 +6,7 @@ use std::env;
 use std::sync::Arc;
 
 use crate::storages::{ShortLink, Storage};
-use crate::utils::generate_random_code;
+use crate::utils::{generate_random_code, TimeParser};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SerializableShortLink {
@@ -97,9 +97,12 @@ impl AdminService {
             target: link.target.clone(),
             created_at: chrono::Utc::now(),
             expires_at: link.expires_at.as_ref().map(|s| {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .unwrap()
-                    .with_timezone(&chrono::Utc)
+                TimeParser::parse_expire_time(s).unwrap_or_else(|_| {
+                    // 如果解析失败，尝试 RFC3339 格式作为后备
+                    chrono::DateTime::parse_from_rfc3339(s)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc)
+                })
             }),
         };
 
@@ -242,9 +245,12 @@ impl AdminService {
                 .expires_at
                 .as_ref()
                 .map(|s| {
-                    chrono::DateTime::parse_from_rfc3339(s)
-                        .unwrap()
-                        .with_timezone(&chrono::Utc)
+                    TimeParser::parse_expire_time(s).unwrap_or_else(|_| {
+                        // 如果解析失败，尝试 RFC3339 格式作为后备
+                        chrono::DateTime::parse_from_rfc3339(s)
+                            .unwrap()
+                            .with_timezone(&chrono::Utc)
+                    })
                 })
                 .or(existing_link.expires_at), // 如果没有提供新的过期时间，保持原有的
         };

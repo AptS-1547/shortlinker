@@ -24,7 +24,7 @@
 ### 选项
 
 - `--force`: 强制覆盖已存在的短码
-- `--expire <时间>`: 设置过期时间（RFC3339 格式）
+- `--expire <时间>`: 设置过期时间（支持多种格式）
 
 ### 示例
 
@@ -35,7 +35,17 @@
 # 随机短码
 ./shortlinker add https://www.example.com
 
-# 设置过期时间
+# 使用相对时间格式设置过期时间（推荐）
+./shortlinker add daily https://example.com --expire 1d
+./shortlinker add weekly https://example.com --expire 1w
+./shortlinker add monthly https://example.com --expire 1M
+./shortlinker add yearly https://example.com --expire 1y
+
+# 组合时间格式
+./shortlinker add complex https://example.com --expire 1d2h30m
+./shortlinker add sale https://shop.com --expire 2w3d
+
+# 使用 RFC3339 格式（传统方式）
 ./shortlinker add temp https://example.com --expire 2024-12-31T23:59:59Z
 
 # 强制覆盖
@@ -81,11 +91,72 @@
 ℹ 共 3 个短链接
 ```
 
+## update - 更新短链接
+
+更新现有短链接的目标URL和过期时间。
+
+### 语法
+
+```bash
+./shortlinker update <短码> <新目标URL> [选项]
+```
+
+### 选项
+
+- `--expire <时间>`: 更新过期时间（支持多种格式）
+
+### 示例
+
+```bash
+# 更新目标URL
+./shortlinker update github https://new-github.com
+
+# 更新URL和过期时间（相对时间格式）
+./shortlinker update github https://new-github.com --expire 30d
+
+# 使用组合时间格式
+./shortlinker update temp https://example.com --expire 1w2d12h
+```
+
 ## 时间格式
 
-### RFC3339 格式
+### 相对时间格式（推荐）
 
-过期时间必须使用 RFC3339 格式：
+支持简洁的相对时间格式，从当前时间开始计算：
+
+#### 单个时间单位
+```bash
+1s   # 1秒后过期
+5m   # 5分钟后过期
+2h   # 2小时后过期
+1d   # 1天后过期
+1w   # 1周后过期
+1M   # 1个月后过期（按30天计算）
+1y   # 1年后过期（按365天计算）
+```
+
+#### 组合时间格式
+```bash
+1d2h30m     # 1天2小时30分钟后过期
+2w3d        # 2周3天后过期
+1y30d       # 1年30天后过期
+1h30m15s    # 1小时30分15秒后过期
+```
+
+#### 支持的时间单位
+| 单位 | 完整形式 | 说明 |
+|------|----------|------|
+| `s` | `sec`, `second`, `seconds` | 秒 |
+| `m` | `min`, `minute`, `minutes` | 分钟 |
+| `h` | `hour`, `hours` | 小时 |
+| `d` | `day`, `days` | 天 |
+| `w` | `week`, `weeks` | 周 |
+| `M` | `month`, `months` | 月（30天） |
+| `y` | `year`, `years` | 年（365天） |
+
+### RFC3339 格式（兼容）
+
+仍然支持传统的 RFC3339 格式：
 
 ```bash
 # 完整格式
@@ -98,14 +169,20 @@
 ### 常用时间示例
 
 ```bash
-# 一天后过期
-./shortlinker add daily https://example.com --expire 2024-01-02T00:00:00Z
+# 短期链接
+./shortlinker add flash https://example.com --expire 1h      # 1小时
+./shortlinker add daily https://example.com --expire 1d     # 1天
 
-# 一周后过期
-./shortlinker add weekly https://example.com --expire 2024-01-08T00:00:00Z
+# 中期链接  
+./shortlinker add weekly https://example.com --expire 1w    # 1周
+./shortlinker add monthly https://example.com --expire 1M   # 1个月
 
-# 一年后过期
-./shortlinker add yearly https://example.com --expire 2025-01-01T00:00:00Z
+# 长期链接
+./shortlinker add yearly https://example.com --expire 1y    # 1年
+
+# 精确时间
+./shortlinker add meeting https://zoom.us/j/123 --expire 2h30m  # 2小时30分钟
+./shortlinker add sale https://shop.com --expire 2w3d          # 2周3天
 ```
 
 ## 错误代码
@@ -152,7 +229,7 @@ FORCE_COLOR=1 ./shortlinker list
 ```bash
 #!/bin/bash
 # 检查命令是否成功
-if ./shortlinker add test https://example.com; then
+if ./shortlinker add test https://example.com --expire 1d; then
     echo "添加成功"
 else
     echo "添加失败"
