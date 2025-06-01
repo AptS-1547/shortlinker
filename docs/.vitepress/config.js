@@ -232,7 +232,7 @@ export default {
     },
 
     editLink: {
-      pattern: 'https://github.com/AptS-1547/shortlinker/edit/main/docs/:path',
+      pattern: 'https://github.com/AptS-1547/shortlinker/edit/master/docs/:path',
       text: '编辑此页面'
     },
 
