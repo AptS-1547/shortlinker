@@ -1,10 +1,10 @@
 # Quick Start
 
-This guide helps you complete Shortlinker configuration and basic usage in 5 minutes.
+This guide helps you configure and use Shortlinker in 5 minutes.
 
 ## Prerequisites
 
-Please first complete any installation method from the [Installation Guide](/en/guide/installation).
+Please complete any installation method from the [Installation Guide](/en/guide/installation) first.
 
 ## Step 1: Basic Configuration
 
@@ -16,9 +16,9 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# Storage configuration (v0.1.0+, optional)
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=links.db
+# Optional: Enable admin and monitoring features
+# ADMIN_TOKEN=your_admin_token
+# HEALTH_TOKEN=your_health_token
 ```
 
 ## Step 2: Start Service
@@ -27,8 +27,9 @@ DB_FILE_NAME=links.db
 # Start server
 ./shortlinker
 
-# You should see output like:
+# Success output:
 # [INFO] Starting server at http://127.0.0.1:8080
+# [INFO] SQLite storage initialized with 0 links
 ```
 
 ## Step 3: Add Short Links
@@ -56,46 +57,49 @@ curl -I http://localhost:8080/github
 
 ## Common Operations
 
-### View All Short Links
 ```bash
+# View all short links
 ./shortlinker list
-```
 
-### Delete Short Link
-```bash
+# Delete short link
 ./shortlinker remove github
-```
 
-### Add Temporary Link
-```bash
-./shortlinker add temp https://example.com --expire 2024-12-31T23:59:59Z
-```
+# Add temporary link
+./shortlinker add temp https://example.com --expire 1d
 
-### Force Overwrite
-```bash
+# Force overwrite
 ./shortlinker add github https://github.com --force
 ```
 
 ## Service Management
 
-### Stop Service
 ```bash
+# Stop service
 # Method 1: Ctrl+C
 # Method 2: Send signal
 kill $(cat shortlinker.pid)
+
+# Reload config (Unix systems)
+kill -USR1 $(cat shortlinker.pid)
 ```
 
-### Reload Configuration
+## Production Environment Quick Configuration
+
+### Recommended Configuration
 ```bash
-# Unix systems
-kill -HUP $(cat shortlinker.pid)
+# Production .env configuration
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=/data/links.db
+DEFAULT_URL=https://your-domain.com
+
+# Enable API features
+ADMIN_TOKEN=your_secure_admin_token
+HEALTH_TOKEN=your_secure_health_token
 ```
 
-## Production Environment Recommendations
-
-### Reverse Proxy
-It's recommended to use Nginx or Caddy as reverse proxy:
-
+### Reverse Proxy Example
 ```nginx
 # Nginx configuration example
 server {
@@ -103,24 +107,33 @@ server {
     server_name your-domain.com;
     location / {
         proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
     }
 }
 ```
 
-### System Service
-Use systemd to manage service:
-
+### Docker Quick Deployment
 ```bash
-# Install as system service
-sudo cp shortlinker.service /etc/systemd/system/
-sudo systemctl enable shortlinker
-sudo systemctl start shortlinker
+# Using Docker Compose
+version: '3.8'
+services:
+  shortlinker:
+    image: e1saps/shortlinker
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
 ```
 
 ## Next Steps
 
 Congratulations! You have successfully configured Shortlinker. Next you can:
 
-- 📋 Learn [CLI Command Details](/en/cli/commands)
-- 🚀 Check [Deployment Guide](/en/deployment/) for production deployment
-- ⚙️ Understand [Advanced Configuration](/en/config/examples)
+- 📋 Learn [CLI Command Details](/en/cli/commands) - Master all command options
+- 🚀 Check [Deployment Guide](/en/deployment/) - Production environment deployment
+- ⚙️ Learn [Configuration Options](/en/config/) - Customize advanced settings
+- 🛡️ Use [Admin API](/en/api/admin) - HTTP interface management
+- 🏥 Configure [Health Check](/en/api/health) - Service monitoring

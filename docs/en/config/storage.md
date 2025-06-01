@@ -1,182 +1,108 @@
 # Storage Backend Configuration
 
-Starting from v0.1.0, Shortlinker supports multiple storage backends. You can choose the most suitable storage solution based on your needs.
+Shortlinker supports multiple storage backends. You can choose the most suitable storage solution based on your needs.
 
-## Version Information
-
-- **v0.1.0+**: Supports SQLite, file storage, and Sled backends, with SQLite as default
-- **< v0.1.0**: Only supports JSON file storage
+> 📋 **Configuration Method**: For storage-related environment variable configuration, see [Environment Variables Configuration](/en/config/)
 
 ## Storage Backend Overview
 
-| Storage Type | Version Support | Default | Performance | Ease of Use | Use Cases |
-|--------------|-----------------|---------|-------------|-------------|-----------|
-| SQLite | v0.1.0+ | ✅ | High | Medium | Production, medium to large deployments |
-| File Storage | All versions | ❌ | Medium | High | Development, debugging, small deployments |
-| Sled | v0.1.0+ | ❌ | High | Medium | High concurrency scenarios |
+| Storage Type | Performance | Ease of Use | Use Cases |
+|--------------|-------------|-------------|-----------|
+| **SQLite** (default) | High | Medium | Production environment, medium to large-scale deployment |
+| **File Storage** | Medium | High | Development debugging, small-scale deployment |
+| **Sled** (planned) | High | Medium | High concurrency scenarios |
 
-## SQLite Database Storage (Default, v0.1.0+)
+## SQLite Database Storage (Recommended)
 
-### Introduction
-SQLite is a lightweight relational database that provides excellent performance and reliability. It has been the recommended choice for production environments since v0.1.0.
-
-### Configuration Parameters
-```bash
-STORAGE_BACKEND=sqlite       # Enable SQLite storage
-DB_FILE_NAME=links.db        # Database file path
-```
-
-### Advantages
+### Features
 - **High Performance**: Native SQL queries with index support
 - **ACID Transactions**: Data consistency guarantee
-- **Concurrent Reads**: Supports multiple read operations
-- **Mature and Stable**: Production environment validated
+- **Concurrent Reading**: Supports multiple read operations
 - **Lightweight**: No additional services required
 
-### Disadvantages
-- **Write Limitations**: Limited high-concurrency write performance
-- **Tool Dependencies**: Requires SQL tools to view data
+### Use Cases
+- Production environment deployment
+- Medium to large-scale link management (1,000+ links)
+- Scenarios requiring data reliability
 
-### Configuration Examples
+### Database Operations
 ```bash
-# Basic configuration
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=data/links.db
+# View table structure
+sqlite3 links.db ".schema"
 
-# Production environment
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/var/lib/shortlinker/links.db
+# View all links
+sqlite3 links.db "SELECT * FROM links;"
 
-# Docker environment
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+# Backup database
+cp links.db links.db.backup
 ```
 
-## File Storage (All Versions)
+## File Storage
 
-### Introduction
-Uses JSON files to store data, simple and intuitive, suitable for development and small-scale deployments. This was the default storage method before v0.1.0.
-
-### Configuration Parameters
-```bash
-STORAGE_BACKEND=file         # Enable file storage
-DB_FILE_NAME=links.json      # JSON file path
-```
-
-### Advantages
+### Features
 - **Simple and Intuitive**: Human-readable JSON format
 - **Easy to Debug**: Direct file viewing and editing
-- **Version Control**: Can be included in Git management
+- **Version Control**: Can be managed with Git
 - **Zero Dependencies**: No additional tools required
 
-### Disadvantages
-- **Performance Limitations**: Slow loading with large amounts of data
-- **Concurrency Limitations**: Mutually exclusive write operations
-- **No Transactions**: Data consistency depends on file system
+### Use Cases
+- Development and testing environments
+- Small-scale deployment (< 1,000 links)
+- Scenarios requiring manual link editing
 
-## Sled Database Storage (v0.1.0+)
-
-### Introduction
-Sled is a modern embedded database designed for high-concurrency scenarios, supported since v0.1.0.
-
-### Configuration Parameters
-```bash
-STORAGE_BACKEND=sled         # Enable Sled storage
-DB_FILE_NAME=links.sled      # Database directory path
+### File Format
+```json
+[
+  {
+    "short_code": "github",
+    "target_url": "https://github.com",
+    "created_at": "2024-01-01T00:00:00Z",
+    "expires_at": null
+  }
+]
 ```
 
-### Advantages
+## Sled Database Storage (Planned)
+
+### Features
 - **High Concurrency**: Excellent concurrent read/write performance
 - **Transaction Support**: ACID transaction guarantee
 - **Compressed Storage**: Automatic data compression
 - **Crash Recovery**: Automatic recovery mechanism
 
-### Disadvantages
-- **Memory Usage**: Relatively higher memory consumption
-- **Ecosystem Maturity**: Newer technology
-- **Tool Support**: Fewer specialized tools
+### Use Cases
+- High concurrency access scenarios
+- Large-scale link management (10,000+ links)
+- High-performance requirement environments
 
 ## Storage Backend Selection Guide
 
 ### By Deployment Scale
 
-#### Small Scale (< 1,000 links)
 ```bash
-# Recommended: File storage (development-friendly)
+# Small scale (< 1,000 links)
 STORAGE_BACKEND=file
 DB_FILE_NAME=links.json
-```
 
-#### Medium Scale (1,000 - 10,000 links)
-```bash
-# Recommended: SQLite (balanced performance and ease of use)
+# Medium scale (1,000 - 10,000 links)
 STORAGE_BACKEND=sqlite
 DB_FILE_NAME=links.db
-```
 
-#### Large Scale (> 10,000 links)
-```bash
-# Recommended: SQLite or Sled
-STORAGE_BACKEND=sqlite
+# Large scale (> 10,000 links)
+STORAGE_BACKEND=sqlite  # or sled (future)
 DB_FILE_NAME=links.db
 ```
 
 ### By Use Case
 
-#### Development Environment
 ```bash
-# File storage - easy to debug
+# Development environment
 STORAGE_BACKEND=file
 DB_FILE_NAME=dev-links.json
-RUST_LOG=debug
-```
 
-#### Production Environment
-```bash
-# SQLite - stable and reliable
+# Production environment
 STORAGE_BACKEND=sqlite
 DB_FILE_NAME=/data/links.db
-```
-
-#### High Concurrency Scenarios
-```bash
-# Sled - high-performance concurrency
-STORAGE_BACKEND=sled
-DB_FILE_NAME=/data/links.sled
-```
-
-## Version Migration Guide
-
-### Upgrading from v0.0.x to v0.1.0+
-
-If you're upgrading from an earlier version, the default storage method has changed from file storage to SQLite:
-
-```bash
-# v0.0.x default configuration (automatically uses file storage)
-# No configuration needed, automatically uses links.json
-
-# v0.1.0+ default configuration (automatically uses SQLite)
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=links.db
-
-# To continue using file storage, explicitly configure
-STORAGE_BACKEND=file
-DB_FILE_NAME=links.json
-```
-
-### Data Migration
-
-```bash
-# Migrate from file storage to SQLite
-# 1. Backup existing data
-cp links.json links.json.backup
-
-# 2. Set new storage configuration
-export STORAGE_BACKEND=sqlite
-export DB_FILE_NAME=links.db
-
-# 3. Restart service, system will automatically detect and migrate data
-./shortlinker
 ```
 
 ## Performance Comparison
@@ -196,6 +122,22 @@ export DB_FILE_NAME=links.db
 - **File Storage**: Mutually exclusive access
 - **Sled**: Multiple readers and writers
 
+## Version Migration
+
+### Upgrading from v0.0.x to v0.1.0+
+
+v0.1.0+ versions use SQLite by default. To continue using file storage:
+
+```bash
+# Explicitly configure file storage
+STORAGE_BACKEND=file
+DB_FILE_NAME=links.json
+```
+
+### Data Migration
+
+The system will automatically detect and migrate data without manual intervention.
+
 ## Troubleshooting
 
 ### SQLite Issues
@@ -203,7 +145,7 @@ export DB_FILE_NAME=links.db
 # Check database integrity
 sqlite3 links.db "PRAGMA integrity_check;"
 
-# Database corruption repair
+# Repair corrupted database
 sqlite3 links.db ".dump" | sqlite3 new_links.db
 ```
 
@@ -216,40 +158,38 @@ jq . links.json
 jq '.' links.json > fixed.json && mv fixed.json links.json
 ```
 
-### Sled Issues
+### Permission Issues
 ```bash
-# Check lock status
-lsof +D links.sled/
+# Check file permissions
+ls -la links.*
 
-# Force unlock (use with caution)
-rm -rf links.sled/db
+# Fix permissions
+chown shortlinker:shortlinker links.*
+chmod 644 links.*
 ```
 
 ## Monitoring Recommendations
 
-### SQLite Monitoring
-```bash
-# Database size
-du -h links.db
+Use health check API to monitor storage status:
 
-# Link count
-sqlite3 links.db "SELECT COUNT(*) FROM links;"
+```bash
+# Check storage health status
+curl -H "Authorization: Bearer $HEALTH_TOKEN" \
+     http://localhost:8080/health
 ```
 
-### File Storage Monitoring
-```bash
-# File size
-ls -lh links.json
-
-# Link count
-jq 'length' links.json
+Response example:
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "storage": {
+      "status": "healthy",
+      "links_count": 1234,
+      "backend": "sqlite"
+    }
+  }
+}
 ```
 
-### Sled Monitoring
-```bash
-# Directory size
-du -sh links.sled/
-
-# Memory usage (via process monitoring)
-ps aux | grep shortlinker
-```
+> 🔗 **Related Documentation**: [Health Check API](/en/api/health)

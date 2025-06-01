@@ -20,15 +20,13 @@
 * 🚀 **High Performance**: Built with Rust + Actix-web
 * 🎯 **Dynamic Management**: Add or remove links at runtime without restarting
 * 🎲 **Smart Short Codes**: Supports both custom and randomly generated codes
-* ⏰ **Expiration Support**: Set expiration times for links with automatic cleanup
-* 💾 **Multiple Storage Backends**: SQLite database, JSON file storage, with Sled embedded database coming soon
+* ⏰ **Expiration Support**: Set expiration times with flexible time formats (v0.1.1+)
+* 💾 **Multiple Storage Backends**: SQLite database, JSON file storage
 * 🔄 **Cross-Platform**: Works on Windows, Linux, and macOS
-* 🔐 **Process Management**: Smart process locking to prevent duplicate instances
-* 🐳 **Containerized**: Optimized Docker image for easy deployment
 * 🛡️ **Admin API**: HTTP API for link management (v0.0.5+)
-* 🧪 **High Test Coverage**: Comprehensive unit and integration test coverage
-* 🔧 **Strong Type Safety**: Complete error handling and type system
-* 🎨 **Colorized Output**: Beautiful command-line interface with color support
+* 🏥 **Health Monitoring**: Built-in health check endpoints
+* 🐳 **Containerized**: Optimized Docker image for easy deployment
+* 🎨 **Beautiful CLI**: Colorized command-line interface
 
 ## Quick Start
 
@@ -43,11 +41,7 @@ cargo run
 ### Deploy with Docker
 
 ```bash
-# Pull from Docker Hub
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
-
-# Or pull from GitHub Container Registry
-docker run -d -p 8080:8080 -v $(pwd)/data:/data ghcr.io/apts-1547/shortlinker
 ```
 
 ## Usage Example
@@ -69,18 +63,13 @@ Once your domain (e.g. `esap.cc`) is bound:
 ./shortlinker add https://github.com                  # Random code
 ./shortlinker add github https://new-url.com --force  # Overwrite existing
 
-# Using convenient relative time format (recommended)
+# Using relative time format (v0.1.1+)
 ./shortlinker add daily https://example.com --expire 1d      # Expires in 1 day
 ./shortlinker add weekly https://example.com --expire 1w     # Expires in 1 week
-./shortlinker add monthly https://example.com --expire 1M    # Expires in 1 month
-./shortlinker add yearly https://example.com --expire 1y     # Expires in 1 year
-./shortlinker add complex https://example.com --expire 1d2h30m  # Expires in 1 day 2 hours 30 minutes
-
-# Using traditional RFC3339 format
-./shortlinker add temp https://example.com --expire "2025-12-31T23:59:59Z"
+./shortlinker add complex https://example.com --expire 1d2h30m  # Complex format
 
 # Manage links
-./shortlinker update github https://new-github.com --expire 30d    # Update existing link
+./shortlinker update github https://new-github.com --expire 30d
 ./shortlinker list                    # List all links
 ./shortlinker remove github           # Remove specific link
 
@@ -92,208 +81,137 @@ Once your domain (e.g. `esap.cc`) is bound:
 
 ## Admin API (v0.0.5+)
 
-Starting from v0.0.5, HTTP API support for link management is available. The Admin API also supports the new relative time format.
+HTTP API for link management with Bearer token authentication.
 
-### Authentication Setup
+### Setup
 
 ```bash
-# Set Admin Token (required, API disabled when empty)
 export ADMIN_TOKEN=your_secret_token
-
-# Custom Route Prefix (optional)
-export ADMIN_ROUTE_PREFIX=/api/admin
+export ADMIN_ROUTE_PREFIX=/admin  # optional
 ```
 
-### API Endpoints
-
-#### GET /admin/link
-Get all short links.
+### Examples
 
 ```bash
+# Get all links
 curl -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link
-```
 
-#### POST /admin/link
-Create a new short link.
-
-```bash
-# Using relative time format (recommended)
+# Create link with relative time
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
      http://localhost:8080/admin/link
 
-# Using combined time format
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"sale","target":"https://shop.com/sale","expires_at":"2w3d"}' \
-     http://localhost:8080/admin/link
-
-# Using traditional RFC3339 format
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"github","target":"https://github.com","expires_at":"2024-12-31T23:59:59Z"}' \
-     http://localhost:8080/admin/link
-```
-
-#### GET /admin/link/{code}
-Get a specific short link.
-
-```bash
-curl -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link/github
-```
-
-#### PUT /admin/link/{code}
-Update an existing short link.
-
-```bash
-curl -X PUT \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://new-github.com","expires_at":"2025-01-31T23:59:59Z"}' \
-     http://localhost:8080/admin/link/github
-```
-
-#### DELETE /admin/link/{code}
-Delete a short link.
-
-```bash
-curl -X DELETE \
-     -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link/github
-```
-
-### Common Operations
-
-```bash
-# Get All Links
-curl -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link
-
-# Create Link with relative time
+# Auto-generate random code
 curl -X POST \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
      -d '{"target":"https://github.com","expires_at":"30d"}' \
      http://localhost:8080/admin/link
 
-# Update Link with combined time format
+# Update link
 curl -X PUT \
      -H "Authorization: Bearer your_secret_token" \
      -H "Content-Type: application/json" \
-     -d '{"target":"https://new-url.com","expires_at":"1w2d"}' \
+     -d '{"target":"https://new-url.com"}' \
      http://localhost:8080/admin/link/github
 
-# Delete Link
+# Delete link
 curl -X DELETE \
      -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link/github
 ```
 
-## Time Format Support
+## Health Check API
 
-shortlinker supports two expiration time formats:
-
-### Relative Time Format (Recommended)
-
-Concise and user-friendly relative time format, calculated from current time:
+Monitor service health and storage status.
 
 ```bash
-# Single time units
-1s, 5m, 2h, 1d, 1w, 1M, 1y
+# Setup
+export HEALTH_TOKEN=your_health_token
 
-# Combined time format
-1d2h30m     # Expires in 1 day 2 hours 30 minutes
-2w3d        # Expires in 2 weeks 3 days
-1y30d       # Expires in 1 year 30 days
+# Health check
+curl -H "Authorization: Bearer your_health_token" \
+     http://localhost:8080/health
+
+# Readiness check
+curl http://localhost:8080/health/ready
+
+# Liveness check  
+curl http://localhost:8080/health/live
 ```
 
-Supported time units:
-- `s` (seconds), `m` (minutes), `h` (hours), `d` (days)
-- `w` (weeks), `M` (months, 30 days), `y` (years, 365 days)
+## Time Format Support (v0.1.1+)
 
-### RFC3339 Format (Compatible)
-
-Traditional ISO 8601 time format:
-
+### Relative Time (Recommended)
 ```bash
-2024-12-31T23:59:59Z        # UTC time
-2024-12-31T23:59:59+08:00   # With timezone
+1s, 5m, 2h, 1d, 1w, 1M, 1y    # Single units
+1d2h30m                        # Combined format
 ```
 
-## Configuration Options
+### RFC3339 Format
+```bash
+2024-12-31T23:59:59Z           # UTC time
+2024-12-31T23:59:59+08:00      # With timezone
+```
 
-Configure using environment variables or a `.env` file:
+## Configuration
 
-| Environment Variable | Default Value | Description        |
-| -------------------- | ------------- | ------------------ |
-| `SERVER_HOST`        | `127.0.0.1`   | Listen address     |
-| `SERVER_PORT`        | `8080`        | Listen port        |
-| `STORAGE_BACKEND`    | `sqlite`      | Storage backend type |
-| `DB_FILE_NAME`       | `links.db` (SQLite), `links.json` (File), `links.sled` (Sled) | Database file path (varies by backend) |
-| `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL |
-| `RANDOM_CODE_LENGTH` | `6`           | Random code length |
-| `ADMIN_TOKEN`        | *(empty)*     | Admin API authentication token |
-| `RUST_LOG`           | `info`        | Logging level |
+Configure using environment variables or `.env` file:
 
-### .env File Example
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERVER_HOST` | `127.0.0.1` | Listen address |
+| `SERVER_PORT` | `8080` | Listen port |
+| `STORAGE_BACKEND` | `sqlite` | Storage type (sqlite/file) |
+| `DB_FILE_NAME` | `links.db` | Database file path |
+| `DEFAULT_URL` | `https://esap.cc/repo` | Default redirect URL |
+| `RANDOM_CODE_LENGTH` | `6` | Random code length |
+| `ADMIN_TOKEN` | *(empty)* | Admin API token |
+| `HEALTH_TOKEN` | *(empty)* | Health API token |
+| `RUST_LOG` | `info` | Log level |
+
+### .env Example
 
 ```bash
-# Server configuration
+# Server
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
-# Storage configuration
+# Storage
 STORAGE_BACKEND=sqlite
 DB_FILE_NAME=data/links.db
 
-# Feature configuration
+# APIs
+ADMIN_TOKEN=your_admin_token
+HEALTH_TOKEN=your_health_token
+
+# Features
 DEFAULT_URL=https://example.com
 RANDOM_CODE_LENGTH=8
 RUST_LOG=info
-
-# Admin API configuration
-ADMIN_TOKEN=your_secure_admin_token
 ```
 
 ## Storage Backends
 
-shortlinker supports multiple storage backends starting from v0.1.0:
-
-- **SQLite** (default, v0.1.0+): Production-grade performance, recommended for production
-- **File Storage** (default before v0.1.0): Simple and easy to use, convenient for debugging
-- **Sled** (coming soon): High concurrency performance, suitable for high-load scenarios
+- **SQLite** (default, v0.1.0+): Production-ready, recommended
+- **File Storage**: Simple JSON-based storage for development
 
 ```bash
-# SQLite storage (default, v0.1.0+)
+# SQLite (recommended)
 STORAGE_BACKEND=sqlite
 DB_FILE_NAME=links.db
 
-# File storage (default before v0.1.0)
+# File storage
 STORAGE_BACKEND=file
 DB_FILE_NAME=links.json
-
-# Sled storage (coming soon)
-# STORAGE_BACKEND=sled
-# DB_FILE_NAME=links.sled
 ```
 
-## Reverse Proxy Configuration
+## Deployment
 
-### Caddy
-
-```caddy
-esap.cc {
-    reverse_proxy 127.0.0.1:8080
-}
-```
-
-### Nginx
+### Reverse Proxy (Nginx)
 
 ```nginx
 server {
@@ -306,7 +224,7 @@ server {
 }
 ```
 
-### systemd
+### systemd Service
 
 ```ini
 [Unit]
@@ -319,73 +237,17 @@ User=www-data
 WorkingDirectory=/opt/shortlinker
 ExecStart=/opt/shortlinker/shortlinker
 Restart=always
-
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
-Environment=RUST_LOG=info
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-## Code Quality & Testing
-
-The shortlinker project emphasizes code quality and reliability:
-
-### Test Coverage
-
-- **CLI Module Tests**: Command parsing, argument validation, error handling
-- **Storage Layer Tests**: File storage, SQLite, Sled multi-backend testing
-- **Service Layer Tests**: Admin API, authentication middleware, HTTP handling
-- **Utilities Tests**: Random code generation, color output, utility functions
-- **Error Handling Tests**: Complete error types and conversion testing
-- **System Integration Tests**: Process management, signal handling, concurrency safety
-- **Performance Tests**: Large dataset handling, concurrent operations, memory usage
-
-### Running Tests
-
-```bash
-# Run all tests
-cargo test
-
-# Run specific module tests
-cargo test cli_tests
-cargo test storages_tests
-cargo test services_tests
-cargo test utils_tests
-cargo test errors_tests
-
-# Show test coverage
-cargo test --verbose
-
-# Parallel testing (faster)
-cargo test -- --test-threads=4
-```
-
-### Code Quality Features
-
-- **Type Safety**: Strict Rust type system with compile-time error checking
-- **Memory Safety**: Zero-cost abstractions without GC, preventing memory leaks
-- **Concurrency Safety**: Arc + Mutex/RwLock ensures thread safety
-- **Error Handling**: Unified error types and propagation mechanisms
-- **Modular Design**: Clear module boundaries and separation of concerns
-- **Complete Documentation**: Detailed code comments and API documentation
-
-## Technical Details
-
-* **Hot Reloading**: Automatic configuration file change detection
-* **Random Code Generation**: Alphanumeric with configurable length, collision avoidance
-* **Expiration Checking**: Real-time validation on request, automatic cleanup
-* **Container Optimization**: Multi-stage build with `scratch` base image
-* **Memory Safety**: Arc + RwLock ensures concurrent safety
-* **Colorized Terminal**: Beautiful output with ANSI color code support
-* **Smart Retry**: Automatic retry mechanisms for network and storage operations
-* **Graceful Shutdown**: Signal handling and resource cleanup
-
 ## Development
 
 ```bash
-# Development build
+# Development
 cargo run
 
 # Production build
@@ -394,23 +256,18 @@ cargo build --release
 # Run tests
 cargo test
 
-# Code formatting
-cargo fmt
-
-# Code linting
-cargo clippy
-
-# Generate documentation
-cargo doc --open
+# Code quality
+cargo fmt && cargo clippy
 ```
 
-### Development Guidelines
+## Technical Highlights
 
-1. **Adding New Features**: Ensure corresponding unit tests are written
-2. **Modifying Storage Layer**: Update implementations for all storage backends
-3. **API Changes**: Update Admin API tests and documentation
-4. **Error Handling**: Use the unified `ShortlinkerError` type
-5. **Logging Output**: Use the `log` crate for structured logging
+- **Cross-Platform Process Management**: Smart lock files and signal handling
+- **Hot Configuration Reload**: Signal-based reload (Unix) and file triggers (Windows)
+- **Container-Aware**: Special handling for Docker environments
+- **Unified Error Handling**: Comprehensive error types with automatic conversions
+- **Memory Safe**: Zero-cost abstractions with thread safety
+- **High Test Coverage**: Comprehensive unit and integration tests
 
 ## License
 

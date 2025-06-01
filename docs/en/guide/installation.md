@@ -6,7 +6,7 @@ Choose the installation method that suits you to quickly deploy Shortlinker.
 
 ### Runtime Environment
 - Operating System: Linux, macOS, Windows
-- Network Connection: For downloading dependencies
+- Network Connection: Required for downloading dependencies
 
 ### Source Compilation Environment
 - **Rust**: >= 1.82.0 (required)
@@ -22,13 +22,13 @@ No dependencies required, start with one command:
 # Basic run
 docker run -d -p 8080:8080 e1saps/shortlinker
 
-# Data persistence
+# Data persistence (recommended)
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
 ```
 
-### 📦 Precompiled Binary
+### 📦 Pre-compiled Binaries
 
-Download the precompiled version for your platform:
+Download the pre-compiled version for your platform:
 
 ```bash
 # Linux x64
@@ -66,7 +66,7 @@ cargo build --release
 
 ## Quick Verification
 
-After installation, verify that the service is working properly:
+After installation, verify the service is working properly:
 
 ```bash
 # Start service
@@ -76,11 +76,6 @@ After installation, verify that the service is working properly:
 curl -I http://localhost:8080/
 # Should return 307 redirect
 ```
-
-The service supports multiple storage backends (v0.1.0+):
-- SQLite (default): Production-grade performance
-- File storage: Simple and convenient for development
-- Sled: High concurrency performance (coming soon)
 
 ## Common Issues
 
@@ -92,13 +87,13 @@ rustup update
 
 ### Compilation Failed
 ```bash
-# Clean and recompile
+# Clean and rebuild
 cargo clean && cargo build --release
 ```
 
 ### Port Already in Use
 ```bash
-# Use another port
+# Use a different port
 SERVER_PORT=3000 ./shortlinker
 ```
 
@@ -107,4 +102,4 @@ SERVER_PORT=3000 ./shortlinker
 After installation, continue reading:
 - 🚀 [Quick Start](/en/guide/getting-started) - Learn basic usage
 - ⚙️ [Configuration](/en/config/) - Understand configuration options
-- 📋 [CLI Tools](/en/cli/) - Master command-line operations
+- 📋 [CLI Tools](/en/cli/) - Master command line operations

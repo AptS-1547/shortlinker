@@ -1,6 +1,6 @@
 # System Service Configuration
 
-Configure Shortlinker as a system service for automatic startup and service management.
+Configure Shortlinker as a system service for auto-start and service management.
 
 ## systemd Service
 
@@ -33,7 +33,6 @@ Environment=STORAGE_BACKEND=sqlite
 Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RUST_LOG=info
-Environment=ADMIN_TOKEN=your_secure_production_token
 
 # Security configuration
 NoNewPrivileges=true
@@ -70,111 +69,14 @@ sudo systemctl start shortlinker
 # Check status
 sudo systemctl status shortlinker
 
-# Start service
+# Start/stop/restart service
 sudo systemctl start shortlinker
-
-# Stop service
 sudo systemctl stop shortlinker
-
-# Restart service
 sudo systemctl restart shortlinker
 
 # View logs
 sudo journalctl -u shortlinker -f
-
-# View recent logs
 sudo journalctl -u shortlinker --since "1 hour ago"
-```
-
-## SysV Init (CentOS 6/RHEL 6)
-
-### Create Startup Script
-
-Create `/etc/init.d/shortlinker`:
-
-```bash
-#!/bin/bash
-# shortlinker        Shortlinker URL Shortening Service
-# chkconfig: 35 99 99
-# description: Shortlinker daemon
-
-. /etc/rc.d/init.d/functions
-
-USER="www-data"
-DAEMON="shortlinker"
-ROOT_DIR="/opt/shortlinker"
-
-DAEMON_PATH="$ROOT_DIR/$DAEMON"
-LOCK_FILE="/var/lock/subsys/shortlinker"
-
-start() {
-    if [ -f $LOCK_FILE ] ; then
-        echo "$DAEMON is locked."
-        return
-    fi
-  
-    echo -n $"Starting $DAEMON: "
-    runuser -l "$USER" -c "$DAEMON_PATH" && echo_success || echo_failure
-    RETVAL=$?
-    echo
-    [ $RETVAL -eq 0 ] && touch $LOCK_FILE
-    return $RETVAL
-}
-
-stop() {
-    echo -n $"Shutting down $DAEMON: "
-    pid=`ps -aefw | grep "$DAEMON" | grep -v " grep " | awk '{print $2}'`
-    kill -9 $pid > /dev/null 2>&1
-    [ $? -eq 0 ] && echo_success || echo_failure
-    echo
-    [ $? -eq 0 ] && rm -f $LOCK_FILE
-}
-
-restart() {
-    stop
-    start
-}
-
-status() {
-    if [ -f $LOCK_FILE ]; then
-        echo "$DAEMON is running."
-    else
-        echo "$DAEMON is stopped."
-    fi
-}
-
-case "$1" in
-    start)
-        start
-        ;;
-    stop)
-        stop
-        ;;
-    status)
-        status
-        ;;
-    restart)
-        restart
-        ;;
-    *)
-        echo "Usage: {start|stop|status|restart}"
-        exit 1
-        ;;
-esac
-
-exit $?
-```
-
-### Installation and Configuration
-
-```bash
-# Install startup script
-sudo chmod +x /etc/init.d/shortlinker
-sudo chkconfig --add shortlinker
-sudo chkconfig shortlinker on
-
-# Start service
-sudo service shortlinker start
 ```
 
 ## Docker Compose Service
@@ -193,56 +95,41 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./data:/data
-      - ./logs:/logs
     environment:
       - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
       - STORAGE_BACKEND=sqlite
-      - DB_FILE_NAME=/data/links.db
+      - DB_FILE_NAME=/data/shortlinker.data
       - DEFAULT_URL=https://your-domain.com
       - RUST_LOG=info
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
-      - ADMIN_ROUTE_PREFIX=/secure-admin
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
           memory: 128M
           cpus: '0.5'
-        reservations:
-          memory: 64M
-          cpus: '0.25'
-    labels:
-      - "com.docker.compose.service=shortlinker"
 ```
 
 ### Service Management
 
 ```bash
-# Start services
+# Start service
 docker-compose up -d
 
-# Check status
+# Check status and logs
 docker-compose ps
-
-# View logs
 docker-compose logs -f shortlinker
 
-# Stop services
+# Stop and restart
 docker-compose down
-
-# Restart services
 docker-compose restart shortlinker
-
-# Update and restart
-docker-compose pull && docker-compose up -d
 ```
 
-## Monitoring and Alerting
+## Monitoring and Logging
 
 ### Service Monitoring Script
 
@@ -252,8 +139,6 @@ docker-compose pull && docker-compose up -d
 
 SERVICE_NAME="shortlinker"
 LOG_FILE="/var/log/shortlinker-monitor.log"
-ADMIN_API_URL="http://localhost:8080/admin/link"
-ADMIN_TOKEN="your_admin_token"
 
 check_service() {
     if systemctl is-active --quiet $SERVICE_NAME; then
@@ -265,82 +150,32 @@ check_service() {
     fi
 }
 
-check_admin_api() {
-    if [ -n "$ADMIN_TOKEN" ]; then
-        response=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" "$ADMIN_API_URL" || echo "error")
-        if echo "$response" | grep -q '"code":0'; then
-            echo "$(date): Admin API is responding" >> $LOG_FILE
-            return 0
-        else
-            echo "$(date): Admin API is not responding properly" >> $LOG_FILE
-            return 1
-        fi
-    fi
-    return 0
-}
-
 restart_service() {
     echo "$(date): Restarting $SERVICE_NAME" >> $LOG_FILE
     systemctl restart $SERVICE_NAME
     sleep 5
-  
-    if check_service && check_admin_api; then
+    
+    if check_service; then
         echo "$(date): $SERVICE_NAME restarted successfully" >> $LOG_FILE
     else
         echo "$(date): Failed to restart $SERVICE_NAME" >> $LOG_FILE
-        # Send alert notification
-        echo "$SERVICE_NAME restart failed on $(hostname)" | mail -s "Service Alert" admin@example.com
     fi
 }
 
 # Main logic
 if ! check_service; then
     restart_service
-elif ! check_admin_api; then
-    echo "$(date): Admin API check failed, restarting service" >> $LOG_FILE
-    restart_service
 fi
 ```
 
-### Add to crontab
+### Scheduled Monitoring
 
 ```bash
-# Check service status every minute
+# Add to crontab
 * * * * * /usr/local/bin/monitor.sh
-
-# Check Admin API health every 5 minutes
-*/5 * * * * /usr/local/bin/check-admin-api.sh
 ```
 
-### Health Check Script for Admin API
-
-```bash
-#!/bin/bash
-# check-admin-api.sh - Admin API health check
-
-ADMIN_API_URL="http://localhost:8080/admin/link"
-ADMIN_TOKEN="your_admin_token"
-
-if [ -z "$ADMIN_TOKEN" ]; then
-    echo "Admin API disabled (no token set)"
-    exit 0
-fi
-
-response=$(curl -s -w "%{http_code}" -H "Authorization: Bearer $ADMIN_TOKEN" "$ADMIN_API_URL")
-http_code=${response: -3}
-
-if [ "$http_code" = "200" ]; then
-    echo "Admin API healthy"
-    exit 0
-else
-    echo "Admin API unhealthy (HTTP $http_code)"
-    exit 1
-fi
-```
-
-## Log Rotation
-
-### logrotate Configuration
+### Log Rotation
 
 Create `/etc/logrotate.d/shortlinker`:
 
@@ -352,38 +187,22 @@ Create `/etc/logrotate.d/shortlinker`:
     delaycompress
     missingok
     notifempty
-    create 644 www-data www-data
     postrotate
-        systemctl reload shortlinker || true
-    endscript
-}
-
-/var/log/shortlinker*.log {
-    daily
-    rotate 30
-    compress
-    delaycompress
-    missingok
-    notifempty
-    postrotate
-        systemctl reload shortlinker || true
+        systemctl reload shortlinker
     endscript
 }
 ```
 
-## Security Hardening
+## Security Configuration
 
-### Firewall Configuration
+### Firewall Settings
 
 ```bash
-# Allow only local access
+# Allow local access only
 sudo ufw allow from 127.0.0.1 to any port 8080
 
-# Or allow only reverse proxy server access
+# Or allow reverse proxy server only
 sudo ufw allow from 10.0.0.100 to any port 8080
-
-# For Admin API, be more restrictive
-sudo ufw allow from 192.168.1.0/24 to any port 8080
 ```
 
 ### File Permissions
@@ -392,94 +211,35 @@ sudo ufw allow from 192.168.1.0/24 to any port 8080
 # Set correct permissions
 sudo chown -R www-data:www-data /opt/shortlinker
 sudo chmod 755 /opt/shortlinker
-sudo chmod 600 /opt/shortlinker/data/links.json
-sudo chmod 755 /opt/shortlinker/shortlinker
-
-# Secure Admin API token in environment
-sudo chmod 600 /opt/shortlinker/.env
+sudo chmod 600 /opt/shortlinker/data/links.db
+sudo chmod 644 /opt/shortlinker/shortlinker
 ```
 
-### AppArmor Profile (Ubuntu/Debian)
+## SysV Init (Compatibility)
 
-Create `/etc/apparmor.d/shortlinker`:
-
-```
-#include <tunables/global>
-
-/opt/shortlinker/shortlinker {
-  #include <abstractions/base>
-  
-  # Allow network access
-  network inet stream,
-  network inet6 stream,
-  
-  # Allow reading configuration
-  /opt/shortlinker/data/ r,
-  /opt/shortlinker/data/** rw,
-  
-  # Allow log writing
-  /opt/shortlinker/logs/ r,
-  /opt/shortlinker/logs/** rw,
-  
-  # Deny everything else
-  deny /etc/shadow r,
-  deny /etc/passwd w,
-  deny /home/** r,
-  deny /root/** r,
-}
-```
-
-```bash
-# Create SELinux policy for Shortlinker
-sudo setsebool -P httpd_can_network_connect 1
-sudo semanage port -a -t http_port_t -p tcp 8080
-
-# Set SELinux context for files
-sudo semanage fcontext -a -t httpd_exec_t "/opt/shortlinker/shortlinker"
-sudo semanage fcontext -a -t httpd_config_t "/opt/shortlinker/data(/.*)?"
-sudo restorecon -R /opt/shortlinker
-```
-
-## Backup and Recovery
-
-### Automated Backup Script
+For systems that don't support systemd, use traditional init scripts:
 
 ```bash
 #!/bin/bash
-# backup.sh - Automated backup script
+# /etc/init.d/shortlinker
 
-BACKUP_DIR="/opt/backups/shortlinker"
-DATA_FILE="/opt/shortlinker/data/links.json"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-
-# Create backup directory
-mkdir -p $BACKUP_DIR
-
-# Backup data file
-cp $DATA_FILE $BACKUP_DIR/links_$TIMESTAMP.json
-
-# Compress old backups
-find $BACKUP_DIR -name "links_*.json" -mtime +1 -exec gzip {} \;
-
-# Remove backups older than 30 days
-find $BACKUP_DIR -name "links_*.json.gz" -mtime +30 -delete
-
-echo "Backup completed: $BACKUP_DIR/links_$TIMESTAMP.json"
-```
-
-### Recovery Procedure
-
-```bash
-# Stop service
-sudo systemctl stop shortlinker
-
-# Restore from backup
-sudo cp /opt/backups/shortlinker/links_20240101_120000.json /opt/shortlinker/data/links.json
-sudo chown www-data:www-data /opt/shortlinker/data/links.json
-
-# Start service
-sudo systemctl start shortlinker
-
-# Verify recovery
-curl -I http://localhost:8080/test-link
+case "$1" in
+    start)
+        echo "Starting shortlinker..."
+        sudo -u www-data /opt/shortlinker/shortlinker &
+        ;;
+    stop)
+        echo "Stopping shortlinker..."
+        pkill -f shortlinker
+        ;;
+    restart)
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
 ```

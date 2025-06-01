@@ -19,42 +19,43 @@ hero:
 features:
   - icon: 🚀
     title: 高性能
-    details: 基于 Rust + Actix-web 构建，提供毫秒级的重定向响应速度
-  - icon: 🎯
-    title: 动态管理
-    details: 支持运行时添加/删除短链，无需重启服务器
-  - icon: 🎲
-    title: 智能短码
-    details: 支持自定义短码和随机生成，避免冲突的智能处理
-  - icon: ⏰
-    title: 过期时间
-    details: 支持设置链接过期时间，自动失效和清理
+    details: 基于 Rust 构建，毫秒级重定向响应，支持高并发访问
   - icon: 💾
-    title: 多后端存储
-    details: 支持 SQLite 数据库（默认，links.db）、JSON 文件存储（links.json）和 Sled 嵌入式数据库（links.sled，即将支持）
-  - icon: 🔄
-    title: 跨平台
-    details: 支持 Windows、Linux、macOS，智能进程锁防止重复启动
-  - icon: 🐳
-    title: 容器化
-    details: 优化的 Docker 镜像部署，多阶段构建，scratch 基础镜像
+    title: 多存储后端
+    details: 支持 SQLite（默认）、JSON 文件、Sled 数据库等多种存储方案
   - icon: 🛡️
-    title: Admin API
-    details: HTTP API 管理接口，支持鉴权和自定义路由前缀 (v0.0.5+)
+    title: 安全可靠
+    details: Admin API 鉴权、健康检查监控、进程保护机制
+  - icon: 🐳
+    title: 部署简单
+    details: Docker 一键部署，支持 systemd 服务管理
+  - icon: ⚡
+    title: 热重载
+    details: 运行时添加/删除短链，无需重启服务器
+  - icon: 🎯
+    title: 智能管理
+    details: 自定义短码、随机生成、过期时间、CLI 工具管理
 ---
-## 为什么选择 Shortlinker
 
-### 💡 极简设计
+## 设计理念
 
-专注于核心功能，无多余特性，配置简单，部署快速
+### 极简主义
+专注于短链接重定向核心功能，配置简单，部署快速
 
-### ⚡ 性能优越
+### 高性能
+Rust 原生性能保障，SQLite 提供生产级数据库性能，异步并发处理
 
-Rust 原生性能，毫秒级响应，支持高并发访问，SQLite 提供生产级数据库性能
+### 易于使用
+命令行工具管理，环境变量配置，Docker 一键部署
 
-### 🛠️ 运维友好
+## 核心特性
 
-单一二进制，Docker 支持，systemd 集成，监控完备
+- **多存储后端**：SQLite 数据库（默认）、JSON 文件存储、Sled 嵌入式数据库
+- **Admin API**：HTTP API 管理接口，支持鉴权和自定义路由前缀
+- **健康监控**：完整的健康检查 API，支持存储状态和运行时间监控
+- **智能过期**：支持灵活的时间格式设置，自动失效和清理
+- **跨平台支持**：Windows、Linux、macOS，智能进程锁防止重复启动
+- **容器优化**：Docker 镜像部署，支持容器重启检测
 
 ## 快速体验
 
@@ -69,6 +70,13 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 curl -L http://localhost:8080/github
 ```
 
+## 使用场景
+
+- **营销推广**：活动链接、社交媒体分享
+- **内部工具**：文档跳转、系统集成
+- **临时链接**：限时分享、测试环境
+- **API 服务**：微服务间链接管理
+
 ## 开始使用
 
-准备好了吗？查看 [快速开始指南](/guide/getting-started) 开始您的 Shortlinker 之旅！
+准备好了吗？查看 [快速开始指南](/guide/getting-started) 开始您的 Shortlinker 

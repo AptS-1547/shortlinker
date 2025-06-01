@@ -11,14 +11,14 @@
 创建配置文件 `.env`：
 
 ```bash
-# 最小配置（SQLite 默认）
+# 最小配置
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# 可选：自定义存储配置
-# STORAGE_BACKEND=sqlite       # 默认值，可省略
-# DB_FILE_NAME=links.db        # SQLite 默认值，可省略
+# 可选：启用管理和监控功能
+# ADMIN_TOKEN=your_admin_token
+# HEALTH_TOKEN=your_health_token
 ```
 
 ## 第二步：启动服务
@@ -57,62 +57,49 @@ curl -I http://localhost:8080/github
 
 ## 常用操作
 
-### 查看所有短链接
 ```bash
+# 查看所有短链接
 ./shortlinker list
-```
 
-### 删除短链接
-```bash
+# 删除短链接
 ./shortlinker remove github
-```
 
-### 添加临时链接
-```bash
-./shortlinker add temp https://example.com --expire 2024-12-31T23:59:59Z
-```
+# 添加临时链接
+./shortlinker add temp https://example.com --expire 1d
 
-### 强制覆盖
-```bash
+# 强制覆盖
 ./shortlinker add github https://github.com --force
 ```
 
 ## 服务管理
 
-### 停止服务
 ```bash
+# 停止服务
 # 方式1：Ctrl+C
 # 方式2：发送信号
 kill $(cat shortlinker.pid)
+
+# 重载配置（Unix 系统）
+kill -USR1 $(cat shortlinker.pid)
 ```
 
-### 重载配置
+## 生产环境快速配置
+
+### 推荐配置
 ```bash
-# Unix 系统
-kill -HUP $(cat shortlinker.pid)
-```
-
-## 生产环境建议
-
-### 存储后端选择
-
-```bash
-# 生产环境推荐 SQLite（默认）
+# 生产环境 .env 配置
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
 STORAGE_BACKEND=sqlite
 DB_FILE_NAME=/data/links.db
+DEFAULT_URL=https://your-domain.com
 
-# 开发环境可使用文件存储
-STORAGE_BACKEND=file
-DB_FILE_NAME=/data/links.json
-
-# 高并发场景可考虑 Sled（即将支持）
-# STORAGE_BACKEND=sled
-# DB_FILE_NAME=/data/links.sled
+# 启用 API 功能
+ADMIN_TOKEN=your_secure_admin_token
+HEALTH_TOKEN=your_secure_health_token
 ```
 
-### 反向代理
-建议使用 Nginx 或 Caddy 作为反向代理：
-
+### 反向代理示例
 ```nginx
 # Nginx 配置示例
 server {
@@ -120,24 +107,33 @@ server {
     server_name your-domain.com;
     location / {
         proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
     }
 }
 ```
 
-### 系统服务
-使用 systemd 管理服务：
-
+### Docker 快速部署
 ```bash
-# 安装为系统服务
-sudo cp shortlinker.service /etc/systemd/system/
-sudo systemctl enable shortlinker
-sudo systemctl start shortlinker
+# 使用 Docker Compose
+version: '3.8'
+services:
+  shortlinker:
+    image: e1saps/shortlinker
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - STORAGE_BACKEND=sqlite
+      - DB_FILE_NAME=/data/links.db
 ```
 
 ## 下一步
 
 恭喜！您已经成功配置了 Shortlinker。接下来可以：
 
-- 📋 学习 [CLI 命令详情](/cli/commands)
-- 🚀 查看 [部署指南](/deployment/) 进行生产部署
-- ⚙️ 了解 [高级配置](/config/examples)
+- 📋 学习 [CLI 命令详情](/cli/commands) - 掌握所有命令选项
+- 🚀 查看 [部署指南](/deployment/) - 进行生产环境部署
+- ⚙️ 了解 [配置选项](/config/) - 自定义高级配置
+- 🛡️ 使用 [Admin API](/api/admin) - HTTP 接口管理
+- 🏥 配置 [健康检查](/api/health) - 服务监控

@@ -1,109 +1,97 @@
-# CLI Tools
+# CLI Command Line Tool
 
-Shortlinker provides powerful command-line tools for managing short links and controlling services.
+Shortlinker provides an intuitive and easy-to-use command line tool for managing short links.
 
-## Overview
+## Tool Features
 
-The CLI tools support two modes:
-- **Service Mode**: Start HTTP server for redirect services
-- **Management Mode**: Manage short links through commands
+- 🎨 **Colored Output** - Clear visual feedback
+- 🔄 **Real-time Sync** - Commands take effect immediately  
+- ⚡ **Fast Response** - Supports SQLite, file, Sled multiple storage backends
+- 🛡️ **Error Handling** - Detailed error messages and suggestions
 
-## Basic Usage
+## Basic Syntax
 
 ```bash
-# Start server (no arguments)
-./shortlinker
-
-# Management commands
-./shortlinker <command> [options]
+./shortlinker <command> [arguments] [options]
 ```
 
-## Available Commands
+## Command Overview
 
-### Service Management
-- `start` - Start the server
-- `stop` - Stop the server  
-- `restart` - Restart the server
-
-### Link Management
-- `add` - Add a new short link
-- `remove` - Delete a short link
-- `list` - List all short links
-
-### Help
-- `help` - Show help information
+| Command | Function | Example |
+|---------|----------|---------|
+| `add` | Add short link | `./shortlinker add github https://github.com` |
+| `remove` | Delete short link | `./shortlinker remove github` |
+| `list` | List all links | `./shortlinker list` |
 
 ## Quick Examples
 
+### Basic Operations
 ```bash
 # Add short link
-./shortlinker add github https://github.com
+./shortlinker add docs https://docs.example.com
 
-# Add with expiration
-./shortlinker add temp https://example.com --expire 2024-12-31T23:59:59Z
-
-# List all links
+# View all links
 ./shortlinker list
 
 # Delete link
-./shortlinker remove github
-
-# Get help
-./shortlinker help
+./shortlinker remove docs
 ```
 
-## Features
-
-### 🎨 Colorful Output
-- Success messages in green
-- Error messages in red
-- Warning messages in yellow
-- Information in blue
-
-### 🔒 Safe Operations
-- Confirmation prompts for destructive operations
-- Conflict detection for duplicate short codes
-- Input validation for URLs and time formats
-
-### 🌐 Cross Platform
-- Consistent behavior across Windows, Linux, macOS
-- Platform-specific optimizations
-- Proper signal handling
-
-### 📝 Rich Feedback
-- Detailed success/error messages
-- Progress indicators for long operations
-- Helpful suggestions for common issues
-
-## Environment Variables
-
-CLI tools read the following environment variables:
-
+### Advanced Features
 ```bash
-# Random code length
-RANDOM_CODE_LENGTH=6
+# Random short code
+./shortlinker add https://example.com
+# Output: ✓ Added short link: aB3dF1 -> https://example.com
 
-# Storage configuration (v0.1.0+)
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=links.db
+# Set expiration time
+./shortlinker add sale https://shop.com/sale --expire 2024-12-25T00:00:00Z
 
-# Log level
-RUST_LOG=info
+# Force overwrite
+./shortlinker add docs https://new-docs.com --force
 ```
 
-## Exit Codes
+## Output Description
 
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Invalid arguments |
-| 3 | File operation error |
-| 4 | Short code conflict |
-| 5 | Short code not found |
+### Success Status
+- ✅ Green text indicates successful operation
+- 🔵 Blue text shows informational messages
+
+### Error Status  
+- ❌ Red text shows error messages
+- 💡 Provides solution suggestions
+
+### Example Output
+```bash
+$ ./shortlinker add github https://github.com
+✓ Added short link: github -> https://github.com
+
+$ ./shortlinker add github https://gitlab.com
+❌ Error: Short code 'github' already exists, currently points to: https://github.com
+💡 To overwrite, use --force parameter
+```
+
+## Script Integration
+
+### Batch Operations
+```bash
+#!/bin/bash
+# Batch import links
+while IFS=',' read -r code url; do
+    ./shortlinker add "$code" "$url"
+done < links.csv
+```
+
+### Error Checking
+```bash
+if ./shortlinker add test https://example.com; then
+    echo "Added successfully"
+else
+    echo "Failed to add"
+    exit 1
+fi
+```
 
 ## Next Steps
 
-- 📖 [Command Reference](/en/cli/commands) - Detailed command documentation
-- ⚙️ [Configuration](/en/config/) - Environment variable settings
-- 🚀 [Deployment](/en/deployment/) - Production deployment guide
+- 📖 Check [Detailed Command Reference](/en/cli/commands) for all options
+- ⚙️ Learn [Configuration Guide](/en/config/) to customize behavior

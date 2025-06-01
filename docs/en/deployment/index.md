@@ -2,19 +2,19 @@
 
 Shortlinker supports multiple deployment methods, from simple local running to production containerized deployment.
 
-## Deployment Methods Overview
+## Deployment Overview
 
 ### 🚀 Quick Deployment
 - **Docker Deployment**: Recommended production solution, no Rust installation required
-- **Precompiled Binary**: Download and run, multi-platform support
-- **Source Compilation**: Requires Rust 1.82+, suitable for customization needs
+- **Pre-compiled Binaries**: Download and run, supports multiple platforms
+- **Source Compilation**: Requires Rust 1.82+, suitable for custom needs
 
 ### 🔧 Production Environment
 - **Reverse Proxy**: Nginx, Caddy, Apache configuration
 - **System Service**: systemd, Docker Compose management
 - **Monitoring & Alerting**: Health checks and log management
 
-## Environment Requirements
+## System Requirements
 
 ### System Requirements
 - **Operating System**: Linux, macOS, Windows
@@ -32,7 +32,7 @@ Shortlinker supports multiple deployment methods, from simple local running to p
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
 ```
 
-### Precompiled Binary
+### Pre-compiled Binaries
 ```bash
 # Download and run
 wget https://github.com/AptS-1547/shortlinker/releases/latest/download/shortlinker-linux-x64.tar.gz
@@ -53,10 +53,10 @@ cargo build --release
 
 ```
 User Request → Reverse Proxy → Shortlinker Service → Data Storage
-    ↓              ↓                   ↓                ↓
-  Browser        Nginx              Docker          JSON File
-  curl           Caddy              systemd      
-  API            Apache             Binary
+    ↓             ↓                ↓                   ↓
+  Browser        Nginx           Docker             SQLite(default)
+  curl           Caddy           systemd            JSON files
+  API            Apache          Binary             Sled database
 ```
 
 ## Security Recommendations
@@ -64,42 +64,14 @@ User Request → Reverse Proxy → Shortlinker Service → Data Storage
 1. **Network Security**: Expose service through reverse proxy
 2. **File Permissions**: Set appropriate data file permissions
 3. **Process Management**: Use system service managers
-4. **Data Backup**: Regular backup of link data
-5. **Admin API Security**: Use strong tokens and HTTPS
+4. **Data Backup**: Regular backup of link data (SQLite can directly backup .db files)
 
 ## Performance Characteristics
 
-- **Response Time**: < 1ms (SQLite/file storage)
+- **Response Time**: < 1ms (SQLite local storage)
 - **Concurrency Support**: Thousands of concurrent connections
 - **Memory Usage**: Extremely low memory footprint
-- **Storage Backends**: SQLite, file, Sled multiple storage options
-
-## Admin API Security (v0.0.5+)
-
-### Security Best Practices
-
-```bash
-# Use strong Admin API token
-ADMIN_TOKEN=very_long_secure_random_token_at_least_32_characters
-
-# Custom route prefix to avoid scanning
-ADMIN_ROUTE_PREFIX=/my-secret-admin-path
-
-# Always use HTTPS in production
-# Never expose Admin API on public networks without proper authentication
-```
-
-### Admin API Configuration Examples
-
-```bash
-# Development (less secure, more convenient)
-ADMIN_TOKEN=dev_token_123
-ADMIN_ROUTE_PREFIX=/admin
-
-# Production (highly secure)
-ADMIN_TOKEN=prod_$(openssl rand -hex 32)
-ADMIN_ROUTE_PREFIX=/management-$(openssl rand -hex 8)
-```
+- **Storage Format**: SQLite database (default), supports JSON files and Sled database
 
 ## Next Steps
 
@@ -109,4 +81,4 @@ Choose the deployment method that suits you:
 - 🔀 [Reverse Proxy](/en/deployment/proxy) - Nginx, Caddy configuration
 - ⚙️ [System Service](/en/deployment/systemd) - systemd and process management
 
-Need configuration help? Check [Configuration Guide](/en/config/) to understand environment variable settings.
+Need configuration help? Check [Configuration Guide](/en/config/) for environment variable settings.
