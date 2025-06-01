@@ -62,6 +62,8 @@ jobs:
         esac
 
     - name: Build
+      env:
+        RUSTFLAGS: "-C link-arg=-s -C opt-level=z -C panic=abort"
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary

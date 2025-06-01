@@ -20,7 +20,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 # 静态链接编译 - 使用 musl 目标
-ENV RUSTFLAGS="-C link-arg=-s"
+ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z"
 RUN touch src/main.rs && \
     cargo build --release --target x86_64-unknown-linux-musl
 
