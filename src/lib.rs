@@ -4,6 +4,7 @@
 
 pub mod cli;
 pub mod errors;
+pub mod middleware;
 pub mod services;
 pub mod storages;
 pub mod system;

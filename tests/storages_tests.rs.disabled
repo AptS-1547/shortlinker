@@ -184,7 +184,7 @@ mod file_storage_tests {
 
         // 存储链接
         let result = storage.set(link.clone()).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Failed to set link: {:?}", result);
 
         // 获取链接
         let retrieved = storage.get("file_test").await;
@@ -207,7 +207,7 @@ mod file_storage_tests {
                 created_at: chrono::Utc::now(),
                 expires_at: None,
             };
-            storage.set(link).await.unwrap();
+            storage.set(link).await.expect(&format!("Failed to set test{}", i));
         }
 
         let all_links = storage.load_all().await;
@@ -229,7 +229,7 @@ mod file_storage_tests {
         };
 
         // 添加链接
-        storage.set(link).await.unwrap();
+        storage.set(link).await.expect("Failed to set link for removal test");
 
         // 验证链接存在
         assert!(storage.get("remove_test").await.is_some());
@@ -262,7 +262,7 @@ mod file_storage_tests {
         };
 
         // 添加原始链接
-        storage.set(original_link.clone()).await.unwrap();
+        storage.set(original_link.clone()).await.expect("Failed to set original link");
 
         // 更新链接
         let updated_link = ShortLink {
@@ -272,7 +272,7 @@ mod file_storage_tests {
             expires_at: Some(chrono::Utc::now() + chrono::Duration::days(1)),
         };
 
-        storage.set(updated_link).await.unwrap();
+        storage.set(updated_link).await.expect("Failed to update link");
 
         // 验证更新
         let retrieved = storage.get("update_test").await.unwrap();
@@ -296,7 +296,7 @@ mod file_storage_tests {
             created_at: chrono::Utc::now(),
             expires_at: None,
         };
-        storage.set(link).await.unwrap();
+        storage.set(link).await.expect("Failed to set initial link");
 
         // 手动修改文件
         let file_path = temp_dir.path().join("test_links.json");
@@ -306,8 +306,8 @@ mod file_storage_tests {
             created_at: chrono::Utc::now().to_rfc3339(),
             expires_at: None,
         }];
-        let json = serde_json::to_string_pretty(&manual_data).unwrap();
-        fs::write(&file_path, json).unwrap();
+        let json = serde_json::to_string_pretty(&manual_data).expect("Failed to serialize manual data");
+        fs::write(&file_path, json).expect("Failed to write manual data");
 
         // 重载
         let result = storage.reload().await;

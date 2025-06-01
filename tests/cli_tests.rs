@@ -455,7 +455,7 @@ mod link_management_tests {
 
         assert!(result.is_err());
         if let Err(CliError::CommandError(msg)) = result {
-            assert!(msg.contains("过期时间格式不正确"));
+            assert!(msg.contains("无效的时间格式"));
         }
     }
 

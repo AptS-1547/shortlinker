@@ -1,5 +1,6 @@
 use actix_web::{test as actix_test, web, App, HttpResponse};
 use serde_json;
+use shortlinker::middleware::AuthMiddleware;
 use shortlinker::services::admin::{AdminService, ApiResponse, PostNewLink, SerializableShortLink};
 use shortlinker::storages::{ShortLink, Storage};
 use std::collections::HashMap;
@@ -444,7 +445,7 @@ mod auth_middleware_tests {
 
         let app = actix_test::init_service(
             App::new()
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route(
                     "/admin/test",
                     web::get().to(|| async { HttpResponse::Ok().json("success") }),
@@ -467,7 +468,7 @@ mod auth_middleware_tests {
 
         let app = actix_test::init_service(
             App::new()
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route(
                     "/admin/test",
                     web::get().to(|| async { HttpResponse::Ok().json("success") }),
@@ -494,7 +495,7 @@ mod auth_middleware_tests {
 
         let app = actix_test::init_service(
             App::new()
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route(
                     "/admin/test",
                     web::get().to(|| async { HttpResponse::Ok().json("success") }),
@@ -521,7 +522,7 @@ mod auth_middleware_tests {
 
         let app = actix_test::init_service(
             App::new()
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route(
                     "/admin/test",
                     web::get().to(|| async { HttpResponse::Ok().json("success") }),
@@ -547,7 +548,7 @@ mod auth_middleware_tests {
 
         let app = actix_test::init_service(
             App::new()
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route(
                     "/admin/test",
                     web::get().to(|| async { HttpResponse::Ok().json("success") }),
@@ -664,7 +665,7 @@ mod integration_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .service(
                     web::scope("/admin")
                         .route("/links", web::get().to(AdminService::get_all_links))
@@ -764,7 +765,7 @@ mod integration_tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(storage))
-                .wrap(from_fn(AdminService::auth_middleware))
+                .wrap(from_fn(AuthMiddleware::admin_auth))
                 .route("/admin/links", web::post().to(AdminService::post_link)),
         )
         .await;

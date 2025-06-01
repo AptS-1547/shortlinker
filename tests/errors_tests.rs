@@ -430,8 +430,25 @@ mod integration_tests {
         let final_errors = errors.lock().unwrap();
         assert_eq!(final_errors.len(), 10);
 
-        for (i, error) in final_errors.iter().enumerate() {
-            assert!(error.to_string().contains(&format!("线程{}的错误", i)));
+        // 验证所有错误都是验证错误类型
+        for error in final_errors.iter() {
+            assert!(matches!(error, ShortlinkerError::Validation(_)));
+            assert!(error.to_string().contains("验证错误"));
+            assert!(error.to_string().contains("线程"));
+            assert!(error.to_string().contains("的错误"));
         }
+
+        // 验证所有线程ID都存在（0-9）
+        let mut found_thread_ids = std::collections::HashSet::new();
+        for error in final_errors.iter() {
+            let error_msg = error.to_string();
+            for i in 0..10 {
+                if error_msg.contains(&format!("线程{}", i)) {
+                    found_thread_ids.insert(i);
+                    break;
+                }
+            }
+        }
+        assert_eq!(found_thread_ids.len(), 10, "应该包含所有线程ID 0-9");
     }
 }
