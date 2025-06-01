@@ -26,6 +26,7 @@ async-trait = "0.1.88"
 futures = "0.3.31"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 sled = "0.34.7"
+tokio = "1.45.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }

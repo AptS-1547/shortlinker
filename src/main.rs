@@ -2,17 +2,20 @@ use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
 use log::{debug, info};
 use std::env;
+use std::time::Instant;
 
 mod cli;
 mod errors;
+mod middleware;
 mod services;
 mod storages;
 mod system;
 mod utils;
 
-use crate::services::{AdminService, RedirectService};
+use crate::middleware::{AuthMiddleware, HealthMiddleware};
+use crate::services::{AdminService, HealthService, RedirectService, AppStartTime};
 use crate::storages::StorageFactory;
-use crate::system::{cleanup_lockfile, init_lockfile, setup_reload_mechanism};
+use crate::system::{cleanup_lockfile, init_lockfile};
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -21,8 +24,14 @@ struct Config {
     server_port: u16,
 }
 
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // 记录程序启动时间
+    let app_start_time = AppStartTime {
+        start_time: Instant::now(),
+    };
+
     let args: Vec<String> = env::args().collect();
     dotenv().ok();
 
@@ -57,14 +66,11 @@ async fn main() -> std::io::Result<()> {
 
     // 设置重载机制
     debug!("Setting up reload mechanism");
-    setup_reload_mechanism(storage.clone());
+    system::setup_reload_mechanism(storage.clone());
 
-    // 获取 admin 路由前缀
+    // 获取路由前缀配置
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
-    let admin_prefix_clone = admin_prefix.clone();
-
-    let bind_address = format!("{}:{}", config.server_host, config.server_port);
-    info!("Starting server at http://{}", bind_address);
+    let health_prefix = env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string());
 
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
@@ -74,13 +80,26 @@ async fn main() -> std::io::Result<()> {
         info!("Admin API available at: {}", admin_prefix);
     }
 
+    // 检查 Health API 是否启用
+    let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
+    if health_token.is_empty() {
+        info!("Health API is disabled (HEALTH_TOKEN is empty)");
+
+    } else {
+        info!("Health API available at: {}", health_prefix);
+    }
+
+    let bind_address = format!("{}:{}", config.server_host, config.server_port);
+    info!("Starting server at http://{}", bind_address);
+
     // Start the HTTP server
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(storage.clone()))
+            .app_data(web::Data::new(app_start_time.clone()))
             .service(
-                web::scope(&admin_prefix_clone)
-                    .wrap(from_fn(AdminService::auth_middleware))
+                web::scope(&admin_prefix.clone())
+                    .wrap(from_fn(AuthMiddleware::admin_auth))
                     .route("/link", web::get().to(AdminService::get_all_links))
                     .route("/link", web::head().to(AdminService::get_all_links))
                     .route("/link", web::post().to(AdminService::post_link))
@@ -88,6 +107,16 @@ async fn main() -> std::io::Result<()> {
                     .route("/link/{code}", web::head().to(AdminService::get_link))
                     .route("/link/{code}", web::delete().to(AdminService::delete_link))
                     .route("/link/{code}", web::put().to(AdminService::update_link)),
+            )
+            .service(
+                web::scope(&health_prefix.clone())
+                    .wrap(from_fn(HealthMiddleware::health_auth))
+                    .route("", web::get().to(HealthService::health_check))
+                    .route("", web::head().to(HealthService::health_check))
+                    .route("/ready", web::get().to(HealthService::readiness_check))
+                    .route("/ready", web::head().to(HealthService::readiness_check))
+                    .route("/live", web::get().to(HealthService::liveness_check))
+                    .route("/live", web::head().to(HealthService::liveness_check)),
             )
             .route("/{path}*", web::get().to(RedirectService::handle_redirect))
             .route("/{path}*", web::head().to(RedirectService::handle_redirect))
