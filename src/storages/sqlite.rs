@@ -1,3 +1,4 @@
+use moka::future::Cache;
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
@@ -11,6 +12,7 @@ use async_trait::async_trait;
 
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,
+    cache: Cache<String, ShortLink>,
 }
 
 impl SqliteStorage {
@@ -21,7 +23,12 @@ impl SqliteStorage {
         let pool = Pool::new(manager)
             .map_err(|e| ShortlinkerError::database_connection(format!("无法创建连接池: {}", e)))?;
 
-        let storage = SqliteStorage { pool };
+        let cache = Cache::builder()
+            .max_capacity(1000) // 设置缓存容量
+            .time_to_live(std::time::Duration::from_secs(60 * 30)) // 设置缓存过期时间为半小时
+            .build();
+
+        let storage = SqliteStorage { pool, cache };
 
         // 初始化数据库表
         storage.init_db()?;
@@ -97,6 +104,12 @@ impl SqliteStorage {
 #[async_trait]
 impl Storage for SqliteStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
+        // 先检查缓存
+        if let Some(link) = self.cache.get(code).await {
+            return Some(link);
+        }
+
+        // 缓存未命中，从数据库查询
         let conn = match self.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
@@ -106,6 +119,7 @@ impl Storage for SqliteStorage {
         };
 
         let code = code.to_string();
+        let cache = self.cache.clone();
 
         let result = actix_web::web::block(move || {
             let mut stmt = conn.prepare(
@@ -124,8 +138,17 @@ impl Storage for SqliteStorage {
 
         match result {
             Ok(Ok((short_code, target_url, created_at, expires_at))) => {
-                match Self::shortlink_from_row(short_code, target_url, created_at, expires_at) {
-                    Ok(link) => Some(link),
+                match Self::shortlink_from_row(
+                    short_code.clone(),
+                    target_url,
+                    created_at,
+                    expires_at,
+                ) {
+                    Ok(link) => {
+                        // 将查询结果放入缓存
+                        cache.insert(short_code, link.clone()).await;
+                        Some(link)
+                    }
                     Err(e) => {
                         error!("解析短链接数据失败: {}", e);
                         None
@@ -208,102 +231,155 @@ impl Storage for SqliteStorage {
     }
 
     async fn set(&self, link: ShortLink) -> Result<()> {
-        let mut conn = self.get_connection()?;
+        let pool = self.pool.clone();
+        let cache = self.cache.clone();
+        let link_clone = link.clone();
 
-        let created_at = link.created_at.to_rfc3339();
-        let expires_at = link.expires_at.map(|dt| dt.to_rfc3339());
+        let result = actix_web::web::block(move || {
+            let mut conn = pool.get().map_err(|e| {
+                ShortlinkerError::database_connection(format!("获取数据库连接失败: {}", e))
+            })?;
 
-        // 开始事务
-        let transaction = conn
-            .transaction()
-            .map_err(|e| ShortlinkerError::database_operation(format!("开始事务失败: {}", e)))?;
+            let created_at = link_clone.created_at.to_rfc3339();
+            let expires_at = link_clone.expires_at.map(|dt| dt.to_rfc3339());
 
-        // 先检查记录是否存在
-        let exists = {
-            let mut stmt = transaction
-                .prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
-                })?;
+            // 开始事务
+            let transaction = conn.transaction().map_err(|e| {
+                ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
+            })?;
 
-            stmt.exists(params![link.code]).map_err(|e| {
-                ShortlinkerError::database_operation(format!("检查记录存在性失败: {}", e))
-            })?
-        };
+            // 先检查记录是否存在
+            let exists = {
+                let mut stmt = transaction
+                    .prepare("SELECT 1 FROM short_links WHERE short_code = ?1")
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
+                    })?;
 
-        let result = if exists {
-            transaction
-                .execute(
-                    "UPDATE short_links SET target_url = ?2, expires_at = ?3 
-                 WHERE short_code = ?1",
-                    params![link.code, link.target, expires_at],
-                )
-                .map_err(|e| ShortlinkerError::database_operation(format!("更新短链接失败: {}", e)))
-                .map(|_| {
-                    info!("短链接已更新: {}", link.code);
-                })
-        } else {
-            transaction
-                .execute(
-                    "INSERT INTO short_links (short_code, target_url, created_at, expires_at) 
-                 VALUES (?1, ?2, ?3, ?4)",
-                    params![link.code, link.target, created_at, expires_at],
-                )
-                .map_err(|e| ShortlinkerError::database_operation(format!("插入短链接失败: {}", e)))
-                .map(|_| {
-                    info!("短链接已创建: {}", link.code);
-                })
-        };
+                stmt.exists(params![link_clone.code]).map_err(|e| {
+                    ShortlinkerError::database_operation(format!("检查记录存在性失败: {}", e))
+                })?
+            };
 
-        // 处理操作结果
+            let result = if exists {
+                transaction
+                    .execute(
+                        "UPDATE short_links SET target_url = ?2, expires_at = ?3 
+                     WHERE short_code = ?1",
+                        params![link_clone.code, link_clone.target, expires_at],
+                    )
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!("更新短链接失败: {}", e))
+                    })
+                    .map(|_| {
+                        info!("短链接已更新: {}", link_clone.code);
+                    })
+            } else {
+                transaction
+                    .execute(
+                        "INSERT INTO short_links (short_code, target_url, created_at, expires_at) 
+                     VALUES (?1, ?2, ?3, ?4)",
+                        params![link_clone.code, link_clone.target, created_at, expires_at],
+                    )
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!("插入短链接失败: {}", e))
+                    })
+                    .map(|_| {
+                        info!("短链接已创建: {}", link_clone.code);
+                    })
+            };
+
+            // 处理操作结果
+            match result {
+                Ok(_) => {
+                    // 提交事务
+                    transaction.commit().map_err(|e| {
+                        ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
+                    })?;
+                    Ok(())
+                }
+                Err(e) => {
+                    // 事务会自动回滚
+                    Err(e)
+                }
+            }
+        })
+        .await;
+
         match result {
-            Ok(_) => {
-                // 提交事务
-                transaction.commit().map_err(|e| {
-                    ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
-                })?;
+            Ok(Ok(_)) => {
+                // 更新缓存
+                cache.insert(link.code.clone(), link).await;
                 Ok(())
             }
-            Err(e) => {
-                // 事务会自动回滚
-                Err(e)
-            }
+            Ok(Err(e)) => Err(e),
+            Err(e) => Err(ShortlinkerError::database_operation(format!(
+                "执行异步操作失败: {:?}",
+                e
+            ))),
         }
     }
 
     async fn remove(&self, code: &str) -> Result<()> {
-        let mut conn = self.get_connection()?;
+        let pool = self.pool.clone();
+        let cache = self.cache.clone();
+        let code = code.to_string();
 
-        // 开始事务
-        let transaction = conn
-            .transaction()
-            .map_err(|e| ShortlinkerError::database_operation(format!("开始事务失败: {}", e)))?;
+        let result = actix_web::web::block(move || {
+            let mut conn = pool.get().map_err(|e| {
+                ShortlinkerError::database_connection(format!("获取数据库连接失败: {}", e))
+            })?;
 
-        let rows_affected = transaction
-            .execute(
-                "DELETE FROM short_links WHERE short_code = ?1",
-                params![code],
-            )
-            .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
+            // 开始事务
+            let transaction = conn.transaction().map_err(|e| {
+                ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
+            })?;
 
-        if rows_affected == 0 {
-            // 事务会自动回滚
-            return Err(ShortlinkerError::not_found(format!(
-                "短链接不存在: {}",
-                code
-            )));
+            let rows_affected = transaction
+                .execute(
+                    "DELETE FROM short_links WHERE short_code = ?1",
+                    params![code],
+                )
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("删除短链接失败: {}", e))
+                })?;
+
+            if rows_affected == 0 {
+                // 事务会自动回滚
+                return Err(ShortlinkerError::not_found(format!(
+                    "短链接不存在: {}",
+                    code
+                )));
+            }
+
+            // 提交事务
+            transaction.commit().map_err(|e| {
+                ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
+            })?;
+
+            info!("短链接已删除: {}", code);
+            Ok(code)
+        })
+        .await;
+
+        match result {
+            Ok(Ok(deleted_code)) => {
+                // 从缓存中移除
+                cache.remove(&deleted_code).await;
+                Ok(())
+            }
+            Ok(Err(e)) => Err(e),
+            Err(e) => Err(ShortlinkerError::database_operation(format!(
+                "执行异步操作失败: {:?}",
+                e
+            ))),
         }
-
-        // 提交事务
-        transaction
-            .commit()
-            .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
-
-        info!("短链接已删除: {}", code);
-        Ok(())
     }
 
     async fn reload(&self) -> Result<()> {
+        // 清空缓存，强制重新从数据库加载
+        self.cache.invalidate_all();
+        info!("SQLite 缓存已清空，数据将从数据库重新加载");
         Ok(())
     }
 
