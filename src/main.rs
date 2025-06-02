@@ -52,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             .unwrap_or_else(|_| "8080".to_string())
             .parse()
             .unwrap(),
+        #[cfg(unix)]
         unix_socket_path: env::var("UNIX_SOCKET_PATH").ok(),
     };
 
