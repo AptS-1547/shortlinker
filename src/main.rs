@@ -21,6 +21,8 @@ use crate::system::{cleanup_lockfile, init_lockfile};
 struct Config {
     server_host: String,
     server_port: u16,
+    #[cfg(unix)]
+    unix_socket_path: Option<String>,
 }
 
 #[actix_web::main]
@@ -50,6 +52,7 @@ async fn main() -> std::io::Result<()> {
             .unwrap_or_else(|_| "8080".to_string())
             .parse()
             .unwrap(),
+        unix_socket_path: env::var("UNIX_SOCKET_PATH").ok(),
     };
 
     // 初始化锁文件
@@ -90,7 +93,7 @@ async fn main() -> std::io::Result<()> {
     info!("Starting server at http://{}", bind_address);
 
     // Start the HTTP server
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
@@ -117,10 +120,30 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/{path}*", web::get().to(RedirectService::handle_redirect))
             .route("/{path}*", web::head().to(RedirectService::handle_redirect))
-    })
-    .bind(bind_address)?
-    .run()
-    .await?;
+    });
+
+    #[cfg(unix)]
+    {
+        if let Some(ref socket_path) = config.unix_socket_path {
+            info!("Starting server on Unix socket: {}", socket_path);
+            // 如果 socket 文件已存在，先删除
+            if std::path::Path::new(socket_path).exists() {
+                std::fs::remove_file(socket_path)?;
+            }
+            server.bind_uds(socket_path)?.run().await?;
+        } else {
+            let bind_address = format!("{}:{}", config.server_host, config.server_port);
+            info!("Starting server at http://{}", bind_address);
+            server.bind(bind_address)?.run().await?;
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let bind_address = format!("{}:{}", config.server_host, config.server_port);
+        info!("Starting server at http://{}", bind_address);
+        server.bind(bind_address)?.run().await?;
+    }
 
     // 清理锁文件
     cleanup_lockfile();

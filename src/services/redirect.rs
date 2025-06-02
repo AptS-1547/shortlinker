@@ -32,7 +32,7 @@ impl RedirectService {
                         info!("链接已过期: {}", captured_path);
                         return HttpResponse::NotFound()
                             .append_header(("Content-Type", "text/html; charset=utf-8"))
-                            .append_header(("Connection", "close"))
+                            .append_header(("Connection", "keep-alive"))
                             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                             .body("Not Found");
                     }
@@ -46,7 +46,7 @@ impl RedirectService {
             } else {
                 HttpResponse::NotFound()
                     .append_header(("Content-Type", "text/html; charset=utf-8"))
-                    .append_header(("Connection", "close"))
+                    .append_header(("Connection", "keep-alive"))
                     .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .body("Not Found")
             }

@@ -80,6 +80,13 @@ impl shortlinker::storages::Storage for MockStorage {
     async fn get_backend_name(&self) -> String {
         "mock".to_string()
     }
+
+    async fn increment_click(
+        &self,
+        _name: &str,
+    ) -> Result<(), shortlinker::errors::ShortlinkerError> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

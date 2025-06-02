@@ -79,7 +79,7 @@ impl HealthService {
 
         HttpResponse::build(response_status)
             .append_header(("Content-Type", "application/json; charset=utf-8"))
-            .append_header(("Connection", "close"))
+            .append_header(("Connection", "keep-alive"))
             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
             .json(health_response)
     }
@@ -90,7 +90,7 @@ impl HealthService {
 
         HttpResponse::Ok()
             .append_header(("Content-Type", "text/plain"))
-            .append_header(("Connection", "close"))
+            .append_header(("Connection", "keep-alive"))
             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
             .body("OK")
     }
@@ -100,7 +100,7 @@ impl HealthService {
         debug!("Received liveness check request");
 
         HttpResponse::NoContent()
-            .append_header(("Connection", "close"))
+            .append_header(("Connection", "keep-alive"))
             .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
             .finish()
     }

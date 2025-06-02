@@ -25,7 +25,7 @@ impl HealthMiddleware {
             return Ok(req.into_response(
                 HttpResponse::NotFound()
                     .append_header(("Content-Type", "text/html; charset=utf-8"))
-                    .append_header(("Connection", "close"))
+                    .append_header(("Connection", "keep-alive"))
                     .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .body("Not Found"),
             ));
@@ -49,7 +49,7 @@ impl HealthMiddleware {
         Ok(req.into_response(
             HttpResponse::Unauthorized()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .append_header(("Connection", "close"))
+                .append_header(("Connection", "keep-alive"))
                 .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .json(serde_json::json!({
                     "code": 401,
