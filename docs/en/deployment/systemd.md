@@ -26,9 +26,13 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=5
 
-# Environment variables
+# Environment variables - TCP port
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
+
+# Environment variables - Unix socket (choose one)
+# Environment=UNIX_SOCKET=/tmp/shortlinker.sock
+
 Environment=STORAGE_BACKEND=sqlite
 Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com

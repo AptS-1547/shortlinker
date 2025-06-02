@@ -27,6 +27,7 @@
 - 🏥 **健康监控**：内置健康检查端点
 - 🐳 **容器化**：优化的 Docker 镜像部署
 - 🎨 **美观 CLI**：彩色命令行界面
+- 🔌 **Unix 套接字**：支持 Unix 套接字绑定
 
 ## 快速开始
 
@@ -41,7 +42,12 @@ cargo run
 ### Docker 部署
 
 ```bash
+# TCP 端口
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
+
+# Unix 套接字
+docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock e1saps/shortlinker
 ```
 
 ## 使用示例
@@ -165,6 +171,7 @@ curl http://localhost:8080/health/live
 |----------|--------|------|
 | `SERVER_HOST` | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | `8080` | 监听端口 |
+| `UNIX_SOCKET` | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
 | `STORAGE_BACKEND` | `sqlite` | 存储类型 (sqlite/file) |
 | `DB_FILE_NAME` | `links.db` | 数据库文件路径 |
 | `DEFAULT_URL` | `https://esap.cc/repo` | 默认跳转地址 |
@@ -176,9 +183,12 @@ curl http://localhost:8080/health/live
 ### .env 示例
 
 ```bash
-# 服务器
+# 服务器 - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+
+# 服务器 - Unix 套接字
+# UNIX_SOCKET=/tmp/shortlinker.sock
 
 # 存储
 STORAGE_BACKEND=sqlite
@@ -214,11 +224,22 @@ DB_FILE_NAME=links.json
 ### 反向代理（Nginx）
 
 ```nginx
+# TCP 端口
 server {
     listen 80;
     server_name esap.cc;
     location / {
         proxy_pass http://127.0.0.1:8080;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+}
+
+# Unix 套接字
+server {
+    listen 80;
+    server_name esap.cc;
+    location / {
+        proxy_pass http://unix:/tmp/shortlinker.sock;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }

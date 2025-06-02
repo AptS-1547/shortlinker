@@ -27,6 +27,7 @@ export SERVER_PORT=8080
 |-----------|------|---------|-------------|
 | `SERVER_HOST` | String | `127.0.0.1` | Listening address |
 | `SERVER_PORT` | Integer | `8080` | Listening port |
+| `UNIX_SOCKET` | String | *(empty)* | Unix socket path (overrides HOST/PORT) |
 | `DEFAULT_URL` | String | `https://esap.cc/repo` | Root path redirect URL |
 | `RANDOM_CODE_LENGTH` | Integer | `6` | Random short code length |
 
@@ -93,9 +94,12 @@ HEALTH_TOKEN=very_secure_health_token_789
 
 ### Docker Environment
 ```bash
-# Server configuration
+# Server configuration - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+
+# Server configuration - Unix socket
+# UNIX_SOCKET=/tmp/shortlinker.sock
 
 # Storage configuration
 STORAGE_BACKEND=sqlite

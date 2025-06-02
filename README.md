@@ -27,6 +27,7 @@
 * 🏥 **Health Monitoring**: Built-in health check endpoints
 * 🐳 **Containerized**: Optimized Docker image for easy deployment
 * 🎨 **Beautiful CLI**: Colorized command-line interface
+* 🔌 **Unix Socket**: Support for Unix socket binding
 
 ## Quick Start
 
@@ -41,7 +42,12 @@ cargo run
 ### Deploy with Docker
 
 ```bash
+# TCP port
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
+
+# Unix socket
+docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock e1saps/shortlinker
 ```
 
 ## Usage Example
@@ -165,6 +171,7 @@ Configure using environment variables or `.env` file:
 |----------|---------|-------------|
 | `SERVER_HOST` | `127.0.0.1` | Listen address |
 | `SERVER_PORT` | `8080` | Listen port |
+| `UNIX_SOCKET` | *(empty)* | Unix socket path (overrides HOST/PORT) |
 | `STORAGE_BACKEND` | `sqlite` | Storage type (sqlite/file) |
 | `DB_FILE_NAME` | `links.db` | Database file path |
 | `DEFAULT_URL` | `https://esap.cc/repo` | Default redirect URL |
@@ -176,9 +183,12 @@ Configure using environment variables or `.env` file:
 ### .env Example
 
 ```bash
-# Server
+# Server - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+
+# Server - Unix socket
+# UNIX_SOCKET=/tmp/shortlinker.sock
 
 # Storage
 STORAGE_BACKEND=sqlite
@@ -214,11 +224,22 @@ DB_FILE_NAME=links.json
 ### Reverse Proxy (Nginx)
 
 ```nginx
+# TCP port
 server {
     listen 80;
     server_name esap.cc;
     location / {
         proxy_pass http://127.0.0.1:8080;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+}
+
+# Unix socket
+server {
+    listen 80;
+    server_name esap.cc;
+    location / {
+        proxy_pass http://unix:/tmp/shortlinker.sock;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }

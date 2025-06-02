@@ -26,10 +26,19 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 
 ### Data Persistence
 ```bash
-# Mount data directory
+# Mount data directory - TCP
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/data \
+  -e STORAGE_BACKEND=sqlite \
+  -e DB_FILE_NAME=/data/shortlinker.data \
+  e1saps/shortlinker
+
+# Unix socket
+docker run -d \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock \
   -e STORAGE_BACKEND=sqlite \
   -e DB_FILE_NAME=/data/shortlinker.data \
   e1saps/shortlinker
@@ -68,16 +77,24 @@ version: '3.8'
 services:
   shortlinker:
     image: e1saps/shortlinker:latest
+    # TCP port
     ports:
-      - "127.0.0.1:8080:8080"  # Local listening only
+      - "127.0.0.1:8080:8080"
+    # Unix socket mount (choose one)
+    # volumes:
+    #   - ./sock:/sock
     volumes:
       - ./data:/data
     environment:
+      # TCP configuration
       - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      # Unix socket configuration (choose one)
+      # - UNIX_SOCKET=/sock/shortlinker.sock
       - STORAGE_BACKEND=sqlite
       - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
-      - ADMIN_TOKEN=${ADMIN_TOKEN}  # Read from environment variables
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
@@ -155,8 +172,14 @@ chmod +x backup.sh
 
 ### Network Security
 ```bash
-# Local listening only
+# Local listening only - TCP
 docker run -d -p 127.0.0.1:8080:8080 e1saps/shortlinker
+
+# Unix socket
+docker run -d \
+  -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock \
+  e1saps/shortlinker
 
 # Custom network
 docker network create shortlinker-net

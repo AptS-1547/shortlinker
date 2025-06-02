@@ -7,10 +7,20 @@ In production environments, it's recommended to expose Shortlinker service throu
 ### Basic Configuration
 
 ```caddy
+# TCP port
 esap.cc {
     reverse_proxy 127.0.0.1:8080
     
     # Optional: Add cache control
+    header {
+        Cache-Control "no-cache, no-store, must-revalidate"
+    }
+}
+
+# Unix socket
+esap.cc {
+    reverse_proxy unix//tmp/shortlinker.sock
+    
     header {
         Cache-Control "no-cache, no-store, must-revalidate"
     }
@@ -41,6 +51,7 @@ esap.cc {
 ### Basic Configuration
 
 ```nginx
+# TCP port
 server {
     listen 80;
     server_name esap.cc;
@@ -52,6 +63,21 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         
         # Disable cache
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+}
+
+# Unix socket
+server {
+    listen 80;
+    server_name esap.cc;
+    
+    location / {
+        proxy_pass http://unix:/tmp/shortlinker.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
         add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }
@@ -101,6 +127,7 @@ server {
 ## Apache Configuration
 
 ```apache
+# TCP port
 <VirtualHost *:80>
     ServerName esap.cc
     
@@ -112,6 +139,20 @@ server {
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
     
     # Logs
+    CustomLog /var/log/apache2/shortlinker.access.log combined
+    ErrorLog /var/log/apache2/shortlinker.error.log
+</VirtualHost>
+
+# Unix socket
+<VirtualHost *:80>
+    ServerName esap.cc
+    
+    ProxyPreserveHost On
+    ProxyPass / unix:/tmp/shortlinker.sock|http://localhost/
+    ProxyPassReverse / unix:/tmp/shortlinker.sock|http://localhost/
+    
+    Header always set Cache-Control "no-cache, no-store, must-revalidate"
+    
     CustomLog /var/log/apache2/shortlinker.access.log combined
     ErrorLog /var/log/apache2/shortlinker.error.log
 </VirtualHost>

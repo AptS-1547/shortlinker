@@ -26,10 +26,19 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 
 ### 数据持久化
 ```bash
-# 挂载数据目录
+# 挂载数据目录 - TCP
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/data \
+  -e STORAGE_BACKEND=sqlite \
+  -e DB_FILE_NAME=/data/shortlinker.data \
+  e1saps/shortlinker
+
+# Unix 套接字
+docker run -d \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock \
   -e STORAGE_BACKEND=sqlite \
   -e DB_FILE_NAME=/data/shortlinker.data \
   e1saps/shortlinker
@@ -68,16 +77,24 @@ version: '3.8'
 services:
   shortlinker:
     image: e1saps/shortlinker:latest
+    # TCP 端口
     ports:
-      - "127.0.0.1:8080:8080"  # 仅本地监听
+      - "127.0.0.1:8080:8080"
+    # Unix 套接字挂载（二选一）
+    # volumes:
+    #   - ./sock:/sock
     volumes:
       - ./data:/data
     environment:
+      # TCP 配置
       - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      # Unix 套接字配置（二选一）
+      # - UNIX_SOCKET=/sock/shortlinker.sock
       - STORAGE_BACKEND=sqlite
       - DB_FILE_NAME=/data/links.db
       - DEFAULT_URL=https://your-domain.com
-      - ADMIN_TOKEN=${ADMIN_TOKEN}  # 从环境变量读取
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
@@ -155,8 +172,14 @@ chmod +x backup.sh
 
 ### 网络安全
 ```bash
-# 仅本地监听
+# 仅本地监听 - TCP
 docker run -d -p 127.0.0.1:8080:8080 e1saps/shortlinker
+
+# Unix 套接字
+docker run -d \
+  -v $(pwd)/sock:/sock \
+  -e UNIX_SOCKET=/sock/shortlinker.sock \
+  e1saps/shortlinker
 
 # 自定义网络
 docker network create shortlinker-net

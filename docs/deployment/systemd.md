@@ -26,9 +26,13 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=5
 
-# 环境变量
+# 环境变量 - TCP 端口
 Environment=SERVER_HOST=127.0.0.1
 Environment=SERVER_PORT=8080
+
+# 环境变量 - Unix 套接字（二选一）
+# Environment=UNIX_SOCKET=/tmp/shortlinker.sock
+
 Environment=STORAGE_BACKEND=sqlite
 Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com

@@ -27,6 +27,7 @@ export SERVER_PORT=8080
 |------|------|--------|------|
 | `SERVER_HOST` | String | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | Integer | `8080` | 监听端口 |
+| `UNIX_SOCKET` | String | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
 | `DEFAULT_URL` | String | `https://esap.cc/repo` | 根路径重定向地址 |
 | `RANDOM_CODE_LENGTH` | Integer | `6` | 随机短码长度 |
 
@@ -93,9 +94,12 @@ HEALTH_TOKEN=very_secure_health_token_789
 
 ### Docker 环境
 ```bash
-# 服务器配置
+# 服务器配置 - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+
+# 服务器配置 - Unix 套接字
+# UNIX_SOCKET=/tmp/shortlinker.sock
 
 # 存储配置
 STORAGE_BACKEND=sqlite
