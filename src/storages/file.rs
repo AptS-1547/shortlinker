@@ -1,7 +1,7 @@
+use dashmap::DashMap;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::sync::{Arc, RwLock};
 use tracing::{error, info};
 
 use super::{ShortLink, Storage};
@@ -12,7 +12,7 @@ use crate::storages::SerializableShortLink;
 
 pub struct FileStorage {
     file_path: String,
-    cache: Arc<RwLock<HashMap<String, ShortLink>>>,
+    cache: DashMap<String, ShortLink>,
 }
 
 impl FileStorage {
@@ -20,19 +20,18 @@ impl FileStorage {
         let file_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.json".to_string());
         let storage = FileStorage {
             file_path,
-            cache: Arc::new(RwLock::new(HashMap::new())),
+            cache: DashMap::new(),
         };
 
         // 初始化时加载数据到缓存
         let links = storage.load_from_file()?;
-        {
-            let mut cache_guard = storage.cache.write().unwrap();
-            *cache_guard = links;
-            info!(
-                "FileStorage 初始化完成，已加载 {} 个短链接",
-                cache_guard.len()
-            );
+        for (code, link) in links {
+            storage.cache.insert(code, link);
         }
+        info!(
+            "FileStorage 初始化完成，已加载 {} 个短链接",
+            storage.cache.len()
+        );
 
         Ok(storage)
     }
@@ -110,48 +109,46 @@ impl FileStorage {
 #[async_trait]
 impl Storage for FileStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
-        let cache_guard = self.cache.read().unwrap();
-        cache_guard.get(code).cloned()
+        self.cache.get(code).map(|entry| entry.value().clone())
     }
 
     async fn load_all(&self) -> HashMap<String, ShortLink> {
-        let cache_guard = self.cache.read().unwrap();
-        cache_guard.clone()
+        self.cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect()
     }
 
     async fn set(&self, link: ShortLink) -> Result<()> {
+        // 检查是否已存在，如果存在则保持原始创建时间
+        let final_link = if let Some(existing_entry) = self.cache.get(&link.code) {
+            ShortLink {
+                code: link.code.clone(),
+                target: link.target,
+                created_at: existing_entry.value().created_at, // 保持原始创建时间
+                expires_at: link.expires_at,
+            }
+        } else {
+            link
+        };
+
         // 更新缓存
-        {
-            let mut cache_guard = self.cache.write().unwrap();
-
-            // 检查是否已存在，如果存在则保持原始创建时间
-            let final_link = if let Some(existing_link) = cache_guard.get(&link.code) {
-                ShortLink {
-                    code: link.code.clone(),
-                    target: link.target,
-                    created_at: existing_link.created_at, // 保持原始创建时间
-                    expires_at: link.expires_at,
-                }
-            } else {
-                link
-            };
-
-            cache_guard.insert(final_link.code.clone(), final_link);
-        }
+        self.cache.insert(final_link.code.clone(), final_link);
 
         // 保存到文件
-        let cache_guard = self.cache.read().unwrap();
-        self.save_to_file(&cache_guard)?;
+        let current_links: HashMap<String, ShortLink> = self
+            .cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect();
+        self.save_to_file(&current_links)?;
 
         Ok(())
     }
 
     async fn remove(&self, code: &str) -> Result<()> {
         // 从缓存中移除
-        let removed = {
-            let mut cache_guard = self.cache.write().unwrap();
-            cache_guard.remove(code).is_some()
-        };
+        let removed = self.cache.remove(code).is_some();
 
         if !removed {
             return Err(ShortlinkerError::not_found(format!(
@@ -161,8 +158,12 @@ impl Storage for FileStorage {
         }
 
         // 保存到文件
-        let cache_guard = self.cache.read().unwrap();
-        self.save_to_file(&cache_guard)?;
+        let current_links: HashMap<String, ShortLink> = self
+            .cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect();
+        self.save_to_file(&current_links)?;
 
         Ok(())
     }
@@ -170,8 +171,10 @@ impl Storage for FileStorage {
     async fn reload(&self) -> Result<()> {
         match self.load_from_file() {
             Ok(new_links) => {
-                let mut cache_guard = self.cache.write().unwrap();
-                *cache_guard = new_links;
+                self.cache.clear();
+                for (code, link) in new_links {
+                    self.cache.insert(code, link);
+                }
                 info!("缓存重载完成");
                 Ok(())
             }

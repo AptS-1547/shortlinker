@@ -16,7 +16,6 @@ path = "src/main.rs"
 [dependencies]
 actix-web = "4.0"
 dotenv = "0.15"
-env_logger = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.9.1"
@@ -29,6 +28,9 @@ tokio = "1.45.1"
 r2d2 = "0.8.10"
 r2d2_sqlite = "0.29.0"
 tracing = "0.1.41"
+dashmap = "6.1.0"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-appender = "0.2.3"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", features = ["iterator"] }

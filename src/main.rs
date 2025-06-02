@@ -1,7 +1,7 @@
 use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
 use std::env;
-use tracing::{debug, info};
+use tracing::{debug, warn};
 
 mod cli;
 mod errors;
@@ -43,7 +43,19 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Server Mode
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+
+    // Initialize tracing subscriber
+    let stdout_log = std::io::stdout();
+    let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
+    let filter = tracing_subscriber::EnvFilter::new(
+        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+    );
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking_writer)
+        .with_env_filter(filter)
+        .with_level(true)
+        .with_ansi(true)
+        .init();
 
     // Load env configurations
     let config = Config {
@@ -61,7 +73,7 @@ async fn main() -> std::io::Result<()> {
 
     // 检查存储后端
     let storage = StorageFactory::create().expect("Failed to create storage");
-    info!(
+    warn!(
         "Using storage backend: {}",
         storage.get_backend_name().await
     );
@@ -77,21 +89,18 @@ async fn main() -> std::io::Result<()> {
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
     if admin_token.is_empty() {
-        info!("Admin API is disabled (ADMIN_TOKEN not set)");
+        warn!("Admin API is disabled (ADMIN_TOKEN not set)");
     } else {
-        info!("Admin API available at: {}", admin_prefix);
+        warn!("Admin API available at: {}", admin_prefix);
     }
 
     // 检查 Health API 是否启用
     let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
     if health_token.is_empty() {
-        info!("Health API is disabled (HEALTH_TOKEN is empty)");
+        warn!("Health API is disabled (HEALTH_TOKEN is empty)");
     } else {
-        info!("Health API available at: {}", health_prefix);
+        warn!("Health API available at: {}", health_prefix);
     }
-
-    let bind_address = format!("{}:{}", config.server_host, config.server_port);
-    info!("Starting server at http://{}", bind_address);
 
     // Start the HTTP server
     let server = HttpServer::new(move || {
@@ -99,7 +108,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .service(
-                web::scope(&admin_prefix.clone())
+                web::scope(&admin_prefix)
                     .wrap(from_fn(AuthMiddleware::admin_auth))
                     .route("/link", web::get().to(AdminService::get_all_links))
                     .route("/link", web::head().to(AdminService::get_all_links))
@@ -110,7 +119,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/link/{code}", web::put().to(AdminService::update_link)),
             )
             .service(
-                web::scope(&health_prefix.clone())
+                web::scope(&health_prefix)
                     .wrap(from_fn(HealthMiddleware::health_auth))
                     .route("", web::get().to(HealthService::health_check))
                     .route("", web::head().to(HealthService::health_check))
@@ -126,7 +135,7 @@ async fn main() -> std::io::Result<()> {
     #[cfg(unix)]
     {
         if let Some(ref socket_path) = config.unix_socket_path {
-            info!("Starting server on Unix socket: {}", socket_path);
+            warn!("Starting server on Unix socket: {}", socket_path);
             // 如果 socket 文件已存在，先删除
             if std::path::Path::new(socket_path).exists() {
                 std::fs::remove_file(socket_path)?;
@@ -134,7 +143,7 @@ async fn main() -> std::io::Result<()> {
             server.bind_uds(socket_path)?.run().await?;
         } else {
             let bind_address = format!("{}:{}", config.server_host, config.server_port);
-            info!("Starting server at http://{}", bind_address);
+            warn!("Starting server at http://{}", bind_address);
             server.bind(bind_address)?.run().await?;
         }
     }
@@ -142,7 +151,7 @@ async fn main() -> std::io::Result<()> {
     #[cfg(not(unix))]
     {
         let bind_address = format!("{}:{}", config.server_host, config.server_port);
-        info!("Starting server at http://{}", bind_address);
+        warn!("Starting server at http://{}", bind_address);
         server.bind(bind_address)?.run().await?;
     }
 

@@ -76,7 +76,7 @@ impl SqliteStorage {
         expires_at: Option<String>,
     ) -> Result<ShortLink> {
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .unwrap_or_else(|_| chrono::Utc::now().into())
+            .map_err(|e| ShortlinkerError::DateParse(format!("创建时间解析失败: {}", e)))?
             .with_timezone(&chrono::Utc);
 
         let expires_at = expires_at.and_then(|s| {
@@ -105,21 +105,25 @@ impl Storage for SqliteStorage {
             }
         };
 
-        let mut stmt = conn.prepare(
-            "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = ?1"
-        ).ok()?;
+        let code = code.to_string();
 
-        let result = stmt.query_row(params![code], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-            ))
-        });
+        let result = actix_web::web::block(move || {
+            let mut stmt = conn.prepare(
+                "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = ?1"
+            )?;
+
+            stmt.query_row(params![code], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })
+        }).await;
 
         match result {
-            Ok((short_code, target_url, created_at, expires_at)) => {
+            Ok(Ok((short_code, target_url, created_at, expires_at))) => {
                 match Self::shortlink_from_row(short_code, target_url, created_at, expires_at) {
                     Ok(link) => Some(link),
                     Err(e) => {
@@ -128,9 +132,13 @@ impl Storage for SqliteStorage {
                     }
                 }
             }
-            Err(rusqlite::Error::QueryReturnedNoRows) => None,
-            Err(e) => {
+            Ok(Err(rusqlite::Error::QueryReturnedNoRows)) => None,
+            Ok(Err(e)) => {
                 error!("查询短链接失败: {}", e);
+                None
+            }
+            Err(e) => {
+                error!("执行异步查询失败: {:?}", e);
                 None
             }
         }

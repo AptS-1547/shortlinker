@@ -9,6 +9,7 @@ pub enum ShortlinkerError {
     NotFound(String),
     Serialization(String),
     SignalOperation(String),
+    DateParse(String),
 }
 
 impl fmt::Display for ShortlinkerError {
@@ -21,6 +22,7 @@ impl fmt::Display for ShortlinkerError {
             ShortlinkerError::NotFound(msg) => write!(f, "资源未找到: {}", msg),
             ShortlinkerError::Serialization(msg) => write!(f, "序列化错误: {}", msg),
             ShortlinkerError::SignalOperation(msg) => write!(f, "信号操作错误: {}", msg),
+            ShortlinkerError::DateParse(msg) => write!(f, "日期解析错误: {}", msg),
         }
     }
 }
