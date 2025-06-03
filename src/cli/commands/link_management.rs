@@ -1,8 +1,11 @@
 use super::super::CliError;
-use crate::storages::{ShortLink, Storage};
+use crate::storages::{SerializableShortLink, ShortLink, Storage};
 use crate::utils::generate_random_code;
 use crate::utils::{colors::*, TimeParser};
 use std::env;
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
 use std::sync::Arc;
 
 pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
@@ -298,6 +301,214 @@ pub async fn update_link(
     // 通知服务器重载
     if let Err(e) = crate::system::notify_server() {
         println!("{}{}⚠{} 通知服务器失败: {}", BOLD, YELLOW, RESET, e);
+    }
+
+    Ok(())
+}
+
+pub async fn export_links(
+    storage: Arc<dyn Storage>,
+    file_path: Option<String>,
+) -> Result<(), CliError> {
+    let links = storage.load_all().await;
+
+    if links.is_empty() {
+        println!("{}{}ℹ{} 没有短链接可导出", BOLD, BLUE, RESET);
+        return Ok(());
+    }
+
+    // 转换为可序列化格式
+    let serializable_links: Vec<SerializableShortLink> = links
+        .values()
+        .map(|link| SerializableShortLink {
+            short_code: link.code.clone(),
+            target_url: link.target.clone(),
+            created_at: link.created_at.to_rfc3339(),
+            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+            click: 0, // 默认点击数为0
+        })
+        .collect();
+
+    let output_path = file_path.unwrap_or_else(|| {
+        format!(
+            "shortlinks_export_{}.json",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        )
+    });
+
+    let file = File::create(&output_path).map_err(|e| {
+        CliError::CommandError(format!("无法创建导出文件 '{}': {}", output_path, e))
+    })?;
+
+    let writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, &serializable_links)
+        .map_err(|e| CliError::CommandError(format!("导出JSON数据失败: {}", e)))?;
+
+    println!(
+        "{}{}✓{} 已导出 {}{}{} 个短链接到: {}{}{}",
+        BOLD,
+        GREEN,
+        RESET,
+        GREEN,
+        links.len(),
+        RESET,
+        CYAN,
+        output_path,
+        RESET
+    );
+
+    Ok(())
+}
+
+pub async fn import_links(
+    storage: Arc<dyn Storage>,
+    file_path: String,
+    force_overwrite: bool,
+) -> Result<(), CliError> {
+    // 检查文件是否存在
+    if !Path::new(&file_path).exists() {
+        return Err(CliError::CommandError(format!(
+            "导入文件不存在: {}",
+            file_path
+        )));
+    }
+
+    let file = File::open(&file_path)
+        .map_err(|e| CliError::CommandError(format!("无法打开导入文件 '{}': {}", file_path, e)))?;
+
+    let reader = BufReader::new(file);
+    let serializable_links: Vec<SerializableShortLink> = serde_json::from_reader(reader)
+        .map_err(|e| CliError::CommandError(format!("解析JSON文件失败: {}", e)))?;
+
+    if serializable_links.is_empty() {
+        println!("{}{}ℹ{} 导入文件为空", BOLD, BLUE, RESET);
+        return Ok(());
+    }
+
+    let existing_links = if !force_overwrite {
+        storage.load_all().await
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    let mut imported_count = 0;
+    let mut skipped_count = 0;
+    let mut error_count = 0;
+
+    for serializable_link in serializable_links {
+        // 检查短码是否已存在
+        if !force_overwrite && existing_links.contains_key(&serializable_link.short_code) {
+            println!(
+                "{}{}⚠{} 跳过已存在的短码: {}{}{} (使用 --force 强制覆盖)",
+                BOLD, YELLOW, RESET, CYAN, serializable_link.short_code, RESET
+            );
+            skipped_count += 1;
+            continue;
+        }
+
+        // 解析时间
+        let created_at = match chrono::DateTime::parse_from_rfc3339(&serializable_link.created_at) {
+            Ok(dt) => dt.with_timezone(&chrono::Utc),
+            Err(e) => {
+                println!(
+                    "{}{}✗{} 跳过短码 '{}{}{}': 创建时间解析失败 - {}",
+                    BOLD, RED, RESET, CYAN, serializable_link.short_code, RESET, e
+                );
+                error_count += 1;
+                continue;
+            }
+        };
+
+        let expires_at = if let Some(expire_str) = serializable_link.expires_at {
+            match chrono::DateTime::parse_from_rfc3339(&expire_str) {
+                Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+                Err(e) => {
+                    println!(
+                        "{}{}✗{} 跳过短码 '{}{}{}': 过期时间解析失败 - {}",
+                        BOLD, RED, RESET, CYAN, serializable_link.short_code, RESET, e
+                    );
+                    error_count += 1;
+                    continue;
+                }
+            }
+        } else {
+            None
+        };
+
+        // 验证URL格式
+        if !serializable_link.target_url.starts_with("http://")
+            && !serializable_link.target_url.starts_with("https://")
+        {
+            println!(
+                "{}{}✗{} 跳过短码 '{}{}{}': URL格式无效 - {}",
+                BOLD,
+                RED,
+                RESET,
+                CYAN,
+                serializable_link.short_code,
+                RESET,
+                serializable_link.target_url
+            );
+            error_count += 1;
+            continue;
+        }
+
+        let link = ShortLink {
+            code: serializable_link.short_code.clone(),
+            target: serializable_link.target_url.clone(),
+            created_at,
+            expires_at,
+        };
+
+        match storage.set(link).await {
+            Ok(_) => {
+                imported_count += 1;
+                println!(
+                    "{}{}✓{} 已导入: {}{}{} -> {}{}{}{}",
+                    BOLD,
+                    GREEN,
+                    RESET,
+                    CYAN,
+                    serializable_link.short_code,
+                    RESET,
+                    BLUE,
+                    UNDERLINE,
+                    serializable_link.target_url,
+                    RESET
+                );
+            }
+            Err(e) => {
+                println!(
+                    "{}{}✗{} 导入失败 '{}{}{}': {}",
+                    BOLD, RED, RESET, CYAN, serializable_link.short_code, RESET, e
+                );
+                error_count += 1;
+            }
+        }
+    }
+
+    println!();
+    println!(
+        "{}{}导入完成:{} 成功 {}{}{} 个，跳过 {}{}{} 个，失败 {}{}{} 个",
+        BOLD,
+        GREEN,
+        RESET,
+        GREEN,
+        imported_count,
+        RESET,
+        YELLOW,
+        skipped_count,
+        RESET,
+        RED,
+        error_count,
+        RESET
+    );
+
+    // 通知服务器重载
+    if imported_count > 0 {
+        if let Err(e) = crate::system::notify_server() {
+            println!("{}{}⚠{} 通知服务器失败: {}", BOLD, YELLOW, RESET, e);
+        }
     }
 
     Ok(())

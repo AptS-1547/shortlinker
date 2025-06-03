@@ -50,11 +50,19 @@ pub fn show_help() {
         "{}  {} list                      # 列出所有短链接{}",
         CYAN, program_name, RESET
     );
+    println!(
+        "{}  {} export [文件路径]           # 导出短链接为JSON{}",
+        CYAN, program_name, RESET
+    );
+    println!(
+        "{}  {} import <文件路径> [选项]     # 从JSON导入短链接{}",
+        CYAN, program_name, RESET
+    );
     println!();
     println!("{}选项:{}", BOLD, RESET);
     println!("  {}--force{}     强制覆盖已存在的短码", YELLOW, RESET);
     println!(
-        "  {}--expire{}    设置过期时间 (RFC3339格式)",
+        "  {}--expire{}    设置过期时间 (RFC3339格式或相对时间)",
         YELLOW, RESET
     );
 }

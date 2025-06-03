@@ -4,7 +4,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::env;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use super::{ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
@@ -19,13 +19,41 @@ impl SqliteStorage {
     pub fn new() -> Result<Self> {
         let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
-        let manager = SqliteConnectionManager::file(&db_path);
-        let pool = Pool::new(manager)
+        let manager = SqliteConnectionManager::file(&db_path).with_init(|c| {
+            // 启用 WAL 模式以支持并发读取
+            c.execute_batch(
+                "PRAGMA synchronous = NORMAL;
+                     PRAGMA cache_size = 1000000;
+                     PRAGMA temp_store = memory;
+                     PRAGMA mmap_size = 268435456;
+                     PRAGMA busy_timeout = 30000;",
+            )?;
+
+            // 检查并设置 WAL 模式 - 使用 query 而不是 execute
+            let mut stmt = c.prepare("PRAGMA journal_mode = WAL")?;
+            let current_mode: String = stmt.query_row([], |row| Ok(row.get::<_, String>(0)?))?;
+
+            if current_mode.to_lowercase() != "wal" {
+                return Err(rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+                    Some(format!("无法设置WAL模式，当前模式: {}", current_mode)),
+                ));
+            }
+
+            Ok(())
+        });
+
+        let pool = Pool::builder()
+            .max_size(15)
+            .min_idle(Some(5))
+            .connection_timeout(std::time::Duration::from_secs(30))
+            .build(manager)
             .map_err(|e| ShortlinkerError::database_connection(format!("无法创建连接池: {}", e)))?;
 
         let cache = Cache::builder()
             .max_capacity(1000) // 设置缓存容量
-            .time_to_live(std::time::Duration::from_secs(60 * 30)) // 设置缓存过期时间为半小时
+            .time_to_live(std::time::Duration::from_secs(60 * 10))
+            .time_to_idle(std::time::Duration::from_secs(60 * 5))
             .build();
 
         let storage = SqliteStorage { pool, cache };
@@ -33,7 +61,7 @@ impl SqliteStorage {
         // 初始化数据库表
         storage.init_db()?;
 
-        info!("SqliteStorage 初始化完成，数据库路径: {}", db_path);
+        warn!("SqliteStorage 初始化完成，数据库路径: {}", db_path);
         Ok(storage)
     }
 

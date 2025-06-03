@@ -22,5 +22,5 @@ target/
 
 .DS_Store
 
-links.db
+links.db*
 shortlinker.pid

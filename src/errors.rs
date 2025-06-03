@@ -58,6 +58,10 @@ impl ShortlinkerError {
     pub fn signal_operation<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::SignalOperation(msg.into())
     }
+
+    pub fn date_parse<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::DateParse(msg.into())
+    }
 }
 
 // 为常见的错误类型实现 From trait
@@ -81,7 +85,7 @@ impl From<serde_json::Error> for ShortlinkerError {
 
 impl From<chrono::ParseError> for ShortlinkerError {
     fn from(err: chrono::ParseError) -> Self {
-        ShortlinkerError::Validation(format!("时间解析错误: {}", err))
+        ShortlinkerError::DateParse(err.to_string())
     }
 }
 

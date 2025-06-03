@@ -30,6 +30,8 @@ impl CliParser {
             "add" => self.parse_add_command(&args[2..]),
             "remove" => self.parse_remove_command(&args[2..]),
             "update" => self.parse_update_command(&args[2..]),
+            "export" => self.parse_export_command(&args[2..]),
+            "import" => self.parse_import_command(&args[2..]),
             _ => Err(CliError::ParseError(format!(
                 "Unknown command: {}",
                 args[1]
@@ -140,6 +142,42 @@ impl CliParser {
             short_code,
             target_url,
             expire_time,
+        })
+    }
+
+    pub fn parse_export_command(&self, args: &[String]) -> Result<Command, CliError> {
+        let file_path = if args.is_empty() {
+            None
+        } else {
+            Some(args[0].clone())
+        };
+
+        Ok(Command::Export { file_path })
+    }
+
+    pub fn parse_import_command(&self, args: &[String]) -> Result<Command, CliError> {
+        if args.is_empty() {
+            return Err(CliError::ParseError(
+                "Import command requires a file path".to_string(),
+            ));
+        }
+
+        let mut force_overwrite = false;
+        let mut file_path = args[0].clone();
+
+        // 检查是否有 --force 参数
+        for arg in args.iter().skip(1) {
+            match arg.as_str() {
+                "--force" => force_overwrite = true,
+                _ => {
+                    return Err(CliError::ParseError(format!("Unknown parameter: {}", arg)));
+                }
+            }
+        }
+
+        Ok(Command::Import {
+            file_path,
+            force_overwrite,
         })
     }
 }

@@ -3,6 +3,20 @@ name = "shortlinker"
 version = "0.1.0"
 edition = "2021"
 
+# 优化配置
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release-debug]
+inherits = "release"
+debug = true
+strip = false
+lto = false
+
 # 添加库配置
 [lib]
 name = "shortlinker"
@@ -14,34 +28,31 @@ name = "shortlinker"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "4.0"
+actix-web = { version = "4.0", default-features = false, features = ["macros"] }
 dotenv = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rand = "0.9.1"
-chrono = "0.4.41"
+rand = { version = "0.9.1", default-features = false, features = ["std", "std_rng"] }
+chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 async-trait = "0.1.88"
 futures = "0.3.31"
-rusqlite = { version = "0.36.0", features = ["bundled"] }
+rusqlite = { version = "0.36.0", default-features = false }
 sled = "0.34.7"
-tokio = "1.45.1"
+tokio = { version = "1.45.1", default-features = false, features = ["rt-multi-thread", "macros"] }
 r2d2 = "0.8.10"
 r2d2_sqlite = "0.29.0"
-tracing = "0.1.41"
+tracing = { version = "0.1.41", default-features = false }
 dashmap = "6.1.0"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt", "ansi"] }
 tracing-appender = "0.2.3"
-moka = { version = "0.12.10", features = ["future"] }
+moka = { version = "0.12.10", default-features = false, features = ["future"] }
 
 [target.'cfg(unix)'.dependencies]
-signal-hook = { version = "0.3", features = ["iterator"] }
-nix = { version = "0.26", features = ["signal", "process"] }
+signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
+nix = { version = "0.26", default-features = false, features = ["signal", "process"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
 actix-rt = "2.9"
 tempfile = "3.8"
-serde_json = "1.0"
-rand = "0.9.1"
-chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.45.1", features = ["full"] }

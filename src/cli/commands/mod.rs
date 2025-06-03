@@ -23,13 +23,20 @@ pub enum Command {
         force_overwrite: bool,
         expire_time: Option<String>,
     },
+    Remove {
+        short_code: String,
+    },
     Update {
         short_code: String,
         target_url: String,
         expire_time: Option<String>,
     },
-    Remove {
-        short_code: String,
+    Export {
+        file_path: Option<String>,
+    },
+    Import {
+        file_path: String,
+        force_overwrite: bool,
     },
 }
 
@@ -65,6 +72,11 @@ impl Command {
                 expire_time,
             } => update_link(storage, short_code, target_url, expire_time).await,
             Command::Remove { short_code } => remove_link(storage, short_code).await,
+            Command::Export { file_path } => export_links(storage, file_path).await,
+            Command::Import {
+                file_path,
+                force_overwrite,
+            } => import_links(storage, file_path, force_overwrite).await,
         }
     }
 }
