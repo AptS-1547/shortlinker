@@ -36,7 +36,7 @@ rand = { version = "0.9.1", default-features = false, features = ["std", "std_rn
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 async-trait = "0.1.88"
 futures = "0.3.31"
-rusqlite = { version = "0.36.0", default-features = false }
+rusqlite = { version = "0.36.0", default-features = false, features = ["bundled"] }
 sled = "0.34.7"
 tokio = { version = "1.45.1", default-features = false, features = ["rt-multi-thread", "macros"] }
 r2d2 = "0.8.10"
