@@ -14,19 +14,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-cross-platform:
-    name: Build Linux & Windows
+  build-linux-windows:
+    name: Build Linux x86/i686 & Windows
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          # Linux musl 静态编译
+          # Linux musl 静态编译 (排除 ARM64)
           - target: x86_64-unknown-linux-musl
             name: shortlinker-linux-x86_64
             packages: musl-tools
-          - target: aarch64-unknown-linux-musl
-            name: shortlinker-linux-aarch64
-            packages: musl-tools gcc-aarch64-linux-gnu
           - target: i686-unknown-linux-musl
             name: shortlinker-linux-i686
             packages: musl-tools gcc-multilib
@@ -61,23 +58,10 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y ${{ matrix.packages }}
-        # 为 ARM64 目标安装专用工具链
-        if [ "${{ matrix.target }}" = "aarch64-unknown-linux-musl" ]; then
-          # 直接使用Ubuntu提供的交叉编译器
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-        fi
 
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
-          aarch64-unknown-linux-musl)
-            # 使用系统的交叉编译器
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            echo "AR_aarch64_unknown_linux_musl=aarch64-linux-gnu-ar" >> $GITHUB_ENV
-            # 关键：指定 sysroot 到 musl
-            echo "CFLAGS_aarch64_unknown_linux_musl=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
-            ;;
           i686-unknown-linux-musl)
             echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
             echo "CC_i686_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
@@ -110,6 +94,52 @@ jobs:
       with:
         name: ${{ matrix.name }}
         path: ${{ matrix.name }}
+
+  build-arm64:
+    name: Build ARM64 Linux
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-unknown-linux-musl
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: aarch64-unknown-linux-musl
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
+    # 专门为 ARM64 安装工具链
+    - name: Install ARM64 cross-compilation toolchain
+      run: |
+        # 下载预编译的 musl 工具链
+        wget -q https://musl.cc/aarch64-linux-musl-cross.tgz
+        tar -xzf aarch64-linux-musl-cross.tgz
+        sudo mv aarch64-linux-musl-cross /opt/
+        echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+
+    - name: Configure ARM64 cross-compilation
+      run: |
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc" >> $GITHUB_ENV
+        echo "CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc" >> $GITHUB_ENV
+        echo "AR_aarch64_unknown_linux_musl=aarch64-linux-musl-ar" >> $GITHUB_ENV
+
+    - name: Build ARM64
+      env:
+        RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
+      run: cargo build --release --target aarch64-unknown-linux-musl
+
+    - name: Rename binary
+      run: mv target/aarch64-unknown-linux-musl/release/shortlinker shortlinker-linux-aarch64
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: shortlinker-linux-aarch64
+        path: shortlinker-linux-aarch64
 
   build-macos:
     name: Build macOS
@@ -152,7 +182,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-cross-platform, build-macos]
+    needs: [build-linux-windows, build-arm64, build-macos]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
