@@ -88,10 +88,7 @@ impl ProcessManager {
             let pid_file = "shortlinker.pid";
 
             if !Path::new(pid_file).exists() {
-                println!(
-                    "{} 未找到 PID 文件，服务器可能未运行",
-                    "⚠".bold().yellow()
-                );
+                println!("{} 未找到 PID 文件，服务器可能未运行", "⚠".bold().yellow());
                 return Ok(());
             }
 
@@ -104,11 +101,7 @@ impl ProcessManager {
                         let server_pid = Pid::from_raw(pid as i32);
 
                         if signal::kill(server_pid, None).is_err() {
-                            println!(
-                                "{} 进程 {} 不存在，清理 PID 文件",
-                                "⚠".bold().yellow(),
-                                pid
-                            );
+                            println!("{} 进程 {} 不存在，清理 PID 文件", "⚠".bold().yellow(), pid);
                             let _ = fs::remove_file(pid_file);
                             return Ok(());
                         }
@@ -169,17 +162,11 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if !Path::new(lock_file).exists() {
-                println!(
-                    "{} 未找到锁文件，服务器可能未运行",
-                    "⚠".bold().yellow()
-                );
+                println!("{} 未找到锁文件，服务器可能未运行", "⚠".bold().yellow());
                 return Ok(());
             }
 
-            println!(
-                "{} Windows 平台不支持自动停止服务器",
-                "⚠".bold().yellow()
-            );
+            println!("{} Windows 平台不支持自动停止服务器", "⚠".bold().yellow());
             println!(
                 "{} 请手动停止服务器进程，然后删除锁文件:",
                 "ℹ".bold().blue()
@@ -226,10 +213,7 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if Path::new(lock_file).exists() {
-                println!(
-                    "{} 检测到锁文件，服务器可能正在运行",
-                    "⚠".bold().yellow()
-                );
+                println!("{} 检测到锁文件，服务器可能正在运行", "⚠".bold().yellow());
                 println!("{} Windows 平台需要手动重启服务器:", "ℹ".bold().blue());
                 println!();
                 println!(

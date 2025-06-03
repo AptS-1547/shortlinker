@@ -5,9 +5,12 @@ use actix_web::{
     Error, HttpResponse,
 };
 use std::env;
+use std::sync::OnceLock;
 use tracing::{debug, info};
 
 pub struct AuthMiddleware;
+
+static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 
 impl AuthMiddleware {
     /// Admin API 身份验证中间件
@@ -16,28 +19,23 @@ impl AuthMiddleware {
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
         // 在每次请求时重新读取环境变量，而不是在启动时缓存
-        let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
+        let admin_token = ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
 
         // 如果 token 为空，认为 Admin API 被禁用
         if admin_token.is_empty() {
-            info!("Admin API 访问被拒绝: API 已禁用 (未设置 ADMIN_TOKEN)");
             return Ok(req.into_response(
                 HttpResponse::NotFound()
-                    .append_header(("Content-Type", "text/html; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .body("Not Found"),
             ));
         }
 
         // 检查 Authorization header
         if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                    if token == admin_token {
-                        debug!("Admin API 鉴权成功");
-                        return next.call(req).await;
-                    }
+            if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
+                if auth_bytes == admin_token.as_bytes() {
+                    debug!("Admin API 鉴权成功");
+                    return next.call(req).await;
                 }
             }
         }
@@ -46,8 +44,6 @@ impl AuthMiddleware {
         Ok(req.into_response(
             HttpResponse::Unauthorized()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .append_header(("Connection", "keep-alive"))
-                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .json(serde_json::json!({
                     "code": 401,
                     "data": { "error": "Unauthorized: Invalid or missing token" }

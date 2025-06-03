@@ -23,7 +23,9 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
                     "  {} -> {} {}",
                     short_code.cyan(),
                     link.target.blue().underline(),
-                    format!("(过期: {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC")).dimmed().yellow()
+                    format!("(过期: {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC"))
+                        .dimmed()
+                        .yellow()
                 );
             } else {
                 println!(
@@ -66,11 +68,7 @@ pub async fn add_link(
         Some(code) => code,
         None => {
             let code = generate_random_code(random_code_length);
-            println!(
-                "{} 生成随机短码: {}",
-                "ℹ".bold().blue(),
-                code.magenta()
-            );
+            println!("{} 生成随机短码: {}", "ℹ".bold().blue(), code.magenta());
             code
         }
     };
@@ -168,11 +166,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
         .await
         .map_err(|e| CliError::CommandError(format!("删除失败: {}", e)))?;
 
-    println!(
-        "{} 已删除短链接: {}",
-        "✓".bold().green(),
-        short_code.cyan()
-    );
+    println!("{} 已删除短链接: {}", "✓".bold().green(), short_code.cyan());
 
     // 通知服务器重载
     if let Err(e) = crate::system::notify_server() {

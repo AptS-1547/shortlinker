@@ -1,6 +1,5 @@
-use actix_web::{middleware::from_fn, web, App, HttpServer};
+use actix_web::{middleware::from_fn, middleware::DefaultHeaders, web, App, HttpServer};
 use dotenv::dotenv;
-use core::num;
 use std::env;
 use tracing::{debug, warn};
 
@@ -106,7 +105,8 @@ async fn main() -> std::io::Result<()> {
     let cpu_count = env::var("CPU_COUNT")
         .unwrap_or_else(|_| num_cpus::get().to_string())
         .parse::<usize>()
-        .unwrap_or_else(|_| num_cpus::get());
+        .unwrap_or_else(|_| num_cpus::get())
+        .min(32);
 
     warn!("Using {} CPU cores for the server", cpu_count);
 
@@ -115,6 +115,13 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
+            .app_data(web::PayloadConfig::new(1024 * 1024)) // 设置最大请求体大小为1MB
+            .wrap(
+                DefaultHeaders::new()
+                    .add(("Connection", "keep-alive"))
+                    .add(("Keep-Alive", "timeout=30, max=1000"))
+                    .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
+            )
             .service(
                 web::scope(&admin_prefix)
                     .wrap(from_fn(AuthMiddleware::admin_auth))
@@ -138,7 +145,11 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/{path}*", web::get().to(RedirectService::handle_redirect))
             .route("/{path}*", web::head().to(RedirectService::handle_redirect))
-    });
+    })
+    .keep_alive(std::time::Duration::from_secs(30)) // 启用长连接
+    .client_request_timeout(std::time::Duration::from_millis(5000)) // 客户端超时
+    .client_disconnect_timeout(std::time::Duration::from_millis(1000)) // 断连超时
+    .workers(cpu_count);
 
     #[cfg(unix)]
     {
@@ -148,11 +159,11 @@ async fn main() -> std::io::Result<()> {
             if std::path::Path::new(socket_path).exists() {
                 std::fs::remove_file(socket_path)?;
             }
-            server.bind_uds(socket_path)?.workers(cpu_count).run().await?;
+            server.bind_uds(socket_path)?.run().await?;
         } else {
             let bind_address = format!("{}:{}", config.server_host, config.server_port);
             warn!("Starting server at http://{}", bind_address);
-            server.bind(bind_address)?.workers(cpu_count).run().await?;
+            server.bind(bind_address)?.run().await?;
         }
     }
 

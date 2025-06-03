@@ -60,8 +60,6 @@ impl AdminService {
 
         HttpResponse::Ok()
             .append_header(("Content-Type", "application/json; charset=utf-8"))
-            .append_header(("Connection", "keep-alive"))
-            .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
             .json(serde_json::json!({ "code": 0, "data": Some(serializable_links) }))
     }
 
@@ -111,8 +109,6 @@ impl AdminService {
                 info!("Admin API: 成功创建链接 - {}", new_link.code);
                 HttpResponse::Created()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 0,
                         data: PostNewLink {
@@ -126,8 +122,6 @@ impl AdminService {
                 error!("Admin API: 创建链接失败 - {}: {}", new_link.code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 1,
                         data: serde_json::json!({
@@ -156,8 +150,6 @@ impl AdminService {
                 };
                 HttpResponse::Ok()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 0,
                         data: serializable_link,
@@ -167,8 +159,6 @@ impl AdminService {
                 info!("Admin API: 链接不存在 - {}", code);
                 HttpResponse::NotFound()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 1,
                         data: serde_json::json!({ "error": "Link not found" }),
@@ -189,8 +179,6 @@ impl AdminService {
                 info!("Admin API: 成功删除链接 - {}", code);
                 HttpResponse::Ok()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 0,
                         data: serde_json::json!({ "message": "Link deleted successfully" }),
@@ -200,8 +188,6 @@ impl AdminService {
                 error!("Admin API: 删除链接失败 - {}: {}", code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 1,
                         data: serde_json::json!({ "error": format!("Error deleting link: {}", e) }),
@@ -228,8 +214,6 @@ impl AdminService {
                 info!("Admin API: 尝试更新不存在的链接 - {}", code);
                 return HttpResponse::NotFound()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 1,
                         data: serde_json::json!({ "error": "Link not found" }),
@@ -260,8 +244,6 @@ impl AdminService {
                 info!("Admin API: 成功更新链接 - {}", code);
                 HttpResponse::Ok()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 0,
                         data: PostNewLink {
@@ -275,8 +257,6 @@ impl AdminService {
                 error!("Admin API: 更新链接失败 - {}: {}", code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                     .json(ApiResponse {
                         code: 1,
                         data: serde_json::json!({
