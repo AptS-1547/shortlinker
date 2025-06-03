@@ -1,4 +1,3 @@
-pub mod colors;
 pub mod time_parser;
 
 pub use time_parser::TimeParser;

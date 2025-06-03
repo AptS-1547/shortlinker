@@ -163,7 +163,7 @@ impl CliParser {
         }
 
         let mut force_overwrite = false;
-        let mut file_path = args[0].clone();
+        let file_path = args[0].clone();
 
         // 检查是否有 --force 参数
         for arg in args.iter().skip(1) {

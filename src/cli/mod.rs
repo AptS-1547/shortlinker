@@ -3,7 +3,7 @@ pub mod parser;
 pub mod process_manager;
 
 use crate::storages::StorageFactory;
-use crate::utils::colors::{BOLD, RED, RESET};
+use colored::*;
 use parser::CliParser;
 use std::fmt;
 use std::process;
@@ -37,7 +37,7 @@ impl From<crate::errors::ShortlinkerError> for CliError {
 
 pub async fn run_cli() {
     if let Err(e) = run_cli_inner().await {
-        println!("{}{}错误:{} {}", BOLD, RED, RESET, e);
+        println!("{} {}", "错误:".bold().red(), e);
         process::exit(1);
     }
 }
