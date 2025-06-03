@@ -104,7 +104,7 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: aarch64-unknown-linux-musl
+        targets: aarch64-unknown-linux-gnu
 
     - uses: Swatinem/rust-cache@v2
       with:
@@ -112,25 +112,20 @@ jobs:
         shared-key: "shortlinker"
         save-if: ${{ github.ref == 'refs/heads/main' }}
 
-    # 专门为 ARM64 安装工具链
-    - name: Install ARM64 cross-compilation toolchain
-      run: |
-        # 下载预编译的 musl 工具链
-        wget -q https://musl.cc/aarch64-linux-musl-cross.tgz
-        tar -xzf aarch64-linux-musl-cross.tgz
-        sudo mv aarch64-linux-musl-cross /opt/
-        echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
 
-    - name: Configure ARM64 cross-compilation
+    - name: Install ARM64 toolchain (glibc)
       run: |
-        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc" >> $GITHUB_ENV
-        echo "CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc" >> $GITHUB_ENV
-        echo "AR_aarch64_unknown_linux_musl=aarch64-linux-musl-ar" >> $GITHUB_ENV
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
 
+    - name: Configure cross-compilation
+      run: |
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+    
     - name: Build ARM64
       env:
         RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
-      run: cargo build --release --target aarch64-unknown-linux-musl
+      run: cargo build --release --target aarch64-unknown-linux-gnu
 
     - name: Rename binary
       run: mv target/aarch64-unknown-linux-musl/release/shortlinker shortlinker-linux-aarch64
