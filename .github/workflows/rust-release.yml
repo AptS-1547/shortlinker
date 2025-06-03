@@ -42,6 +42,12 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+    
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Install cross-compilation tools
       if: matrix.packages
@@ -53,8 +59,11 @@ jobs:
       run: |
         case "${{ matrix.target }}" in
           aarch64-unknown-linux-musl)
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            # 使用 musl-gcc 而不是 aarch64-linux-gnu-gcc
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+            echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
+            echo "AR_aarch64_unknown_linux_musl=ar" >> $GITHUB_ENV
+            echo "CFLAGS_aarch64_unknown_linux_musl=-target aarch64-unknown-linux-musl" >> $GITHUB_ENV
             ;;
           i686-unknown-linux-musl)
             echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
@@ -107,6 +116,12 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Build native
       env:
