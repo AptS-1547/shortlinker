@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
 
-**A minimalist URL shortener service supporting HTTP 302 redirection, built with Rust. Easy to deploy and lightning fast.**
+**A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast.**
 
 [English](README.md) • [中文](README.zh.md)
 

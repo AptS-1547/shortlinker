@@ -8,6 +8,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 - 🔄 **Real-time Sync** - Commands take effect immediately  
 - ⚡ **Fast Response** - Supports SQLite, file, Sled multiple storage backends
 - 🛡️ **Error Handling** - Detailed error messages and suggestions
+- 📦 **Import/Export** - JSON format backup and migration support
 
 ## Basic Syntax
 
@@ -21,7 +22,10 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 |---------|----------|---------|
 | `add` | Add short link | `./shortlinker add github https://github.com` |
 | `remove` | Delete short link | `./shortlinker remove github` |
+| `update` | Update short link | `./shortlinker update github https://new-url.com` |
 | `list` | List all links | `./shortlinker list` |
+| `export` | Export data | `./shortlinker export backup.json` |
+| `import` | Import data | `./shortlinker import backup.json --force` |
 
 ## Quick Examples
 
@@ -35,6 +39,15 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 
 # Delete link
 ./shortlinker remove docs
+```
+
+### Data Management
+```bash
+# Export data
+./shortlinker export backup.json
+
+# Import data
+./shortlinker import backup.json --force
 ```
 
 ### Advanced Features

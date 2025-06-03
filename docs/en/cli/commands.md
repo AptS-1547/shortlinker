@@ -34,6 +34,39 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker add google https://www.google.com --force
 ```
 
+### export - Export Short Links
+
+```bash
+./shortlinker export [file_path]
+```
+
+**Examples**:
+```bash
+# Default filename
+./shortlinker export
+
+# Specify filename
+./shortlinker export backup.json
+```
+
+### import - Import Short Links
+
+```bash
+./shortlinker import <file_path> [options]
+```
+
+**Options**:
+- `--force`: Force overwrite existing short codes
+
+**Examples**:
+```bash
+# Import with default options
+./shortlinker import backup.json
+
+# Force overwrite existing codes
+./shortlinker import backup.json --force
+```
+
 ### remove - Delete Short Link
 
 ```bash

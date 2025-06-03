@@ -8,6 +8,7 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 - 🔄 **实时同步** - 命令执行立即生效  
 - ⚡ **快速响应** - 支持 SQLite、文件、Sled 多种存储后端
 - 🛡️ **错误处理** - 详细的错误信息和建议
+- 📦 **数据导入导出** - JSON 格式备份和迁移支持
 
 ## 基本语法
 
@@ -21,7 +22,10 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 |------|------|------|
 | `add` | 添加短链接 | `./shortlinker add github https://github.com` |
 | `remove` | 删除短链接 | `./shortlinker remove github` |
+| `update` | 更新短链接 | `./shortlinker update github https://new-url.com` |
 | `list` | 列出所有链接 | `./shortlinker list` |
+| `export` | 导出数据 | `./shortlinker export backup.json` |
+| `import` | 导入数据 | `./shortlinker import backup.json --force` |
 
 ## 快速示例
 
@@ -37,58 +41,25 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 ./shortlinker remove docs
 ```
 
+### 数据管理
+```bash
+# 导出数据
+./shortlinker export backup.json
+
+# 导入数据
+./shortlinker import backup.json --force
+```
+
 ### 高级功能
 ```bash
 # 随机短码
 ./shortlinker add https://example.com
-# 输出：✓ 已添加短链接: aB3dF1 -> https://example.com
 
 # 设置过期时间
-./shortlinker add sale https://shop.com/sale --expire 2024-12-25T00:00:00Z
+./shortlinker add sale https://shop.com/sale --expire 1d
 
 # 强制覆盖
 ./shortlinker add docs https://new-docs.com --force
-```
-
-## 输出说明
-
-### 成功状态
-- ✅ 绿色文本表示操作成功
-- 🔵 蓝色文本显示信息提示
-
-### 错误状态  
-- ❌ 红色文本显示错误信息
-- 💡 提供解决建议
-
-### 示例输出
-```bash
-$ ./shortlinker add github https://github.com
-✓ 已添加短链接: github -> https://github.com
-
-$ ./shortlinker add github https://gitlab.com
-❌ 错误: 短码 'github' 已存在，当前指向: https://github.com
-💡 如需覆盖，请使用 --force 参数
-```
-
-## 脚本集成
-
-### 批量操作
-```bash
-#!/bin/bash
-# 批量导入链接
-while IFS=',' read -r code url; do
-    ./shortlinker add "$code" "$url"
-done < links.csv
-```
-
-### 错误检查
-```bash
-if ./shortlinker add test https://example.com; then
-    echo "添加成功"
-else
-    echo "添加失败"
-    exit 1
-fi
 ```
 
 ## 下一步
