@@ -20,14 +20,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          # Linux musl 静态编译
+          - target: x86_64-unknown-linux-musl
             name: shortlinker-linux-x86_64
-          - target: aarch64-unknown-linux-gnu
+            packages: musl-tools
+          - target: aarch64-unknown-linux-musl
             name: shortlinker-linux-aarch64
-            packages: gcc-aarch64-linux-gnu
-          - target: i686-unknown-linux-gnu
+            packages: musl-tools gcc-aarch64-linux-gnu
+          - target: i686-unknown-linux-musl
             name: shortlinker-linux-i686
-            packages: gcc-multilib
+            packages: musl-tools gcc-multilib
+          # Windows
           - target: x86_64-pc-windows-gnu
             name: shortlinker-windows-x86_64.exe
             packages: gcc-mingw-w64-x86-64
@@ -49,12 +52,18 @@ jobs:
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
-          aarch64-unknown-linux-gnu)
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          aarch64-unknown-linux-musl)
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
             ;;
-          i686-unknown-linux-gnu)
-            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=gcc" >> $GITHUB_ENV
-            echo "CFLAGS=-m32" >> $GITHUB_ENV
+          i686-unknown-linux-musl)
+            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+            echo "CC_i686_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
+            echo "CFLAGS_i686_unknown_linux_musl=-m32" >> $GITHUB_ENV
+            ;;
+          x86_64-unknown-linux-musl)
+            echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+            echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
             ;;
           x86_64-pc-windows-gnu)
             echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc" >> $GITHUB_ENV
@@ -63,7 +72,7 @@ jobs:
 
     - name: Build
       env:
-        RUSTFLAGS: "-C link-arg=-s -C opt-level=z -C panic=abort"
+        RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary
@@ -100,6 +109,8 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Build native
+      env:
+        RUSTFLAGS: "-C link-arg=-s"
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary
