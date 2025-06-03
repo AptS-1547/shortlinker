@@ -54,16 +54,22 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y ${{ matrix.packages }}
+        # 为 ARM64 目标安装专用工具链
+        if [ "${{ matrix.target }}" = "aarch64-unknown-linux-musl" ]; then
+          wget https://more.musl.cc/10/x86_64-linux-musl/aarch64-linux-musl-cross.tgz
+          tar -xzf aarch64-linux-musl-cross.tgz
+          sudo mv aarch64-linux-musl-cross /opt/
+          echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+        fi
 
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
           aarch64-unknown-linux-musl)
             # 使用 musl-gcc 而不是 aarch64-linux-gnu-gcc
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
-            echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
-            echo "AR_aarch64_unknown_linux_musl=ar" >> $GITHUB_ENV
-            echo "CFLAGS_aarch64_unknown_linux_musl=-target aarch64-unknown-linux-musl" >> $GITHUB_ENV
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc" >> $GITHUB_ENV
+            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc" >> $GITHUB_ENV
+            echo "AR_aarch64_unknown_linux_musl=aarch64-linux-musl-ar" >> $GITHUB_ENV
             ;;
           i686-unknown-linux-musl)
             echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
