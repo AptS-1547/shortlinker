@@ -49,6 +49,13 @@ jobs:
         shared-key: "shortlinker"
         save-if: ${{ github.ref == 'refs/heads/main' }}
 
+    - name: Cache and install APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: ${{ matrix.packages }}
+        version: 1.0
+        execute_install_scripts: true
+
     - name: Install cross-compilation tools
       if: matrix.packages
       run: |
@@ -56,20 +63,20 @@ jobs:
         sudo apt-get install -y ${{ matrix.packages }}
         # 为 ARM64 目标安装专用工具链
         if [ "${{ matrix.target }}" = "aarch64-unknown-linux-musl" ]; then
-          wget https://more.musl.cc/10/x86_64-linux-musl/aarch64-linux-musl-cross.tgz
-          tar -xzf aarch64-linux-musl-cross.tgz
-          sudo mv aarch64-linux-musl-cross /opt/
-          echo "/opt/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
+          # 直接使用Ubuntu提供的交叉编译器
+          sudo apt-get install -y gcc-aarch64-linux-gnu
         fi
 
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
           aarch64-unknown-linux-musl)
-            # 使用 musl-gcc 而不是 aarch64-linux-gnu-gcc
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc" >> $GITHUB_ENV
-            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc" >> $GITHUB_ENV
-            echo "AR_aarch64_unknown_linux_musl=aarch64-linux-musl-ar" >> $GITHUB_ENV
+            # 使用系统的交叉编译器
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "CC_aarch64_unknown_linux_musl=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "AR_aarch64_unknown_linux_musl=aarch64-linux-gnu-ar" >> $GITHUB_ENV
+            # 关键：指定 sysroot 到 musl
+            echo "CFLAGS_aarch64_unknown_linux_musl=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
             ;;
           i686-unknown-linux-musl)
             echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
