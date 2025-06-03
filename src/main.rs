@@ -65,7 +65,7 @@ async fn main() -> std::io::Result<()> {
             .parse()
             .unwrap(),
         #[cfg(unix)]
-        unix_socket_path: env::var("UNIX_SOCKET_PATH").ok(),
+        unix_socket_path: env::var("UNIX_SOCKET").ok(),
     };
 
     // 初始化锁文件

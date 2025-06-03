@@ -36,7 +36,7 @@ LABEL license="MIT"
 # 从构建阶段复制二进制文件 (使用 musl 目标路径)
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/shortlinker /shortlinker
 
-VOLUME ["/data"]
+VOLUME ["/data", "/socket"]
 
 # 暴露端口
 EXPOSE 8080
