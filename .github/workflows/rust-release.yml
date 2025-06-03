@@ -14,20 +14,20 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-cross-platform:
-    name: Build Linux & Windows
+  build-linux-windows:
+    name: Build Linux x86/i686 & Windows
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          # Linux musl 静态编译 (排除 ARM64)
+          - target: x86_64-unknown-linux-musl
             name: shortlinker-linux-x86_64
-          - target: aarch64-unknown-linux-gnu
-            name: shortlinker-linux-aarch64
-            packages: gcc-aarch64-linux-gnu
-          - target: i686-unknown-linux-gnu
+            packages: musl-tools
+          - target: i686-unknown-linux-musl
             name: shortlinker-linux-i686
-            packages: gcc-multilib
+            packages: musl-tools gcc-multilib
+          # Windows
           - target: x86_64-pc-windows-gnu
             name: shortlinker-windows-x86_64.exe
             packages: gcc-mingw-w64-x86-64
@@ -39,6 +39,19 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
+    
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Cache and install APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: ${{ matrix.packages }}
+        version: 1.0
+        execute_install_scripts: true
 
     - name: Install cross-compilation tools
       if: matrix.packages
@@ -49,12 +62,14 @@ jobs:
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
-          aarch64-unknown-linux-gnu)
-            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          i686-unknown-linux-musl)
+            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+            echo "CC_i686_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
+            echo "CFLAGS_i686_unknown_linux_musl=-m32" >> $GITHUB_ENV
             ;;
-          i686-unknown-linux-gnu)
-            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=gcc" >> $GITHUB_ENV
-            echo "CFLAGS=-m32" >> $GITHUB_ENV
+          x86_64-unknown-linux-musl)
+            echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
+            echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
             ;;
           x86_64-pc-windows-gnu)
             echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc" >> $GITHUB_ENV
@@ -63,7 +78,7 @@ jobs:
 
     - name: Build
       env:
-        RUSTFLAGS: "-C link-arg=-s -C opt-level=z -C panic=abort"
+        RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary
@@ -79,6 +94,46 @@ jobs:
       with:
         name: ${{ matrix.name }}
         path: ${{ matrix.name }}
+
+  build-arm64:
+    name: Build ARM64 Linux
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-unknown-linux-gnu
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: aarch64-unknown-linux-musl
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Install ARM64 toolchain (glibc)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+
+    - name: Configure cross-compilation
+      run: |
+        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+    
+    - name: Build ARM64
+      env:
+        RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
+      run: cargo build --release --target aarch64-unknown-linux-gnu
+
+    - name: Rename binary
+      run: mv target/aarch64-unknown-linux-gnu/release/shortlinker shortlinker-linux-aarch64
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: shortlinker-linux-aarch64
+        path: shortlinker-linux-aarch64
 
   build-macos:
     name: Build macOS
@@ -99,7 +154,15 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ matrix.target }}
+        shared-key: "shortlinker"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
     - name: Build native
+      env:
+        RUSTFLAGS: "-C link-arg=-s"
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary
@@ -113,7 +176,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build-cross-platform, build-macos]
+    needs: [build-linux-windows, build-arm64, build-macos]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
