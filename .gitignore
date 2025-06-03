@@ -24,3 +24,4 @@ target/
 
 links.db*
 shortlinker.pid
+cargo-flamegraph.trace/

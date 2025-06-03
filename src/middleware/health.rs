@@ -5,7 +5,10 @@ use actix_web::{
     Error, HttpResponse,
 };
 use std::env;
+use std::sync::OnceLock;
 use tracing::{debug, info};
+
+static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
 
 pub struct HealthMiddleware;
 
@@ -17,30 +20,24 @@ impl HealthMiddleware {
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
         // 检查是否设置了健康检查 token
-        let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
+        let health_token =
+            HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
 
         // 如果 token 为空，认为 Health API 被禁用
         if health_token.is_empty() {
-            info!("Health API 访问被拒绝: API 已禁用 (未设置 HEALTH_TOKEN)");
             return Ok(req.into_response(
                 HttpResponse::NotFound()
-                    .append_header(("Content-Type", "text/html; charset=utf-8"))
-                    .append_header(("Connection", "keep-alive"))
-                    .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .body("Not Found"),
             ));
         }
 
-        debug!("Health auth: token validation required");
-
         // 检查 Authorization header
         if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if let Some(token) = auth_str.strip_prefix("Bearer ") {
-                    if token == health_token {
-                        debug!("Health API 鉴权成功");
-                        return next.call(req).await;
-                    }
+            if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
+                if auth_bytes == health_token.as_bytes() {
+                    debug!("Health API 鉴权成功");
+                    return next.call(req).await;
                 }
             }
         }
@@ -49,8 +46,6 @@ impl HealthMiddleware {
         Ok(req.into_response(
             HttpResponse::Unauthorized()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .append_header(("Connection", "keep-alive"))
-                .append_header(("Cache-Control", "no-cache, no-store, must-revalidate"))
                 .json(serde_json::json!({
                     "code": 401,
                     "data": { "error": "Unauthorized: Invalid or missing token" }

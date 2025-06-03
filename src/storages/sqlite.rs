@@ -23,10 +23,13 @@ impl SqliteStorage {
             // 启用 WAL 模式以支持并发读取
             c.execute_batch(
                 "PRAGMA synchronous = NORMAL;
-                     PRAGMA cache_size = 1000000;
-                     PRAGMA temp_store = memory;
-                     PRAGMA mmap_size = 268435456;
-                     PRAGMA busy_timeout = 30000;",
+                 PRAGMA cache_size = -64000;
+                 PRAGMA temp_store = memory;
+                 PRAGMA mmap_size = 536870912;
+                 PRAGMA journal_mode = WAL;
+                 PRAGMA wal_autocheckpoint = 1000;
+                 PRAGMA busy_timeout = 5000;
+                 PRAGMA optimize;",
             )?;
 
             // 检查并设置 WAL 模式 - 使用 query 而不是 execute
@@ -44,15 +47,16 @@ impl SqliteStorage {
         });
 
         let pool = Pool::builder()
-            .max_size(15)
-            .min_idle(Some(5))
-            .connection_timeout(std::time::Duration::from_secs(30))
+            .max_size(20)
+            .min_idle(Some(8))
+            .max_lifetime(Some(std::time::Duration::from_secs(1800)))
+            .connection_timeout(std::time::Duration::from_secs(10))
             .build(manager)
             .map_err(|e| ShortlinkerError::database_connection(format!("无法创建连接池: {}", e)))?;
 
         let cache = Cache::builder()
-            .max_capacity(1000) // 设置缓存容量
-            .time_to_live(std::time::Duration::from_secs(60 * 10))
+            .max_capacity(10000) // 设置缓存容量
+            .time_to_live(std::time::Duration::from_secs(60 * 15))
             .time_to_idle(std::time::Duration::from_secs(60 * 5))
             .build();
 
