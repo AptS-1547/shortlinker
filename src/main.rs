@@ -1,5 +1,6 @@
 use actix_web::{middleware::from_fn, web, App, HttpServer};
 use dotenv::dotenv;
+use core::num;
 use std::env;
 use tracing::{debug, warn};
 
@@ -102,6 +103,13 @@ async fn main() -> std::io::Result<()> {
         warn!("Health API available at: {}", health_prefix);
     }
 
+    let cpu_count = env::var("CPU_COUNT")
+        .unwrap_or_else(|_| num_cpus::get().to_string())
+        .parse::<usize>()
+        .unwrap_or_else(|_| num_cpus::get());
+
+    warn!("Using {} CPU cores for the server", cpu_count);
+
     // Start the HTTP server
     let server = HttpServer::new(move || {
         App::new()
@@ -140,11 +148,11 @@ async fn main() -> std::io::Result<()> {
             if std::path::Path::new(socket_path).exists() {
                 std::fs::remove_file(socket_path)?;
             }
-            server.bind_uds(socket_path)?.run().await?;
+            server.bind_uds(socket_path)?.workers(cpu_count).run().await?;
         } else {
             let bind_address = format!("{}:{}", config.server_host, config.server_port);
             warn!("Starting server at http://{}", bind_address);
-            server.bind(bind_address)?.run().await?;
+            server.bind(bind_address)?.workers(cpu_count).run().await?;
         }
     }
 

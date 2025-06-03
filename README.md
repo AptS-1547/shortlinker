@@ -172,6 +172,7 @@ Configure using environment variables or `.env` file:
 | `SERVER_HOST` | `127.0.0.1` | Listen address |
 | `SERVER_PORT` | `8080` | Listen port |
 | `UNIX_SOCKET` | *(empty)* | Unix socket path (overrides HOST/PORT) |
+| `CPU_COUNT` | *(auto)* | Worker thread count (defaults to CPU cores) |
 | `STORAGE_BACKEND` | `sqlite` | Storage type (sqlite/file) |
 | `DB_FILE_NAME` | `links.db` | Database file path |
 | `DEFAULT_URL` | `https://esap.cc/repo` | Default redirect URL |
@@ -186,6 +187,7 @@ Configure using environment variables or `.env` file:
 # Server - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+CPU_COUNT=4
 
 # Server - Unix socket
 # UNIX_SOCKET=/tmp/shortlinker.sock

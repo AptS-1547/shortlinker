@@ -172,6 +172,7 @@ curl http://localhost:8080/health/live
 | `SERVER_HOST` | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | `8080` | 监听端口 |
 | `UNIX_SOCKET` | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
+| `CPU_COUNT` | *(自动)* | 工作线程数量（默认为CPU核心数） |
 | `STORAGE_BACKEND` | `sqlite` | 存储类型 (sqlite/file) |
 | `DB_FILE_NAME` | `links.db` | 数据库文件路径 |
 | `DEFAULT_URL` | `https://esap.cc/repo` | 默认跳转地址 |
@@ -186,6 +187,7 @@ curl http://localhost:8080/health/live
 # 服务器 - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+CPU_COUNT=4
 
 # 服务器 - Unix 套接字
 # UNIX_SOCKET=/tmp/shortlinker.sock

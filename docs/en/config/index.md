@@ -28,6 +28,7 @@ export SERVER_PORT=8080
 | `SERVER_HOST` | String | `127.0.0.1` | Listening address |
 | `SERVER_PORT` | Integer | `8080` | Listening port |
 | `UNIX_SOCKET` | String | *(empty)* | Unix socket path (overrides HOST/PORT) |
+| `CPU_COUNT` | Integer | *(auto)* | Worker thread count (defaults to CPU cores) |
 | `DEFAULT_URL` | String | `https://esap.cc/repo` | Root path redirect URL |
 | `RANDOM_CODE_LENGTH` | Integer | `6` | Random short code length |
 
@@ -80,6 +81,7 @@ HEALTH_TOKEN=dev_health
 # Basic configuration
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
+CPU_COUNT=8
 RUST_LOG=info
 DEFAULT_URL=https://your-domain.com
 
@@ -97,6 +99,7 @@ HEALTH_TOKEN=very_secure_health_token_789
 # Server configuration - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+CPU_COUNT=4
 
 # Server configuration - Unix socket
 # UNIX_SOCKET=/tmp/shortlinker.sock

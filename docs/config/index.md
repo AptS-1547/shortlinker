@@ -28,6 +28,7 @@ export SERVER_PORT=8080
 | `SERVER_HOST` | String | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | Integer | `8080` | 监听端口 |
 | `UNIX_SOCKET` | String | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
+| `CPU_COUNT` | Integer | *(自动)* | 工作线程数量（默认为CPU核心数） |
 | `DEFAULT_URL` | String | `https://esap.cc/repo` | 根路径重定向地址 |
 | `RANDOM_CODE_LENGTH` | Integer | `6` | 随机短码长度 |
 
@@ -80,6 +81,7 @@ HEALTH_TOKEN=dev_health
 # 基础配置
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
+CPU_COUNT=8
 RUST_LOG=info
 DEFAULT_URL=https://your-domain.com
 
@@ -97,6 +99,7 @@ HEALTH_TOKEN=very_secure_health_token_789
 # 服务器配置 - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+CPU_COUNT=4
 
 # 服务器配置 - Unix 套接字
 # UNIX_SOCKET=/tmp/shortlinker.sock

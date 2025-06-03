@@ -122,6 +122,8 @@ DB_FILE_NAME=/data/links.db
 - **File Storage**: Mutually exclusive access
 - **Sled**: Multiple readers and writers
 
+> 💡 **Performance Tip**: Adjust worker thread count via `CPU_COUNT` environment variable to optimize concurrent processing. Recommended to set equal to or slightly less than CPU core count.
+
 ## Version Migration
 
 ### Upgrading from v0.0.x to v0.1.0+
