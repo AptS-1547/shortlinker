@@ -1,5 +1,4 @@
 use actix_web::{web, HttpResponse, Responder};
-use tracing_subscriber::field::debug;
 use std::env;
 use std::sync::Arc;
 use std::sync::OnceLock;
