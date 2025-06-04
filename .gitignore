@@ -23,5 +23,7 @@ target/
 .DS_Store
 
 links.db*
+links.json
 shortlinker.pid
 cargo-flamegraph.trace/
+flamegraph.svg
