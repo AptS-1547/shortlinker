@@ -18,7 +18,7 @@ impl AuthMiddleware {
         req: ServiceRequest,
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
-        // 在每次请求时重新读取环境变量，而不是在启动时缓存
+        // 在第一次调用时从环境变量中获取 ADMIN_TOKEN
         let admin_token = ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
 
         // 如果 token 为空，认为 Admin API 被禁用

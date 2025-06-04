@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use tracing::{debug, error, info};
 
 use crate::storages::{ShortLink, Storage};
@@ -28,6 +29,8 @@ pub struct PostNewLink {
     pub target: String,
     pub expires_at: Option<String>,
 }
+
+static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
 
 pub struct AdminService;
 
@@ -71,10 +74,12 @@ impl AdminService {
         // 检查是否提供了有效的 code，如果没有随机生成
         if link.code.is_none() || link.code.as_ref().unwrap().is_empty() {
             debug!("Admin API: 未提供 code，随机生成新的短链接代码");
-            let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
-                .unwrap_or_else(|_| "6".to_string())
-                .parse()
-                .unwrap_or(6);
+            let random_code_length = *RANDOM_CODE_LENGTH.get_or_init(|| {
+                env::var("RANDOM_CODE_LENGTH")
+                    .unwrap_or_else(|_| "6".to_string())
+                    .parse::<usize>()
+                    .unwrap_or(6)
+            });
             let random_code = generate_random_code(random_code_length);
             link.code = Some(random_code);
         } else {
