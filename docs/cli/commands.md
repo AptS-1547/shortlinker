@@ -62,6 +62,30 @@
 ./shortlinker list
 ```
 
+### start - 后台启动服务器
+
+```bash
+./shortlinker start
+```
+
+### stop - 停止服务器
+
+```bash
+./shortlinker stop
+```
+
+### restart - 重启服务器
+
+```bash
+./shortlinker restart
+```
+
+### help - 查看帮助
+
+```bash
+./shortlinker help
+```
+
 ### update - 更新短链接
 
 ```bash

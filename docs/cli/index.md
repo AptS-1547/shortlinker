@@ -20,6 +20,10 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 
 | 命令 | 功能 | 示例 |
 |------|------|------|
+| `help` | 查看帮助 | `./shortlinker help` |
+| `start` | 启动服务器 | `./shortlinker start` |
+| `stop` | 停止服务器 | `./shortlinker stop` |
+| `restart` | 重启服务器 | `./shortlinker restart` |
 | `add` | 添加短链接 | `./shortlinker add github https://github.com` |
 | `remove` | 删除短链接 | `./shortlinker remove github` |
 | `update` | 更新短链接 | `./shortlinker update github https://new-url.com` |
