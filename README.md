@@ -17,15 +17,16 @@
 
 ## 🚀 Benchmark (v0.1.6)
 
-**Environment**  
-- OS: Linux  
-- CPU: Single-core @ 12500-class  
+**Environment**
+
+- OS: Linux
+- CPU: Single-core @ 12500-class
 - Tool: [`wrk`](https://github.com/wg/wrk)
 
-| Type         | Scenario                        | QPS Peak   | Cache Hit | Bloom Filter | DB Access |
-|--------------|----------------------------------|------------|-----------|---------------|-----------|
-| Cache Hit    | Hot shortlink (repeated access) | **720,000** | ✅ Yes    | ✅ Yes        | ❌ No     |
-| Cache Miss   | Cold shortlink (random access)  | **590,000** | ❌ No     | ✅ Yes        | ✅ Yes     |
+| Type       | Scenario                        | QPS Peak          | Cache Hit | Bloom Filter | DB Access |
+| ---------- | ------------------------------- | ----------------- | --------- | ------------ | --------- |
+| Cache Hit  | Hot shortlink (repeated access) | **712,855.19** | ✅ Yes    | ✅ Yes       | ❌ No     |
+| Cache Miss | Cold shortlink (random access)  | **598,176.38** | ❌ No     | ✅ Yes       | ✅ Yes    |
 
 > 💡 Even under cache miss, the system sustains nearly 600k QPS — demonstrating excellent performance with SQLite, `actix-web`, and async caching.
 
@@ -166,12 +167,14 @@ curl http://localhost:8080/health/live
 ## Time Format Support (v0.1.1+)
 
 ### Relative Time (Recommended)
+
 ```bash
 1s, 5m, 2h, 1d, 1w, 1M, 1y    # Single units
 1d2h30m                        # Combined format
 ```
 
 ### RFC3339 Format
+
 ```bash
 2024-12-31T23:59:59Z           # UTC time
 2024-12-31T23:59:59+08:00      # With timezone
@@ -181,19 +184,19 @@ curl http://localhost:8080/health/live
 
 Configure using environment variables or `.env` file:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SERVER_HOST` | `127.0.0.1` | Listen address |
-| `SERVER_PORT` | `8080` | Listen port |
-| `UNIX_SOCKET` | *(empty)* | Unix socket path (overrides HOST/PORT) |
-| `CPU_COUNT` | *(auto)* | Worker thread count (defaults to CPU cores) |
-| `STORAGE_BACKEND` | `sqlite` | Storage type (sqlite/file) |
-| `DB_FILE_NAME` | `links.db` | Database file path |
-| `DEFAULT_URL` | `https://esap.cc/repo` | Default redirect URL |
-| `RANDOM_CODE_LENGTH` | `6` | Random code length |
-| `ADMIN_TOKEN` | *(empty)* | Admin API token |
-| `HEALTH_TOKEN` | *(empty)* | Health API token |
-| `RUST_LOG` | `info` | Log level |
+| Variable               | Default                  | Description                                 |
+| ---------------------- | ------------------------ | ------------------------------------------- |
+| `SERVER_HOST`        | `127.0.0.1`            | Listen address                              |
+| `SERVER_PORT`        | `8080`                 | Listen port                                 |
+| `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
+| `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
+| `STORAGE_BACKEND`    | `sqlite`               | Storage type (sqlite/file)                  |
+| `DB_FILE_NAME`       | `links.db`             | Database file path                          |
+| `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
+| `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
+| `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
+| `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
+| `RUST_LOG`           | `info`                 | Log level                                   |
 
 ### .env Example
 
