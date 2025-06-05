@@ -22,17 +22,21 @@ jobs:
         include:
           # Linux musl 静态编译 (排除 ARM64)
           - target: x86_64-unknown-linux-musl
-            name: shortlinker-linux-x86_64
+            name: linux_x86_64
             packages: musl-tools
           - target: i686-unknown-linux-musl
-            name: shortlinker-linux-i686
+            name: linux_i686
             packages: musl-tools gcc-multilib
           # Windows
           - target: x86_64-pc-windows-gnu
-            name: shortlinker-windows-x86_64.exe
+            name: windows_x86_64.exe
             packages: gcc-mingw-w64-x86-64
 
     steps:
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - uses: actions/checkout@v4
 
     - name: Install Rust
@@ -84,21 +88,25 @@ jobs:
     - name: Rename binary
       run: |
         if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
-          mv target/${{ matrix.target }}/release/shortlinker.exe ${{ matrix.name }}
+          mv target/${{ matrix.target }}/release/shortlinker.exe shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
         else
-          mv target/${{ matrix.target }}/release/shortlinker ${{ matrix.name }}
+          mv target/${{ matrix.target }}/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
         fi
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}
-        path: ${{ matrix.name }}
+        name: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
+        path: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
 
   build-arm64:
     name: Build ARM64 Linux
     runs-on: ubuntu-latest
     steps:
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - uses: actions/checkout@v4
 
     - name: Install Rust
@@ -127,13 +135,13 @@ jobs:
       run: cargo build --release --target aarch64-unknown-linux-gnu
 
     - name: Rename binary
-      run: mv target/aarch64-unknown-linux-gnu/release/shortlinker shortlinker-linux-aarch64
+      run: mv target/aarch64-unknown-linux-gnu/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: shortlinker-linux-aarch64
-        path: shortlinker-linux-aarch64
+        name: shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
+        path: shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
 
   build-macos:
     name: Build macOS
@@ -142,11 +150,15 @@ jobs:
       matrix:
         include:
           - target: x86_64-apple-darwin
-            name: shortlinker-macos-x86_64
+            name: macos_x86_64
           - target: aarch64-apple-darwin
-            name: shortlinker-macos-aarch64
+            name: macos_aarch64
 
     steps:
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - uses: actions/checkout@v4
 
     - name: Install Rust
@@ -166,13 +178,13 @@ jobs:
       run: cargo build --release --target ${{ matrix.target }}
 
     - name: Rename binary
-      run: mv target/${{ matrix.target }}/release/shortlinker ${{ matrix.name }}
+      run: mv target/${{ matrix.target }}/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}
-        path: ${{ matrix.name }}
+        name: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
+        path: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
 
   release:
     name: Create Release
@@ -350,19 +362,19 @@ jobs:
           <td>
           
           **x86_64** (Intel/AMD 64位)  
-          📥 [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-x86_64)
+          📥 [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_x86_64)
           
           **ARM64** (树莓派4/服务器)  
-          📥 [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-aarch64)
+          📥 [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_aarch64)
           
           **i686** (32位老设备)  
-          📥 [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-linux-i686)
+          📥 [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_i686)
           
           </td>
           <td>
           
           **x86_64** (64位 Windows)  
-          📥 [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-windows-x86_64.exe)
+          📥 [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_windows_x86_64.exe)
           
           <br><br><br><br>
           
@@ -370,10 +382,10 @@ jobs:
           <td>
           
           **Intel** (Intel Mac)  
-          📥 [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-x86_64)
+          📥 [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_macos_x86_64)
           
           **Apple Silicon** (M1/M2/M3)  
-          📥 [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-macos-aarch64)
+          📥 [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_macos_aarch64)
           
           <br><br>
           
