@@ -4,18 +4,17 @@
 
 ## 功能特性
 
-- 🎨 **现代化界面** - 基于 Vue 3 + TailwindUI 的响应式设计
-- 🔐 **安全认证** - Bearer Token 认证，与后端 Admin API 无缝集成
+- 🎨 **现代化界面** - 基于 Next.js + TailwindUI 的响应式设计
+- 🔐 **安全认证** - Token 以 HttpOnly Cookie 存储，更安全地访问 Admin API
 - 📊 **完整管理** - 支持短链接的增删改查操作
 - ⚡ **实时更新** - 操作后自动刷新数据
 - 🕐 **过期管理** - 可视化过期时间设置和显示
 
 ## 技术栈
 
-- **前端框架**: Vue 3 + TypeScript
-- **UI 组件**: TailwindUI + Headless UI
-- **状态管理**: Pinia
-- **构建工具**: Vite
+- **前端框架**: Next.js + TypeScript
+- **UI 组件**: TailwindUI + React
+- **构建工具**: Vite / Next.js
 - **包管理**: Yarn
 
 ## 开发状态

@@ -4,18 +4,17 @@ A modern web management interface for managing [Shortlinker](../README.md) short
 
 ## Features
 
-- 🎨 **Modern Interface** - Responsive design based on Vue 3 + TailwindUI
-- 🔐 **Secure Authentication** - Bearer Token authentication with seamless Admin API integration
+- 🎨 **Modern Interface** - Responsive design based on Next.js + TailwindUI
+- 🔐 **Secure Authentication** - Token stored in an HttpOnly cookie for safer Admin API access
 - 📊 **Complete Management** - Support for CRUD operations on short links
 - ⚡ **Real-time Updates** - Automatic data refresh after operations
 - 🕐 **Expiration Management** - Visual expiration time setting and display
 
 ## Tech Stack
 
-- **Frontend Framework**: Vue 3 + TypeScript
-- **UI Components**: TailwindUI + Headless UI
-- **State Management**: Pinia
-- **Build Tool**: Vite
+- **Frontend Framework**: Next.js + TypeScript
+- **UI Components**: TailwindUI + React
+- **Build Tool**: Vite / Next.js
 - **Package Manager**: Yarn
 
 ## Development Status

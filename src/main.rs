@@ -127,14 +127,19 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope(&admin_prefix)
-                    .wrap(from_fn(AuthMiddleware::admin_auth))
-                    .route("/link", web::get().to(AdminService::get_all_links))
-                    .route("/link", web::head().to(AdminService::get_all_links))
-                    .route("/link", web::post().to(AdminService::post_link))
-                    .route("/link/{code}", web::get().to(AdminService::get_link))
-                    .route("/link/{code}", web::head().to(AdminService::get_link))
-                    .route("/link/{code}", web::delete().to(AdminService::delete_link))
-                    .route("/link/{code}", web::put().to(AdminService::update_link)),
+                    .route("/login", web::post().to(AdminService::login))
+                    .route("/logout", web::post().to(AdminService::logout))
+                    .service(
+                        web::scope("")
+                            .wrap(from_fn(AuthMiddleware::admin_auth))
+                            .route("/link", web::get().to(AdminService::get_all_links))
+                            .route("/link", web::head().to(AdminService::get_all_links))
+                            .route("/link", web::post().to(AdminService::post_link))
+                            .route("/link/{code}", web::get().to(AdminService::get_link))
+                            .route("/link/{code}", web::head().to(AdminService::get_link))
+                            .route("/link/{code}", web::delete().to(AdminService::delete_link))
+                            .route("/link/{code}", web::put().to(AdminService::update_link)),
+                    )
             )
             .service(
                 web::scope(&health_prefix)
