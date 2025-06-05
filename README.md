@@ -15,6 +15,20 @@
 
 </div>
 
+## 🚀 Benchmark (v0.1.6)
+
+**Environment**  
+- OS: Linux  
+- CPU: Single-core @ 12500-class  
+- Tool: [`wrk`](https://github.com/wg/wrk)
+
+| Type         | Scenario                        | QPS Peak   | Cache Hit | Bloom Filter | DB Access |
+|--------------|----------------------------------|------------|-----------|---------------|-----------|
+| Cache Hit    | Hot shortlink (repeated access) | **720,000** | ✅ Yes    | ✅ Yes        | ❌ No     |
+| Cache Miss   | Cold shortlink (random access)  | **590,000** | ❌ No     | ✅ Yes        | ✅ Yes     |
+
+> 💡 Even under cache miss, the system sustains nearly 600k QPS — demonstrating excellent performance with SQLite, `actix-web`, and async caching.
+
 ## ✨ Features
 
 * 🚀 **High Performance**: Built with Rust + Actix-web
