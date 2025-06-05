@@ -65,7 +65,10 @@ impl AdminService {
         query: web::Query<GetLinksQuery>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: request to list all links with filters: {:?}", query);
+        info!(
+            "Admin API: request to list all links with filters: {:?}",
+            query
+        );
 
         let all_links = storage.load_all().await;
         info!("Admin API: retrieved {} total links", all_links.len());
@@ -94,7 +97,7 @@ impl AdminService {
                 }
 
                 // 过期状态过滤
-                let is_expired = link.expires_at.map_or(false, |exp| exp < now);
+                let is_expired = link.expires_at.is_some_and(|exp| exp < now);
 
                 if query.only_expired == Some(true) && !is_expired {
                     return false;
@@ -114,7 +117,7 @@ impl AdminService {
         let total = filtered_links.len();
         let page = query.page.unwrap_or(1).max(1);
         let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
-        let total_pages = (total + page_size - 1) / page_size;
+        let total_pages = total.div_ceil(page_size);
 
         // 分页
         let start = (page - 1) * page_size;
@@ -222,7 +225,10 @@ impl AdminService {
                     })
             }
             Err(e) => {
-                error!("Admin API: failed to create link - {}: {}", new_link.code, e);
+                error!(
+                    "Admin API: failed to create link - {}: {}",
+                    new_link.code, e
+                );
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {

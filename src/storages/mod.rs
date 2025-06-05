@@ -46,13 +46,13 @@ pub mod sqlite;
 pub struct StorageFactory;
 
 impl StorageFactory {
-    pub fn create() -> Result<Arc<dyn Storage>> {
+    pub async fn create() -> Result<Arc<dyn Storage>> {
         let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
 
         let boxed: Box<dyn Storage> = match backend.as_str() {
-            "sled" => Box::new(sled::SledStorage::new()?),
-            "file" => Box::new(file::FileStorage::new()?),
-            _ => Box::new(sqlite::SqliteStorage::new()?),
+            "sled" => Box::new(sled::SledStorage::new_async().await?),
+            "file" => Box::new(file::FileStorage::new_async().await?),
+            _ => Box::new(sqlite::SqliteStorage::new_async().await?),
         };
 
         Ok(Arc::from(boxed))

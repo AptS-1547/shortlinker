@@ -18,7 +18,6 @@ impl AuthMiddleware {
         req: ServiceRequest,
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
-
         if req.method() == actix_web::http::Method::OPTIONS {
             // 对于 OPTIONS 请求，直接返回 204 No Content
             return Ok(req.into_response(

@@ -8,7 +8,7 @@ use crate::storages::Storage;
 
 static DEFAULT_URL: OnceLock<String> = OnceLock::new();
 
-pub struct RedirectService;
+pub struct RedirectService {}
 
 impl RedirectService {
     pub async fn handle_redirect(
@@ -38,7 +38,7 @@ impl RedirectService {
                     if expires_at < chrono::Utc::now() {
                         return HttpResponse::NotFound()
                             .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                            .insert_header(("Cache-Control", "no-cache"))
+                            .insert_header(("Cache-Control", "public, max-age=60"))
                             .body("Not Found");
                     }
                 }
@@ -53,7 +53,7 @@ impl RedirectService {
 
                 HttpResponse::TemporaryRedirect()
                     .insert_header(("Location", link.target))
-                    .insert_header(("Cache-Control", "no-cache"))
+                    .insert_header(("Cache-Control", "public, max-age=60"))
                     .finish()
             }
             None => {

@@ -43,7 +43,7 @@ pub async fn run_cli() {
 }
 
 async fn run_cli_inner() -> Result<(), CliError> {
-    let storage = StorageFactory::create().map_err(|e| CliError::StorageError(e.to_string()))?;
+    let storage = StorageFactory::create().await.map_err(|e| CliError::StorageError(e.to_string()))?;
     let parser = CliParser::new();
     let command = parser.parse()?;
     command.execute(storage).await

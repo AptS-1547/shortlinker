@@ -46,6 +46,7 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Server Mode
+    env::set_var("CLI_MODE", "false");
 
     // Initialize tracing subscriber
     let stdout_log = std::io::stdout();
@@ -75,7 +76,9 @@ async fn main() -> std::io::Result<()> {
     init_lockfile()?;
 
     // 检查存储后端
-    let storage = StorageFactory::create().expect("Failed to create storage");
+    let storage = StorageFactory::create()
+        .await
+        .expect("Failed to create storage backend");
     warn!(
         "Using storage backend: {}",
         storage.get_backend_name().await

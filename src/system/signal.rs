@@ -13,8 +13,9 @@ pub fn notify_server() -> Result<()> {
                 .trim()
                 .parse()
                 .map_err(|e| ShortlinkerError::validation(format!("Invalid PID format: {}", e)))?;
-            signal::kill(Pid::from_raw(pid), Signal::SIGUSR1)
-                .map_err(|e| ShortlinkerError::signal_operation(format!("Failed to send signal: {}", e)))?;
+            signal::kill(Pid::from_raw(pid), Signal::SIGUSR1).map_err(|e| {
+                ShortlinkerError::signal_operation(format!("Failed to send signal: {}", e))
+            })?;
             println!("Server reload notified");
             Ok(())
         }

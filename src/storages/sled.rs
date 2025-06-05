@@ -7,7 +7,7 @@ use async_trait::async_trait;
 pub struct SledStorage;
 
 impl SledStorage {
-    pub fn new() -> Result<Self> {
+    pub async fn new_async() -> Result<Self> {
         Ok(SledStorage)
     }
 }
@@ -60,7 +60,7 @@ impl Storage for SledStorage {
         "sled".to_string()
     }
 
-    async fn increment_click(&self, code: &str) -> Result<()> {
+    async fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
     }
 }

@@ -64,7 +64,10 @@ pub fn init_lockfile() -> Result<(), std::io::Error> {
     // Check if lock file already exists
     if Path::new(lock_file).exists() {
         error!("Server already running, stop it first");
-        error!("If the server is not running, delete the lock file: {}", lock_file);
+        error!(
+            "If the server is not running, delete the lock file: {}",
+            lock_file
+        );
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
             "Server is already running",
