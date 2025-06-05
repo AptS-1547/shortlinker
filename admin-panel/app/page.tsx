@@ -133,3 +133,8 @@ export default function AdminPage() {
     </div>
   );
 }
+
+// 添加这个函数使页面在构建时静态生成
+export async function generateStaticParams() {
+  return [];
+}
