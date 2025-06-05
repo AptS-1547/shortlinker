@@ -2,7 +2,7 @@ use actix_web::middleware::Next;
 use actix_web::{
     body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
-    Error, HttpResponse,
+    Error, HttpResponse, HttpMessage,
 };
 use std::env;
 use std::sync::OnceLock;
@@ -34,9 +34,17 @@ impl AuthMiddleware {
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
                 if auth_bytes == admin_token.as_bytes() {
-                    debug!("Admin API authentication succeeded");
+                    debug!("Admin API authentication succeeded via header");
                     return next.call(req).await;
                 }
+            }
+        }
+
+        // 检查 Cookie
+        if let Some(cookie) = req.cookie("token") {
+            if cookie.value().as_bytes() == admin_token.as_bytes() {
+                debug!("Admin API authentication succeeded via cookie");
+                return next.call(req).await;
             }
         }
 
