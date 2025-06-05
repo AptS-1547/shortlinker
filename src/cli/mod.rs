@@ -37,7 +37,7 @@ impl From<crate::errors::ShortlinkerError> for CliError {
 
 pub async fn run_cli() {
     if let Err(e) = run_cli_inner().await {
-        println!("{} {}", "错误:".bold().red(), e);
+        println!("{} {}", "Error:".bold().red(), e);
         process::exit(1);
     }
 }

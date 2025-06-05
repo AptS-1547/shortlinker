@@ -12,14 +12,14 @@ pub fn notify_server() -> Result<()> {
             let pid: i32 = pid_str
                 .trim()
                 .parse()
-                .map_err(|e| ShortlinkerError::validation(format!("PID格式无效: {}", e)))?;
+                .map_err(|e| ShortlinkerError::validation(format!("Invalid PID format: {}", e)))?;
             signal::kill(Pid::from_raw(pid), Signal::SIGUSR1)
-                .map_err(|e| ShortlinkerError::signal_operation(format!("发送信号失败: {}", e)))?;
-            println!("已通知服务器重新加载配置");
+                .map_err(|e| ShortlinkerError::signal_operation(format!("Failed to send signal: {}", e)))?;
+            println!("Server reload notified");
             Ok(())
         }
         Err(_) => {
-            println!("警告: 无法找到服务器进程，请手动重启服务器");
+            println!("Warning: server process not found, please restart manually");
             Ok(())
         }
     }
@@ -27,16 +27,16 @@ pub fn notify_server() -> Result<()> {
 
 #[cfg(windows)]
 pub fn notify_server() -> Result<()> {
-    // Windows平台使用触发文件方式
+    // On Windows use a trigger file
     match fs::write("shortlinker.reload", "") {
         Ok(_) => {
-            println!("已通知服务器重新加载配置");
+            println!("Server reload notified");
             Ok(())
         }
         Err(e) => {
-            println!("通知服务器失败: {}", e);
+            println!("Failed to notify server: {}", e);
             Err(ShortlinkerError::file_operation(format!(
-                "通知服务器失败: {}",
+                "Failed to notify server: {}",
                 e
             )))
         }

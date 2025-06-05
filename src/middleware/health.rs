@@ -36,13 +36,13 @@ impl HealthMiddleware {
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
                 if auth_bytes == health_token.as_bytes() {
-                    debug!("Health API 鉴权成功");
+                    debug!("Health API authentication succeeded");
                     return next.call(req).await;
                 }
             }
         }
 
-        info!("Health API 鉴权失败: token不匹配或缺少Authorization header");
+        info!("Health API authentication failed: token mismatch or missing Authorization header");
         Ok(req.into_response(
             HttpResponse::Unauthorized()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))

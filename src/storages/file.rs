@@ -23,13 +23,13 @@ impl FileStorage {
             cache: DashMap::new(),
         };
 
-        // 初始化时加载数据到缓存
+        // Load data into cache during initialization
         let links = storage.load_from_file()?;
         for (code, link) in links {
             storage.cache.insert(code, link);
         }
         info!(
-            "FileStorage 初始化完成，已加载 {} 个短链接",
+            "FileStorage initialized with {} short links",
             storage.cache.len()
         );
 
@@ -62,27 +62,27 @@ impl FileStorage {
                             },
                         );
                     }
-                    info!("已加载 {} 个短链接", map.len());
+                    info!("Loaded {} short links", map.len());
                     Ok(map)
                 }
                 Err(e) => {
-                    error!("解析链接文件失败: {}", e);
+                    error!("Failed to parse link file: {}", e);
                     Err(ShortlinkerError::serialization(format!(
-                        "解析链接文件失败: {}",
+                        "Failed to parse link file: {}",
                         e
                     )))
                 }
             },
             Err(_) => {
-                info!("链接文件不存在，创建空的存储");
+                info!("Link file not found, creating empty storage");
                 if let Err(e) = fs::write(&self.file_path, "[]") {
-                    error!("创建链接文件失败: {}", e);
+                    error!("Failed to create link file: {}", e);
                     return Err(ShortlinkerError::file_operation(format!(
-                        "创建链接文件失败: {}",
+                        "Failed to create link file: {}",
                         e
                     )));
                 }
-                info!("已创建空的链接文件: {}", self.file_path);
+                info!("Created empty link file: {}", self.file_path);
                 Ok(HashMap::new())
             }
         }
@@ -175,11 +175,11 @@ impl Storage for FileStorage {
                 for (code, link) in new_links {
                     self.cache.insert(code, link);
                 }
-                info!("缓存重载完成");
+                info!("Cache reloaded");
                 Ok(())
             }
             Err(e) => {
-                error!("重载失败: {}", e);
+                error!("Reload failed: {}", e);
                 Err(e)
             }
         }

@@ -62,10 +62,10 @@ impl SqliteStorage {
 
         let storage = SqliteStorage { pool, cache };
 
-        // 初始化数据库表
+        // Initialize database tables
         storage.init_db()?;
 
-        warn!("SqliteStorage 初始化完成，数据库路径: {}", db_path);
+        warn!("SqliteStorage initialized, database path: {}", db_path);
         Ok(storage)
     }
 
@@ -141,11 +141,11 @@ impl Storage for SqliteStorage {
             return Some(link);
         }
 
-        // 缓存未命中，从数据库查询
+        // Cache miss, query database
         let conn = match self.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
-                error!("获取数据库连接失败: {}", e);
+                error!("Failed to get database connection: {}", e);
                 return None;
             }
         };
@@ -177,23 +177,23 @@ impl Storage for SqliteStorage {
                     expires_at,
                 ) {
                     Ok(link) => {
-                        // 将查询结果放入缓存
+                        // Store result into cache
                         cache.insert(short_code, link.clone()).await;
                         Some(link)
                     }
                     Err(e) => {
-                        error!("解析短链接数据失败: {}", e);
+                        error!("Failed to parse short link data: {}", e);
                         None
                     }
                 }
             }
             Ok(Err(rusqlite::Error::QueryReturnedNoRows)) => None,
             Ok(Err(e)) => {
-                error!("查询短链接失败: {}", e);
+                error!("Query short link failed: {}", e);
                 None
             }
             Err(e) => {
-                error!("执行异步查询失败: {:?}", e);
+                error!("Async query failed: {:?}", e);
                 None
             }
         }
@@ -203,7 +203,7 @@ impl Storage for SqliteStorage {
         let conn = match self.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
-                error!("获取数据库连接失败: {}", e);
+                error!("Failed to get database connection: {}", e);
                 return HashMap::new();
             }
         };
@@ -215,7 +215,7 @@ impl Storage for SqliteStorage {
         {
             Ok(stmt) => stmt,
             Err(e) => {
-                error!("准备查询语句失败: {}", e);
+                error!("Failed to prepare query statement: {}", e);
                 return links;
             }
         };
@@ -230,7 +230,7 @@ impl Storage for SqliteStorage {
         }) {
             Ok(rows) => rows,
             Err(e) => {
-                error!("查询所有短链接失败: {}", e);
+                error!("Failed to query all short links: {}", e);
                 return links;
             }
         };
@@ -248,17 +248,17 @@ impl Storage for SqliteStorage {
                             links.insert(short_code, link);
                         }
                         Err(e) => {
-                            error!("解析短链接数据失败: {}", e);
+                            error!("Failed to parse short link data: {}", e);
                         }
                     }
                 }
                 Err(e) => {
-                    error!("读取行数据失败: {}", e);
+                    error!("Failed to read row data: {}", e);
                 }
             }
         }
 
-        info!("已加载 {} 个短链接", links.len());
+        info!("Loaded {} short links", links.len());
         links
     }
 
@@ -304,7 +304,7 @@ impl Storage for SqliteStorage {
                         ShortlinkerError::database_operation(format!("更新短链接失败: {}", e))
                     })
                     .map(|_| {
-                        info!("短链接已更新: {}", link_clone.code);
+                        info!("Short link updated: {}", link_clone.code);
                     })
             } else {
                 transaction
@@ -317,7 +317,7 @@ impl Storage for SqliteStorage {
                         ShortlinkerError::database_operation(format!("插入短链接失败: {}", e))
                     })
                     .map(|_| {
-                        info!("短链接已创建: {}", link_clone.code);
+                        info!("Short link created: {}", link_clone.code);
                     })
             };
 
@@ -389,7 +389,7 @@ impl Storage for SqliteStorage {
                 ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
             })?;
 
-            info!("短链接已删除: {}", code);
+            info!("Short link deleted: {}", code);
             Ok(code)
         })
         .await;
@@ -409,9 +409,9 @@ impl Storage for SqliteStorage {
     }
 
     async fn reload(&self) -> Result<()> {
-        // 清空缓存，强制重新从数据库加载
+        // Clear cache to force reload from database
         self.cache.invalidate_all();
-        info!("SQLite 缓存已清空，数据将从数据库重新加载");
+        info!("SQLite cache cleared, data will be reloaded from database");
         Ok(())
     }
 

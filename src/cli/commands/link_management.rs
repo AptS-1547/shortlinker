@@ -13,9 +13,9 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
     let links = storage.load_all().await;
 
     if links.is_empty() {
-        println!("{} 没有短链接", "ℹ".bold().blue());
+        println!("{} No short links found", "ℹ".bold().blue());
     } else {
-        println!("{}", "短链接列表:".bold().green());
+        println!("{}", "Short link list:".bold().green());
         println!();
         for (short_code, link) in &links {
             if let Some(expires_at) = link.expires_at {
@@ -23,7 +23,7 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
                     "  {} -> {} {}",
                     short_code.cyan(),
                     link.target.blue().underline(),
-                    format!("(过期: {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC"))
+                    format!("(expires: {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC"))
                         .dimmed()
                         .yellow()
                 );
@@ -37,7 +37,7 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
         }
         println!();
         println!(
-            "{} 共 {} 个短链接",
+            "{} Total {} short links",
             "ℹ".bold().blue(),
             links.len().to_string().green()
         );
@@ -68,7 +68,7 @@ pub async fn add_link(
         Some(code) => code,
         None => {
             let code = generate_random_code(random_code_length);
-            println!("{} 生成随机短码: {}", "ℹ".bold().blue(), code.magenta());
+            println!("{} Generated random code: {}", "ℹ".bold().blue(), code.magenta());
             code
         }
     };
@@ -79,7 +79,7 @@ pub async fn add_link(
     if links.contains_key(&final_short_code) {
         if force_overwrite {
             println!(
-                "{} 强制覆盖短码 '{}': {} -> {}",
+                "{} Force overwriting code '{}': {} -> {}",
                 "⚠".bold().yellow(),
                 final_short_code.cyan(),
                 links[&final_short_code].target.dimmed().underline(),
@@ -87,7 +87,7 @@ pub async fn add_link(
             );
         } else {
             return Err(CliError::CommandError(format!(
-                "短码 '{}' 已存在，当前指向: {}。如需覆盖，请使用 --force 参数",
+                "Code '{}' already exists and points to {}. Use --force to overwrite",
                 final_short_code, links[&final_short_code].target
             )));
         }
@@ -97,7 +97,7 @@ pub async fn add_link(
         match TimeParser::parse_expire_time(&expire) {
             Ok(dt) => {
                 println!(
-                    "{} 过期时间解析为: {}",
+                    "{} Expiration parsed as: {}",
                     "ℹ".bold().blue(),
                     dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
                 );
@@ -128,7 +128,7 @@ pub async fn add_link(
 
     if let Some(expire) = expires_at {
         println!(
-            "{} 已添加短链接: {} -> {} (过期时间: {})",
+            "{} Added short link: {} -> {} (expires: {})",
             "✓".bold().green(),
             final_short_code.cyan(),
             target_url.blue().underline(),
@@ -136,16 +136,16 @@ pub async fn add_link(
         );
     } else {
         println!(
-            "{} 已添加短链接: {} -> {}",
+            "{} Added short link: {} -> {}",
             "✓".bold().green(),
             final_short_code.cyan(),
             target_url.blue().underline()
         );
     }
 
-    // 通知服务器重载
+    // Notify server to reload
     if let Err(e) = crate::system::notify_server() {
-        println!("{} 通知服务器失败: {}", "⚠".bold().yellow(), e);
+        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
     Ok(())
@@ -166,11 +166,11 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
         .await
         .map_err(|e| CliError::CommandError(format!("删除失败: {}", e)))?;
 
-    println!("{} 已删除短链接: {}", "✓".bold().green(), short_code.cyan());
+    println!("{} Deleted short link: {}", "✓".bold().green(), short_code.cyan());
 
-    // 通知服务器重载
+    // Notify server to reload
     if let Err(e) = crate::system::notify_server() {
-        println!("{} 通知服务器失败: {}", "⚠".bold().yellow(), e);
+        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
     Ok(())
@@ -234,7 +234,7 @@ pub async fn update_link(
         .map_err(|e| CliError::CommandError(format!("更新失败: {}", e)))?;
 
     println!(
-        "{} 短链接已从 {} 更新为 {}",
+        "{} Short link updated from {} to {}",
         "✓".bold().green(),
         old_link.target.dimmed().underline(),
         target_url.blue().underline()
@@ -242,15 +242,15 @@ pub async fn update_link(
 
     if let Some(expire) = expires_at {
         println!(
-            "{} 过期时间: {}",
+            "{} Expiration: {}",
             "ℹ".bold().blue(),
             expire.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
         );
     }
 
-    // 通知服务器重载
+    // Notify server to reload
     if let Err(e) = crate::system::notify_server() {
-        println!("{} 通知服务器失败: {}", "⚠".bold().yellow(), e);
+        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
     Ok(())
@@ -263,7 +263,7 @@ pub async fn export_links(
     let links = storage.load_all().await;
 
     if links.is_empty() {
-        println!("{} 没有短链接可导出", "ℹ".bold().blue());
+        println!("{} No short links to export", "ℹ".bold().blue());
         return Ok(());
     }
 
@@ -287,15 +287,15 @@ pub async fn export_links(
     });
 
     let file = File::create(&output_path).map_err(|e| {
-        CliError::CommandError(format!("无法创建导出文件 '{}': {}", output_path, e))
+        CliError::CommandError(format!("Failed to create export file '{}': {}", output_path, e))
     })?;
 
     let writer = BufWriter::new(file);
     serde_json::to_writer_pretty(writer, &serializable_links)
-        .map_err(|e| CliError::CommandError(format!("导出JSON数据失败: {}", e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to export JSON data: {}", e)))?;
 
     println!(
-        "{} 已导出 {} 个短链接到: {}",
+        "{} Exported {} short links to: {}",
         "✓".bold().green(),
         links.len().to_string().green(),
         output_path.cyan()
@@ -309,23 +309,23 @@ pub async fn import_links(
     file_path: String,
     force_overwrite: bool,
 ) -> Result<(), CliError> {
-    // 检查文件是否存在
+    // Check if file exists
     if !Path::new(&file_path).exists() {
         return Err(CliError::CommandError(format!(
-            "导入文件不存在: {}",
+            "Import file not found: {}",
             file_path
         )));
     }
 
     let file = File::open(&file_path)
-        .map_err(|e| CliError::CommandError(format!("无法打开导入文件 '{}': {}", file_path, e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e)))?;
 
     let reader = BufReader::new(file);
     let serializable_links: Vec<SerializableShortLink> = serde_json::from_reader(reader)
-        .map_err(|e| CliError::CommandError(format!("解析JSON文件失败: {}", e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?;
 
     if serializable_links.is_empty() {
-        println!("{} 导入文件为空", "ℹ".bold().blue());
+        println!("{} Import file is empty", "ℹ".bold().blue());
         return Ok(());
     }
 
@@ -343,7 +343,7 @@ pub async fn import_links(
         // 检查短码是否已存在
         if !force_overwrite && existing_links.contains_key(&serializable_link.short_code) {
             println!(
-                "{} 跳过已存在的短码: {} (使用 --force 强制覆盖)",
+                "{} Skipping existing code: {} (use --force to overwrite)",
                 "⚠".bold().yellow(),
                 serializable_link.short_code.cyan()
             );
@@ -356,7 +356,7 @@ pub async fn import_links(
             Ok(dt) => dt.with_timezone(&chrono::Utc),
             Err(e) => {
                 println!(
-                    "{} 跳过短码 '{}': 创建时间解析失败 - {}",
+                    "{} Skipping code '{}': failed to parse created_at - {}",
                     "✗".bold().red(),
                     serializable_link.short_code.cyan(),
                     e
@@ -371,7 +371,7 @@ pub async fn import_links(
                 Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
                 Err(e) => {
                     println!(
-                        "{} 跳过短码 '{}': 过期时间解析失败 - {}",
+                        "{} Skipping code '{}': failed to parse expiration - {}",
                         "✗".bold().red(),
                         serializable_link.short_code.cyan(),
                         e
@@ -389,7 +389,7 @@ pub async fn import_links(
             && !serializable_link.target_url.starts_with("https://")
         {
             println!(
-                "{} 跳过短码 '{}': URL格式无效 - {}",
+                "{} Skipping code '{}': invalid URL - {}",
                 "✗".bold().red(),
                 serializable_link.short_code.cyan(),
                 serializable_link.target_url
@@ -409,7 +409,7 @@ pub async fn import_links(
             Ok(_) => {
                 imported_count += 1;
                 println!(
-                    "{} 已导入: {} -> {}",
+                    "{} Imported: {} -> {}",
                     "✓".bold().green(),
                     serializable_link.short_code.cyan(),
                     serializable_link.target_url.blue().underline()
@@ -417,7 +417,7 @@ pub async fn import_links(
             }
             Err(e) => {
                 println!(
-                    "{} 导入失败 '{}': {}",
+                    "{} Failed to import '{}': {}",
                     "✗".bold().red(),
                     serializable_link.short_code.cyan(),
                     e
@@ -429,17 +429,17 @@ pub async fn import_links(
 
     println!();
     println!(
-        "{} 成功 {} 个，跳过 {} 个，失败 {} 个",
-        "导入完成:".bold().green(),
+        "{} Success: {} , skipped {} , failed {}",
+        "Import finished:".bold().green(),
         imported_count.to_string().green(),
         skipped_count.to_string().yellow(),
         error_count.to_string().red()
     );
 
-    // 通知服务器重载
+    // Notify server to reload
     if imported_count > 0 {
         if let Err(e) = crate::system::notify_server() {
-            println!("{} 通知服务器失败: {}", "⚠".bold().yellow(), e);
+            println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
         }
     }
 

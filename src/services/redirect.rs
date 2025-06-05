@@ -17,7 +17,7 @@ impl RedirectService {
     ) -> impl Responder {
         let captured_path = path.into_inner();
 
-        debug!("捕获的路径: {}", captured_path);
+        debug!("Captured path: {}", captured_path);
 
         if captured_path.is_empty() {
             let default_url = DEFAULT_URL
@@ -49,7 +49,7 @@ impl RedirectService {
                     let _ = storage_clone.increment_click(&code_clone).await;
                 });
 
-                debug!("重定向 {} -> {}", captured_path, link.target);
+                debug!("Redirecting {} -> {}", captured_path, link.target);
 
                 HttpResponse::TemporaryRedirect()
                     .insert_header(("Location", link.target))
@@ -57,7 +57,7 @@ impl RedirectService {
                     .finish()
             }
             None => {
-                debug!("未找到重定向链接: {}", captured_path);
+                debug!("Redirect link not found: {}", captured_path);
                 HttpResponse::NotFound()
                     .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .insert_header(("Cache-Control", "public, max-age=60")) // 缓存404

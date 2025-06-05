@@ -39,10 +39,10 @@ impl AdminService {
         _req: HttpRequest,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: 获取所有链接请求");
+        info!("Admin API: request to list all links");
 
         let links = storage.load_all().await;
-        info!("Admin API: 成功获取 {} 个链接", links.len());
+        info!("Admin API: retrieved {} links", links.len());
 
         let serializable_links: HashMap<String, SerializableShortLink> = links
             .into_iter()
@@ -71,9 +71,9 @@ impl AdminService {
         mut link: web::Json<PostNewLink>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        // 检查是否提供了有效的 code，如果没有随机生成
+        // Check if a valid code is provided, otherwise generate one
         if link.code.is_none() || link.code.as_ref().unwrap().is_empty() {
-            debug!("Admin API: 未提供 code，随机生成新的短链接代码");
+            debug!("Admin API: no code provided, generating a new one");
             let random_code_length = *RANDOM_CODE_LENGTH.get_or_init(|| {
                 env::var("RANDOM_CODE_LENGTH")
                     .unwrap_or_else(|_| "6".to_string())
@@ -84,13 +84,13 @@ impl AdminService {
             link.code = Some(random_code);
         } else {
             info!(
-                "Admin API: 使用提供的 code: {}",
+                "Admin API: using provided code: {}",
                 link.code.as_ref().unwrap()
             );
         }
 
         info!(
-            "Admin API: 创建链接请求 - code: {}, target: {}",
+            "Admin API: create link request - code: {}, target: {}",
             link.code.as_ref().unwrap_or(&"None".to_string()),
             link.target
         );
@@ -111,7 +111,7 @@ impl AdminService {
 
         match storage.set(new_link.clone()).await {
             Ok(_) => {
-                info!("Admin API: 成功创建链接 - {}", new_link.code);
+                info!("Admin API: link created - {}", new_link.code);
                 HttpResponse::Created()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -124,7 +124,7 @@ impl AdminService {
                     })
             }
             Err(e) => {
-                error!("Admin API: 创建链接失败 - {}: {}", new_link.code, e);
+                error!("Admin API: failed to create link - {}: {}", new_link.code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -142,11 +142,11 @@ impl AdminService {
         code: web::Path<String>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: 获取链接请求 - code: {}", code);
+        info!("Admin API: get link request - code: {}", code);
 
         match storage.get(&code).await {
             Some(link) => {
-                info!("Admin API: 成功获取链接 - {}", code);
+                info!("Admin API: link retrieved - {}", code);
                 let serializable_link = SerializableShortLink {
                     short_code: link.code.clone(),
                     target_url: link.target,
@@ -161,7 +161,7 @@ impl AdminService {
                     })
             }
             None => {
-                info!("Admin API: 链接不存在 - {}", code);
+                info!("Admin API: link not found - {}", code);
                 HttpResponse::NotFound()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -177,11 +177,11 @@ impl AdminService {
         code: web::Path<String>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: 删除链接请求 - code: {}", code);
+        info!("Admin API: delete link request - code: {}", code);
 
         match storage.remove(&code).await {
             Ok(_) => {
-                info!("Admin API: 成功删除链接 - {}", code);
+                info!("Admin API: link deleted - {}", code);
                 HttpResponse::Ok()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -190,7 +190,7 @@ impl AdminService {
                     })
             }
             Err(e) => {
-                error!("Admin API: 删除链接失败 - {}: {}", code, e);
+                error!("Admin API: failed to delete link - {}: {}", code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -208,7 +208,7 @@ impl AdminService {
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
         info!(
-            "Admin API: 更新链接请求 - code: {}, target: {}",
+            "Admin API: update link request - code: {}, target: {}",
             code, link.target
         );
 
@@ -216,7 +216,7 @@ impl AdminService {
         let existing_link = match storage.get(&code).await {
             Some(link) => link,
             None => {
-                info!("Admin API: 尝试更新不存在的链接 - {}", code);
+                info!("Admin API: attempt to update nonexistent link - {}", code);
                 return HttpResponse::NotFound()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -246,7 +246,7 @@ impl AdminService {
 
         match storage.set(updated_link.clone()).await {
             Ok(_) => {
-                info!("Admin API: 成功更新链接 - {}", code);
+                info!("Admin API: link updated - {}", code);
                 HttpResponse::Ok()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -259,7 +259,7 @@ impl AdminService {
                     })
             }
             Err(e) => {
-                error!("Admin API: 更新链接失败 - {}: {}", code, e);
+                error!("Admin API: failed to update link - {}: {}", code, e);
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
