@@ -35,63 +35,6 @@ static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
 pub struct AdminService;
 
 impl AdminService {
-    pub async fn login(req: HttpRequest) -> impl Responder {
-        let admin_token = env::var("ADMIN_TOKEN").unwrap_or_default();
-        if admin_token.is_empty() {
-            return HttpResponse::Unauthorized()
-                .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: serde_json::json!({"error": "Admin API disabled"}),
-                });
-        }
-
-        let provided = req
-            .headers()
-            .get("Authorization")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.strip_prefix("Bearer "))
-            .unwrap_or("");
-
-        if provided != admin_token {
-            info!("Admin API: login failed - invalid token");
-            return HttpResponse::Unauthorized()
-                .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: serde_json::json!({"error": "Invalid token"}),
-                });
-        }
-
-        info!("Admin API: login success");
-        HttpResponse::Ok()
-            .append_header((
-                "Set-Cookie",
-                format!(
-                    "token={}; Path=/; Secure; HttpOnly; SameSite=Strict",
-                    admin_token
-                ),
-            ))
-            .append_header(("Content-Type", "application/json; charset=utf-8"))
-            .json(ApiResponse {
-                code: 0,
-                data: serde_json::json!({"message": "ok"}),
-            })
-    }
-
-    pub async fn logout(_req: HttpRequest) -> impl Responder {
-        HttpResponse::Ok()
-            .append_header((
-                "Set-Cookie",
-                "token=deleted; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
-            ))
-            .append_header(("Content-Type", "application/json; charset=utf-8"))
-            .json(ApiResponse {
-                code: 0,
-                data: serde_json::json!({"message": "logged out"}),
-            })
-    }
-
     pub async fn get_all_links(
         _req: HttpRequest,
         storage: web::Data<Arc<dyn Storage>>,

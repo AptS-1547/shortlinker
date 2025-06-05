@@ -2,7 +2,7 @@ use actix_web::middleware::Next;
 use actix_web::{
     body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
-    Error, HttpResponse, HttpMessage,
+    Error, HttpResponse,
 };
 use std::env;
 use std::sync::OnceLock;
@@ -18,6 +18,16 @@ impl AuthMiddleware {
         req: ServiceRequest,
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
+
+        if req.method() == actix_web::http::Method::OPTIONS {
+            // 对于 OPTIONS 请求，直接返回 204 No Content
+            return Ok(req.into_response(
+                HttpResponse::NoContent()
+                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
+                    .finish(),
+            ));
+        }
+
         // 在第一次调用时从环境变量中获取 ADMIN_TOKEN
         let admin_token = ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
 
@@ -34,17 +44,9 @@ impl AuthMiddleware {
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
                 if auth_bytes == admin_token.as_bytes() {
-                    debug!("Admin API authentication succeeded via header");
+                    debug!("Admin API authentication succeeded");
                     return next.call(req).await;
                 }
-            }
-        }
-
-        // 检查 Cookie
-        if let Some(cookie) = req.cookie("token") {
-            if cookie.value().as_bytes() == admin_token.as_bytes() {
-                debug!("Admin API authentication succeeded via cookie");
-                return next.call(req).await;
             }
         }
 

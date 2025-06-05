@@ -19,6 +19,16 @@ impl HealthMiddleware {
         req: ServiceRequest,
         next: Next<BoxBody>,
     ) -> Result<ServiceResponse<BoxBody>, Error> {
+
+        if req.method() == actix_web::http::Method::OPTIONS {
+            // 对于 OPTIONS 请求，直接返回 204 No Content
+            return Ok(req.into_response(
+                HttpResponse::NoContent()
+                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
+                    .finish(),
+            ));
+        }
+
         // 检查是否设置了健康检查 token
         let health_token =
             HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
