@@ -79,6 +79,30 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker list
 ```
 
+### start - Start server in background
+
+```bash
+./shortlinker start
+```
+
+### stop - Stop running server
+
+```bash
+./shortlinker stop
+```
+
+### restart - Restart server
+
+```bash
+./shortlinker restart
+```
+
+### help - Show command help
+
+```bash
+./shortlinker help
+```
+
 **Output Format**:
 ```bash
 Short links list:

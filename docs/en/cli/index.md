@@ -20,6 +20,10 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 
 | Command | Function | Example |
 |---------|----------|---------|
+| `help` | Show help | `./shortlinker help` |
+| `start` | Start server | `./shortlinker start` |
+| `stop` | Stop server | `./shortlinker stop` |
+| `restart` | Restart server | `./shortlinker restart` |
 | `add` | Add short link | `./shortlinker add github https://github.com` |
 | `remove` | Delete short link | `./shortlinker remove github` |
 | `update` | Update short link | `./shortlinker update github https://new-url.com` |
