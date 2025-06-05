@@ -20,13 +20,13 @@
 **Environment**
 
 - OS: Linux
-- CPU: Single-core @ 12500-class
+- CPU: Single-core @ 12th Gen Intel(R) Core(TM) i5-12500
 - Tool: [`wrk`](https://github.com/wg/wrk)
 
 | Type       | Scenario                        | QPS Peak          | Cache Hit | Bloom Filter | DB Access |
 | ---------- | ------------------------------- | ----------------- | --------- | ------------ | --------- |
-| Cache Hit  | Hot shortlink (repeated access) | **712,855.19** | ✅ Yes    | ✅ Yes       | ❌ No     |
-| Cache Miss | Cold shortlink (random access)  | **598,176.38** | ❌ No     | ✅ Yes       | ✅ Yes    |
+| Cache Hit  | Hot shortlink (repeated access) | **719,997.22** | ✅ Yes    | ✅ Yes       | ❌ No     |
+| Cache Miss | Cold shortlink (random access)  | **595,980.01** | ❌ No     | ✅ Yes       | ✅ Yes    |
 
 > 💡 Even under cache miss, the system sustains nearly 600k QPS — demonstrating excellent performance with SQLite, `actix-web`, and async caching.
 
