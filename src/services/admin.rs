@@ -30,6 +30,31 @@ pub struct PostNewLink {
     pub expires_at: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GetLinksQuery {
+    pub page: Option<usize>,
+    pub page_size: Option<usize>,
+    pub created_after: Option<String>,
+    pub created_before: Option<String>,
+    pub only_expired: Option<bool>,
+    pub only_active: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PaginatedResponse<T> {
+    pub code: i32,
+    pub data: T,
+    pub pagination: PaginationInfo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PaginationInfo {
+    pub page: usize,
+    pub page_size: usize,
+    pub total: usize,
+    pub total_pages: usize,
+}
+
 static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
 
 pub struct AdminService;
@@ -37,14 +62,70 @@ pub struct AdminService;
 impl AdminService {
     pub async fn get_all_links(
         _req: HttpRequest,
+        query: web::Query<GetLinksQuery>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: request to list all links");
+        info!("Admin API: request to list all links with filters: {:?}", query);
 
-        let links = storage.load_all().await;
-        info!("Admin API: retrieved {} links", links.len());
+        let all_links = storage.load_all().await;
+        info!("Admin API: retrieved {} total links", all_links.len());
 
-        let serializable_links: HashMap<String, SerializableShortLink> = links
+        let now = chrono::Utc::now();
+
+        // 过滤链接
+        let mut filtered_links: Vec<(String, ShortLink)> = all_links
+            .into_iter()
+            .filter(|(_, link)| {
+                // 时间过滤
+                if let Some(created_after) = &query.created_after {
+                    if let Ok(after_time) = chrono::DateTime::parse_from_rfc3339(created_after) {
+                        if link.created_at < after_time.with_timezone(&chrono::Utc) {
+                            return false;
+                        }
+                    }
+                }
+
+                if let Some(created_before) = &query.created_before {
+                    if let Ok(before_time) = chrono::DateTime::parse_from_rfc3339(created_before) {
+                        if link.created_at > before_time.with_timezone(&chrono::Utc) {
+                            return false;
+                        }
+                    }
+                }
+
+                // 过期状态过滤
+                let is_expired = link.expires_at.map_or(false, |exp| exp < now);
+
+                if query.only_expired == Some(true) && !is_expired {
+                    return false;
+                }
+
+                if query.only_active == Some(true) && is_expired {
+                    return false;
+                }
+
+                true
+            })
+            .collect();
+
+        // 按创建时间降序排序（最新的在前）
+        filtered_links.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
+
+        let total = filtered_links.len();
+        let page = query.page.unwrap_or(1).max(1);
+        let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
+        let total_pages = (total + page_size - 1) / page_size;
+
+        // 分页
+        let start = (page - 1) * page_size;
+        let end = (start + page_size).min(total);
+        let paginated_links = if start < total {
+            filtered_links[start..end].to_vec()
+        } else {
+            vec![]
+        };
+
+        let serializable_links: HashMap<String, SerializableShortLink> = paginated_links
             .into_iter()
             .map(|(code, link)| {
                 let created_at = link.created_at.to_rfc3339();
@@ -61,9 +142,26 @@ impl AdminService {
             })
             .collect();
 
+        info!(
+            "Admin API: returning {} links (page {} of {}, total: {})",
+            serializable_links.len(),
+            page,
+            total_pages,
+            total
+        );
+
         HttpResponse::Ok()
             .append_header(("Content-Type", "application/json; charset=utf-8"))
-            .json(serde_json::json!({ "code": 0, "data": Some(serializable_links) }))
+            .json(PaginatedResponse {
+                code: 0,
+                data: serializable_links,
+                pagination: PaginationInfo {
+                    page,
+                    page_size,
+                    total,
+                    total_pages,
+                },
+            })
     }
 
     pub async fn post_link(
