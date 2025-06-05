@@ -50,6 +50,7 @@ tracing-appender = "0.2.3"
 moka = { version = "0.12.10", default-features = false, features = ["future"] }
 colored = "3.0.0"
 num_cpus = "1.17.0"
+bloomfilter = "3.0.1"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

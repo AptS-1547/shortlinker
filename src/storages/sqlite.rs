@@ -115,7 +115,7 @@ impl SqliteStorage {
         expires_at: Option<String>,
     ) -> Result<ShortLink> {
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
-            .map_err(|e| ShortlinkerError::DateParse(format!("创建时间解析失败: {}", e)))?
+            .map_err(|e| ShortlinkerError::date_parse(format!("创建时间解析失败: {}", e)))?
             .with_timezone(&chrono::Utc);
 
         let expires_at = expires_at.and_then(|s| {
@@ -419,7 +419,7 @@ impl Storage for SqliteStorage {
         "sqlite".to_string()
     }
 
-    async fn increment_click(&self, code: &str) -> Result<()> {
+    async fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
     }
 }

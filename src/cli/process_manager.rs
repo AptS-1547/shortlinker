@@ -88,7 +88,10 @@ impl ProcessManager {
             let pid_file = "shortlinker.pid";
 
             if !Path::new(pid_file).exists() {
-                println!("{} PID file not found, server may not be running", "⚠".bold().yellow());
+                println!(
+                    "{} PID file not found, server may not be running",
+                    "⚠".bold().yellow()
+                );
                 return Ok(());
             }
 
@@ -101,7 +104,11 @@ impl ProcessManager {
                         let server_pid = Pid::from_raw(pid as i32);
 
                         if signal::kill(server_pid, None).is_err() {
-                            println!("{} Process {} not found, cleaning PID file", "⚠".bold().yellow(), pid);
+                            println!(
+                                "{} Process {} not found, cleaning PID file",
+                                "⚠".bold().yellow(),
+                                pid
+                            );
                             let _ = fs::remove_file(pid_file);
                             return Ok(());
                         }
@@ -146,11 +153,16 @@ impl ProcessManager {
                             }
                         }
                     } else {
-                        return Err(CliError::ProcessError("Invalid PID file format".to_string()));
+                        return Err(CliError::ProcessError(
+                            "Invalid PID file format".to_string(),
+                        ));
                     }
                 }
                 Err(e) => {
-                    return Err(CliError::ProcessError(format!("Failed to read PID file: {}", e)));
+                    return Err(CliError::ProcessError(format!(
+                        "Failed to read PID file: {}",
+                        e
+                    )));
                 }
             }
         }
@@ -162,11 +174,17 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if !Path::new(lock_file).exists() {
-                println!("{} Lock file not found, server may not be running", "⚠".bold().yellow());
+                println!(
+                    "{} Lock file not found, server may not be running",
+                    "⚠".bold().yellow()
+                );
                 return Ok(());
             }
 
-            println!("{} Windows does not support automatic stop", "⚠".bold().yellow());
+            println!(
+                "{} Windows does not support automatic stop",
+                "⚠".bold().yellow()
+            );
             println!(
                 "{} Please stop the server process manually then delete the lock file:",
                 "ℹ".bold().blue()
@@ -213,7 +231,10 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if Path::new(lock_file).exists() {
-                println!("{} Lock file detected, server might be running", "⚠".bold().yellow());
+                println!(
+                    "{} Lock file detected, server might be running",
+                    "⚠".bold().yellow()
+                );
                 println!("{} Windows requires manual restart:", "ℹ".bold().blue());
                 println!();
                 println!(
@@ -225,7 +246,10 @@ impl ProcessManager {
                 println!("{} 3. Restart the server:", "ℹ".bold().blue());
                 println!("   {}", "shortlinker.exe".cyan());
             } else {
-                println!("{} No running server found, starting directly:", "ℹ".bold().blue());
+                println!(
+                    "{} No running server found, starting directly:",
+                    "ℹ".bold().blue()
+                );
                 println!("  {}", "shortlinker.exe".cyan());
             }
         }

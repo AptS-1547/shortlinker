@@ -65,7 +65,10 @@ impl AdminService {
         query: web::Query<GetLinksQuery>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
-        info!("Admin API: request to list all links with filters: {:?}", query);
+        info!(
+            "Admin API: request to list all links with filters: {:?}",
+            query
+        );
 
         let all_links = storage.load_all().await;
         info!("Admin API: retrieved {} total links", all_links.len());
@@ -222,7 +225,10 @@ impl AdminService {
                     })
             }
             Err(e) => {
-                error!("Admin API: failed to create link - {}: {}", new_link.code, e);
+                error!(
+                    "Admin API: failed to create link - {}: {}",
+                    new_link.code, e
+                );
                 HttpResponse::InternalServerError()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {

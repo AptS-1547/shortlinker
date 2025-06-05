@@ -68,7 +68,11 @@ pub async fn add_link(
         Some(code) => code,
         None => {
             let code = generate_random_code(random_code_length);
-            println!("{} Generated random code: {}", "ℹ".bold().blue(), code.magenta());
+            println!(
+                "{} Generated random code: {}",
+                "ℹ".bold().blue(),
+                code.magenta()
+            );
             code
         }
     };
@@ -166,7 +170,11 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
         .await
         .map_err(|e| CliError::CommandError(format!("删除失败: {}", e)))?;
 
-    println!("{} Deleted short link: {}", "✓".bold().green(), short_code.cyan());
+    println!(
+        "{} Deleted short link: {}",
+        "✓".bold().green(),
+        short_code.cyan()
+    );
 
     // Notify server to reload
     if let Err(e) = crate::system::notify_server() {
@@ -287,7 +295,10 @@ pub async fn export_links(
     });
 
     let file = File::create(&output_path).map_err(|e| {
-        CliError::CommandError(format!("Failed to create export file '{}': {}", output_path, e))
+        CliError::CommandError(format!(
+            "Failed to create export file '{}': {}",
+            output_path, e
+        ))
     })?;
 
     let writer = BufWriter::new(file);
@@ -317,8 +328,9 @@ pub async fn import_links(
         )));
     }
 
-    let file = File::open(&file_path)
-        .map_err(|e| CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e)))?;
+    let file = File::open(&file_path).map_err(|e| {
+        CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
+    })?;
 
     let reader = BufReader::new(file);
     let serializable_links: Vec<SerializableShortLink> = serde_json::from_reader(reader)

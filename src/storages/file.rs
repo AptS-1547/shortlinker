@@ -189,7 +189,7 @@ impl Storage for FileStorage {
         "file".to_string()
     }
 
-    async fn increment_click(&self, code: &str) -> Result<()> {
+    async fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
     }
 }
