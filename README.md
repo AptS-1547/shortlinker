@@ -295,3 +295,24 @@ cargo fmt && cargo clippy
 ## License
 
 MIT License © AptS:1547
+
+<pre>
+
+```
+        ／＞　 フ
+       | 　_　_|    AptS:1547
+     ／` ミ＿xノ    — shortlinker assistant bot —
+    /　　　　 |
+   /　 ヽ　　 ﾉ      Rust / SQLite / Bloom / CLI
+   │　　|　|　|
+／￣|　　 |　|　|
+(￣ヽ＿_ヽ_)__)
+＼二)
+
+   「ready to 307 !」
+```
+
+> [🔗 Visit Project Docs](https://www.esaps.net/)
+> [💬 Powered by AptS](https://github.com/AptS-1547)
+
+</pre>
