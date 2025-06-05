@@ -1,62 +1,110 @@
-use actix_web::middleware::Next;
+use std::env;
+use std::rc::Rc;
+use std::sync::OnceLock;
+use actix_service::{Service, Transform};
 use actix_web::{
-    body::BoxBody,
+    body::EitherBody,
     dev::{ServiceRequest, ServiceResponse},
+    http::header::CONTENT_TYPE,
+    http::StatusCode,
     Error, HttpResponse,
 };
-use std::env;
-use std::sync::OnceLock;
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 use tracing::{debug, info};
-
-pub struct AuthMiddleware;
 
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 
-impl AuthMiddleware {
-    /// Admin API 身份验证中间件
-    pub async fn admin_auth(
-        req: ServiceRequest,
-        next: Next<BoxBody>,
-    ) -> Result<ServiceResponse<BoxBody>, Error> {
-        if req.method() == actix_web::http::Method::OPTIONS {
-            // 对于 OPTIONS 请求，直接返回 204 No Content
-            return Ok(req.into_response(
-                HttpResponse::NoContent()
-                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                    .finish(),
-            ));
-        }
+#[derive(Clone)]
+pub struct AdminAuth;
 
-        // 在第一次调用时从环境变量中获取 ADMIN_TOKEN
-        let admin_token = ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
+impl<S, B> Transform<S, ServiceRequest> for AdminAuth
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<EitherBody<B>>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = AdminAuthMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
-        // 如果 token 为空，认为 Admin API 被禁用
-        if admin_token.is_empty() {
-            return Ok(req.into_response(
-                HttpResponse::NotFound()
-                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                    .body("Not Found"),
-            ));
-        }
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(AdminAuthMiddleware {
+            service: Rc::new(service),
+        }))
+    }
+}
 
-        // 检查 Authorization header
-        if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
-                if auth_bytes == admin_token.as_bytes() {
-                    debug!("Admin API authentication succeeded");
-                    return next.call(req).await;
-                }
+pub struct AdminAuthMiddleware<S> {
+    service: Rc<S>,
+}
+
+impl<S, B> Service<ServiceRequest> for AdminAuthMiddleware<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<EitherBody<B>>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(
+        &self,
+        ctx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(ctx)
+    }
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let srv = self.service.clone();
+        Box::pin(async move {
+            let method = req.method().clone();
+
+            if method == actix_web::http::Method::OPTIONS {
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::NO_CONTENT)
+                        .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
+                        .finish()
+                        .map_into_right_body(),
+                ));
             }
-        }
 
-        info!("Admin API authentication failed: token mismatch or missing Authorization header");
-        Ok(req.into_response(
-            HttpResponse::Unauthorized()
-                .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .json(serde_json::json!({
-                    "code": 401,
-                    "data": { "error": "Unauthorized: Invalid or missing token" }
-                })),
-        ))
+            let token = ADMIN_TOKEN
+                .get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
+
+            if token.is_empty() {
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::NOT_FOUND)
+                        .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
+                        .body("Not Found")
+                        .map_into_right_body(),
+                ));
+            }
+
+            let auth_ok = req
+                .headers()
+                .get("Authorization")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.strip_prefix("Bearer "))
+                .map(|val| val == token)
+                .unwrap_or(false);
+
+            if !auth_ok {
+                info!("Admin auth failed");
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::UNAUTHORIZED)
+                        .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
+                        .json(serde_json::json!({
+                            "code": 401,
+                            "data": { "error": "Unauthorized: Invalid or missing token" }
+                        }))
+                        .map_into_right_body(),
+                ));
+            }
+
+            debug!("Admin auth passed");
+            let res = srv.call(req).await?.map_into_left_body();
+            Ok(res)
+        })
     }
 }

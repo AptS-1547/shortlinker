@@ -1715,6 +1715,7 @@ name = "shortlinker"
 version = "0.1.6"
 dependencies = [
  "actix-rt",
+ "actix-service",
  "actix-web",
  "async-trait",
  "bloomfilter",
@@ -1723,6 +1724,7 @@ dependencies = [
  "dashmap",
  "dotenv",
  "futures",
+ "futures-util",
  "moka",
  "nix",
  "num_cpus",

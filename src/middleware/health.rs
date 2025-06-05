@@ -1,64 +1,110 @@
-use actix_web::middleware::Next;
+use std::env;
+use std::rc::Rc;
+use std::sync::OnceLock;
+use actix_service::{Service, Transform};
 use actix_web::{
-    body::BoxBody,
+    body::EitherBody,
     dev::{ServiceRequest, ServiceResponse},
+    http::header::CONTENT_TYPE,
+    http::StatusCode,
     Error, HttpResponse,
 };
-use std::env;
-use std::sync::OnceLock;
+use futures_util::future::{ready, LocalBoxFuture, Ready};
 use tracing::{debug, info};
 
 static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
 
-pub struct HealthMiddleware;
+#[derive(Clone)]
+pub struct HealthAuth;
 
-impl HealthMiddleware {
-    /// 严格的健康检查中间件
-    /// 当设置了特定的健康检查 token 时进行验证
-    pub async fn health_auth(
-        req: ServiceRequest,
-        next: Next<BoxBody>,
-    ) -> Result<ServiceResponse<BoxBody>, Error> {
-        if req.method() == actix_web::http::Method::OPTIONS {
-            // 对于 OPTIONS 请求，直接返回 204 No Content
-            return Ok(req.into_response(
-                HttpResponse::NoContent()
-                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                    .finish(),
-            ));
-        }
+impl<S, B> Transform<S, ServiceRequest> for HealthAuth
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<EitherBody<B>>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = HealthAuthMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
-        // 检查是否设置了健康检查 token
-        let health_token =
-            HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(HealthAuthMiddleware {
+            service: Rc::new(service),
+        }))
+    }
+}
 
-        // 如果 token 为空，认为 Health API 被禁用
-        if health_token.is_empty() {
-            return Ok(req.into_response(
-                HttpResponse::NotFound()
-                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                    .body("Not Found"),
-            ));
-        }
+pub struct HealthAuthMiddleware<S> {
+    service: Rc<S>,
+}
 
-        // 检查 Authorization header
-        if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
-                if auth_bytes == health_token.as_bytes() {
-                    debug!("Health API authentication succeeded");
-                    return next.call(req).await;
-                }
+impl<S, B> Service<ServiceRequest> for HealthAuthMiddleware<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<EitherBody<B>>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(
+        &self,
+        ctx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(ctx)
+    }
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let srv = self.service.clone();
+        Box::pin(async move {
+            let method = req.method().clone();
+
+            if method == actix_web::http::Method::OPTIONS {
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::NO_CONTENT)
+                        .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
+                        .finish()
+                        .map_into_right_body(),
+                ));
             }
-        }
 
-        info!("Health API authentication failed: token mismatch or missing Authorization header");
-        Ok(req.into_response(
-            HttpResponse::Unauthorized()
-                .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .json(serde_json::json!({
-                    "code": 401,
-                    "data": { "error": "Unauthorized: Invalid or missing token" }
-                })),
-        ))
+            let token = HEALTH_TOKEN
+                .get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
+
+            if token.is_empty() {
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::NOT_FOUND)
+                        .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
+                        .body("Not Found")
+                        .map_into_right_body(),
+                ));
+            }
+
+            let auth_ok = req
+                .headers()
+                .get("Authorization")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.strip_prefix("Bearer "))
+                .map(|val| val == token)
+                .unwrap_or(false);
+
+            if !auth_ok {
+                info!("Health auth failed");
+                return Ok(req.into_response(
+                    HttpResponse::build(StatusCode::UNAUTHORIZED)
+                        .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
+                        .json(serde_json::json!({
+                            "code": 401,
+                            "data": { "error": "Unauthorized: Invalid or missing token" }
+                        }))
+                        .map_into_right_body(),
+                ));
+            }
+
+            debug!("Health auth passed");
+            let res = srv.call(req).await?.map_into_left_body();
+            Ok(res)
+        })
     }
 }

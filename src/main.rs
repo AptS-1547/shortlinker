@@ -1,5 +1,5 @@
 use actix_web::{
-    middleware::{from_fn, DefaultHeaders},
+    middleware::DefaultHeaders,
     web, App, HttpServer,
 };
 use dotenv::dotenv;
@@ -14,7 +14,7 @@ mod storages;
 mod system;
 mod utils;
 
-use crate::middleware::{AuthMiddleware, HealthMiddleware};
+use crate::middleware::{AdminAuth, HealthAuth};
 use crate::services::{AdminService, AppStartTime, HealthService, RedirectService};
 use crate::storages::StorageFactory;
 use crate::system::{cleanup_lockfile, init_lockfile};
@@ -130,7 +130,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope(&admin_prefix)
-                    .wrap(from_fn(AuthMiddleware::admin_auth))
+                    .wrap(AdminAuth)
                     .route("/link", web::get().to(AdminService::get_all_links))
                     .route("/link", web::head().to(AdminService::get_all_links))
                     .route("/link", web::post().to(AdminService::post_link))
@@ -141,7 +141,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope(&health_prefix)
-                    .wrap(from_fn(HealthMiddleware::health_auth))
+                    .wrap(HealthAuth)
                     .route("", web::get().to(HealthService::health_check))
                     .route("", web::head().to(HealthService::health_check))
                     .route("/ready", web::get().to(HealthService::readiness_check))
