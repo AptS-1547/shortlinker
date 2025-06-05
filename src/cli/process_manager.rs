@@ -5,7 +5,7 @@ pub struct ProcessManager;
 
 impl ProcessManager {
     pub fn start_server() -> Result<(), CliError> {
-        println!("{} 正在启动 shortlinker 服务器...", "ℹ".bold().blue());
+        println!("{} Starting shortlinker server...", "ℹ".bold().blue());
 
         #[cfg(unix)]
         {
@@ -23,17 +23,17 @@ impl ProcessManager {
 
                             if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
                                 println!(
-                                    "{} 服务器已在运行 (PID: {})",
+                                    "{} Server already running (PID: {})",
                                     "⚠".bold().yellow(),
                                     old_pid
                                 );
                                 println!(
-                                    "{} 如需重启，请先使用 'stop' 命令停止服务器",
+                                    "{} To restart, first use the 'stop' command",
                                     "ℹ".bold().blue()
                                 );
                                 return Ok(());
                             } else {
-                                println!("{} 清理孤立的 PID 文件...", "ℹ".bold().blue());
+                                println!("{} Cleaning up stale PID file...", "ℹ".bold().blue());
                                 let _ = fs::remove_file(pid_file);
                             }
                         }
@@ -44,9 +44,9 @@ impl ProcessManager {
                 }
             }
 
-            println!("{} 使用以下命令启动服务器:", "ℹ".bold().blue());
+            println!("{} Start the server with:", "ℹ".bold().blue());
             println!("  {}", "./shortlinker".cyan());
-            println!("{} 或在后台运行:", "ℹ".bold().blue());
+            println!("{} Or run in the background:", "ℹ".bold().blue());
             println!(
                 "  {}",
                 "nohup ./shortlinker > shortlinker.log 2>&1 &".cyan()
@@ -60,17 +60,17 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if Path::new(lock_file).exists() {
-                println!("{} 服务器可能已在运行", "⚠".bold().yellow());
+                println!("{} Server may already be running", "⚠".bold().yellow());
                 println!(
-                    "{} 如确认服务器未运行，请删除锁文件: {}",
+                    "{} If the server is not running, delete the lock file: {}",
                     "ℹ".bold().blue(),
                     lock_file
                 );
-                println!("{} 然后重新启动服务器", "ℹ".bold().blue());
+                println!("{} Then restart the server", "ℹ".bold().blue());
                 return Ok(());
             }
 
-            println!("{} 使用以下命令启动服务器:", "ℹ".bold().blue());
+            println!("{} Start the server with:", "ℹ".bold().blue());
             println!("  {}", "shortlinker.exe".cyan());
         }
 
@@ -78,7 +78,7 @@ impl ProcessManager {
     }
 
     pub fn stop_server() -> Result<(), CliError> {
-        println!("{} 正在停止 shortlinker 服务器...", "ℹ".bold().blue());
+        println!("{} Stopping shortlinker server...", "ℹ".bold().blue());
 
         #[cfg(unix)]
         {
@@ -88,7 +88,7 @@ impl ProcessManager {
             let pid_file = "shortlinker.pid";
 
             if !Path::new(pid_file).exists() {
-                println!("{} 未找到 PID 文件，服务器可能未运行", "⚠".bold().yellow());
+                println!("{} PID file not found, server may not be running", "⚠".bold().yellow());
                 return Ok(());
             }
 
@@ -101,7 +101,7 @@ impl ProcessManager {
                         let server_pid = Pid::from_raw(pid as i32);
 
                         if signal::kill(server_pid, None).is_err() {
-                            println!("{} 进程 {} 不存在，清理 PID 文件", "⚠".bold().yellow(), pid);
+                            println!("{} Process {} not found, cleaning PID file", "⚠".bold().yellow(), pid);
                             let _ = fs::remove_file(pid_file);
                             return Ok(());
                         }
@@ -109,7 +109,7 @@ impl ProcessManager {
                         match signal::kill(server_pid, Signal::SIGTERM) {
                             Ok(_) => {
                                 println!(
-                                    "{} 已向服务器进程 {} 发送停止信号",
+                                    "{} Sent stop signal to server process {}",
                                     "✓".bold().green(),
                                     pid
                                 );
@@ -118,12 +118,12 @@ impl ProcessManager {
 
                                 if signal::kill(server_pid, None).is_ok() {
                                     println!(
-                                        "{} 服务器进程仍在运行，尝试强制终止...",
+                                        "{} Server process still running, trying to force kill...",
                                         "⚠".bold().yellow()
                                     );
                                     match signal::kill(server_pid, Signal::SIGKILL) {
                                         Ok(_) => {
-                                            println!("{} 服务器已强制停止", "✓".bold().green())
+                                            println!("{} Server force stopped", "✓".bold().green())
                                         }
                                         Err(e) => {
                                             return Err(CliError::ProcessError(format!(
@@ -133,24 +133,24 @@ impl ProcessManager {
                                         }
                                     }
                                 } else {
-                                    println!("{} 服务器已正常停止", "✓".bold().green());
+                                    println!("{} Server stopped gracefully", "✓".bold().green());
                                 }
 
                                 let _ = fs::remove_file(pid_file);
                             }
                             Err(e) => {
                                 return Err(CliError::ProcessError(format!(
-                                    "无法停止服务器进程: {}",
+                                    "Failed to stop server process: {}",
                                     e
                                 )));
                             }
                         }
                     } else {
-                        return Err(CliError::ProcessError("PID 文件格式无效".to_string()));
+                        return Err(CliError::ProcessError("Invalid PID file format".to_string()));
                     }
                 }
                 Err(e) => {
-                    return Err(CliError::ProcessError(format!("无法读取 PID 文件: {}", e)));
+                    return Err(CliError::ProcessError(format!("Failed to read PID file: {}", e)));
                 }
             }
         }
@@ -162,18 +162,18 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if !Path::new(lock_file).exists() {
-                println!("{} 未找到锁文件，服务器可能未运行", "⚠".bold().yellow());
+                println!("{} Lock file not found, server may not be running", "⚠".bold().yellow());
                 return Ok(());
             }
 
-            println!("{} Windows 平台不支持自动停止服务器", "⚠".bold().yellow());
+            println!("{} Windows does not support automatic stop", "⚠".bold().yellow());
             println!(
-                "{} 请手动停止服务器进程，然后删除锁文件:",
+                "{} Please stop the server process manually then delete the lock file:",
                 "ℹ".bold().blue()
             );
             println!("  {}", format!("del {}", lock_file).cyan());
             println!(
-                "{} 或使用任务管理器终止 shortlinker.exe 进程",
+                "{} Or terminate shortlinker.exe via Task Manager",
                 "ℹ".bold().blue()
             );
         }
@@ -182,7 +182,7 @@ impl ProcessManager {
     }
 
     pub fn restart_server() -> Result<(), CliError> {
-        println!("{} 正在重启 shortlinker 服务器...", "ℹ".bold().blue());
+        println!("{} Restarting shortlinker server...", "ℹ".bold().blue());
 
         #[cfg(unix)]
         {
@@ -197,9 +197,9 @@ impl ProcessManager {
             // 等待一小段时间确保端口释放
             std::thread::sleep(std::time::Duration::from_millis(1000));
 
-            println!("{} 启动新的服务器进程...", "ℹ".bold().blue());
+            println!("{} Starting new server process...", "ℹ".bold().blue());
             println!("  {}", "./shortlinker".cyan());
-            println!("{} 或在后台运行:", "ℹ".bold().blue());
+            println!("{} Or run in the background:", "ℹ".bold().blue());
             println!(
                 "  {}",
                 "nohup ./shortlinker > shortlinker.log 2>&1 &".cyan()
@@ -213,19 +213,19 @@ impl ProcessManager {
             let lock_file = ".shortlinker.lock";
 
             if Path::new(lock_file).exists() {
-                println!("{} 检测到锁文件，服务器可能正在运行", "⚠".bold().yellow());
-                println!("{} Windows 平台需要手动重启服务器:", "ℹ".bold().blue());
+                println!("{} Lock file detected, server might be running", "⚠".bold().yellow());
+                println!("{} Windows requires manual restart:", "ℹ".bold().blue());
                 println!();
                 println!(
-                    "{} 1. 使用任务管理器终止 shortlinker.exe 进程",
+                    "{} 1. Terminate shortlinker.exe via Task Manager",
                     "ℹ".bold().blue()
                 );
-                println!("{} 2. 删除锁文件:", "ℹ".bold().blue());
+                println!("{} 2. Delete the lock file:", "ℹ".bold().blue());
                 println!("   {}", format!("del {}", lock_file).cyan());
-                println!("{} 3. 重新启动服务器:", "ℹ".bold().blue());
+                println!("{} 3. Restart the server:", "ℹ".bold().blue());
                 println!("   {}", "shortlinker.exe".cyan());
             } else {
-                println!("{} 未发现运行中的服务器，直接启动:", "ℹ".bold().blue());
+                println!("{} No running server found, starting directly:", "ℹ".bold().blue());
                 println!("  {}", "shortlinker.exe".cyan());
             }
         }

@@ -34,13 +34,13 @@ impl AuthMiddleware {
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Some(auth_bytes) = auth_header.as_bytes().strip_prefix(b"Bearer ") {
                 if auth_bytes == admin_token.as_bytes() {
-                    debug!("Admin API 鉴权成功");
+                    debug!("Admin API authentication succeeded");
                     return next.call(req).await;
                 }
             }
         }
 
-        info!("Admin API 鉴权失败: token不匹配或缺少Authorization header");
+        info!("Admin API authentication failed: token mismatch or missing Authorization header");
         Ok(req.into_response(
             HttpResponse::Unauthorized()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
