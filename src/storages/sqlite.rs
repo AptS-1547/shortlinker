@@ -1,22 +1,35 @@
+use bloomfilter::Bloom;
 use moka::future::Cache;
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
+use std::sync::OnceLock;
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 use super::{ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 use async_trait::async_trait;
 
+static CLI_MODE: OnceLock<bool> = OnceLock::new();
+
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,
     cache: Cache<String, ShortLink>,
+    bloom_filter: Arc<RwLock<Bloom<str>>>,
 }
 
 impl SqliteStorage {
-    pub fn new() -> Result<Self> {
+    pub async fn new_async() -> Result<Self> {
+        let cli_mode = *CLI_MODE.get_or_init(|| {
+                env::var("CLI_MODE")
+                    .map(|v| v == "true")
+                    .unwrap_or(false)
+        });
+
         let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
         let manager = SqliteConnectionManager::file(&db_path).with_init(|c| {
@@ -34,7 +47,7 @@ impl SqliteStorage {
 
             // 检查并设置 WAL 模式 - 使用 query 而不是 execute
             let mut stmt = c.prepare("PRAGMA journal_mode = WAL")?;
-            let current_mode: String = stmt.query_row([], |row| Ok(row.get::<_, String>(0)?))?;
+            let current_mode: String = stmt.query_row([], |row| row.get::<_, String>(0))?;
 
             if current_mode.to_lowercase() != "wal" {
                 return Err(rusqlite::Error::SqliteFailure(
@@ -60,10 +73,29 @@ impl SqliteStorage {
             .time_to_idle(std::time::Duration::from_secs(60 * 5))
             .build();
 
-        let storage = SqliteStorage { pool, cache };
+        // 先创建一个临时的 bloom filter，稍后会根据实际数据量重新创建
+        let bloom_filter = Arc::new(RwLock::new(
+            Bloom::new_for_fp_rate(1000, 0.01)
+                .unwrap_or_else(|_| panic!("Failed to create temporary bloom filter")),
+        ));
+
+        let storage = SqliteStorage {
+            pool,
+            cache,
+            bloom_filter,
+        };
 
         // Initialize database tables
         storage.init_db()?;
+
+        // 在同步构造函数中初始化异步 bloom filter：
+        // 因为此方法只在程序启动时调用一次，不存在并发或 runtime 嵌套问题
+        if cli_mode {
+            warn!("CLI mode detected, skipping bloom filter initialization");
+            return Ok(storage);
+        }
+        
+        storage.init_bloom_filter_with_count().await?;
 
         warn!("SqliteStorage initialized, database path: {}", db_path);
         Ok(storage)
@@ -131,6 +163,83 @@ impl SqliteStorage {
             expires_at,
         })
     }
+
+    async fn init_bloom_filter_with_count(&self) -> Result<()> {
+        let conn = self.get_connection()?;
+        let bloom_filter = Arc::clone(&self.bloom_filter);
+
+        let result = {
+            // 先查询记录总数
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM short_links", [], |row| row.get(0))
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("查询记录总数失败: {}", e))
+                })?;
+
+            // 根据实际记录数量确定 bloom filter 容量
+            // 至少设置为 1000，为未来增长预留空间
+            let capacity = std::cmp::max(count as usize * 2, 1000);
+
+            info!(
+                "Database has {} records, creating bloom filter with capacity {}",
+                count, capacity
+            );
+
+            // 查询所有短码
+            let mut stmt = conn
+                .prepare("SELECT short_code FROM short_links")
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
+                })?;
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("查询短码失败: {}", e))
+                })?;
+
+            let mut codes = Vec::new();
+            for row in rows {
+                match row {
+                    Ok(code) => codes.push(code),
+                    Err(e) => error!("Failed to read short code: {}", e),
+                }
+            }
+
+            Ok((capacity, codes))
+        };
+
+        match result {
+            Ok((capacity, codes)) => {
+                // 创建新的 bloom filter
+                let new_bloom = Bloom::new_for_fp_rate(capacity, 0.01).unwrap_or_else(|_| {
+                    warn!(
+                        "Failed to create bloom filter with capacity {}, using default",
+                        capacity
+                    );
+                    Bloom::new_for_fp_rate(10000, 0.01)
+                        .unwrap_or_else(|_| panic!("Failed to create fallback bloom filter"))
+                });
+
+                // 替换原有的 bloom filter 并加载数据
+                {
+                    let mut bloom = bloom_filter.write().await;
+                    *bloom = new_bloom;
+
+                    for code in &codes {
+                        bloom.set(code);
+                    }
+                }
+
+                info!(
+                    "Bloom filter initialized with {} short codes, capacity: {}",
+                    codes.len(),
+                    capacity
+                );
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[async_trait]
@@ -139,6 +248,19 @@ impl Storage for SqliteStorage {
         // 先检查缓存
         if let Some(link) = self.cache.get(code).await {
             return Some(link);
+        }
+
+        // 使用 bloom filter 进行快速预检查
+        {
+            if *CLI_MODE.get().unwrap_or(&false) {
+                warn!("CLI mode detected, skipping bloom filter check");
+            } else {
+                let bloom = self.bloom_filter.read().await;
+                if !bloom.check(code) {
+                    // bloom filter 确定不存在，直接返回 None
+                    return None;
+                }
+            }
         }
 
         // Cache miss, query database
@@ -199,6 +321,8 @@ impl Storage for SqliteStorage {
         }
     }
 
+    // NOTE: load_all 不更新 bloom filter，因为主要用于非 HTTP 路径（例如 CLI export）
+    // 如果未来在 get() 中依赖它，需要手动触发 reload() 逻辑
     async fn load_all(&self) -> HashMap<String, ShortLink> {
         let conn = match self.get_connection() {
             Ok(conn) => conn,
@@ -265,6 +389,7 @@ impl Storage for SqliteStorage {
     async fn set(&self, link: ShortLink) -> Result<()> {
         let pool = self.pool.clone();
         let cache = self.cache.clone();
+        let bloom_filter = Arc::clone(&self.bloom_filter);
         let link_clone = link.clone();
 
         let result = actix_web::web::block(move || {
@@ -341,7 +466,14 @@ impl Storage for SqliteStorage {
         match result {
             Ok(Ok(_)) => {
                 // 更新缓存
-                cache.insert(link.code.clone(), link).await;
+                cache.insert(link.code.clone(), link.clone()).await;
+
+                // 将新的短码添加到 bloom filter
+                {
+                    let mut bloom = bloom_filter.write().await;
+                    bloom.set(link.code.as_str());
+                }
+
                 Ok(())
             }
             Ok(Err(e)) => Err(e),
@@ -411,7 +543,11 @@ impl Storage for SqliteStorage {
     async fn reload(&self) -> Result<()> {
         // Clear cache to force reload from database
         self.cache.invalidate_all();
-        info!("SQLite cache cleared, data will be reloaded from database");
+
+        // 重新初始化 bloom filter
+        self.init_bloom_filter_with_count().await?;
+
+        info!("SQLite cache and bloom filter cleared, data reloaded from database");
         Ok(())
     }
 

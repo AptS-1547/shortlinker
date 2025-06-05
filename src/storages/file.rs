@@ -16,7 +16,7 @@ pub struct FileStorage {
 }
 
 impl FileStorage {
-    pub fn new() -> Result<Self> {
+    pub async fn new_async() -> Result<Self> {
         let file_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.json".to_string());
         let storage = FileStorage {
             file_path,

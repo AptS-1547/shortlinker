@@ -7,7 +7,7 @@ use async_trait::async_trait;
 pub struct SledStorage;
 
 impl SledStorage {
-    pub fn new() -> Result<Self> {
+    pub async fn new_async() -> Result<Self> {
         Ok(SledStorage)
     }
 }

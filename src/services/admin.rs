@@ -97,7 +97,7 @@ impl AdminService {
                 }
 
                 // 过期状态过滤
-                let is_expired = link.expires_at.map_or(false, |exp| exp < now);
+                let is_expired = link.expires_at.is_some_and(|exp| exp < now);
 
                 if query.only_expired == Some(true) && !is_expired {
                     return false;
@@ -117,7 +117,7 @@ impl AdminService {
         let total = filtered_links.len();
         let page = query.page.unwrap_or(1).max(1);
         let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
-        let total_pages = (total + page_size - 1) / page_size;
+        let total_pages = total.div_ceil(page_size);
 
         // 分页
         let start = (page - 1) * page_size;
