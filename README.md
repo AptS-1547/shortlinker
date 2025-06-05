@@ -311,8 +311,6 @@ cargo fmt && cargo clippy
 MIT License © AptS:1547
 
 <pre>
-
-```
         ／＞　 フ
        | 　_　_|    AptS:1547
      ／` ミ＿xノ    — shortlinker assistant bot —
@@ -324,9 +322,7 @@ MIT License © AptS:1547
 ＼二)
 
    「ready to 307 !」
-```
-
-> [🔗 Visit Project Docs](https://www.esaps.net/)
-> [💬 Powered by AptS](https://github.com/AptS-1547)
-
 </pre>
+
+> [🔗 Visit Project Docs](https://esap.cc/docs)
+> [💬 Powered by AptS:1547](https://github.com/AptS-1547)
