@@ -254,6 +254,7 @@ impl Storage for SqliteStorage {
         {
             if *CLI_MODE.get().unwrap_or(&false) {
                 warn!("CLI mode detected, skipping bloom filter check");
+                return None;
             } else {
                 let bloom = self.bloom_filter.read().await;
                 if !bloom.check(code) {
