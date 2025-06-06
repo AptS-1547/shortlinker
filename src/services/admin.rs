@@ -8,56 +8,15 @@ use tracing::{debug, error, info};
 
 use crate::storages::{ShortLink, Storage};
 use crate::utils::{generate_random_code, TimeParser};
+use crate::structs::{
+    ApiResponse, GetLinksQuery, PaginationInfo, PaginatedResponse, PostNewLink,
+    SerializableShortLink,
+};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SerializableShortLink {
-    pub short_code: String,
-    pub target_url: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ApiResponse<T> {
-    pub code: i32,
-    pub data: T,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PostNewLink {
-    pub code: Option<String>,
-    pub target: String,
-    pub expires_at: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct GetLinksQuery {
-    pub page: Option<usize>,
-    pub page_size: Option<usize>,
-    pub created_after: Option<String>,
-    pub created_before: Option<String>,
-    pub only_expired: Option<bool>,
-    pub only_active: Option<bool>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PaginatedResponse<T> {
-    pub code: i32,
-    pub data: T,
-    pub pagination: PaginationInfo,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PaginationInfo {
-    pub page: usize,
-    pub page_size: usize,
-    pub total: usize,
-    pub total_pages: usize,
-}
 
 static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
 
-pub struct AdminService;
+pub use crate::structs::AdminService;
 
 impl AdminService {
     pub async fn get_all_links(

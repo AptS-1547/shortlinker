@@ -6,12 +6,7 @@ use tracing::{debug, error, info};
 
 use crate::storages::Storage;
 use crate::utils::TimeParser;
-
-// 应用启动时间结构体
-#[derive(Clone, Debug)]
-pub struct AppStartTime {
-    pub start_datetime: chrono::DateTime<chrono::Utc>,
-}
+use crate::structs::AppStartTime;
 
 pub struct HealthService;
 

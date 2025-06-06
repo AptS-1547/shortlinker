@@ -1,5 +1,5 @@
 use super::super::CliError;
-use crate::storages::{SerializableShortLink, ShortLink, Storage};
+use crate::storages::{StorageSerializableShortLink, ShortLink, Storage};
 use crate::utils::generate_random_code;
 use crate::utils::TimeParser;
 use colored::*;
@@ -276,9 +276,9 @@ pub async fn export_links(
     }
 
     // 转换为可序列化格式
-    let serializable_links: Vec<SerializableShortLink> = links
+    let serializable_links: Vec<StorageSerializableShortLink> = links
         .values()
-        .map(|link| SerializableShortLink {
+        .map(|link| StorageSerializableShortLink {
             short_code: link.code.clone(),
             target_url: link.target.clone(),
             created_at: link.created_at.to_rfc3339(),
@@ -333,7 +333,7 @@ pub async fn import_links(
     })?;
 
     let reader = BufReader::new(file);
-    let serializable_links: Vec<SerializableShortLink> = serde_json::from_reader(reader)
+    let serializable_links: Vec<StorageSerializableShortLink> = serde_json::from_reader(reader)
         .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?;
 
     if serializable_links.is_empty() {

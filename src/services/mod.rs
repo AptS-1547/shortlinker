@@ -4,6 +4,4 @@ pub mod redirect;
 
 pub use admin::AdminService;
 pub use health::HealthService;
-pub use redirect::RedirectService;
-
-pub use health::AppStartTime;
+pub use crate::structs::{AppStartTime, RedirectService};

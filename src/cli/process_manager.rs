@@ -1,7 +1,6 @@
 use super::CliError;
 use colored::*;
-
-pub struct ProcessManager;
+pub use crate::structs::ProcessManager;
 
 impl ProcessManager {
     pub fn start_server() -> Result<(), CliError> {

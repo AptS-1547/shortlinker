@@ -13,20 +13,14 @@ mod services;
 mod storages;
 mod system;
 mod utils;
+mod structs;
 
 use crate::middleware::{AdminAuth, HealthAuth};
 use crate::services::{AdminService, AppStartTime, HealthService, RedirectService};
 use crate::storages::StorageFactory;
 use crate::system::{cleanup_lockfile, init_lockfile};
+use crate::structs::Config;
 
-// 配置结构体
-#[derive(Clone, Debug)]
-struct Config {
-    server_host: String,
-    server_port: u16,
-    #[cfg(unix)]
-    unix_socket_path: Option<String>,
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

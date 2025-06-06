@@ -9,6 +9,7 @@ pub mod services;
 pub mod storages;
 pub mod system;
 pub mod utils;
+pub mod structs;
 
 #[cfg(test)]
 mod tests {

@@ -3,28 +3,11 @@ use std::env;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+pub use crate::structs::{ShortLink, StorageSerializableShortLink};
 
 use crate::errors::Result;
 use async_trait::async_trait;
 
-#[derive(Debug, Clone)]
-pub struct ShortLink {
-    pub code: String,
-    pub target: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SerializableShortLink {
-    pub short_code: String,
-    pub target_url: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-
-    #[serde(default)]
-    pub click: usize,
-}
 
 #[async_trait]
 pub trait Storage: Send + Sync {

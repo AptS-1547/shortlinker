@@ -1,7 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
+pub use crate::structs::TimeParser;
 
-#[derive(Debug, Clone)]
-pub struct TimeParser;
 
 impl TimeParser {
     /// 解析时间字符串，支持多种格式：

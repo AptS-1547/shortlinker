@@ -1,7 +1,6 @@
 use super::{commands::Command, CliError};
 use std::env;
-
-pub struct CliParser;
+pub use crate::structs::CliParser;
 
 impl Default for CliParser {
     fn default() -> Self {

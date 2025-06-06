@@ -5,10 +5,9 @@ use std::sync::OnceLock;
 use tracing::debug;
 
 use crate::storages::Storage;
+pub use crate::structs::RedirectService;
 
 static DEFAULT_URL: OnceLock<String> = OnceLock::new();
-
-pub struct RedirectService {}
 
 impl RedirectService {
     pub async fn handle_redirect(

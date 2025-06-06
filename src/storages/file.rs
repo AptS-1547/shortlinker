@@ -8,7 +8,7 @@ use super::{ShortLink, Storage};
 use async_trait::async_trait;
 
 use crate::errors::{Result, ShortlinkerError};
-use crate::storages::SerializableShortLink;
+use crate::storages::StorageSerializableShortLink;
 
 pub struct FileStorage {
     file_path: String,
@@ -38,7 +38,7 @@ impl FileStorage {
 
     fn load_from_file(&self) -> Result<HashMap<String, ShortLink>> {
         match fs::read_to_string(&self.file_path) {
-            Ok(content) => match serde_json::from_str::<Vec<SerializableShortLink>>(&content) {
+            Ok(content) => match serde_json::from_str::<Vec<StorageSerializableShortLink>>(&content) {
                 Ok(links) => {
                     let mut map = HashMap::new();
                     for link in links {
@@ -89,9 +89,9 @@ impl FileStorage {
     }
 
     fn save_to_file(&self, links: &HashMap<String, ShortLink>) -> Result<()> {
-        let links_vec: Vec<SerializableShortLink> = links
+        let links_vec: Vec<StorageSerializableShortLink> = links
             .iter()
-            .map(|(_, link)| SerializableShortLink {
+            .map(|(_, link)| StorageSerializableShortLink {
                 short_code: link.code.clone(),
                 target_url: link.target.clone(),
                 created_at: link.created_at.to_rfc3339(),
