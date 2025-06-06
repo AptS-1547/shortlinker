@@ -1,8 +1,24 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::{ShortLink, Storage};
 use crate::errors::Result;
-use async_trait::async_trait;
+
+// 注册 sled 存储插件
+// 这样子可以在应用启动时自动注册 sled 存储插件
+pub fn register_sled_plugin() {
+    use super::register::register_storage_plugin;
+    register_storage_plugin(
+        "sled",
+        Arc::new(|| {
+            Box::pin(async {
+                let s = SledStorage::new_async().await?;
+                Ok(Box::new(s) as Box<dyn Storage>)
+            })
+        }),
+    );
+}
 
 pub struct SledStorage;
 

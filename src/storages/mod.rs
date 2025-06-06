@@ -2,29 +2,16 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-
-use crate::errors::Result;
+use crate::errors::{Result, ShortlinkerError};
 use async_trait::async_trait;
 
-#[derive(Debug, Clone)]
-pub struct ShortLink {
-    pub code: String,
-    pub target: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-}
+mod backends;
+mod models;
+mod register;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SerializableShortLink {
-    pub short_code: String,
-    pub target_url: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-
-    #[serde(default)]
-    pub click: usize,
-}
+pub use backends::{file, sled, sqlite};
+pub use models::{SerializableShortLink, ShortLink};
+use register::get_storage_plugin;
 
 #[async_trait]
 pub trait Storage: Send + Sync {
@@ -39,22 +26,31 @@ pub trait Storage: Send + Sync {
     async fn increment_click(&self, code: &str) -> Result<()>;
 }
 
-pub mod file;
-pub mod sled;
-pub mod sqlite;
-
 pub struct StorageFactory;
+
+// 注册所有存储插件
+pub fn register_all_plugins() {
+    sqlite::register_sqlite_plugin();
+    sled::register_sled_plugin();
+    file::register_file_plugin();
+}
 
 impl StorageFactory {
     pub async fn create() -> Result<Arc<dyn Storage>> {
+        // 注册所有存储插件
+        register_all_plugins();
+
         let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
 
-        let boxed: Box<dyn Storage> = match backend.as_str() {
-            "sled" => Box::new(sled::SledStorage::new_async().await?),
-            "file" => Box::new(file::FileStorage::new_async().await?),
-            _ => Box::new(sqlite::SqliteStorage::new_async().await?),
-        };
-
-        Ok(Arc::from(boxed))
+        if let Some(ctor) = get_storage_plugin(&backend) {
+            let storage = ctor().await?;
+            register::debug_registry(); // 调试函数，打印已注册的存储后端
+            Ok(Arc::from(storage))
+        } else {
+            Err(ShortlinkerError::storage_plugin_not_found(format!(
+                "Unknown storage backend: {}",
+                backend
+            )))
+        }
     }
 }

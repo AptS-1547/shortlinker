@@ -16,6 +16,21 @@ use async_trait::async_trait;
 
 static CLI_MODE: OnceLock<bool> = OnceLock::new();
 
+// 注册 SQLite 存储插件
+// 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
+pub fn register_sqlite_plugin() {
+    use super::register::register_storage_plugin;
+    register_storage_plugin(
+        "sqlite",
+        Arc::new(|| {
+            Box::pin(async {
+                let s = SqliteStorage::new_async().await?;
+                Ok(Box::new(s) as Box<dyn Storage>)
+            })
+        }),
+    );
+}
+
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,
     cache: Cache<String, ShortLink>,
@@ -24,11 +39,8 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new_async() -> Result<Self> {
-        let cli_mode = *CLI_MODE.get_or_init(|| {
-                env::var("CLI_MODE")
-                    .map(|v| v == "true")
-                    .unwrap_or(false)
-        });
+        let cli_mode =
+            *CLI_MODE.get_or_init(|| env::var("CLI_MODE").map(|v| v == "true").unwrap_or(false));
 
         let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
@@ -94,7 +106,7 @@ impl SqliteStorage {
             warn!("CLI mode detected, skipping bloom filter initialization");
             return Ok(storage);
         }
-        
+
         storage.init_bloom_filter_with_count().await?;
 
         warn!("SqliteStorage initialized, database path: {}", db_path);

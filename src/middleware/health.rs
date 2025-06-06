@@ -1,6 +1,3 @@
-use std::env;
-use std::rc::Rc;
-use std::sync::OnceLock;
 use actix_service::{Service, Transform};
 use actix_web::{
     body::EitherBody,
@@ -10,6 +7,9 @@ use actix_web::{
     Error, HttpResponse,
 };
 use futures_util::future::{ready, LocalBoxFuture, Ready};
+use std::env;
+use std::rc::Rc;
+use std::sync::OnceLock;
 use tracing::{debug, info};
 
 static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
@@ -69,8 +69,7 @@ where
                 ));
             }
 
-            let token = HEALTH_TOKEN
-                .get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
+            let token = HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
 
             if token.is_empty() {
                 return Ok(req.into_response(

@@ -9,6 +9,7 @@ pub enum ShortlinkerError {
     NotFound(String),
     Serialization(String),
     SignalOperation(String),
+    StoragePluginNotFound(String),
     DateParse(String),
 }
 
@@ -22,6 +23,7 @@ impl fmt::Display for ShortlinkerError {
             ShortlinkerError::NotFound(msg) => write!(f, "资源未找到: {}", msg),
             ShortlinkerError::Serialization(msg) => write!(f, "序列化错误: {}", msg),
             ShortlinkerError::SignalOperation(msg) => write!(f, "信号操作错误: {}", msg),
+            ShortlinkerError::StoragePluginNotFound(msg) => write!(f, "存储插件未找到: {}", msg),
             ShortlinkerError::DateParse(msg) => write!(f, "日期解析错误: {}", msg),
         }
     }
@@ -57,6 +59,10 @@ impl ShortlinkerError {
 
     pub fn signal_operation<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::SignalOperation(msg.into())
+    }
+
+    pub fn storage_plugin_not_found<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::StoragePluginNotFound(msg.into())
     }
 
     pub fn date_parse<T: Into<String>>(msg: T) -> Self {
