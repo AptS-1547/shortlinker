@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use moka::future::Cache;
 
-use crate::cache::L2Cache;
+use crate::cache::{CacheResult, L2Cache};
 use crate::declare_l2_plugin;
 use crate::storages::ShortLink;
 
@@ -9,6 +9,12 @@ declare_l2_plugin!("moka", MokaCacheWrapper);
 
 pub struct MokaCacheWrapper {
     inner: Cache<String, ShortLink>,
+}
+
+impl Default for MokaCacheWrapper {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MokaCacheWrapper {
@@ -24,8 +30,12 @@ impl MokaCacheWrapper {
 
 #[async_trait]
 impl L2Cache for MokaCacheWrapper {
-    async fn get(&self, key: &str) -> Option<ShortLink> {
-        self.inner.get(key).await
+    async fn get(&self, key: &str) -> CacheResult {
+        if let Some(value) = self.inner.get(key).await {
+            CacheResult::Found(value.clone())
+        } else {
+            CacheResult::NotFound
+        }
     }
 
     async fn insert(&self, key: String, value: ShortLink) {

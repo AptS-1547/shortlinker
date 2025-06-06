@@ -8,8 +8,14 @@ declare_l1_plugin!("null", NullFilterL1Cache);
 
 pub struct NullFilterL1Cache;
 
+impl Default for NullFilterL1Cache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NullFilterL1Cache {
-    pub fn new(_capacity: usize, _fp_rate: f64) -> Self {
+    pub fn new() -> Self {
         debug!("Using NullFilterL1Cache: no L1 cache will be used");
         NullFilterL1Cache
     }
@@ -29,7 +35,7 @@ impl L1Cache for NullFilterL1Cache {
         debug!("NullFilterL1Cache: skip bulk_set");
     }
 
-    async fn clear(&self, _count: usize) {
+    async fn clear(&self, _count: usize, _fp_rate: f64) {
         debug!("NullFilterL1Cache: skip clear");
     }
 }

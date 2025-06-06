@@ -1,5 +1,12 @@
+use std::collections::HashMap;
+
 use crate::storages::ShortLink;
 use async_trait::async_trait;
+
+pub struct BloomConfig {
+    pub capacity: usize,
+    pub fp_rate: f64,
+}
 
 /// 缓存查询结果
 #[derive(Debug, Clone)]
@@ -21,6 +28,12 @@ pub trait Cache: Send + Sync {
 
     /// 批量加载 L1 缓存
     async fn load_l1_cache(&self, keys: &[String]);
+
+    /// 批量加载 L2 缓存
+    async fn load_l2_cache(&self, keys: HashMap<String, ShortLink>);
+
+    /// 重新初始化 L1 缓存
+    async fn reconfigure(&self, config: BloomConfig);
 }
 
 #[async_trait]
@@ -37,19 +50,25 @@ pub trait L1Cache: Send + Sync {
     async fn bulk_set(&self, keys: &[String]);
 
     /// 清空整个 L1 缓存（重载、重建场景）
-    async fn clear(&self, count: usize) {
+    async fn clear(&self, count: usize, fp_rate: f64) {
         // 默认实现：子类可以选择覆盖
         tracing::debug!(
-            "L1Cache.clear called with count: {}, but no action taken",
-            count
+            "Clearing L1 cache with count: {}, fp_rate: {}",
+            count,
+            fp_rate
         );
     }
 }
 
 #[async_trait]
 pub trait L2Cache: Send + Sync {
-    async fn get(&self, key: &str) -> Option<ShortLink>;
+    async fn get(&self, key: &str) -> CacheResult;
     async fn insert(&self, key: String, value: ShortLink);
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
+
+    async fn load_l2_cache(&self, _keys: HashMap<String, ShortLink>) {
+        // 默认实现：子类可以选择覆盖
+        tracing::debug!("Not loading L2 cache, no operation defined");
+    }
 }

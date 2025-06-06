@@ -13,9 +13,15 @@ pub struct BloomFilterL1Cache {
     inner: Arc<RwLock<Bloom<str>>>,
 }
 
+impl Default for BloomFilterL1Cache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BloomFilterL1Cache {
-    pub fn new(capacity: usize, fp_rate: f64) -> Self {
-        let bloom = Bloom::new_for_fp_rate(capacity, fp_rate)
+    pub fn new() -> Self {
+        let bloom = Bloom::new_for_fp_rate(10_000, 0.001)
             .unwrap_or_else(|_| panic!("Failed to create bloom filter"));
         Self {
             inner: Arc::new(RwLock::new(bloom)),
@@ -43,11 +49,14 @@ impl L1Cache for BloomFilterL1Cache {
         debug!("Bulk inserted {} keys into bloom filter", keys.len());
     }
 
-    async fn clear(&self, count: usize) {
+    async fn clear(&self, count: usize, _fp_rate: f64) {
         let mut bloom = self.inner.write().await;
-        let new = Bloom::new_for_fp_rate(count, 0.001)
-            .unwrap_or_else(|_| panic!("Failed to create new bloom filter"));
-        *bloom = new;
-        debug!("Bloom filter cleared and reinitialized");
+        let capacity = count.max(9_000) + 1000; // Ensure a minimum capacity
+        *bloom = Bloom::new_for_fp_rate(capacity, _fp_rate)
+            .unwrap_or_else(|_| panic!("Failed to clear bloom filter"));
+        debug!(
+            "Bloom filter cleared with count: {}, fp_rate: {}",
+            capacity, _fp_rate
+        );
     }
 }

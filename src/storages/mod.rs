@@ -10,7 +10,7 @@ use crate::errors::{Result, ShortlinkerError};
 
 mod backends;
 mod models;
-mod register;
+pub mod register;
 
 pub use models::{CachePreference, SerializableShortLink, ShortLink};
 use register::get_storage_plugin;
@@ -44,7 +44,6 @@ impl StorageFactory {
 
         if let Some(ctor) = get_storage_plugin(&backend) {
             let storage = ctor().await?;
-            register::debug_storage_registry(); // 调试函数，打印已注册的存储后端
             Ok(Arc::from(storage))
         } else {
             error!("Failed to create storage backend: {}", backend);

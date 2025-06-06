@@ -5,11 +5,12 @@ macro_rules! declare_l1_plugin {
         fn __register_l1_plugin() {
             use std::sync::Arc;
             use $crate::cache::register::register_l1_plugin;
+
             register_l1_plugin(
                 $name,
                 Arc::new(|| {
                     Box::pin(async {
-                        let l1 = <$ty>::new(1_000, 0.001);
+                        let l1 = <$ty>::new();
                         Ok(Box::new(l1) as Box<dyn $crate::cache::traits::L1Cache>)
                     })
                 }),

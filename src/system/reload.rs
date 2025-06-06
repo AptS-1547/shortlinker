@@ -1,5 +1,5 @@
-use crate::cache::Cache;
-use crate::storages;
+use crate::cache::{traits::BloomConfig, Cache};
+use crate::storages::Storage;
 use std::sync::Arc;
 use std::thread;
 
@@ -7,26 +7,41 @@ use std::thread;
 #[cfg(unix)]
 pub fn setup_reload_mechanism(
     cache: Arc<dyn Cache + 'static>,
-    storage: Arc<dyn storages::Storage>,
+    storage: Arc<dyn Storage + 'static>,
 ) {
     use signal_hook::{consts::SIGUSR1, iterator::Signals};
 
     thread::spawn(move || {
         let mut signals = Signals::new([SIGUSR1]).unwrap();
         for _ in signals.forever() {
-            tracing::info!("Received SIGUSR1, reloading links from storage");
-            if let Err(e) = futures::executor::block_on(storage.reload()) {
-                tracing::error!("Failed to reload link configuration: {}", e);
-                continue;
+            tracing::info!("Received SIGUSR1, reloading...");
+            if let Err(e) = futures::executor::block_on(async {
+                storage.reload().await?;
+                let links = storage.load_all().await;
+                cache
+                    .reconfigure(BloomConfig {
+                        capacity: links.len(),
+                        fp_rate: 0.001,
+                    })
+                    .await;
+                cache
+                    .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
+                    .await;
+                cache.load_l2_cache(links).await;
+                Ok::<(), anyhow::Error>(())
+            }) {
+                tracing::error!("Reload failed: {}", e);
             }
-            tracing::info!("Link configuration reloaded");
         }
     });
 }
 
 // Windows平台的文件监听
 #[cfg(windows)]
-pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
+pub fn setup_reload_mechanism(
+    cache: Arc<dyn Cache + 'static>,
+    storage: Arc<dyn Storage + 'static>,
+) {
     use std::fs;
     use std::time::{Duration, SystemTime};
 
@@ -40,16 +55,25 @@ pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
             if let Ok(metadata) = fs::metadata(reload_file) {
                 if let Ok(modified) = metadata.modified() {
                     if modified > last_check {
-                        tracing::info!("Reload request detected, reloading links from storage");
-                        if let Err(e) = futures::executor::block_on(storage.reload()) {
-                            tracing::error!("Failed to reload link configuration: {}", e);
-                            last_check = SystemTime::now();
-                            continue;
+                        tracing::info!("Reload request detected, reloading...");
+                        if let Err(e) = futures::executor::block_on(async {
+                            storage.reload().await?;
+                            let links = storage.load_all().await;
+                            cache
+                                .reconfigure(BloomConfig {
+                                    capacity: links.len(),
+                                    fp_rate: 0.001,
+                                })
+                                .await;
+                            cache
+                                .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
+                                .await;
+                            cache.load_l2_cache(links).await;
+                            Ok::<(), anyhow::Error>(())
+                        }) {
+                            tracing::error!("Reload failed: {}", e);
                         }
                         last_check = SystemTime::now();
-                        tracing::info!("Link configuration reloaded");
-
-                        // 删除触发文件
                         let _ = fs::remove_file(reload_file);
                     }
                 }

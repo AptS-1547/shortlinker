@@ -2,12 +2,18 @@ use crate::storages::ShortLink;
 use async_trait::async_trait;
 use tracing::debug;
 
-use crate::cache::L2Cache;
+use crate::cache::{CacheResult, L2Cache};
 use crate::declare_l2_plugin;
 
 declare_l2_plugin!("null", NullL2Cache);
 
 pub struct NullL2Cache;
+
+impl Default for NullL2Cache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NullL2Cache {
     pub fn new() -> Self {
@@ -18,9 +24,9 @@ impl NullL2Cache {
 
 #[async_trait]
 impl L2Cache for NullL2Cache {
-    async fn get(&self, key: &str) -> Option<ShortLink> {
+    async fn get(&self, key: &str) -> CacheResult {
         debug!("NullL2Cache.get called for key: {}", key);
-        None
+        CacheResult::NotFound
     }
 
     async fn insert(&self, key: String, _: ShortLink) {

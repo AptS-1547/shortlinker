@@ -50,7 +50,7 @@ impl RedirectService {
                     capture_path, link.target
                 );
                 Self::update_click(storage.clone(), capture_path.clone());
-                return Self::finish_redirect(link);
+                Self::finish_redirect(link)
             }
             CacheResult::ExistsButNoValue => {
                 debug!("L2 ache miss for path: {}", capture_path);
@@ -59,23 +59,23 @@ impl RedirectService {
                         Self::update_click(storage.clone(), capture_path.clone());
                         cache.insert(capture_path.clone(), link.clone()).await;
 
-                        return Self::finish_redirect(link);
+                        Self::finish_redirect(link)
                     }
                     None => {
                         debug!("Redirect link not found: {}", capture_path);
-                        return HttpResponse::build(StatusCode::NOT_FOUND)
+                        HttpResponse::build(StatusCode::NOT_FOUND)
                             .insert_header(("Content-Type", "text/html; charset=utf-8"))
                             .insert_header(("Cache-Control", "public, max-age=60")) // 缓存404
-                            .body("Not Found");
+                            .body("Not Found")
                     }
                 }
             }
             CacheResult::NotFound => {
-                debug!("L1 Cache not found for path: {}", capture_path);
-                return HttpResponse::build(StatusCode::NOT_FOUND)
+                debug!("Cache not found for path: {}", capture_path);
+                HttpResponse::build(StatusCode::NOT_FOUND)
                     .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .insert_header(("Cache-Control", "public, max-age=60"))
-                    .body("Not Found");
+                    .body("Not Found")
             }
         }
     }

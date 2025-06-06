@@ -73,6 +73,12 @@ async fn main() -> std::io::Result<()> {
     // 初始化锁文件
     init_lockfile()?;
 
+    // DEBUG 输出已注册的存储和缓存插件
+    if cfg!(debug_assertions) {
+        storages::register::debug_storage_registry(); // 调试函数，打印已注册的存储插件
+        cache::register::debug_cache_registry(); // 调试函数，打印已注册的缓存插件
+    }
+
     // 检查存储后端
     let storage = StorageFactory::create()
         .await
@@ -82,18 +88,29 @@ async fn main() -> std::io::Result<()> {
         storage.get_backend_name().await
     );
 
-    cache::register::debug_cache_registry(); // 调试函数，打印已注册的缓存插件
-
     // 初始化 L1 和 L2 缓存
     let cache = cache::LayeredCache::new(storage.preferred_cache().clone())
         .await
         .expect("Failed to create cache");
 
     // 构建 L1 初始化缓存
-    debug!("Initializing L1 cache with preloading");
-    cache
-        .load_l1_cache(&storage.load_all().await.keys().cloned().collect::<Vec<_>>())
-        .await;
+    debug!("Initializing L1/L2 cache with preloading");
+    {
+        let links = storage.load_all().await;
+        cache
+            .reconfigure(cache::traits::BloomConfig {
+                capacity: links.len(),
+                fp_rate: 0.001,
+            })
+            .await;
+        cache
+            .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
+            .await;
+
+        cache.load_l2_cache(links.clone()).await;
+
+        debug!("L1/L2 cache initialized with {} links", links.len());
+    }
 
     // 设置重载机制
     debug!("Setting up reload mechanism");

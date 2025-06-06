@@ -1,9 +1,10 @@
 use crate::cache::register::{get_l1_plugin, get_l2_plugin};
 use crate::cache::traits::CacheResult;
-use crate::cache::{Cache, L1Cache, L2Cache};
+use crate::cache::traits::{BloomConfig, Cache, L1Cache, L2Cache};
 use crate::errors::ShortlinkerError;
 use crate::storages::{CachePreference, ShortLink};
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct LayeredCache {
@@ -36,13 +37,7 @@ impl Cache for LayeredCache {
         if !self.l1.check(key).await {
             return CacheResult::NotFound;
         }
-        match self.l2.get(key).await {
-            Some(value) => CacheResult::Found(value),
-            None => {
-                // 如果 L2 没有，返回存在但没有值的状态
-                CacheResult::ExistsButNoValue
-            }
-        }
+        return self.l2.get(key).await;
     }
 
     async fn insert(&self, key: String, value: ShortLink) {
@@ -60,5 +55,14 @@ impl Cache for LayeredCache {
 
     async fn load_l1_cache(&self, keys: &[String]) {
         self.l1.bulk_set(keys).await;
+    }
+
+    async fn load_l2_cache(&self, keys: HashMap<String, ShortLink>) {
+        self.l2.invalidate_all().await;
+        self.l2.load_l2_cache(keys).await;
+    }
+
+    async fn reconfigure(&self, config: BloomConfig) {
+        self.l1.clear(config.capacity, config.fp_rate).await;
     }
 }
