@@ -2,7 +2,6 @@ use dashmap::DashMap;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::sync::Arc;
 use tracing::{error, info};
 
 use async_trait::async_trait;
@@ -12,18 +11,7 @@ use crate::errors::{Result, ShortlinkerError};
 
 // 注册 file 存储插件
 // 这样子可以在应用启动时自动注册 file 存储插件
-pub fn register_file_plugin() {
-    use super::register::register_storage_plugin;
-    register_storage_plugin(
-        "file",
-        Arc::new(|| {
-            Box::pin(async {
-                let s = FileStorage::new_async().await?;
-                Ok(Box::new(s) as Box<dyn Storage>)
-            })
-        }),
-    );
-}
+declare_storage_plugin!("file", FileStorage);
 
 pub struct FileStorage {
     file_path: String,

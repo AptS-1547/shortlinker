@@ -1,3 +1,6 @@
+#[macro_use]
+mod macros;
+
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
@@ -9,7 +12,6 @@ mod backends;
 mod models;
 mod register;
 
-pub use backends::{file, sled, sqlite};
 pub use models::{SerializableShortLink, ShortLink};
 use register::get_storage_plugin;
 
@@ -28,18 +30,8 @@ pub trait Storage: Send + Sync {
 
 pub struct StorageFactory;
 
-// 注册所有存储插件
-pub fn register_all_plugins() {
-    sqlite::register_sqlite_plugin();
-    sled::register_sled_plugin();
-    file::register_file_plugin();
-}
-
 impl StorageFactory {
     pub async fn create() -> Result<Arc<dyn Storage>> {
-        // 注册所有存储插件
-        register_all_plugins();
-
         let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
 
         if let Some(ctor) = get_storage_plugin(&backend) {

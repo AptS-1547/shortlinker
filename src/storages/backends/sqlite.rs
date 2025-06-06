@@ -18,18 +18,7 @@ static CLI_MODE: OnceLock<bool> = OnceLock::new();
 
 // 注册 SQLite 存储插件
 // 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
-pub fn register_sqlite_plugin() {
-    use super::register::register_storage_plugin;
-    register_storage_plugin(
-        "sqlite",
-        Arc::new(|| {
-            Box::pin(async {
-                let s = SqliteStorage::new_async().await?;
-                Ok(Box::new(s) as Box<dyn Storage>)
-            })
-        }),
-    );
-}
+declare_storage_plugin!("sqlite", SqliteStorage);
 
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,

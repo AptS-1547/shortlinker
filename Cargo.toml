@@ -54,6 +54,7 @@ bloomfilter = "3.0.1"
 actix-service = "2.0.3"
 futures-util = "0.3.31"
 once_cell = "1.21.3"
+ctor = "0.4.2"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
