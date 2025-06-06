@@ -1,10 +1,14 @@
+use crate::cache::Cache;
 use crate::storages;
 use std::sync::Arc;
 use std::thread;
 
 // Unix平台的信号监听
 #[cfg(unix)]
-pub fn setup_reload_mechanism(storage: Arc<dyn storages::Storage>) {
+pub fn setup_reload_mechanism(
+    cache: Arc<dyn Cache + 'static>,
+    storage: Arc<dyn storages::Storage>,
+) {
     use signal_hook::{consts::SIGUSR1, iterator::Signals};
 
     thread::spawn(move || {

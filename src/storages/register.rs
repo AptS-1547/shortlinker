@@ -22,8 +22,12 @@ pub fn get_storage_plugin(name: &str) -> Option<StorageConstructor> {
     STORAGE_REGISTRY.read().unwrap().get(name).cloned()
 }
 
+pub fn get_storage_plugin_names() -> Vec<String> {
+    STORAGE_REGISTRY.read().unwrap().keys().cloned().collect()
+}
+
 /// 调试函数：打印当前所有已注册的 Storage backend 名称
-pub fn debug_registry() {
+pub fn debug_storage_registry() {
     let registry = STORAGE_REGISTRY.read().unwrap();
     if registry.is_empty() {
         debug!("No storage backends registered.");

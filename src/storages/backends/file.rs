@@ -1,4 +1,3 @@
-use dashmap::DashMap;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -6,7 +5,7 @@ use tracing::{error, info};
 
 use async_trait::async_trait;
 
-use super::{SerializableShortLink, ShortLink, Storage};
+use super::{CachePreference, SerializableShortLink, ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 
 // 注册 file 存储插件
@@ -15,28 +14,18 @@ declare_storage_plugin!("file", FileStorage);
 
 pub struct FileStorage {
     file_path: String,
-    cache: DashMap<String, ShortLink>,
 }
 
 impl FileStorage {
     pub async fn new_async() -> Result<Self> {
         let file_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.json".to_string());
-        let storage = FileStorage {
-            file_path,
-            cache: DashMap::new(),
-        };
 
-        // Load data into cache during initialization
-        let links = storage.load_from_file()?;
-        for (code, link) in links {
-            storage.cache.insert(code, link);
+        // 如果不存在就初始化
+        if fs::read_to_string(&file_path).is_err() {
+            fs::write(&file_path, "[]")?;
         }
-        info!(
-            "FileStorage initialized with {} short links",
-            storage.cache.len()
-        );
 
-        Ok(storage)
+        Ok(FileStorage { file_path })
     }
 
     fn load_from_file(&self) -> Result<HashMap<String, ShortLink>> {
@@ -112,77 +101,92 @@ impl FileStorage {
 #[async_trait]
 impl Storage for FileStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
-        self.cache.get(code).map(|entry| entry.value().clone())
+        match self.load_from_file() {
+            Ok(links) => links.get(code).cloned(),
+            Err(e) => {
+                error!("Failed to load links from file: {}", e);
+                None
+            }
+        }
     }
 
     async fn load_all(&self) -> HashMap<String, ShortLink> {
-        self.cache
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect()
+        // 从文件加载所有链接
+        match self.load_from_file() {
+            Ok(links) => links,
+            Err(e) => {
+                error!("Failed to load links from file: {}", e);
+                HashMap::new()
+            }
+        }
     }
 
     async fn set(&self, link: ShortLink) -> Result<()> {
         // 检查是否已存在，如果存在则保持原始创建时间
-        let final_link = if let Some(existing_entry) = self.cache.get(&link.code) {
-            ShortLink {
-                code: link.code.clone(),
-                target: link.target,
-                created_at: existing_entry.value().created_at, // 保持原始创建时间
-                expires_at: link.expires_at,
+        match self.load_from_file() {
+            Ok(mut links) => {
+                if let Some(existing_link) = links.get(&link.code) {
+                    // 如果已存在，保持原始创建时间
+                    let created_at = existing_link.created_at;
+                    links.insert(
+                        link.code.clone(),
+                        ShortLink {
+                            code: link.code,
+                            target: link.target,
+                            created_at,
+                            expires_at: link.expires_at,
+                        },
+                    );
+                } else {
+                    // 如果不存在，使用当前时间作为创建时间
+                    links.insert(link.code.clone(), link);
+                }
+
+                // 保存到文件
+                self.save_to_file(&links)?;
             }
-        } else {
-            link
-        };
-
-        // 更新缓存
-        self.cache.insert(final_link.code.clone(), final_link);
-
-        // 保存到文件
-        let current_links: HashMap<String, ShortLink> = self
-            .cache
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect();
-        self.save_to_file(&current_links)?;
+            Err(e) => {
+                error!("Failed to load links from file: {}", e);
+                return Err(e);
+            }
+        }
 
         Ok(())
     }
 
     async fn remove(&self, code: &str) -> Result<()> {
         // 从缓存中移除
-        let removed = self.cache.remove(code).is_some();
-
-        if !removed {
-            return Err(ShortlinkerError::not_found(format!(
-                "短链接不存在: {}",
-                code
-            )));
+        match self.load_from_file() {
+            Ok(mut links) => {
+                if links.remove(code).is_some() {
+                    // 如果成功移除，保存到文件
+                    self.save_to_file(&links)?;
+                    info!("Removed link with code: {}", code);
+                    Ok(())
+                } else {
+                    error!("Link with code {} not found", code);
+                    Err(ShortlinkerError::not_found(format!(
+                        "Link with code {} not found",
+                        code
+                    )))
+                }
+            }
+            Err(e) => {
+                error!("Failed to load links from file: {}", e);
+                Err(e)
+            }
         }
-
-        // 保存到文件
-        let current_links: HashMap<String, ShortLink> = self
-            .cache
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect();
-        self.save_to_file(&current_links)?;
-
-        Ok(())
     }
 
     async fn reload(&self) -> Result<()> {
+        // 重新加载所有链接到内存
         match self.load_from_file() {
-            Ok(new_links) => {
-                self.cache.clear();
-                for (code, link) in new_links {
-                    self.cache.insert(code, link);
-                }
-                info!("Cache reloaded");
+            Ok(links) => {
+                info!("Reloaded {} short links from file", links.len());
                 Ok(())
             }
             Err(e) => {
-                error!("Reload failed: {}", e);
+                error!("Failed to reload links from file: {}", e);
                 Err(e)
             }
         }
@@ -194,5 +198,12 @@ impl Storage for FileStorage {
 
     async fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
+    }
+
+    fn preferred_cache(&self) -> CachePreference {
+        CachePreference {
+            l1: "null".into(),
+            l2: "memory".into(),
+        }
     }
 }

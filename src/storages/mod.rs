@@ -4,18 +4,18 @@ mod macros;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
+use tracing::error;
 
 use crate::errors::{Result, ShortlinkerError};
-use async_trait::async_trait;
 
 mod backends;
 mod models;
 mod register;
 
-pub use models::{SerializableShortLink, ShortLink};
+pub use models::{CachePreference, SerializableShortLink, ShortLink};
 use register::get_storage_plugin;
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait Storage: Send + Sync {
     async fn get(&self, code: &str) -> Option<ShortLink>;
     async fn load_all(&self) -> HashMap<String, ShortLink>;
@@ -26,6 +26,14 @@ pub trait Storage: Send + Sync {
 
     /// 增加点击量计数器
     async fn increment_click(&self, code: &str) -> Result<()>;
+
+    /// 缓存首选项
+    fn preferred_cache(&self) -> CachePreference {
+        CachePreference {
+            l1: "null".into(),
+            l2: "null".into(),
+        }
+    }
 }
 
 pub struct StorageFactory;
@@ -36,9 +44,12 @@ impl StorageFactory {
 
         if let Some(ctor) = get_storage_plugin(&backend) {
             let storage = ctor().await?;
-            register::debug_registry(); // 调试函数，打印已注册的存储后端
+            register::debug_storage_registry(); // 调试函数，打印已注册的存储后端
             Ok(Arc::from(storage))
         } else {
+            error!("Failed to create storage backend: {}", backend);
+            let available_backends = register::get_storage_plugin_names();
+            error!("Available storage backends: {:?}", available_backends);
             Err(ShortlinkerError::storage_plugin_not_found(format!(
                 "Unknown storage backend: {}",
                 backend

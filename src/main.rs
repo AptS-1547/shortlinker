@@ -3,6 +3,7 @@ use dotenv::dotenv;
 use std::env;
 use tracing::{debug, warn};
 
+mod cache;
 mod cli;
 mod errors;
 mod middleware;
@@ -81,9 +82,22 @@ async fn main() -> std::io::Result<()> {
         storage.get_backend_name().await
     );
 
+    cache::register::debug_cache_registry(); // 调试函数，打印已注册的缓存插件
+
+    // 初始化 L1 和 L2 缓存
+    let cache = cache::LayeredCache::new(storage.preferred_cache().clone())
+        .await
+        .expect("Failed to create cache");
+
+    // 构建 L1 初始化缓存
+    debug!("Initializing L1 cache with preloading");
+    cache
+        .load_l1_cache(&storage.load_all().await.keys().cloned().collect::<Vec<_>>())
+        .await;
+
     // 设置重载机制
     debug!("Setting up reload mechanism");
-    system::setup_reload_mechanism(storage.clone());
+    system::setup_reload_mechanism(cache.clone(), storage.clone());
 
     // 获取路由前缀配置
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
@@ -116,6 +130,7 @@ async fn main() -> std::io::Result<()> {
     // Start the HTTP server
     let server = HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024)) // 设置最大请求体大小为1MB

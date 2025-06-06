@@ -1,16 +1,12 @@
-use bloomfilter::Bloom;
-use moka::future::Cache;
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::env;
-use std::sync::Arc;
 use std::sync::OnceLock;
-use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
-use super::{ShortLink, Storage};
+use super::{CachePreference, ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 use async_trait::async_trait;
 
@@ -22,8 +18,6 @@ declare_storage_plugin!("sqlite", SqliteStorage);
 
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,
-    cache: Cache<String, ShortLink>,
-    bloom_filter: Arc<RwLock<Bloom<str>>>,
 }
 
 impl SqliteStorage {
@@ -68,23 +62,7 @@ impl SqliteStorage {
             .build(manager)
             .map_err(|e| ShortlinkerError::database_connection(format!("无法创建连接池: {}", e)))?;
 
-        let cache = Cache::builder()
-            .max_capacity(10000) // 设置缓存容量
-            .time_to_live(std::time::Duration::from_secs(60 * 15))
-            .time_to_idle(std::time::Duration::from_secs(60 * 5))
-            .build();
-
-        // 先创建一个临时的 bloom filter，稍后会根据实际数据量重新创建
-        let bloom_filter = Arc::new(RwLock::new(
-            Bloom::new_for_fp_rate(1000, 0.01)
-                .unwrap_or_else(|_| panic!("Failed to create temporary bloom filter")),
-        ));
-
-        let storage = SqliteStorage {
-            pool,
-            cache,
-            bloom_filter,
-        };
+        let storage = SqliteStorage { pool };
 
         // Initialize database tables
         storage.init_db()?;
@@ -95,8 +73,6 @@ impl SqliteStorage {
             warn!("CLI mode detected, skipping bloom filter initialization");
             return Ok(storage);
         }
-
-        storage.init_bloom_filter_with_count().await?;
 
         warn!("SqliteStorage initialized, database path: {}", db_path);
         Ok(storage)
@@ -164,107 +140,11 @@ impl SqliteStorage {
             expires_at,
         })
     }
-
-    async fn init_bloom_filter_with_count(&self) -> Result<()> {
-        let conn = self.get_connection()?;
-        let bloom_filter = Arc::clone(&self.bloom_filter);
-
-        let result = {
-            // 先查询记录总数
-            let count: i64 = conn
-                .query_row("SELECT COUNT(*) FROM short_links", [], |row| row.get(0))
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("查询记录总数失败: {}", e))
-                })?;
-
-            // 根据实际记录数量确定 bloom filter 容量
-            // 至少设置为 1000，为未来增长预留空间
-            let capacity = std::cmp::max(count as usize * 2, 1000);
-
-            info!(
-                "Database has {} records, creating bloom filter with capacity {}",
-                count, capacity
-            );
-
-            // 查询所有短码
-            let mut stmt = conn
-                .prepare("SELECT short_code FROM short_links")
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("准备查询语句失败: {}", e))
-                })?;
-            let rows = stmt
-                .query_map([], |row| row.get::<_, String>(0))
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("查询短码失败: {}", e))
-                })?;
-
-            let mut codes = Vec::new();
-            for row in rows {
-                match row {
-                    Ok(code) => codes.push(code),
-                    Err(e) => error!("Failed to read short code: {}", e),
-                }
-            }
-
-            Ok((capacity, codes))
-        };
-
-        match result {
-            Ok((capacity, codes)) => {
-                // 创建新的 bloom filter
-                let new_bloom = Bloom::new_for_fp_rate(capacity, 0.01).unwrap_or_else(|_| {
-                    warn!(
-                        "Failed to create bloom filter with capacity {}, using default",
-                        capacity
-                    );
-                    Bloom::new_for_fp_rate(10000, 0.01)
-                        .unwrap_or_else(|_| panic!("Failed to create fallback bloom filter"))
-                });
-
-                // 替换原有的 bloom filter 并加载数据
-                {
-                    let mut bloom = bloom_filter.write().await;
-                    *bloom = new_bloom;
-
-                    for code in &codes {
-                        bloom.set(code);
-                    }
-                }
-
-                info!(
-                    "Bloom filter initialized with {} short codes, capacity: {}",
-                    codes.len(),
-                    capacity
-                );
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
-    }
 }
 
 #[async_trait]
 impl Storage for SqliteStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
-        // 先检查缓存
-        if let Some(link) = self.cache.get(code).await {
-            return Some(link);
-        }
-
-        // 使用 bloom filter 进行快速预检查
-        {
-            if *CLI_MODE.get().unwrap_or(&false) {
-                warn!("CLI mode detected, skipping bloom filter check");
-                return None;
-            } else {
-                let bloom = self.bloom_filter.read().await;
-                if !bloom.check(code) {
-                    // bloom filter 确定不存在，直接返回 None
-                    return None;
-                }
-            }
-        }
-
         // Cache miss, query database
         let conn = match self.get_connection() {
             Ok(conn) => conn,
@@ -275,7 +155,6 @@ impl Storage for SqliteStorage {
         };
 
         let code = code.to_string();
-        let cache = self.cache.clone();
 
         let result = actix_web::web::block(move || {
             let mut stmt = conn.prepare(
@@ -300,11 +179,7 @@ impl Storage for SqliteStorage {
                     created_at,
                     expires_at,
                 ) {
-                    Ok(link) => {
-                        // Store result into cache
-                        cache.insert(short_code, link.clone()).await;
-                        Some(link)
-                    }
+                    Ok(link) => Some(link),
                     Err(e) => {
                         error!("Failed to parse short link data: {}", e);
                         None
@@ -390,8 +265,6 @@ impl Storage for SqliteStorage {
 
     async fn set(&self, link: ShortLink) -> Result<()> {
         let pool = self.pool.clone();
-        let cache = self.cache.clone();
-        let bloom_filter = Arc::clone(&self.bloom_filter);
         let link_clone = link.clone();
 
         let result = actix_web::web::block(move || {
@@ -466,18 +339,7 @@ impl Storage for SqliteStorage {
         .await;
 
         match result {
-            Ok(Ok(_)) => {
-                // 更新缓存
-                cache.insert(link.code.clone(), link.clone()).await;
-
-                // 将新的短码添加到 bloom filter
-                {
-                    let mut bloom = bloom_filter.write().await;
-                    bloom.set(link.code.as_str());
-                }
-
-                Ok(())
-            }
+            Ok(Ok(_)) => Ok(()),
             Ok(Err(e)) => Err(e),
             Err(e) => Err(ShortlinkerError::database_operation(format!(
                 "执行异步操作失败: {:?}",
@@ -488,7 +350,6 @@ impl Storage for SqliteStorage {
 
     async fn remove(&self, code: &str) -> Result<()> {
         let pool = self.pool.clone();
-        let cache = self.cache.clone();
         let code = code.to_string();
 
         let result = actix_web::web::block(move || {
@@ -529,11 +390,7 @@ impl Storage for SqliteStorage {
         .await;
 
         match result {
-            Ok(Ok(deleted_code)) => {
-                // 从缓存中移除
-                cache.remove(&deleted_code).await;
-                Ok(())
-            }
+            Ok(Ok(_)) => Ok(()),
             Ok(Err(e)) => Err(e),
             Err(e) => Err(ShortlinkerError::database_operation(format!(
                 "执行异步操作失败: {:?}",
@@ -543,13 +400,7 @@ impl Storage for SqliteStorage {
     }
 
     async fn reload(&self) -> Result<()> {
-        // Clear cache to force reload from database
-        self.cache.invalidate_all();
-
-        // 重新初始化 bloom filter
-        self.init_bloom_filter_with_count().await?;
-
-        info!("SQLite cache and bloom filter cleared, data reloaded from database");
+        info!("Reloading links from SQLite storage");
         Ok(())
     }
 
@@ -559,5 +410,12 @@ impl Storage for SqliteStorage {
 
     async fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
+    }
+
+    fn preferred_cache(&self) -> CachePreference {
+        CachePreference {
+            l1: "bloom".into(),
+            l2: "moka".into(),
+        }
     }
 }

@@ -2,6 +2,7 @@
 //!
 //! 这是一个高性能的短链接服务，支持命令行管理和Web API。
 
+pub mod cache;
 pub mod cli;
 pub mod errors;
 pub mod middleware;
