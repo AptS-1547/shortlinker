@@ -26,11 +26,8 @@ pub trait Cache: Send + Sync {
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
-    /// 批量加载 L1 缓存
-    async fn load_l1_cache(&self, keys: &[String]);
-
-    /// 批量加载 L2 缓存
-    async fn load_l2_cache(&self, keys: HashMap<String, ShortLink>);
+    /// 批量加载 L1 和 L2 缓存
+    async fn load_cache(&self, links: HashMap<String, ShortLink>);
 
     /// 重新初始化 L1 缓存
     async fn reconfigure(&self, config: BloomConfig);

@@ -103,11 +103,8 @@ async fn main() -> std::io::Result<()> {
                 fp_rate: 0.001,
             })
             .await;
-        cache
-            .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
-            .await;
 
-        cache.load_l2_cache(links.clone()).await;
+        cache.load_cache(links.clone()).await;
 
         debug!("L1/L2 cache initialized with {} links", links.len());
     }

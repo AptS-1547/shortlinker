@@ -24,10 +24,8 @@ pub fn setup_reload_mechanism(
                         fp_rate: 0.001,
                     })
                     .await;
-                cache
-                    .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
-                    .await;
-                cache.load_l2_cache(links).await;
+
+                cache.load_cache(links).await;
                 Ok::<(), anyhow::Error>(())
             }) {
                 tracing::error!("Reload failed: {}", e);
@@ -65,10 +63,8 @@ pub fn setup_reload_mechanism(
                                     fp_rate: 0.001,
                                 })
                                 .await;
-                            cache
-                                .load_l1_cache(&links.keys().cloned().collect::<Vec<_>>())
-                                .await;
-                            cache.load_l2_cache(links).await;
+
+                            cache.load_cache(links).await;
                             Ok::<(), anyhow::Error>(())
                         }) {
                             tracing::error!("Reload failed: {}", e);

@@ -34,7 +34,7 @@ impl L2Cache for MokaCacheWrapper {
         if let Some(value) = self.inner.get(key).await {
             CacheResult::Found(value.clone())
         } else {
-            CacheResult::NotFound
+            CacheResult::ExistsButNoValue
         }
     }
 

@@ -6,4 +6,4 @@ pub mod register;
 pub mod traits;
 
 pub use layered::LayeredCache;
-pub use traits::{Cache, CacheResult, L1Cache, L2Cache};
+pub use traits::{BloomConfig, Cache, CacheResult, L1Cache, L2Cache};

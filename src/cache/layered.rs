@@ -1,6 +1,5 @@
 use crate::cache::register::{get_l1_plugin, get_l2_plugin};
-use crate::cache::traits::CacheResult;
-use crate::cache::traits::{BloomConfig, Cache, L1Cache, L2Cache};
+use crate::cache::{BloomConfig, Cache, CacheResult, L1Cache, L2Cache};
 use crate::errors::ShortlinkerError;
 use crate::storages::{CachePreference, ShortLink};
 use async_trait::async_trait;
@@ -53,13 +52,14 @@ impl Cache for LayeredCache {
         self.l2.invalidate_all().await;
     }
 
-    async fn load_l1_cache(&self, keys: &[String]) {
-        self.l1.bulk_set(keys).await;
-    }
+    async fn load_cache(&self, links: HashMap<String, ShortLink>) {
+        self.l1
+            .bulk_set(&links.keys().cloned().collect::<Vec<_>>())
+            .await;
 
-    async fn load_l2_cache(&self, keys: HashMap<String, ShortLink>) {
+        // L2 需要先清空再加载
         self.l2.invalidate_all().await;
-        self.l2.load_l2_cache(keys).await;
+        self.l2.load_l2_cache(links).await;
     }
 
     async fn reconfigure(&self, config: BloomConfig) {
