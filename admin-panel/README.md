@@ -1,38 +1,40 @@
 # Shortlinker Admin Panel
 
-A modern web management interface for managing [Shortlinker](../README.md) short link service.
+A modern web administration interface for managing the [Shortlinker](../README.md) URL shortening service.
 
 ## Features
 
-- 🎨 **Modern Interface** - Responsive design based on Next.js + TailwindUI
-- 🔐 **Secure Authentication** - Token stored in an HttpOnly cookie for safer Admin API access
-- 📊 **Complete Management** - Support for CRUD operations on short links
-- ⚡ **Real-time Updates** - Automatic data refresh after operations
-- 🕐 **Expiration Management** - Visual expiration time setting and display
+- 🎨 **Modern Interface** - Responsive design built with Vue 3 + Vite
+- 🔐 **Secure Authentication** - Token-based access to Admin API  
+- 📊 **Complete Management** - Full CRUD operations for short links
+- ⚡ **Real-time Updates** - Auto-refresh data after operations
+- 🕐 **Expiration Management** - Visual expiration time setting with local timezone support
+- 💚 **Health Monitoring** - Real-time backend service status display
+- 🔄 **Client-side Routing** - SPA routing system based on Vue Router
 
 ## Tech Stack
 
-- **Frontend Framework**: Next.js + TypeScript
-- **UI Components**: TailwindUI + React
-- **Build Tool**: Vite / Next.js
+- **Frontend Framework**: Vue 3 + TypeScript + Vite
+- **UI Components**: TailwindCSS + Vue
+- **HTTP Client**: Axios
+- **State Management**: Pinia
+- **Routing System**: Vue Router
 - **Package Manager**: Yarn
 
-## Development Status
+## Completed Features
 
-🚧 **Under Development** - This admin panel is currently in the planning and development phase, and will be completed in future versions.
-
-### Planned Features
-
-- [ ] User authentication interface
-- [ ] Short link list management
-- [ ] Create and edit short links
-- [ ] Batch operations
-- [ ] Statistics dashboard
-- [ ] Internationalization support
+- ✅ User authentication interface
+- ✅ Short link list management
+- ✅ Create and edit short links
+- ✅ Delete link functionality
+- ✅ Health status monitoring
+- ✅ Local timezone time display
+- ✅ Client-side routing system
+- ✅ Conflict detection and handling
 
 ## Environment Configuration
 
-Future support for the following environment variables:
+Supports the following environment variables:
 
 ```bash
 # Shortlinker service address
@@ -41,36 +43,62 @@ VITE_API_BASE_URL=http://localhost:8080
 # Admin API route prefix
 VITE_ADMIN_ROUTE_PREFIX=/admin
 
-# Default admin token (development environment)
-VITE_DEFAULT_ADMIN_TOKEN=your_admin_token
+# Health check route prefix
+VITE_HEALTH_ROUTE_PREFIX=/health
 ```
 
 ## API Integration
 
-Admin Panel will be built based on Shortlinker's [Admin API](../src/admin.rs), supporting the following endpoints:
+Admin Panel is built on Shortlinker's [Admin API](../src/services/admin.rs), supporting:
 
 - `GET /admin/link` - Get all short links
 - `POST /admin/link` - Create new short link
 - `GET /admin/link/{code}` - Get specific short link
 - `PUT /admin/link/{code}` - Update short link
 - `DELETE /admin/link/{code}` - Delete short link
+- `GET /health` - Health check
 
 ## Authentication
 
-All API requests require a Bearer Token in the header:
+All API requests require Bearer Token in header:
 
 ```
 Authorization: Bearer {ADMIN_TOKEN}
 ```
 
-## Development Roadmap
+## Development
 
-This admin panel will be implemented progressively in future versions. Stay tuned!
+```bash
+# Install dependencies
+yarn install
+
+# Development mode
+yarn dev
+
+# Build for production
+yarn build
+```
+
+## Routing System
+
+The admin panel uses Vue Router with the following routes:
+
+- `/admin/login` - User login page
+- `/admin/dashboard` - Main dashboard (link management)
+- `/admin/links` - Link management page
+- `/admin/analytics` - Data analytics page (planned)
+
+### Route Features
+
+- 🔒 **Route Guards** - Automatic authentication status checking
+- 📱 **Responsive** - Mobile and desktop support
+- ⚡ **Fast Navigation** - Instant routing based on Vue Router
+- 🔄 **State Persistence** - Maintain application state during navigation
 
 ## Related Documentation
 
 - 📖 [Shortlinker Main Documentation](../README.md)
-- 🔧 [Admin API Source Code](../src/admin.rs)
+- 🔧 [Admin API Source Code](../src/services/admin.rs)
 - ⚙️ [Configuration Guide](../docs/config/index.md)
 
 ## License

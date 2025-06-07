@@ -161,7 +161,12 @@ async fn main() -> std::io::Result<()> {
                 DefaultHeaders::new()
                     .add(("Connection", "keep-alive"))
                     .add(("Keep-Alive", "timeout=30, max=1000"))
-                    .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
+                    .add(("Cache-Control", "no-cache, no-store, must-revalidate"))
+                    // 跨站需要 .env 中配置 CORS
+                    .add(("Access-Control-Allow-Origin", "http://localhost:3000"))
+                    .add(("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"))
+                    .add(("Access-Control-Allow-Headers", "Content-Type, Authorization"))
+                    .add(("Access-Control-Allow-Credentials", "true")),
             )
             .service(
                 web::scope(&admin_prefix)
@@ -172,7 +177,8 @@ async fn main() -> std::io::Result<()> {
                     .route("/link/{code}", web::get().to(AdminService::get_link))
                     .route("/link/{code}", web::head().to(AdminService::get_link))
                     .route("/link/{code}", web::delete().to(AdminService::delete_link))
-                    .route("/link/{code}", web::put().to(AdminService::update_link)),
+                    .route("/link/{code}", web::put().to(AdminService::update_link))
+                    .route("/auth/login", web::post().to(AdminService::check_admin_token)),
             )
             .service(
                 web::scope(&health_prefix)

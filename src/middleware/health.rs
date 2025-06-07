@@ -13,6 +13,7 @@ use std::sync::OnceLock;
 use tracing::{debug, info};
 
 static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
+static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct HealthAuth;
@@ -70,6 +71,7 @@ where
             }
 
             let token = HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
+            let admin_token = ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
 
             if token.is_empty() {
                 return Ok(req.into_response(
@@ -85,7 +87,7 @@ where
                 .get("Authorization")
                 .and_then(|h| h.to_str().ok())
                 .and_then(|s| s.strip_prefix("Bearer "))
-                .map(|val| val == token)
+                .map(|val| val == token || val == admin_token)
                 .unwrap_or(false);
 
             if !auth_ok {
