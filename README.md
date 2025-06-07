@@ -196,7 +196,10 @@ Configure using environment variables or `.env` file:
 | `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
+| `ENABLE_FRONTEND_ROUTES` | `false` | Serve web admin panel (requires build and ADMIN_TOKEN) |
+| `FRONTEND_ROUTE_PREFIX` | `/panel` | Web admin panel route prefix |
 | `RUST_LOG`           | `info`                 | Log level                                   |
+> **Note**: The web admin panel is a new feature and may be unstable.
 
 ### .env Example
 
@@ -299,6 +302,11 @@ cargo test
 # Code quality
 cargo fmt && cargo clippy
 ```
+## Related Modules
+
+- **Web Admin Panel**: GUI to manage links in `admin-panel/` ([docs](/admin-panel/))
+- **Cloudflare Worker**: Serverless version in `cf-worker/` ([docs](/cf-worker/))
+
 
 ## Technical Highlights
 

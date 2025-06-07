@@ -77,6 +77,9 @@ curl -L http://localhost:8080/github
 - **临时链接**：限时分享、测试环境
 - **API 服务**：微服务间链接管理
 
+
 ## 开始使用
 
-准备好了吗？查看 [快速开始指南](/guide/getting-started) 开始您的 Shortlinker 
+准备好了吗？查看 [快速开始指南](/guide/getting-started) 开始您的 Shortlinker 之旅。
+
+更多组件：[Web 管理界面](/admin-panel/) | [Cloudflare Worker 版本](/cf-worker/)。

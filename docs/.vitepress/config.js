@@ -142,7 +142,23 @@ export default {
           ]
         }
       ],
-      
+      '/admin-panel/': [
+        {
+          text: 'Web 管理界面',
+          items: [
+            { text: '概述', link: '/admin-panel/' }
+          ]
+        }
+      ],
+      '/cf-worker/': [
+        {
+          text: 'Cloudflare Worker',
+          items: [
+            { text: '概述', link: '/cf-worker/' }
+          ]
+        }
+      ],
+
       // English sidebar
       '/en/': [
         {
@@ -198,6 +214,22 @@ export default {
             { text: 'HTTP Interface', link: '/en/api/' },
             { text: 'Admin API', link: '/en/api/admin' },
             { text: 'Health Check API', link: '/en/api/health' }
+          ]
+        }
+      ],
+      '/en/admin-panel/': [
+        {
+          text: 'Web Admin Panel',
+          items: [
+            { text: 'Overview', link: '/en/admin-panel/' }
+          ]
+        }
+      ],
+      '/en/cf-worker/': [
+        {
+          text: 'Cloudflare Worker',
+          items: [
+            { text: 'Overview', link: '/en/cf-worker/' }
           ]
         }
       ]

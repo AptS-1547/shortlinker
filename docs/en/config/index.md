@@ -49,6 +49,9 @@ export SERVER_PORT=8080
 | `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API route prefix |
 | `HEALTH_TOKEN` | String | *(empty)* | Health check API auth token, **disabled when empty** |
 | `HEALTH_ROUTE_PREFIX` | String | `/health` | Health check API route prefix |
+| `ENABLE_FRONTEND_ROUTES` | Boolean | `false` | Enable the web admin panel (requires ADMIN_TOKEN) |
+| `FRONTEND_ROUTE_PREFIX` | String | `/panel` | Route prefix for the web admin panel |
+> **Note**: The web admin panel is a new feature and may still be unstable.
 
 > For detailed API configuration, see [Admin API](/en/api/admin) and [Health Check API](/en/api/health)
 

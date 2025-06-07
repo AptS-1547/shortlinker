@@ -2,6 +2,7 @@
 
 一个现代化的 Web 管理界面，用于管理 [Shortlinker](../README.zh.md) 短链接服务。
 
+要在 Shortlinker 中启用此界面，需要先构建 `dist` 目录并设置 `ENABLE_FRONTEND_ROUTES=true`，同时保证已配置 `ADMIN_TOKEN`。该功能仍处于试验阶段，可能不稳定。
 ## 功能特性
 
 - 🎨 **现代化界面** - 基于 Vue 3 + Vite 的响应式设计
