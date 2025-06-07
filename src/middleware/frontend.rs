@@ -10,15 +10,15 @@ use futures_util::future::{ready, LocalBoxFuture, Ready};
 use std::env;
 use std::rc::Rc;
 use std::sync::OnceLock;
-use tracing::{debug, info};
+use tracing::debug;
 
-static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
+static ENABLE_FRONTEND_ROUTES: OnceLock<bool> = OnceLock::new();
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone)]
-pub struct HealthAuth;
+pub struct FrontendGuard;
 
-impl<S, B> Transform<S, ServiceRequest> for HealthAuth
+impl<S, B> Transform<S, ServiceRequest> for FrontendGuard
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     B: 'static,
@@ -26,21 +26,21 @@ where
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
-    type Transform = HealthAuthMiddleware<S>;
+    type Transform = FrontendGuardMiddleware<S>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(HealthAuthMiddleware {
+        ready(Ok(FrontendGuardMiddleware {
             service: Rc::new(service),
         }))
     }
 }
 
-pub struct HealthAuthMiddleware<S> {
+pub struct FrontendGuardMiddleware<S> {
     service: Rc<S>,
 }
 
-impl<S, B> Service<ServiceRequest> for HealthAuthMiddleware<S>
+impl<S, B> Service<ServiceRequest> for FrontendGuardMiddleware<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     B: 'static,
@@ -59,11 +59,15 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let token = HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
+            let enable_frontend_routes = ENABLE_FRONTEND_ROUTES.get_or_init(|| {
+                env::var("ENABLE_FRONTEND_ROUTES")
+                    .map(|v| v == "true")
+                    .unwrap_or(false)
+            });
             let admin_token =
                 ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
 
-            if token.is_empty() && admin_token.is_empty() {
+            if !enable_frontend_routes || admin_token.is_empty() {
                 return Ok(req.into_response(
                     HttpResponse::build(StatusCode::NOT_FOUND)
                         .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
@@ -72,37 +76,7 @@ where
                 ));
             }
 
-            if req.method().clone() == actix_web::http::Method::OPTIONS {
-                return Ok(req.into_response(
-                    HttpResponse::build(StatusCode::NO_CONTENT)
-                        .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
-                        .finish()
-                        .map_into_right_body(),
-                ));
-            }
-
-            let auth_ok = req
-                .headers()
-                .get("Authorization")
-                .and_then(|h| h.to_str().ok())
-                .and_then(|s| s.strip_prefix("Bearer "))
-                .map(|val| val == token || val == admin_token)
-                .unwrap_or(false);
-
-            if !auth_ok {
-                info!("Health auth failed");
-                return Ok(req.into_response(
-                    HttpResponse::build(StatusCode::UNAUTHORIZED)
-                        .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                        .json(serde_json::json!({
-                            "code": 401,
-                            "data": { "error": "Unauthorized: Invalid or missing token" }
-                        }))
-                        .map_into_right_body(),
-                ));
-            }
-
-            debug!("Health auth passed");
+            debug!("Processing frontend request: {}", req.path());
             let res = srv.call(req).await?.map_into_left_body();
             Ok(res)
         })

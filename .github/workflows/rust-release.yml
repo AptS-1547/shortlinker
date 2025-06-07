@@ -14,6 +14,38 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 'latest'
+        cache-dependency-path: 'yarn.lock'
+
+    - name: Install frontend dependencies
+      working-directory: frontend
+      run: |
+        cd admin-panel
+        yarn install --frozen-lockfile --production
+
+    - name: Build frontend
+      working-directory: frontend
+      run: |
+        cd admin-panel
+        yarn build
+
+    - name: Upload frontend build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-dist
+        path: admin-panel/dist
+        # 仅保留最近一次构建的前端文件
+        retention-days: 1
+
   build-linux-windows:
     name: Build Linux x86/i686 & Windows
     runs-on: ubuntu-latest
@@ -38,6 +70,12 @@ jobs:
       run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
     - uses: actions/checkout@v4
+
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: admin-panel/dist
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -109,6 +147,12 @@ jobs:
 
     - uses: actions/checkout@v4
 
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: admin-panel/dist
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -160,6 +204,12 @@ jobs:
       run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
     - uses: actions/checkout@v4
+
+    - name: Download frontend build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: admin-panel/dist
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable

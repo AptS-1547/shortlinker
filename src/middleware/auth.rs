@@ -27,7 +27,7 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
-            admin_prefix: env::var("ADMIN_PREFIX").unwrap_or_else(|_| "admin".to_string()),
+            admin_prefix: env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string()),
             admin_token: env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string()),
         }))
     }
@@ -92,7 +92,7 @@ where
     /// Check if the request path is the login endpoint
     fn is_login_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
         let path = req.path();
-        let login_path = format!("/{}/auth/login", admin_prefix);
+        let login_path = format!("{}/auth/login", admin_prefix);
         path == login_path
     }
 }
@@ -117,16 +117,16 @@ where
         let srv = self.service.clone();
         let admin_token = self.admin_token.clone();
         let admin_prefix = self.admin_prefix.clone();
-        
-        Box::pin(async move {
-            // Handle CORS preflight requests
-            if req.method() == Method::OPTIONS {
-                return Ok(Self::handle_options_request(req));
-            }
 
+        Box::pin(async move {
             // Check if admin token is configured
             if admin_token.is_empty() {
                 return Ok(Self::handle_missing_token(req));
+            }
+
+            // Handle CORS preflight requests
+            if req.method() == Method::OPTIONS {
+                return Ok(Self::handle_options_request(req));
             }
 
             // Allow login endpoint to pass through without authentication
@@ -142,7 +142,7 @@ where
             }
 
             debug!("Admin authentication successful");
-            
+
             // Process the request with the next service
             let response = srv.call(req).await?.map_into_left_body();
             Ok(response)

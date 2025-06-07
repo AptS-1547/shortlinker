@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use tracing::{debug, error, info};
 
+use crate::cache::traits::CompositeCacheTrait;
 use crate::storages::{ShortLink, Storage};
+use crate::system::reload::reload_all;
 use crate::utils::{generate_random_code, TimeParser};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -115,16 +117,19 @@ impl AdminService {
         query: web::Query<GetLinksQuery>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
-        info!("Admin API: request to list all links with filters: {:?}", query);
+        debug!(
+            "Admin API: request to list all links with filters: {:?}",
+            query
+        );
 
         let all_links = storage.load_all().await;
-        info!("Admin API: retrieved {} total links", all_links.len());
+        debug!("Admin API: retrieved {} total links", all_links.len());
 
         let now = chrono::Utc::now();
         let mut filtered_links = Self::filter_links(all_links, &query, now);
 
         // Sort by creation time (newest first)
-        filtered_links.sort_by(|a , b| b.1.created_at.cmp(&a.1.created_at));
+        filtered_links.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
 
         let total = filtered_links.len();
         let page = query.page.unwrap_or(1).max(1);
@@ -136,7 +141,10 @@ impl AdminService {
 
         info!(
             "Admin API: returning {} links (page {} of {}, total: {})",
-            serializable_links.len(), page, total_pages, total
+            serializable_links.len(),
+            page,
+            total_pages,
+            total
         );
 
         Ok(HttpResponse::Ok()
@@ -201,7 +209,7 @@ impl AdminService {
     ) -> Vec<(String, ShortLink)> {
         let start = (page - 1) * page_size;
         let end = (start + page_size).min(links.len());
-        
+
         if start < links.len() {
             links.drain(start..end).collect()
         } else {
@@ -219,6 +227,7 @@ impl AdminService {
     pub async fn post_link(
         _req: HttpRequest,
         mut link: web::Json<PostNewLink>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
         // Generate code if not provided
@@ -227,11 +236,17 @@ impl AdminService {
             let random_code = generate_random_code(Self::get_random_code_length());
             link.code = Some(random_code);
         } else {
-            info!("Admin API: using provided code: {}", link.code.as_ref().unwrap());
+            info!(
+                "Admin API: using provided code: {}",
+                link.code.as_ref().unwrap()
+            );
         }
 
         let code = link.code.as_ref().unwrap();
-        info!("Admin API: create link request - code: {}, target: {}", code, link.target);
+        info!(
+            "Admin API: create link request - code: {}, target: {}",
+            code, link.target
+        );
 
         // Parse expiration time
         let expires_at = match &link.expires_at {
@@ -255,6 +270,7 @@ impl AdminService {
         match storage.set(new_link.clone()).await {
             Ok(_) => {
                 info!("Admin API: link created - {}", new_link.code);
+                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
                 Ok(HttpResponse::Created()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -268,8 +284,14 @@ impl AdminService {
             }
             Err(e) => {
                 let error_msg = format!("Error creating link: {}", e);
-                error!("Admin API: failed to create link - {}: {}", new_link.code, e);
-                Ok(Self::error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+                error!(
+                    "Admin API: failed to create link - {}: {}",
+                    new_link.code, e
+                );
+                Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error_msg,
+                ))
             }
         }
     }
@@ -289,7 +311,10 @@ impl AdminService {
             }
             None => {
                 info!("Admin API: link not found - {}", code);
-                Ok(Self::error_response(StatusCode::NOT_FOUND, "Link not found"))
+                Ok(Self::error_response(
+                    StatusCode::NOT_FOUND,
+                    "Link not found",
+                ))
             }
         }
     }
@@ -297,6 +322,7 @@ impl AdminService {
     pub async fn delete_link(
         _req: HttpRequest,
         code: web::Path<String>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
         info!("Admin API: delete link request - code: {}", code);
@@ -304,14 +330,18 @@ impl AdminService {
         match storage.remove(&code).await {
             Ok(_) => {
                 info!("Admin API: link deleted - {}", code);
-                Ok(Self::success_response(serde_json::json!({ 
-                    "message": "Link deleted successfully" 
+                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+                Ok(Self::success_response(serde_json::json!({
+                    "message": "Link deleted successfully"
                 })))
             }
             Err(e) => {
                 let error_msg = format!("Error deleting link: {}", e);
                 error!("Admin API: failed to delete link - {}: {}", code, e);
-                Ok(Self::error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+                Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error_msg,
+                ))
             }
         }
     }
@@ -320,16 +350,23 @@ impl AdminService {
         _req: HttpRequest,
         code: web::Path<String>,
         link: web::Json<PostNewLink>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
-        info!("Admin API: update link request - code: {}, target: {}", code, link.target);
+        info!(
+            "Admin API: update link request - code: {}, target: {}",
+            code, link.target
+        );
 
         // Get existing link to preserve creation time
         let existing_link = match storage.get(&code).await {
             Some(link) => link,
             None => {
                 info!("Admin API: attempt to update nonexistent link - {}", code);
-                return Ok(Self::error_response(StatusCode::NOT_FOUND, "Link not found"));
+                return Ok(Self::error_response(
+                    StatusCode::NOT_FOUND,
+                    "Link not found",
+                ));
             }
         };
 
@@ -355,6 +392,7 @@ impl AdminService {
         match storage.set(updated_link.clone()).await {
             Ok(_) => {
                 info!("Admin API: link updated - {}", code);
+                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
                 Ok(Self::success_response(PostNewLink {
                     code: Some(updated_link.code),
                     target: updated_link.target,
@@ -364,7 +402,10 @@ impl AdminService {
             Err(e) => {
                 let error_msg = format!("Error updating link: {}", e);
                 error!("Admin API: failed to update link - {}: {}", code, e);
-                Ok(Self::error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+                Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error_msg,
+                ))
             }
         }
     }
@@ -377,12 +418,39 @@ impl AdminService {
 
         if login_body.password == admin_token {
             info!("Admin API: login successful");
-            Ok(Self::success_response(serde_json::json!({ 
-                "message": "Login successful" 
+            Ok(Self::success_response(serde_json::json!({
+                "message": "Login successful"
             })))
         } else {
             error!("Admin API: login failed - invalid token");
-            Ok(Self::error_response(StatusCode::UNAUTHORIZED, "Invalid admin token"))
+            Ok(Self::error_response(
+                StatusCode::UNAUTHORIZED,
+                "Invalid admin token",
+            ))
+        }
+    }
+
+    async fn reload_system(
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        storage: web::Data<Arc<dyn Storage>>,
+    ) -> ActixResult<impl Responder> {
+        info!("Admin API: reload system request");
+
+        match reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await {
+            Ok(_) => {
+                info!("Admin API: system reload successful");
+                Ok(Self::success_response(serde_json::json!({
+                    "message": "System reloaded successfully"
+                })))
+            }
+            Err(e) => {
+                let error_msg = format!("System reload failed: {}", e);
+                error!("Admin API: system reload failed: {}", e);
+                Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error_msg,
+                ))
+            }
         }
     }
 }

@@ -10,8 +10,8 @@ export class ApiConfig {
 
   private constructor() {
     this.baseUrl = this.getBaseUrl()
-    this.adminRoutePrefix = this.getEnvValue('ADMIN_ROUTE_PREFIX', '/admin')
-    this.healthRoutePrefix = this.getEnvValue('HEALTH_ROUTE_PREFIX', '/health')
+    this.adminRoutePrefix = this.getRoutePrefix('admin', '/admin')
+    this.healthRoutePrefix = this.getRoutePrefix('health', '/health')
   }
 
   static getInstance(): ApiConfig {
@@ -31,6 +31,26 @@ export class ApiConfig {
     }
     return this.getEnvValue('API_BASE_URL', 'http://127.0.0.1:8080')
   }
+
+  private getRoutePrefix(type: 'admin' | 'health', defaultValue: string): string {
+    // 优先使用 Rust 注入的配置
+    if (typeof window !== 'undefined' && (window as any).__APP_CONFIG__) {
+      const config = (window as any).__APP_CONFIG__
+      if (type === 'admin' && config.adminRoutePrefix) {
+        console.warn('Using admin route prefix from Rust config:', config.adminRoutePrefix)
+        return config.adminRoutePrefix
+      }
+      if (type === 'health' && config.healthRoutePrefix) {
+        console.warn('Using health route prefix from Rust config:', config.healthRoutePrefix)
+        return config.healthRoutePrefix
+      }
+    }
+
+    // 降级到环境变量
+    console.warn(`Using ${type} route prefix from environment variable`)
+    return this.getEnvValue(`${type.toUpperCase()}_ROUTE_PREFIX`, defaultValue)
+  }
+
 }
 
 // ==================== 错误处理 ====================

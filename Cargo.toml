@@ -29,6 +29,9 @@ path = "src/lib.rs"
 name = "shortlinker"
 path = "src/main.rs"
 
+# 确保有构建脚本
+build = "build.rs"
+
 [dependencies]
 actix-web = "4.0"
 dotenv = "0.15"

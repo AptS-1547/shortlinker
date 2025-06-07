@@ -9,10 +9,14 @@
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
     <script>
-      // 手动设置测试值
-      window.__APP_BASE_PATH__ = '%BASE_PATH%';
+      // Configuration object to be used in the application
+      window.__APP_CONFIG__ = {
+        basePath: '%BASE_PATH%',
+        adminRoutePrefix: '%ADMIN_ROUTE_PREFIX%',
+        healthRoutePrefix: '%HEALTH_ROUTE_PREFIX%'
+      };
     </script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

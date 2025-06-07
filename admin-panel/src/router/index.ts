@@ -15,10 +15,13 @@ const getBasePath = () => {
   }
 
   // 优先从 window 对象获取（Rust 可以注入）
-  if ((window as any).__APP_BASE_PATH__ && (window as any).__APP_BASE_PATH__ !== '%BASE_PATH%') {
-    console.warn('Using base path from window object:', (window as any).__APP_BASE_PATH__)
-    return (window as any).__APP_BASE_PATH__
-  }
+    if (typeof window !== 'undefined' && (window as any).__APP_CONFIG__) {
+      const config = (window as any).__APP_CONFIG__
+      if (config.basePath && config.basePath !== '%BASE_PATH%') {
+        console.warn('Using base path from Rust config:', config.basePath)
+        return config.basePath
+      }
+    }
 
   // 其次从 meta 标签获取
   const metaBase = document.querySelector('meta[name="base-path"]')?.getAttribute('content')

@@ -14,8 +14,10 @@ mod storages;
 mod system;
 mod utils;
 
-use crate::middleware::{AdminAuth, HealthAuth};
-use crate::services::{AdminService, AppStartTime, HealthService, RedirectService};
+use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
+use crate::services::{
+    AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
+};
 use crate::storages::click::{global::set_global_click_manager, manager::ClickManager};
 use crate::storages::StorageFactory;
 use crate::system::{cleanup_lockfile, init_lockfile};
@@ -125,6 +127,8 @@ async fn main() -> std::io::Result<()> {
     // 获取路由前缀配置
     let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
     let health_prefix = env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string());
+    let frontend_prefix =
+        env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string());
 
     // 检查 Admin API 是否启用
     let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
@@ -136,10 +140,23 @@ async fn main() -> std::io::Result<()> {
 
     // 检查 Health API 是否启用
     let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
-    if health_token.is_empty() {
-        warn!("Health API is disabled (HEALTH_TOKEN is empty)");
+    if health_token.is_empty() && admin_token.is_empty() {
+        warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
     } else {
         warn!("Health API available at: {}", health_prefix);
+    }
+
+    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_FRONTEND_ROUTES 未设置为 true
+    let enable_frontend_routes = env::var("ENABLE_FRONTEND_ROUTES")
+        .map(|v| v == "true")
+        .unwrap_or(false);
+    if !enable_frontend_routes || admin_token.is_empty() {
+        // 如果前端路由未启用，设置前端路由前缀为 ""
+        warn!(
+            "Frontend routes are disabled (ENABLE_FRONTEND_ROUTES is false or ADMIN_TOKEN not set)"
+        );
+    } else {
+        warn!("Frontend routes available at: {}", frontend_prefix);
     }
 
     let cpu_count = env::var("CPU_COUNT")
@@ -161,12 +178,7 @@ async fn main() -> std::io::Result<()> {
                 DefaultHeaders::new()
                     .add(("Connection", "keep-alive"))
                     .add(("Keep-Alive", "timeout=30, max=1000"))
-                    .add(("Cache-Control", "no-cache, no-store, must-revalidate"))
-                    // 跨站需要 .env 中配置 CORS
-                    .add(("Access-Control-Allow-Origin", "http://localhost:3000"))
-                    .add(("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS"))
-                    .add(("Access-Control-Allow-Headers", "Content-Type, Authorization"))
-                    .add(("Access-Control-Allow-Credentials", "true")),
+                    .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
             )
             .service(
                 web::scope(&admin_prefix)
@@ -178,7 +190,10 @@ async fn main() -> std::io::Result<()> {
                     .route("/link/{code}", web::head().to(AdminService::get_link))
                     .route("/link/{code}", web::delete().to(AdminService::delete_link))
                     .route("/link/{code}", web::put().to(AdminService::update_link))
-                    .route("/auth/login", web::post().to(AdminService::check_admin_token)),
+                    .route(
+                        "/auth/login",
+                        web::post().to(AdminService::check_admin_token),
+                    ),
             )
             .service(
                 web::scope(&health_prefix)
@@ -189,6 +204,42 @@ async fn main() -> std::io::Result<()> {
                     .route("/ready", web::head().to(HealthService::readiness_check))
                     .route("/live", web::get().to(HealthService::liveness_check))
                     .route("/live", web::head().to(HealthService::liveness_check)),
+            )
+            .service(
+                web::scope(&frontend_prefix)
+                    .wrap(FrontendGuard)
+                    .route("", web::get().to(FrontendService::handle_index))
+                    .route("", web::head().to(FrontendService::handle_index))
+                    .route(
+                        "/assets/{path:.*}",
+                        web::get().to(FrontendService::handle_static),
+                    )
+                    .route(
+                        "/assets/{path:.*}",
+                        web::head().to(FrontendService::handle_static),
+                    )
+                    .route("/admin", web::get().to(FrontendService::handle_admin_panel))
+                    .route(
+                        "/admin",
+                        web::head().to(FrontendService::handle_admin_panel),
+                    )
+                    .route(
+                        "/favicon.ico",
+                        web::get().to(FrontendService::handle_favicon),
+                    )
+                    .route(
+                        "/favicon.ico",
+                        web::head().to(FrontendService::handle_favicon),
+                    )
+                    // SPA 路由回退，处理所有其他路径
+                    .route(
+                        "/{path:.*}",
+                        web::get().to(FrontendService::handle_spa_fallback),
+                    )
+                    .route(
+                        "/{path:.*}",
+                        web::head().to(FrontendService::handle_spa_fallback),
+                    ),
             )
             .route("/{path}*", web::get().to(RedirectService::handle_redirect))
             .route("/{path}*", web::head().to(RedirectService::handle_redirect))
