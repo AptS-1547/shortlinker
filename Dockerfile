@@ -1,12 +1,27 @@
+# 前端构建阶段
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app/admin-panel
+
+# 复制前端文件
+COPY admin-panel/package*.json admin-panel/yarn.lock ./
+RUN npm install
+
+COPY admin-panel/ ./
+RUN npm run build
+
 # 多阶段构建 - 构建阶段
 FROM rust:1.87-slim AS builder
 
-# 安装构建依赖
+# 安装构建依赖，包含完整的 OpenSSL 开发库
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    libssl3 \
+    openssl \
     ca-certificates \
     musl-tools \
+    musl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 添加 musl 目标
@@ -19,8 +34,16 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
+# 从前端构建阶段复制构建产物
+COPY --from=frontend-builder /app/admin-panel/dist ./admin-panel/dist
+
+# 设置 OpenSSL 环境变量和编译选项
+ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV OPENSSL_STATIC=1
+ENV OPENSSL_DIR=/usr
+ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z -C target-feature=+crt-static"
+
 # 静态链接编译 - 使用 musl 目标
-ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z"
 RUN touch src/main.rs && \
     cargo build --release --target x86_64-unknown-linux-musl
 

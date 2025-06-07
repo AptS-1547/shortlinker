@@ -19,6 +19,9 @@ show_usage() {
     echo "使用方法: $0 <version>"
     echo "示例: $0 v0.1.6"
     echo "      $0 0.1.6"
+    echo "      $0 v0.1.7-alpha"
+    echo "      $0 0.2.0-beta.1"
+    echo "      $0 1.0.0-rc.2"
     exit 1
 }
 
@@ -33,9 +36,12 @@ VERSION=$1
 # 移除版本号前的 'v' 前缀（如果存在）
 VERSION_NUMBER=${VERSION#v}
 
-# 验证版本号格式 (x.y.z)
-if ! [[ $VERSION_NUMBER =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    print_message $RED "错误: 版本号格式无效。请使用 x.y.z 格式 (例如: 0.1.6)"
+# 验证版本号格式 (x.y.z 或 x.y.z-prerelease)
+if ! [[ $VERSION_NUMBER =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)*)?$ ]]; then
+    print_message $RED "错误: 版本号格式无效。"
+    echo "支持的格式:"
+    echo "  - 标准版本: x.y.z (例如: 1.0.0)"
+    echo "  - 预发布版本: x.y.z-prerelease (例如: 1.0.0-alpha, 1.0.0-beta.1, 1.0.0-rc.2)"
     exit 1
 fi
 

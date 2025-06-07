@@ -23,20 +23,15 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 'latest'
-        cache-dependency-path: 'yarn.lock'
+        node-version: '20'  # 使用 Node.js 20.x 版本
 
     - name: Install frontend dependencies
-      working-directory: frontend
-      run: |
-        cd admin-panel
-        yarn install --frozen-lockfile --production
+      working-directory: admin-panel
+      run: npm install
 
     - name: Build frontend
-      working-directory: frontend
-      run: |
-        cd admin-panel
-        yarn build
+      working-directory: admin-panel
+      run: npm run build
 
     - name: Upload frontend build artifacts
       uses: actions/upload-artifact@v4
@@ -48,6 +43,7 @@ jobs:
 
   build-linux-windows:
     name: Build Linux x86/i686 & Windows
+    needs: build-frontend
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -139,6 +135,7 @@ jobs:
 
   build-arm64:
     name: Build ARM64 Linux
+    needs: build-frontend
     runs-on: ubuntu-latest
     steps:
     - name: Get tag name
@@ -189,6 +186,7 @@ jobs:
 
   build-macos:
     name: Build macOS
+    needs: build-frontend
     runs-on: macos-latest
     strategy:
       matrix:
