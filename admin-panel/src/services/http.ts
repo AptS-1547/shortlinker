@@ -48,7 +48,7 @@ export class ApiError extends Error {
 const handleAuthError = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('adminToken')
-    window.location.href = '/admin/login'
+    window.location.href = '/login'
   }
 }
 

@@ -1,36 +1,70 @@
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Top Header -->
-    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
+    <header class="bg-gradient-to-r from-slate-800 to-slate-700 text-white shadow-md">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <!-- Logo and Title -->
           <div class="flex items-center space-x-4">
             <div class="flex items-center space-x-3">
-              <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg
-                  class="w-5 h-5 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                  />
-                </svg>
+              <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                <LinkIcon className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 class="text-xl font-bold">ShortLinker Admin</h1>
-                <p class="text-blue-100 text-sm">Manage your short links</p>
+                <h1 class="text-xl font-bold">{{ $t('layout.title') }}</h1>
+                <p class="text-slate-300 text-sm">{{ $t('layout.subtitle') }}</p>
               </div>
             </div>
           </div>
 
           <!-- Right Side -->
           <div class="flex items-center space-x-4">
+            <!-- Language Switcher -->
+            <div class="relative" ref="languageDropdown">
+              <button
+                @click="toggleLanguageMenu"
+                class="flex items-center space-x-2 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20 transition-all duration-200 transform hover:scale-105"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                <span class="text-sm font-medium">{{ currentLanguage }}</span>
+                <ChevronDownIcon class="w-3 h-3 text-white/60 transition-transform duration-200" :class="{ 'rotate-180': showLanguageMenu }" />
+              </button>
+
+              <!-- Language Dropdown -->
+              <Transition
+                enter-active-class="transition ease-out duration-200"
+                enter-from-class="opacity-0 scale-95"
+                enter-to-class="opacity-100 scale-100"
+                leave-active-class="transition ease-in duration-75"
+                leave-from-class="opacity-100 scale-100"
+                leave-to-class="opacity-0 scale-95"
+              >
+                <div
+                  v-if="showLanguageMenu"
+                  class="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
+                >
+                  <button
+                    @click="changeLanguage('zh')"
+                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    :class="{ 'bg-gray-100 font-medium': locale === 'zh' }"
+                  >
+                    <span>🇨🇳</span>
+                    <span>{{ $t('layout.language.chinese') }}</span>
+                  </button>
+                  <button
+                    @click="changeLanguage('en')"
+                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                    :class="{ 'bg-gray-100 font-medium': locale === 'en' }"
+                  >
+                    <span>🇺🇸</span>
+                    <span>{{ $t('layout.language.english') }}</span>
+                  </button>
+                </div>
+              </Transition>
+            </div>
+
             <!-- Health Status - 可点击 -->
             <button
               @click="openHealthModal"
@@ -41,16 +75,16 @@
                   :class="[
                     'w-3 h-3 rounded-full transition-all duration-300 relative z-10',
                     healthStatus === 'healthy'
-                      ? 'bg-green-400'
+                      ? 'bg-emerald-400'
                       : healthStatus === 'unhealthy'
                         ? 'bg-red-400'
-                        : 'bg-yellow-400',
+                        : 'bg-amber-400',
                   ]"
                 ></div>
                 <!-- 呼吸灯外圈动画 -->
                 <div
                   v-if="healthStatus === 'healthy'"
-                  class="absolute inset-0 w-3 h-3 bg-green-400 rounded-full animate-breathing opacity-75"
+                  class="absolute inset-0 w-3 h-3 bg-emerald-400 rounded-full animate-breathing opacity-75"
                 ></div>
                 <div
                   v-else-if="healthStatus === 'unhealthy'"
@@ -58,39 +92,20 @@
                 ></div>
                 <div
                   v-else
-                  class="absolute inset-0 w-3 h-3 bg-yellow-400 rounded-full animate-pulse opacity-75"
+                  class="absolute inset-0 w-3 h-3 bg-amber-400 rounded-full animate-pulse opacity-75"
                 ></div>
               </div>
-              <span class="text-sm font-medium capitalize">{{ healthStatus }}</span>
-              <svg
-                class="w-3 h-3 text-white/60"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              <span class="text-sm font-medium capitalize">{{ $t(`layout.health.${healthStatus}`) }}</span>
+              <ChevronRightIcon className="w-3 h-3 text-white/60" />
             </button>
 
             <!-- Logout -->
             <button
               @click="handleLogout"
-              class="flex items-center space-x-2 text-blue-100 hover:text-white transition-colors"
+              class="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              <span class="text-sm font-medium">Logout</span>
+              <LogoutIcon className="w-4 h-4" />
+              <span class="text-sm font-medium">{{ $t('layout.logout') }}</span>
             </button>
           </div>
         </div>
@@ -98,22 +113,22 @@
     </header>
 
     <!-- Navigation Tabs -->
-    <div class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav class="flex space-x-8">
+        <nav class="flex items-center gap-2 py-3">
           <router-link
             v-for="item in menuItems"
             :key="item.path"
             :to="item.path"
             :class="[
-              'flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+              'flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ease-in-out transform hover:scale-105',
               $route.path === item.path
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                ? 'bg-white/15 text-white shadow-lg scale-105 backdrop-blur-sm'
+                : 'text-slate-300 hover:text-white hover:bg-white/8',
             ]"
           >
-            <component :is="item.icon" class="w-5 h-5" />
-            <span>{{ item.label }}</span>
+            <component :is="item.icon" class="w-4 h-4 transition-transform duration-300" />
+            <span class="transition-colors duration-300">{{ $t(item.label) }}</span>
           </router-link>
         </nav>
       </div>
@@ -125,37 +140,59 @@
     </main>
 
     <!-- Health Modal -->
-    <HealthModal :is-open="showHealthModal" :health-data="healthData" @close="closeHealthModal" />
+    <HealthModal
+      :is-open="showHealthModal"
+      :health-data="healthData"
+      @close="closeHealthModal"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useHealthStore } from '@/stores/health'
 import { storeToRefs } from 'pinia'
-import { Squares2X2Icon, LinkIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
+import { Squares2X2Icon, LinkIcon as HeroLinkIcon, ChartBarIcon as HeroChartBarIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { LinkIcon, ChevronRightIcon, LogoutIcon } from '@/components/icons'
 import HealthModal from '@/components/HealthModal.vue'
 
 const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
 const healthStore = useHealthStore()
+const { locale, t } = useI18n()
 const { status: healthData } = storeToRefs(healthStore)
 const { checkHealth } = healthStore
 
 const showHealthModal = ref(false)
+const showLanguageMenu = ref(false)
+const languageDropdown = ref<HTMLElement>()
 
 const menuItems = [
-  { path: '/admin/dashboard', label: 'Dashboard', icon: Squares2X2Icon },
-  { path: '/admin/links', label: 'Links', icon: LinkIcon },
-  { path: '/admin/analytics', label: 'Analytics', icon: ChartBarIcon },
+  { path: '/dashboard', label: 'layout.navigation.dashboard', icon: Squares2X2Icon },
+  { path: '/links', label: 'layout.navigation.links', icon: HeroLinkIcon },
+  { path: '/analytics', label: 'layout.navigation.analytics', icon: HeroChartBarIcon },
 ]
 
 const healthStatus = computed(() => {
   return healthData.value?.status || 'unknown'
 })
+
+const currentLanguage = computed(() => {
+  return locale.value === 'zh' ? '中文' : 'English'
+})
+
+const toggleLanguageMenu = () => {
+  showLanguageMenu.value = !showLanguageMenu.value
+}
+
+const changeLanguage = (newLocale: string) => {
+  locale.value = newLocale
+  localStorage.setItem('preferred-language', newLocale)
+  showLanguageMenu.value = false
+}
 
 const openHealthModal = () => {
   // 打开模态框前刷新健康状态
@@ -169,12 +206,23 @@ const closeHealthModal = () => {
 
 function handleLogout() {
   authStore.logout()
-  router.push('/admin/login')
+  router.push('/login')
 }
 
-// 组件挂载时检查健康状态
+// 点击外部关闭语言菜单
+const handleClickOutside = (event: Event) => {
+  if (languageDropdown.value && !languageDropdown.value.contains(event.target as Node)) {
+    showLanguageMenu.value = false
+  }
+}
+
 onMounted(() => {
   checkHealth()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -192,82 +240,30 @@ onMounted(() => {
   }
 }
 
-@keyframes gentle-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 0.4;
-  }
-}
-
 .animate-breathing {
   animation: breathing 2s ease-in-out infinite;
 }
 
-.animate-gentle-pulse {
-  animation: gentle-pulse 2s ease-in-out infinite;
-}
-
-/* 更强的发光效果 */
-.glow-green {
-  box-shadow:
-    0 0 6px #4ade80,
-    0 0 12px #4ade80,
-    0 0 18px #4ade80;
-}
-
-.glow-red {
-  box-shadow:
-    0 0 6px #f87171,
-    0 0 12px #f87171,
-    0 0 18px #f87171;
-}
-
-/* 健康状态的特殊动画 */
-.health-indicator {
+/* 胶囊式导航的额外效果 */
+nav a {
   position: relative;
+  backdrop-filter: blur(10px);
 }
 
-.health-indicator.healthy::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background: radial-gradient(circle, rgba(74, 222, 128, 0.3) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: breathing 2s ease-in-out infinite;
+nav a.router-link-active {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
-.health-indicator.unhealthy::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background: radial-gradient(circle, rgba(248, 113, 113, 0.3) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+nav a:hover:not(.router-link-active) {
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* 原有样式 */
-.router-link-active {
-  border-color: #3b82f6;
-  color: #3b82f6;
-}
-
-.router-link-exact-active {
-  border-color: #3b82f6;
-  color: #3b82f6;
-}
-
-nav a:not(.router-link-active) {
-  border-color: transparent;
-  color: #6b7280;
-}
-
-nav a:not(.router-link-active):hover {
-  color: #374151;
-  border-color: #d1d5db;
+/* 增强阴影层次 */
+header {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 </style>

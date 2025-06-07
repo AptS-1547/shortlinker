@@ -26,7 +26,7 @@ export interface AuthResponse {
 
 export interface HealthResponse {
   status: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface BatchOperationResult {
@@ -44,4 +44,26 @@ export interface LinkCreateResult {
   success: boolean
   exists?: boolean
   existingLink?: SerializableShortLink
+}
+
+export interface GetLinksQuery {
+  page?: number
+  page_size?: number
+  created_after?: string
+  created_before?: string
+  only_expired?: boolean
+  only_active?: boolean
+  search?: string // 如果后端支持搜索功能的话
+}
+
+// 新的API响应格式
+export interface PaginatedLinksResponse {
+  code: number
+  data: Record<string, SerializableShortLink>
+  pagination: {
+    page: number
+    page_size: number
+    total: number
+    total_pages: number
+  }
 }

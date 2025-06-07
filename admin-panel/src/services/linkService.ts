@@ -1,14 +1,67 @@
 import { adminClient } from './http'
 import { ApiError } from './http'
-import type { SerializableShortLink, LinkPayload, LinkCreateResult } from './types'
+import type { SerializableShortLink, LinkPayload, LinkCreateResult, GetLinksQuery, PaginatedLinksResponse } from './types'
 
 export class LinkService {
   /**
-   * 获取所有链接
+   * 获取所有链接（带筛选）
    */
-  async fetchAll(): Promise<Record<string, SerializableShortLink>> {
-    const response = await adminClient.get('/link')
+  async fetchAll(query?: GetLinksQuery): Promise<Record<string, SerializableShortLink>> {
+    const params = new URLSearchParams()
+
+    if (query) {
+      if (query.page !== undefined) params.append('page', query.page.toString())
+      if (query.page_size !== undefined) params.append('page_size', query.page_size.toString())
+      if (query.created_after) params.append('created_after', query.created_after)
+      if (query.created_before) params.append('created_before', query.created_before)
+      if (query.only_expired !== undefined) params.append('only_expired', query.only_expired.toString())
+      if (query.only_active !== undefined) params.append('only_active', query.only_active.toString())
+    }
+
+    const url = params.toString() ? `/link?${params.toString()}` : '/link'
+    const response = await adminClient.get(url)
     return response.data || {}
+  }
+
+  /**
+   * 获取分页链接（如果后端支持分页响应）
+   */
+  async fetchPaginated(query?: GetLinksQuery): Promise<PaginatedLinksResponse> {
+    const params = new URLSearchParams()
+
+    if (query) {
+      if (query.page !== undefined) params.append('page', query.page.toString())
+      if (query.page_size !== undefined) params.append('page_size', query.page_size.toString())
+      if (query.created_after) params.append('created_after', query.created_after)
+      if (query.created_before) params.append('created_before', query.created_before)
+      if (query.only_expired !== undefined) params.append('only_expired', query.only_expired.toString())
+      if (query.only_active !== undefined) params.append('only_active', query.only_active.toString())
+      if (query.search) params.append('search', query.search)
+    }
+
+    const url = params.toString() ? `/link?${params.toString()}` : '/link'
+    const response = await adminClient.get(url)
+
+    // 处理新的API响应格式: { code, data, pagination }
+    if (response && response.data && response.pagination) {
+      return {
+        code: response.code || 0,
+        data: response.data || {},
+        pagination: response.pagination
+      }
+    }
+
+    // 如果响应格式不正确，返回空数据
+    return {
+      code: 0,
+      data: {},
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total: 0,
+        total_pages: 0
+      }
+    }
   }
 
   /**

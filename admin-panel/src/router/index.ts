@@ -6,26 +6,54 @@ import DashboardView from '@/views/DashboardView.vue'
 import LinksView from '@/views/LinksView.vue'
 import AnalyticsView from '@/views/AnalyticsView.vue'
 
+// 从运行时配置或环境变量获取基础路径
+const getBasePath = () => {
+  // 确保在浏览器环境中运行
+  if (typeof window === 'undefined') {
+    // 如果在 SSR 环境中，使用构建时的 BASE_URL
+    return import.meta.env.BASE_URL || '/'
+  }
+
+  // 优先从 window 对象获取（Rust 可以注入）
+  if ((window as any).__APP_BASE_PATH__ && (window as any).__APP_BASE_PATH__ !== '%BASE_PATH%') {
+    console.warn('Using base path from window object:', (window as any).__APP_BASE_PATH__)
+    return (window as any).__APP_BASE_PATH__
+  }
+
+  // 其次从 meta 标签获取
+  const metaBase = document.querySelector('meta[name="base-path"]')?.getAttribute('content')
+  if (metaBase && metaBase !== '%BASE_PATH%') {
+    console.warn('Using base path from meta tag:', metaBase)
+    return metaBase
+  }
+
+  // 最后使用构建时的配置
+  console.warn('Using base path from import.meta.env:', import.meta.env.BASE_URL)
+  return import.meta.env.BASE_URL || '/'
+}
+
+const basePath = getBasePath()
+
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(basePath),
   routes: [
     {
       path: '/',
-      redirect: '/admin/dashboard',
+      redirect: '/dashboard',
     },
     {
-      path: '/admin/login',
+      path: '/login',
       name: 'login',
       component: LoginView,
     },
     {
-      path: '/admin',
+      path: '/',
       component: AdminLayout,
       meta: { requiresAuth: true },
       children: [
         {
           path: '',
-          redirect: '/admin/dashboard',
+          redirect: '/dashboard',
         },
         {
           path: 'dashboard',
@@ -44,6 +72,11 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      redirect: '/dashboard',
+    },
   ],
 })
 
@@ -51,12 +84,13 @@ router.beforeEach((to) => {
   const authStore = useAuthStore()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return '/admin/login'
+    return { path: '/login' }
   }
 
-  if (to.path === '/admin/login' && authStore.isAuthenticated) {
-    return '/admin/dashboard'
+  if (to.path === '/login' && authStore.isAuthenticated) {
+    return { path: '/dashboard' }
   }
 })
+
 
 export default router

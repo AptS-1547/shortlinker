@@ -16,19 +16,9 @@ export class QRCodeService {
         margin,
         errorCorrectionLevel,
         type: 'image/png',
-        quality: 1.0,
         color: {
           dark: '#000000',
           light: '#FFFFFF',
-        },
-        rendererOpts: {
-          quality: 1.0,
-          scale: Math.max(4, Math.ceil(size / 100)),
-          compressionLevel: 6,
-          filters: 'all',
-          palette: false,
-          backgroundIndex: 0,
-          resolution: 300,
         },
       })
     } catch (error) {

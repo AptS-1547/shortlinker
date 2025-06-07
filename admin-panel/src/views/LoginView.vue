@@ -1,46 +1,34 @@
 <template>
   <div
-    class="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 flex items-center justify-center px-4"
+    class="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 flex items-center justify-center px-4"
   >
     <div class="max-w-md w-full space-y-8">
       <div class="text-center">
         <div class="w-20 h-20 mx-auto mb-6 relative">
           <div
-            class="absolute inset-0 bg-white/20 rounded-2xl backdrop-blur-sm border border-white/30 animate-pulse"
+            class="absolute inset-0 bg-indigo-100 rounded-2xl border border-indigo-200 shadow-lg"
           ></div>
           <div
-            class="absolute inset-2 bg-gradient-to-br from-white to-blue-100 rounded-xl flex items-center justify-center shadow-2xl"
+            class="absolute inset-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg"
           >
-            <svg
-              class="w-10 h-10 text-blue-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-              />
-            </svg>
+            <LinkIcon className="w-10 h-10 text-white" />
           </div>
         </div>
-        <h2 class="text-3xl font-bold text-white mb-2">Admin Login</h2>
-        <p class="text-blue-100">Enter your password to access the admin panel</p>
+        <h2 class="text-3xl font-bold text-gray-900 mb-2">{{ $t('auth.title') }}</h2>
+        <p class="text-gray-700">{{ $t('auth.description') }}</p>
       </div>
 
       <form @submit="handleSubmit" class="space-y-6">
-        <div class="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-2xl">
+        <div class="bg-white rounded-2xl p-6 border border-gray-200 shadow-xl">
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-white mb-2"> Password </label>
+              <label class="block text-sm font-medium text-gray-900 mb-2">{{ $t('auth.password') }}</label>
               <input
                 type="password"
                 v-model="password"
-                placeholder="Enter admin password"
+                :placeholder="$t('auth.passwordPlaceholder')"
                 :disabled="isSubmitting"
-                class="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent transition-all duration-200 backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -49,36 +37,26 @@
               v-if="error"
               :class="[
                 'p-3 rounded-lg border',
-                error.includes('Authenticating') || error.includes('Verifying')
-                  ? 'bg-blue-500/20 border-blue-400/30'
-                  : 'bg-red-500/20 border-red-400/30',
+                error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-red-50 border-red-200',
               ]"
             >
               <div class="flex items-center gap-2">
                 <div
-                  v-if="error.includes('Authenticating') || error.includes('Verifying')"
-                  class="animate-spin rounded-full h-4 w-4 border-2 border-blue-200 border-t-transparent"
+                  v-if="error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))"
+                  class="animate-spin rounded-full h-4 w-4 border-2 border-emerald-500 border-t-transparent"
                 ></div>
-                <svg
+                <ExclamationTriangleIcon
                   v-else
-                  class="w-4 h-4 text-red-200"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
+                  className="w-4 h-4 text-red-500"
+                />
                 <p
                   :class="[
                     'text-sm',
-                    error.includes('Authenticating') || error.includes('Verifying')
-                      ? 'text-blue-100'
-                      : 'text-red-100',
+                    error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))
+                      ? 'text-emerald-700'
+                      : 'text-red-700',
                   ]"
                 >
                   {{ error }}
@@ -89,59 +67,31 @@
             <button
               type="submit"
               :disabled="isSubmitting"
-              class="w-full px-6 py-3 bg-gradient-to-r from-white to-blue-50 text-blue-600 font-semibold rounded-xl hover:from-blue-50 hover:to-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+              class="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
             >
               <template v-if="isSubmitting">
-                <svg
-                  class="w-5 h-5 mr-2 animate-spin inline"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
+                <RefreshIcon className="w-5 h-5 mr-2 animate-spin inline" />
                 {{
-                  error.includes('Authenticating')
-                    ? 'Authenticating...'
-                    : error.includes('Verifying')
-                      ? 'Verifying...'
-                      : 'Processing...'
+                  error.includes($t('auth.authenticating'))
+                    ? $t('auth.authenticating')
+                    : error.includes($t('auth.verifying'))
+                      ? $t('auth.verifying')
+                      : $t('auth.processing')
                 }}
               </template>
-              <template v-else> Login </template>
+              <template v-else>{{ $t('auth.login') }}</template>
             </button>
           </div>
         </div>
       </form>
 
       <!-- 服务器信息提示 -->
-      <div class="bg-white/5 backdrop-blur-xl rounded-lg p-4 border border-white/10">
+      <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-lg">
         <div class="flex items-start gap-3">
-          <svg
-            class="w-5 h-5 text-blue-200 mt-0.5 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <InfoIcon className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
           <div>
-            <h4 class="text-sm font-semibold text-white">Server Connection</h4>
-            <p class="text-sm text-blue-100 mt-1">
-              Make sure the ShortLinker service is running on
-              <span class="font-mono bg-white/10 px-1 rounded">
-                {{ apiBaseUrl }}
-              </span>
+            <h4 class="text-sm font-semibold text-gray-900">{{ $t('auth.serverConnection') }}</h4>
+            <p class="text-sm text-gray-700 mt-1" v-html="$t('auth.serverConnectionDesc', { url: `<span class='font-mono bg-gray-100 px-1 rounded text-indigo-600'>${apiBaseUrl}</span>` })">
             </p>
           </div>
         </div>
@@ -155,9 +105,12 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { AuthAPI, HealthAPI } from '@/services/api'
+import { LinkIcon, RefreshIcon, ExclamationTriangleIcon, InfoIcon } from '@/components/icons'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const password = ref('')
 const isSubmitting = ref(false)
@@ -171,7 +124,7 @@ const handleSubmit = async (e: Event) => {
   e.preventDefault()
 
   if (!password.value.trim()) {
-    error.value = 'Please enter a password'
+    error.value = t('auth.errors.passwordRequired')
     return
   }
 
@@ -179,40 +132,33 @@ const handleSubmit = async (e: Event) => {
   error.value = ''
 
   try {
-    // 调用登录API验证密码
-    error.value = 'Authenticating...'
+    error.value = t('auth.authenticating')
 
     const authResponse = await AuthAPI.login({ password: password.value.trim() })
-
-    // 存储验证通过的密码作为token
     authStore.login(authResponse.token)
 
-    // 验证访问权限
-    error.value = 'Verifying access...'
+    error.value = t('auth.verifying')
     await HealthAPI.check()
 
-    // 跳转到管理页面
-    router.push('/admin/dashboard')
+    router.push('/dashboard')
   } catch (err) {
     console.error('Authentication failed:', err)
-
-    // 清除可能已存储的token
     authStore.logout()
 
     if (err instanceof Error) {
       if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
-        error.value = 'Cannot connect to server. Please check if the service is running.'
+        error.value = t('auth.errors.networkError')
       } else if (err.message.includes('401')) {
-        error.value = 'Invalid password or unauthorized access'
+        error.value = t('auth.errors.unauthorized')
       } else if (err.message.includes('404')) {
-        error.value = 'Authentication endpoint not found. Please check server configuration.'
+        error.value = t('auth.errors.notFound')
       } else if (err.message.includes('500')) {
-        error.value = 'Server error. Please try again later.'
+        error.value = t('auth.errors.serverError')
       } else {
-        error.value = `Server error: ${err.message}`
+        error.value = t('auth.errors.authFailed')
       }
     } else {
-      error.value = 'Authentication failed. Please try again.'
+      error.value = t('auth.errors.authFailed')
     }
   } finally {
     isSubmitting.value = false

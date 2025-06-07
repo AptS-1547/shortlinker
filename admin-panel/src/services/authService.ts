@@ -1,5 +1,4 @@
 import { adminClient } from './http'
-import { ApiError } from './http'
 import type { AuthRequest, AuthResponse } from './types'
 
 export class AuthService {
