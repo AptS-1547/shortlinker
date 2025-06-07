@@ -122,9 +122,9 @@ impl AdminService {
 
         let now = chrono::Utc::now();
         let mut filtered_links = Self::filter_links(all_links, &query, now);
-        
+
         // Sort by creation time (newest first)
-        filtered_links.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
+        filtered_links.sort_by(|a , b| b.1.created_at.cmp(&a.1.created_at));
 
         let total = filtered_links.len();
         let page = query.page.unwrap_or(1).max(1);
@@ -209,13 +209,10 @@ impl AdminService {
         }
     }
 
-    fn serialize_links(links: Vec<(String, ShortLink)>) -> HashMap<String, SerializableShortLink> {
+    fn serialize_links(links: Vec<(String, ShortLink)>) -> Vec<SerializableShortLink> {
         links
             .into_iter()
-            .map(|(code, link)| {
-                let serializable = Self::to_serializable_link(code.clone(), link);
-                (code, serializable)
-            })
+            .map(|(code, link)| Self::to_serializable_link(code, link))
             .collect()
     }
 
