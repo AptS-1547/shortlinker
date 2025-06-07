@@ -80,3 +80,5 @@ curl -L http://localhost:8080/github
 ## Get Started
 
 Ready to go? Check out the [Quick Start Guide](/en/guide/getting-started) to begin with Shortlinker
+More modules: [Web Admin Panel](/en/admin-panel/) | [Cloudflare Worker Version](/en/cf-worker/).
+
