@@ -3,28 +3,28 @@ use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::env;
-use std::sync::OnceLock;
-use tracing::{error, info, warn};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 use super::{CachePreference, ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
+use crate::storages::click::ClickSink;
+use crate::storages::models::StorageConfig;
 use async_trait::async_trait;
 
-static CLI_MODE: OnceLock<bool> = OnceLock::new();
+use crate::storages::click::global::get_click_manager;
 
 // 注册 SQLite 存储插件
 // 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
 declare_storage_plugin!("sqlite", SqliteStorage);
 
+#[derive(Clone)]
 pub struct SqliteStorage {
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl SqliteStorage {
     pub async fn new_async() -> Result<Self> {
-        let cli_mode =
-            *CLI_MODE.get_or_init(|| env::var("CLI_MODE").map(|v| v == "true").unwrap_or(false));
-
         let db_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.db".to_string());
 
         let manager = SqliteConnectionManager::file(&db_path).with_init(|c| {
@@ -66,15 +66,8 @@ impl SqliteStorage {
 
         // Initialize database tables
         storage.init_db()?;
-
-        // 在同步构造函数中初始化异步 bloom filter：
-        // 因为此方法只在程序启动时调用一次，不存在并发或 runtime 嵌套问题
-        if cli_mode {
-            warn!("CLI mode detected, skipping bloom filter initialization");
-            return Ok(storage);
-        }
-
         warn!("SqliteStorage initialized, database path: {}", db_path);
+
         Ok(storage)
     }
 
@@ -97,6 +90,16 @@ impl SqliteStorage {
             [],
         )
         .map_err(|e| ShortlinkerError::database_operation(format!("创建表失败: {}", e)))?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS links_meta (
+                short_code TEXT PRIMARY KEY,
+                click_count INTEGER DEFAULT 0,
+                FOREIGN KEY (short_code) REFERENCES short_links(short_code) ON DELETE CASCADE
+            )",
+            [],
+        )
+        .map_err(|e| ShortlinkerError::database_operation(format!("创建元信息表失败: {}", e)))?;
 
         // 为过期时间添加索引，用于快速查找过期链接
         conn.execute(
@@ -315,10 +318,19 @@ impl Storage for SqliteStorage {
                     )
                     .map_err(|e| {
                         ShortlinkerError::database_operation(format!("插入短链接失败: {}", e))
-                    })
-                    .map(|_| {
-                        info!("Short link created: {}", link_clone.code);
-                    })
+                    })?;
+
+                transaction
+                    .execute(
+                        "INSERT INTO links_meta (short_code, click_count) VALUES (?1, 0)",
+                        params![link_clone.code],
+                    )
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!("插入点击元信息失败: {}", e))
+                    })?;
+
+                info!("Short link created: {}", link_clone.code);
+                Ok(())
             };
 
             // 处理操作结果
@@ -404,11 +416,22 @@ impl Storage for SqliteStorage {
         Ok(())
     }
 
-    async fn get_backend_name(&self) -> String {
-        "sqlite".to_string()
+    async fn get_backend_config(&self) -> StorageConfig {
+        StorageConfig {
+            storage_type: "sqlite".into(),
+            support_click: true,
+        }
     }
 
-    async fn increment_click(&self, _code: &str) -> Result<()> {
+    fn as_click_sink(&self) -> Option<Arc<dyn ClickSink>>
+    where
+        Self: Clone + Sized,
+    {
+        Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
+    }
+
+    fn increment_click(&self, code: &str) -> Result<()> {
+        get_click_manager().increment(code);
         Ok(())
     }
 
@@ -416,6 +439,56 @@ impl Storage for SqliteStorage {
         CachePreference {
             l1: "bloom".into(),
             l2: "moka".into(),
+        }
+    }
+}
+
+#[async_trait]
+impl ClickSink for SqliteStorage {
+    async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
+        let pool = self.pool.clone();
+
+        let result = actix_web::web::block(move || {
+            let mut conn = match pool.get() {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("click flush: failed to get connection: {}", e);
+                    return Err(anyhow::anyhow!("Failed to get connection: {}", e));
+                }
+            };
+
+            let tx = match conn.transaction() {
+                Ok(t) => t,
+                Err(e) => {
+                    error!("click flush: failed to start transaction: {}", e);
+                    return Err(anyhow::anyhow!("Failed to start transaction: {}", e));
+                }
+            };
+
+            for (code, count) in updates {
+                if let Err(e) = tx.execute(
+                    "INSERT INTO links_meta (short_code, click_count)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(short_code) DO UPDATE SET click_count = click_count + ?2",
+                    rusqlite::params![code, count],
+                ) {
+                    error!("click flush: failed to write for {}: {}", code, e);
+                }
+            }
+
+            if let Err(e) = tx.commit() {
+                error!("click flush: failed to commit: {}", e);
+                Err(anyhow::anyhow!("Failed to commit: {}", e))
+            } else {
+                debug!("click counts flushed to DB.");
+                Ok(())
+            }
+        })
+        .await;
+
+        match result {
+            Ok(inner_result) => inner_result,
+            Err(e) => Err(anyhow::anyhow!("Blocking operation failed: {:?}", e)),
         }
     }
 }

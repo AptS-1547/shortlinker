@@ -1,6 +1,8 @@
 use actix_web::{middleware::DefaultHeaders, web, App, HttpServer};
 use dotenv::dotenv;
 use std::env;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::{debug, warn};
 
 mod cache;
@@ -14,6 +16,7 @@ mod utils;
 
 use crate::middleware::{AdminAuth, HealthAuth};
 use crate::services::{AdminService, AppStartTime, HealthService, RedirectService};
+use crate::storages::click::{global::set_global_click_manager, manager::ClickManager};
 use crate::storages::StorageFactory;
 use crate::system::{cleanup_lockfile, init_lockfile};
 
@@ -85,15 +88,21 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to create storage backend");
     warn!(
         "Using storage backend: {}",
-        storage.get_backend_name().await
+        storage.get_backend_config().await.storage_type
     );
 
+    if let Some(click_sink) = storage.as_click_sink() {
+        let manager = Arc::new(ClickManager::new(click_sink, Duration::from_secs(30)));
+        set_global_click_manager(manager.clone());
+        manager.start();
+    }
+
     // 初始化 L1 和 L2 缓存
-    let cache = cache::LayeredCache::new(storage.preferred_cache().clone())
+    let cache = cache::CompositeCache::new(storage.preferred_cache().clone())
         .await
         .expect("Failed to create cache");
 
-    // 构建 L1 初始化缓存
+    // 构建 L1 和 L2 初始化缓存
     debug!("Initializing L1/L2 cache with preloading");
     {
         let links = storage.load_all().await;

@@ -3,6 +3,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum ShortlinkerError {
     CachePluginNotFound(String),
+    DatabaseConfig(String),
     DatabaseConnection(String),
     DatabaseOperation(String),
     FileOperation(String),
@@ -18,6 +19,7 @@ impl fmt::Display for ShortlinkerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ShortlinkerError::CachePluginNotFound(msg) => write!(f, "缓存插件未找到: {}", msg),
+            ShortlinkerError::DatabaseConfig(msg) => write!(f, "数据库配置错误: {}", msg),
             ShortlinkerError::DatabaseConnection(msg) => write!(f, "数据库连接错误: {}", msg),
             ShortlinkerError::DatabaseOperation(msg) => write!(f, "数据库操作错误: {}", msg),
             ShortlinkerError::FileOperation(msg) => write!(f, "文件操作错误: {}", msg),
@@ -37,6 +39,10 @@ impl std::error::Error for ShortlinkerError {}
 impl ShortlinkerError {
     pub fn cache_plugin_not_found<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CachePluginNotFound(msg.into())
+    }
+
+    pub fn database_config<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::DatabaseConfig(msg.into())
     }
 
     pub fn database_connection<T: Into<String>>(msg: T) -> Self {

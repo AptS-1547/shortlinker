@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 use super::{ShortLink, Storage};
-use crate::errors::Result;
+use crate::{errors::Result, storages::models::StorageConfig};
 
 // 注册 sled 存储插件
 // 这样子可以在应用启动时自动注册 sled 存储插件
@@ -60,11 +60,14 @@ impl Storage for SledStorage {
         Ok(())
     }
 
-    async fn get_backend_name(&self) -> String {
-        "sled".to_string()
+    async fn get_backend_config(&self) -> StorageConfig {
+        StorageConfig {
+            storage_type: "sled".into(),
+            support_click: true,
+        }
     }
 
-    async fn increment_click(&self, _code: &str) -> Result<()> {
+    fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
     }
 }

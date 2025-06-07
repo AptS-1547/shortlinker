@@ -20,7 +20,7 @@ pub enum CacheResult {
 }
 
 #[async_trait]
-pub trait Cache: Send + Sync {
+pub trait CompositeCacheTrait: Send + Sync {
     async fn get(&self, key: &str) -> CacheResult;
     async fn insert(&self, key: String, value: ShortLink);
     async fn remove(&self, key: &str);
@@ -34,7 +34,7 @@ pub trait Cache: Send + Sync {
 }
 
 #[async_trait]
-pub trait L1Cache: Send + Sync {
+pub trait ExistenceFilter: Send + Sync {
     /// 在访问后端前先判断是否可能存在
     /// - `false` 表示**一定不存在**
     /// - `true` 表示**可能存在**
@@ -50,7 +50,7 @@ pub trait L1Cache: Send + Sync {
     async fn clear(&self, count: usize, fp_rate: f64) {
         // 默认实现：子类可以选择覆盖
         tracing::debug!(
-            "Clearing L1 cache with count: {}, fp_rate: {}",
+            "Not clearing Existence Filter, no operation defined. Count: {}, FP Rate: {}",
             count,
             fp_rate
         );
@@ -58,7 +58,7 @@ pub trait L1Cache: Send + Sync {
 }
 
 #[async_trait]
-pub trait L2Cache: Send + Sync {
+pub trait ObjectCache: Send + Sync {
     async fn get(&self, key: &str) -> CacheResult;
     async fn insert(&self, key: String, value: ShortLink);
     async fn remove(&self, key: &str);
@@ -66,6 +66,6 @@ pub trait L2Cache: Send + Sync {
 
     async fn load_l2_cache(&self, _keys: HashMap<String, ShortLink>) {
         // 默认实现：子类可以选择覆盖
-        tracing::debug!("Not loading L2 cache, no operation defined");
+        tracing::debug!("Not loading Object Cache, no operation defined");
     }
 }

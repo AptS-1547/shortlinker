@@ -6,9 +6,13 @@ use std::env;
 use std::sync::Arc;
 use tracing::error;
 
-use crate::errors::{Result, ShortlinkerError};
+use crate::{
+    errors::{Result, ShortlinkerError},
+    storages::models::StorageConfig,
+};
 
 mod backends;
+pub mod click;
 mod models;
 pub mod register;
 
@@ -22,10 +26,14 @@ pub trait Storage: Send + Sync {
     async fn set(&self, link: ShortLink) -> Result<()>;
     async fn remove(&self, code: &str) -> Result<()>;
     async fn reload(&self) -> Result<()>;
-    async fn get_backend_name(&self) -> String;
+    async fn get_backend_config(&self) -> StorageConfig;
 
     /// 增加点击量计数器
-    async fn increment_click(&self, code: &str) -> Result<()>;
+    fn as_click_sink(&self) -> Option<Arc<dyn click::ClickSink>> {
+        None
+    }
+
+    fn increment_click(&self, code: &str) -> Result<()>;
 
     /// 缓存首选项
     fn preferred_cache(&self) -> CachePreference {

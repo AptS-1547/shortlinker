@@ -1,12 +1,12 @@
-use crate::cache::traits::{CacheResult, L2Cache};
-use crate::declare_l2_plugin;
+use crate::cache::traits::{CacheResult, ObjectCache};
+use crate::declare_object_cache_plugin;
 use crate::storages::ShortLink;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-declare_l2_plugin!("memory", MemoryCache);
+declare_object_cache_plugin!("memory", MemoryCache);
 
 #[derive(Default)]
 pub struct MemoryCache {
@@ -22,7 +22,7 @@ impl MemoryCache {
 }
 
 #[async_trait]
-impl L2Cache for MemoryCache {
+impl ObjectCache for MemoryCache {
     async fn get(&self, key: &str) -> CacheResult {
         if let Some(value) = self.inner.get(key) {
             CacheResult::Found(value.clone())

@@ -31,7 +31,7 @@ impl HealthService {
                     json!({
                         "status": "healthy",
                         "links_count": links.len(),
-                        "backend": storage.get_backend_name().await
+                        "backend": storage.get_backend_config().await
                     })
                 }
                 Err(_) => {
@@ -39,7 +39,7 @@ impl HealthService {
                     json!({
                         "status": "unhealthy",
                         "error": "timeout",
-                        "backend": storage.get_backend_name().await
+                        "backend": storage.get_backend_config().await
                     })
                 }
             };

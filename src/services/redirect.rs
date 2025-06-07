@@ -7,11 +7,11 @@ use std::sync::Arc;
 use tracing::debug;
 use tracing::instrument;
 
-use crate::cache::Cache;
 use crate::cache::CacheResult;
+use crate::cache::CompositeCacheTrait;
 use crate::storages::{ShortLink, Storage};
 
-pub static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
+static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
     std::env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string())
 });
 
@@ -21,7 +21,7 @@ impl RedirectService {
     #[instrument(skip(cache, storage), fields(path = %path))]
     pub async fn handle_redirect(
         path: web::Path<String>,
-        cache: web::Data<Arc<dyn Cache>>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> impl Responder {
         let captured_path = path.into_inner();
@@ -40,7 +40,7 @@ impl RedirectService {
 
     async fn process_redirect(
         capture_path: String,
-        cache: web::Data<Arc<dyn Cache>>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> HttpResponse {
         match cache.get(&capture_path).await {
@@ -83,7 +83,7 @@ impl RedirectService {
     fn update_click(storage: web::Data<Arc<dyn Storage>>, code: String) {
         let storage_clone = storage.clone();
         tokio::spawn(async move {
-            if let Err(e) = storage_clone.increment_click(&code).await {
+            if let Err(e) = storage_clone.increment_click(&code) {
                 debug!("Failed to increment click for {}: {}", code, e);
             }
         });

@@ -1,9 +1,9 @@
-pub mod l1;
-pub mod l2;
-pub mod layered;
+pub mod composite;
+pub mod existence_filter;
 pub mod macros;
+pub mod object_cache;
 pub mod register;
 pub mod traits;
 
-pub use layered::LayeredCache;
-pub use traits::{BloomConfig, Cache, CacheResult, L1Cache, L2Cache};
+pub use composite::CompositeCache;
+pub use traits::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};

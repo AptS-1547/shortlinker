@@ -24,3 +24,9 @@ pub struct SerializableShortLink {
     #[serde(default)]
     pub click: usize,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StorageConfig {
+    pub storage_type: String,
+    pub support_click: bool,
+}

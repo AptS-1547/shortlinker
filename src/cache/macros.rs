@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! declare_l1_plugin {
+macro_rules! declare_existence_filter_plugin {
     ($name:expr, $ty:ty) => {
         #[ctor::ctor]
         fn __register_l1_plugin() {
@@ -11,7 +11,7 @@ macro_rules! declare_l1_plugin {
                 Arc::new(|| {
                     Box::pin(async {
                         let l1 = <$ty>::new();
-                        Ok(Box::new(l1) as Box<dyn $crate::cache::traits::L1Cache>)
+                        Ok(Box::new(l1) as Box<dyn $crate::cache::ExistenceFilter>)
                     })
                 }),
             );
@@ -20,7 +20,7 @@ macro_rules! declare_l1_plugin {
 }
 
 #[macro_export]
-macro_rules! declare_l2_plugin {
+macro_rules! declare_object_cache_plugin {
     ($name:expr, $ty:ty) => {
         #[ctor::ctor]
         fn __register_cache_plugin() {
@@ -32,7 +32,7 @@ macro_rules! declare_l2_plugin {
                 Arc::new(|| {
                     Box::pin(async {
                         let cache = <$ty>::new();
-                        Ok(Box::new(cache) as Box<dyn $crate::cache::traits::L2Cache>)
+                        Ok(Box::new(cache) as Box<dyn $crate::cache::ObjectCache>)
                     })
                 }),
             );

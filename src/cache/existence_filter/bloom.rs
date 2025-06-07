@@ -4,22 +4,22 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::debug;
 
-use crate::cache::L1Cache;
-use crate::declare_l1_plugin;
+use crate::cache::ExistenceFilter;
+use crate::declare_existence_filter_plugin;
 
-declare_l1_plugin!("bloom", BloomFilterL1Cache);
+declare_existence_filter_plugin!("bloom", BloomExistenceFilterCache);
 
-pub struct BloomFilterL1Cache {
+pub struct BloomExistenceFilterCache {
     inner: Arc<RwLock<Bloom<str>>>,
 }
 
-impl Default for BloomFilterL1Cache {
+impl Default for BloomExistenceFilterCache {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BloomFilterL1Cache {
+impl BloomExistenceFilterCache {
     pub fn new() -> Self {
         let bloom = Bloom::new_for_fp_rate(10_000, 0.001)
             .unwrap_or_else(|_| panic!("Failed to create bloom filter"));
@@ -30,7 +30,7 @@ impl BloomFilterL1Cache {
 }
 
 #[async_trait]
-impl L1Cache for BloomFilterL1Cache {
+impl ExistenceFilter for BloomExistenceFilterCache {
     async fn check(&self, key: &str) -> bool {
         let bloom = self.inner.read().await;
         bloom.check(key)

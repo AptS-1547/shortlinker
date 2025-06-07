@@ -1,4 +1,4 @@
-use crate::cache::traits::{L1Cache, L2Cache};
+use crate::cache::traits::{ExistenceFilter, ObjectCache};
 use crate::errors::Result;
 use once_cell::sync::Lazy;
 use std::{
@@ -8,35 +8,37 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-pub type BoxedL1CacheFuture = Pin<Box<dyn Future<Output = Result<Box<dyn L1Cache>>> + Send>>;
-pub type L1CacheConstructor = Arc<dyn Fn() -> BoxedL1CacheFuture + Send + Sync>;
+pub type BoxedExistenceFilterFuture =
+    Pin<Box<dyn Future<Output = Result<Box<dyn ExistenceFilter>>> + Send>>;
+pub type ExistenceFilterConstructor = Arc<dyn Fn() -> BoxedExistenceFilterFuture + Send + Sync>;
 
-pub type BoxedL2CacheFuture = Pin<Box<dyn Future<Output = Result<Box<dyn L2Cache>>> + Send>>;
-pub type L2CacheConstructor = Arc<dyn Fn() -> BoxedL2CacheFuture + Send + Sync>;
+pub type BoxedObjectCacheFuture =
+    Pin<Box<dyn Future<Output = Result<Box<dyn ObjectCache>>> + Send>>;
+pub type ObjectCacheConstructor = Arc<dyn Fn() -> BoxedObjectCacheFuture + Send + Sync>;
 
-static CACHE_L1_REGISTRY: Lazy<RwLock<HashMap<String, L1CacheConstructor>>> =
+static CACHE_L1_REGISTRY: Lazy<RwLock<HashMap<String, ExistenceFilterConstructor>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-static CACHE_L2_REGISTRY: Lazy<RwLock<HashMap<String, L2CacheConstructor>>> =
+static CACHE_L2_REGISTRY: Lazy<RwLock<HashMap<String, ObjectCacheConstructor>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub fn register_l1_plugin<S: Into<String>>(name: S, constructor: L1CacheConstructor) {
+pub fn register_l1_plugin<S: Into<String>>(name: S, constructor: ExistenceFilterConstructor) {
     let name = name.into();
     let mut registry = CACHE_L1_REGISTRY.write().unwrap();
     registry.insert(name, constructor);
 }
 
-pub fn get_l1_plugin(name: &str) -> Option<L1CacheConstructor> {
+pub fn get_l1_plugin(name: &str) -> Option<ExistenceFilterConstructor> {
     CACHE_L1_REGISTRY.read().unwrap().get(name).cloned()
 }
 
-pub fn register_l2_plugin<S: Into<String>>(name: S, constructor: L2CacheConstructor) {
+pub fn register_l2_plugin<S: Into<String>>(name: S, constructor: ObjectCacheConstructor) {
     let name = name.into();
     let mut registry = CACHE_L2_REGISTRY.write().unwrap();
     registry.insert(name, constructor);
 }
 
-pub fn get_l2_plugin(name: &str) -> Option<L2CacheConstructor> {
+pub fn get_l2_plugin(name: &str) -> Option<ObjectCacheConstructor> {
     CACHE_L2_REGISTRY.read().unwrap().get(name).cloned()
 }
 

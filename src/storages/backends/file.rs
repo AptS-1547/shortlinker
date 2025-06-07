@@ -7,6 +7,7 @@ use async_trait::async_trait;
 
 use super::{CachePreference, SerializableShortLink, ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
+use crate::storages::models::StorageConfig;
 
 // 注册 file 存储插件
 // 这样子可以在应用启动时自动注册 file 存储插件
@@ -192,11 +193,14 @@ impl Storage for FileStorage {
         }
     }
 
-    async fn get_backend_name(&self) -> String {
-        "file".to_string()
+    async fn get_backend_config(&self) -> StorageConfig {
+        StorageConfig {
+            storage_type: "file".into(),
+            support_click: true,
+        }
     }
 
-    async fn increment_click(&self, _code: &str) -> Result<()> {
+    fn increment_click(&self, _code: &str) -> Result<()> {
         Ok(())
     }
 
