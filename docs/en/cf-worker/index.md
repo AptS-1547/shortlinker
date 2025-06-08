@@ -15,9 +15,8 @@ A serverless variant built with Cloudflare Workers is included in the `cf-worker
 3. Run `wrangler publish` to deploy
 
 Example:
+
 ```bash
 cd cf-worker
 wrangler publish
 ```
-
-See [`cf-worker/README.md`](../../cf-worker/README.md) for details.

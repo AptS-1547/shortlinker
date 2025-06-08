@@ -3,6 +3,7 @@
 Shortlinker includes an optional Vue 3 based administration panel located in the `admin-panel` directory. It communicates with the backend via the Admin API for graphical management.
 
 To enable the panel in Shortlinker, build `admin-panel/dist` and set `ENABLE_FRONTEND_ROUTES=true` along with `ADMIN_TOKEN`. This feature is new and may be unstable.
+
 ## Main Features
 
 - 🔑 Token authentication login
@@ -28,5 +29,3 @@ yarn build
 
 # The output in dist/ can be served by any static server
 ```
-
-See [`admin-panel/README.md`](../../admin-panel/README.md) for full details.

@@ -19,5 +19,3 @@
 cd cf-worker
 wrangler publish
 ```
-
-更多细节请查看 [`cf-worker/README.md`](../../cf-worker/README.md)。
