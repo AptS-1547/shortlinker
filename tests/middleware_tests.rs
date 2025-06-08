@@ -1,4 +1,4 @@
-use actix_web::{test, web, App, HttpResponse, http::StatusCode, http::Method};
+use actix_web::{http::Method, http::StatusCode, test, web, App, HttpResponse};
 use shortlinker::middleware::AdminAuth;
 use std::sync::Mutex;
 
@@ -10,11 +10,11 @@ async fn admin_auth_missing_token_returns_404() {
     std::env::set_var("ADMIN_TOKEN", "");
     std::env::set_var("ADMIN_ROUTE_PREFIX", "/admin");
 
-    let app = test::init_service(
-        App::new()
-            .wrap(AdminAuth)
-            .route("/admin/test", web::get().to(|| async { HttpResponse::Ok() }))
-    ).await;
+    let app = test::init_service(App::new().wrap(AdminAuth).route(
+        "/admin/test",
+        web::get().to(|| async { HttpResponse::Ok() }),
+    ))
+    .await;
 
     let req = test::TestRequest::get().uri("/admin/test").to_request();
     let resp = test::call_service(&app, req).await;
@@ -27,13 +27,15 @@ async fn admin_auth_allows_login_without_token() {
     std::env::set_var("ADMIN_TOKEN", "secret");
     std::env::set_var("ADMIN_ROUTE_PREFIX", "/admin");
 
-    let app = test::init_service(
-        App::new()
-            .wrap(AdminAuth)
-            .route("/admin/auth/login", web::get().to(|| async { HttpResponse::Ok() }))
-    ).await;
+    let app = test::init_service(App::new().wrap(AdminAuth).route(
+        "/admin/auth/login",
+        web::get().to(|| async { HttpResponse::Ok() }),
+    ))
+    .await;
 
-    let req = test::TestRequest::get().uri("/admin/auth/login").to_request();
+    let req = test::TestRequest::get()
+        .uri("/admin/auth/login")
+        .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -44,11 +46,11 @@ async fn admin_auth_validates_token() {
     std::env::set_var("ADMIN_TOKEN", "secret");
     std::env::set_var("ADMIN_ROUTE_PREFIX", "/admin");
 
-    let app = test::init_service(
-        App::new()
-            .wrap(AdminAuth)
-            .route("/admin/protected", web::get().to(|| async { HttpResponse::Ok() }))
-    ).await;
+    let app = test::init_service(App::new().wrap(AdminAuth).route(
+        "/admin/protected",
+        web::get().to(|| async { HttpResponse::Ok() }),
+    ))
+    .await;
 
     let req = test::TestRequest::get()
         .uri("/admin/protected")
@@ -71,11 +73,11 @@ async fn admin_auth_handles_options() {
     std::env::set_var("ADMIN_TOKEN", "secret");
     std::env::set_var("ADMIN_ROUTE_PREFIX", "/admin");
 
-    let app = test::init_service(
-        App::new()
-            .wrap(AdminAuth)
-            .route("/admin/test", web::get().to(|| async { HttpResponse::Ok() }))
-    ).await;
+    let app = test::init_service(App::new().wrap(AdminAuth).route(
+        "/admin/test",
+        web::get().to(|| async { HttpResponse::Ok() }),
+    ))
+    .await;
 
     let req = test::TestRequest::default()
         .method(Method::OPTIONS)

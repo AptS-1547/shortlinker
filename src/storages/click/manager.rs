@@ -1,6 +1,9 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
 
@@ -8,6 +11,9 @@ use crate::storages::click::ClickSink;
 
 // 全局缓冲区，用于临时计数点击
 pub static CLICK_BUFFER: Lazy<DashMap<String, usize>> = Lazy::new(DashMap::new);
+
+// 全局更新锁，防止多线程同时更新缓冲区
+pub static CLICK_UPDATE_LOCK: AtomicBool = AtomicBool::new(false);
 
 pub struct ClickManager {
     sink: Arc<dyn ClickSink>,
@@ -33,21 +39,42 @@ impl ClickManager {
             loop {
                 sleep(self.flush_interval).await;
 
-                let updates: Vec<_> = CLICK_BUFFER
-                    .iter()
-                    .map(|entry| (entry.key().clone(), *entry.value()))
-                    .collect();
-
-                if updates.is_empty() {
-                    continue;
-                }
-
-                CLICK_BUFFER.clear();
-
-                if let Err(e) = self.sink.flush_clicks(updates).await {
-                    debug!("ClickManager: flush_clicks failed: {}", e);
-                }
+                debug!("ClickManager: Triggering flush to storage");
+                // 定期触发刷盘
+                self.flush_inner().await;
             }
         });
+    }
+
+    pub async fn flush(&self) {
+        // 手动触发刷盘
+        debug!("ClickManager: Manual flush triggered");
+        self.flush_inner().await;
+    }
+
+    async fn flush_inner(&self) {
+        if CLICK_UPDATE_LOCK.swap(true, Ordering::SeqCst) {
+            return; // 有其他 flush 正在进行
+        }
+
+        let result = {
+            let updates = CLICK_BUFFER
+                .iter()
+                .map(|entry| (entry.key().clone(), *entry.value()))
+                .collect::<Vec<_>>();
+
+            if updates.is_empty() {
+                return;
+            }
+            CLICK_BUFFER.clear();
+
+            self.sink.flush_clicks(updates).await
+        };
+
+        if let Err(e) = result {
+            debug!("ClickManager: flush_clicks failed: {}", e);
+        }
+
+        CLICK_UPDATE_LOCK.store(false, Ordering::SeqCst);
     }
 }

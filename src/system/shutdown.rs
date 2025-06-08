@@ -1,0 +1,19 @@
+use tokio::signal;
+use tracing::warn;
+
+use crate::storages::click::global::get_click_manager;
+
+pub async fn listen_for_shutdown() {
+    // 等待 Ctrl+C 信号
+    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+    warn!("Shutdown signal received, flushing click data...");
+
+    // 调用点击管理器的 manual_flush
+    let manager = get_click_manager();
+    manager.flush().await;
+
+    warn!("ClickManager flushed successfully");
+
+    crate::system::lockfile::cleanup_lockfile();
+    warn!("Lockfile cleaned up, shutting down...");
+}

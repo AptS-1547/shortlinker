@@ -1,8 +1,6 @@
 use actix_web::{middleware::DefaultHeaders, web, App, HttpServer};
 use dotenv::dotenv;
 use std::env;
-use std::sync::Arc;
-use std::time::Duration;
 use tracing::{debug, warn};
 
 mod cache;
@@ -18,9 +16,6 @@ use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
 };
-use crate::storages::click::{global::set_global_click_manager, manager::ClickManager};
-use crate::storages::StorageFactory;
-use crate::system::{cleanup_lockfile, init_lockfile};
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -33,25 +28,25 @@ struct Config {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv().ok();
+    let args: Vec<String> = env::args().collect();
+
+    // CLI Mode
+    if args.len() > 1 {
+        system::startup::cli_pre_startup().await;
+        cli::run_cli().await;
+        return Ok(());
+    }
+
     // 记录程序启动时间
     let app_start_time = AppStartTime {
         start_datetime: chrono::Utc::now(),
     };
 
-    let args: Vec<String> = env::args().collect();
-    dotenv().ok();
+    // 启动前预处理 //
 
-    // CLI Mode
-    if args.len() > 1 {
-        env::set_var("CLI_MODE", "true");
-        cli::run_cli().await;
-        return Ok(());
-    }
-
-    // Server Mode
-    env::set_var("CLI_MODE", "false");
-
-    // Initialize tracing subscriber
+    debug!("Starting pre-startup processing...");
+    // 初始化日志
     let stdout_log = std::io::stdout();
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
     let filter = tracing_subscriber::EnvFilter::new(
@@ -64,6 +59,24 @@ async fn main() -> std::io::Result<()> {
         .with_ansi(true)
         .init();
 
+    let startup = system::startup::prepare_server_startup().await;
+
+    let cache = startup.cache.clone();
+    let storage = startup.storage.clone();
+    let route = startup.route_config.clone();
+
+    let admin_prefix = route.admin_prefix;
+    let health_prefix = route.health_prefix;
+    let frontend_prefix = route.frontend_prefix;
+
+    // 输出预处理时间
+    debug!(
+        "Pre-startup processing completed in {} ms",
+        app_start_time.start_datetime.timestamp_millis()
+    );
+
+    // 预处理完成 //
+
     // Load env configurations
     let config = Config {
         server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
@@ -74,90 +87,6 @@ async fn main() -> std::io::Result<()> {
         #[cfg(unix)]
         unix_socket_path: env::var("UNIX_SOCKET").ok(),
     };
-
-    // 初始化锁文件
-    init_lockfile()?;
-
-    // DEBUG 输出已注册的存储和缓存插件
-    if cfg!(debug_assertions) {
-        storages::register::debug_storage_registry(); // 调试函数，打印已注册的存储插件
-        cache::register::debug_cache_registry(); // 调试函数，打印已注册的缓存插件
-    }
-
-    // 检查存储后端
-    let storage = StorageFactory::create()
-        .await
-        .expect("Failed to create storage backend");
-    warn!(
-        "Using storage backend: {}",
-        storage.get_backend_config().await.storage_type
-    );
-
-    if let Some(click_sink) = storage.as_click_sink() {
-        let manager = Arc::new(ClickManager::new(click_sink, Duration::from_secs(30)));
-        set_global_click_manager(manager.clone());
-        manager.start();
-    }
-
-    // 初始化 L1 和 L2 缓存
-    let cache = cache::CompositeCache::new(storage.preferred_cache().clone())
-        .await
-        .expect("Failed to create cache");
-
-    // 构建 L1 和 L2 初始化缓存
-    debug!("Initializing L1/L2 cache with preloading");
-    {
-        let links = storage.load_all().await;
-        cache
-            .reconfigure(cache::traits::BloomConfig {
-                capacity: links.len(),
-                fp_rate: 0.001,
-            })
-            .await;
-
-        cache.load_cache(links.clone()).await;
-
-        debug!("L1/L2 cache initialized with {} links", links.len());
-    }
-
-    // 设置重载机制
-    debug!("Setting up reload mechanism");
-    system::setup_reload_mechanism(cache.clone(), storage.clone());
-
-    // 获取路由前缀配置
-    let admin_prefix = env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string());
-    let health_prefix = env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string());
-    let frontend_prefix =
-        env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string());
-
-    // 检查 Admin API 是否启用
-    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
-    if admin_token.is_empty() {
-        warn!("Admin API is disabled (ADMIN_TOKEN not set)");
-    } else {
-        warn!("Admin API available at: {}", admin_prefix);
-    }
-
-    // 检查 Health API 是否启用
-    let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
-    if health_token.is_empty() && admin_token.is_empty() {
-        warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
-    } else {
-        warn!("Health API available at: {}", health_prefix);
-    }
-
-    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_FRONTEND_ROUTES 未设置为 true
-    let enable_frontend_routes = env::var("ENABLE_FRONTEND_ROUTES")
-        .map(|v| v == "true")
-        .unwrap_or(false);
-    if !enable_frontend_routes || admin_token.is_empty() {
-        // 如果前端路由未启用，设置前端路由前缀为 ""
-        warn!(
-            "Frontend routes are disabled (ENABLE_FRONTEND_ROUTES is false or ADMIN_TOKEN not set)"
-        );
-    } else {
-        warn!("Frontend routes available at: {}", frontend_prefix);
-    }
 
     let cpu_count = env::var("CPU_COUNT")
         .unwrap_or_else(|_| num_cpus::get().to_string())
@@ -249,31 +178,40 @@ async fn main() -> std::io::Result<()> {
     .client_disconnect_timeout(std::time::Duration::from_millis(1000)) // 断连超时
     .workers(cpu_count);
 
-    #[cfg(unix)]
-    {
-        if let Some(ref socket_path) = config.unix_socket_path {
-            warn!("Starting server on Unix socket: {}", socket_path);
-            // 如果 socket 文件已存在，先删除
-            if std::path::Path::new(socket_path).exists() {
-                std::fs::remove_file(socket_path)?;
+    let server = {
+        #[cfg(unix)]
+        {
+            if let Some(ref socket_path) = config.unix_socket_path {
+                warn!("Starting server on Unix socket: {}", socket_path);
+                if std::path::Path::new(socket_path).exists() {
+                    std::fs::remove_file(socket_path)?;
+                }
+                Some(server.bind_uds(socket_path)?)
+            } else {
+                let bind_address = format!("{}:{}", config.server_host, config.server_port);
+                warn!("Starting server at http://{}", bind_address);
+                Some(server.bind(bind_address)?)
             }
-            server.bind_uds(socket_path)?.run().await?;
-        } else {
+        }
+
+        #[cfg(not(unix))]
+        {
             let bind_address = format!("{}:{}", config.server_host, config.server_port);
             warn!("Starting server at http://{}", bind_address);
-            server.bind(bind_address)?.run().await?;
+            Some(server.bind(bind_address)?)
         }
     }
+    .expect("Server binding failed")
+    .run();
 
-    #[cfg(not(unix))]
-    {
-        let bind_address = format!("{}:{}", config.server_host, config.server_port);
-        warn!("Starting server at http://{}", bind_address);
-        server.bind(bind_address)?.run().await?;
+    tokio::select! {
+        res = server => {
+            res?;
+        }
+        _ = system::shutdown::listen_for_shutdown() => {
+            warn!("Graceful shutdown: flushed click buffer before exit");
+        }
     }
-
-    // 清理锁文件
-    cleanup_lockfile();
 
     Ok(())
 }

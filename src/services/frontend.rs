@@ -76,7 +76,8 @@ impl FrontendService {
             Some(content) => {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(content);
-                let processed_html = html_content.replace("%BASE_PATH%", &frontend_prefix)
+                let processed_html = html_content
+                    .replace("%BASE_PATH%", &frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
                     .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
 
@@ -86,7 +87,8 @@ impl FrontendService {
             }
             None => {
                 let fallback_html = include_str!("../../admin-panel/dist/index.html");
-                let processed_html = fallback_html.replace("%BASE_PATH%", &frontend_prefix)
+                let processed_html = fallback_html
+                    .replace("%BASE_PATH%", &frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
                     .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
                 Ok(HttpResponse::Ok()
@@ -186,7 +188,8 @@ impl FrontendService {
             Some(content) => {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(content);
-                let processed_html = html_content.replace("%BASE_PATH%", &frontend_prefix)
+                let processed_html = html_content
+                    .replace("%BASE_PATH%", &frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
                     .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
 
