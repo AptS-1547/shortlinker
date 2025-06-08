@@ -12,8 +12,9 @@ export default {
         nav: [
           { text: '首页', link: '/' },
           { text: '快速开始', link: '/guide/getting-started' },
-          { text: 'CLI 工具', link: '/cli/' },
           { text: '配置说明', link: '/config/' },
+          { text: 'CLI 工具', link: '/cli/' },
+          { text: 'Web 管理界面', link: '/admin-panel/' },
           { text: '部署指南', link: '/deployment/' },
           { text: 'API 文档', link: '/api/' }
         ],
@@ -51,8 +52,9 @@ export default {
         nav: [
           { text: 'Home', link: '/en/' },
           { text: 'Quick Start', link: '/en/guide/getting-started' },
-          { text: 'CLI Tools', link: '/en/cli/' },
           { text: 'Configuration', link: '/en/config/' },
+          { text: 'CLI Tools', link: '/en/cli/' },
+          { text: 'Web Admin Panel', link: '/en/admin-panel/' },
           { text: 'Deployment', link: '/en/deployment/' },
           { text: 'API Docs', link: '/en/api/' }
         ],

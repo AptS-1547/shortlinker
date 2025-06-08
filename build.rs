@@ -6,7 +6,10 @@ use std::path::Path;
 fn main() {
     println!("cargo:rerun-if-changed=admin-panel/dist");
 
-    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| {
+        eprintln!("Error: OUT_DIR environment variable not set");
+        std::process::exit(1);
+    });
     let dest_path = Path::new(&out_dir).join("static_files.rs");
     let mut f = fs::File::create(&dest_path).unwrap();
 
@@ -148,7 +151,7 @@ fn create_fallback_files(dist_path: &Path) {
         <h2>⚠️ Admin Panel Not Built</h2>
         <p>The admin panel needs to be built before running the server.</p>
         <p>Please run the following commands:</p>
-        <p><code>cd admin-panel && npm install && npm run build</code></p>
+        <p><code>cd admin-panel && yarn && yarn build</code></p>
     </div>
 </body>
 </html>"#;
