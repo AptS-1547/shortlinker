@@ -106,9 +106,8 @@ mod error_conversion_tests {
         let parse_error = chrono::DateTime::parse_from_rfc3339(invalid_date).unwrap_err();
         let shortlinker_error: ShortlinkerError = parse_error.into();
 
-        assert!(matches!(shortlinker_error, ShortlinkerError::Validation(_)));
-        assert!(shortlinker_error.to_string().contains("验证错误"));
-        assert!(shortlinker_error.to_string().contains("时间解析错误"));
+        assert!(matches!(shortlinker_error, ShortlinkerError::DateParse(_)));
+        assert!(shortlinker_error.to_string().contains("日期解析错误"));
     }
 }
 
