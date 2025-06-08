@@ -12,7 +12,7 @@ pub struct CompositeCache {
 }
 
 impl CompositeCache {
-    pub async fn new(
+    pub async fn create(
         pref: CachePreference,
     ) -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
         let l1_ctor = get_l1_plugin(&pref.l1).ok_or_else(|| {

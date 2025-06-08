@@ -211,7 +211,7 @@ async fn main() -> std::io::Result<()> {
             res?;
         }
         _ = system::shutdown::listen_for_shutdown() => {
-            warn!("Graceful shutdown: flushed click buffer before exit");
+            warn!("Graceful shutdown: all tasks completed");
         }
     }
 

@@ -77,9 +77,9 @@ impl FrontendService {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(content);
                 let processed_html = html_content
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
+                    .replace("%BASE_PATH%", frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
 
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
@@ -88,9 +88,9 @@ impl FrontendService {
             None => {
                 let fallback_html = include_str!("../../admin-panel/dist/index.html");
                 let processed_html = fallback_html
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
+                    .replace("%BASE_PATH%", frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
                     .body(processed_html))
@@ -104,7 +104,7 @@ impl FrontendService {
         debug!("Serving static file: {}", path);
 
         // 根据文件扩展名确定 Content-Type
-        let content_type = match path.split('.').last() {
+        let content_type = match path.split('.').next_back() {
             Some("css") => "text/css",
             Some("js") => "application/javascript",
             Some("json") => "application/json",
@@ -189,9 +189,9 @@ impl FrontendService {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(content);
                 let processed_html = html_content
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix);
+                    .replace("%BASE_PATH%", frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
 
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
@@ -203,7 +203,7 @@ impl FrontendService {
                     env!("CARGO_MANIFEST_DIR"),
                     "/admin-panel/dist/index.html"
                 ));
-                let processed_html = html.replace("%BASE_PATH%", &frontend_prefix);
+                let processed_html = html.replace("%BASE_PATH%", frontend_prefix);
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
                     .body(processed_html))

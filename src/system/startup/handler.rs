@@ -59,7 +59,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     }
 
     // 初始化缓存
-    let cache = cache::CompositeCache::new(storage.preferred_cache().clone())
+    let cache = cache::CompositeCache::create(storage.preferred_cache().clone())
         .await
         .expect("Failed to create cache");
 
@@ -118,6 +118,9 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
             "Frontend routes are disabled (ENABLE_FRONTEND_ROUTES is false or ADMIN_TOKEN not set)"
         );
     } else {
-        warn!("Frontend routes available at: {}", route_config.frontend_prefix);
+        warn!(
+            "Frontend routes available at: {}",
+            route_config.frontend_prefix
+        );
     }
 }

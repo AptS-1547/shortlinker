@@ -1,5 +1,5 @@
 use std::fs;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 // Unix平台的PID文件管理
 #[cfg(unix)]
@@ -48,7 +48,7 @@ pub fn init_lockfile() -> Result<(), std::io::Error> {
         error!("Failed to write PID file: {}", e);
         return Err(e);
     } else {
-        info!("Server PID: {}", pid);
+        debug!("Server PID: {}", pid);
     }
 
     Ok(())

@@ -187,7 +187,7 @@ impl AdminService {
                 }
 
                 // Expiration status filter
-                let is_expired = link.expires_at.map_or(false, |exp| exp < now);
+                let is_expired = link.expires_at.is_some_and(|exp| exp < now);
 
                 if query.only_expired == Some(true) && !is_expired {
                     return false;
@@ -231,7 +231,7 @@ impl AdminService {
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
         // Generate code if not provided
-        if link.code.as_ref().map_or(true, |c| c.is_empty()) {
+        if link.code.as_ref().is_none_or(|c| c.is_empty()) {
             debug!("Admin API: no code provided, generating a new one");
             let random_code = generate_random_code(Self::get_random_code_length());
             link.code = Some(random_code);
@@ -427,30 +427,6 @@ impl AdminService {
                 StatusCode::UNAUTHORIZED,
                 "Invalid admin token",
             ))
-        }
-    }
-
-    async fn reload_system(
-        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
-    ) -> ActixResult<impl Responder> {
-        info!("Admin API: reload system request");
-
-        match reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await {
-            Ok(_) => {
-                info!("Admin API: system reload successful");
-                Ok(Self::success_response(serde_json::json!({
-                    "message": "System reloaded successfully"
-                })))
-            }
-            Err(e) => {
-                let error_msg = format!("System reload failed: {}", e);
-                error!("Admin API: system reload failed: {}", e);
-                Ok(Self::error_response(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    &error_msg,
-                ))
-            }
         }
     }
 }

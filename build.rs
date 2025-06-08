@@ -160,7 +160,7 @@ fn create_fallback_files(dist_path: &Path) {
         .expect("Failed to write fallback index.html");
 
     // 创建空的 favicon
-    fs::write(dist_path.join("favicon.ico"), &[]).expect("Failed to write fallback favicon");
+    fs::write(dist_path.join("favicon.ico"), []).expect("Failed to write fallback favicon");
 
     fs::create_dir_all(dist_path.join("assets")).expect("Failed to create assets directory");
 }
