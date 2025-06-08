@@ -15,7 +15,7 @@
 
 </div>
 
-## 🚀 Benchmark (v0.1.6)
+## 🚀 Benchmark (v0.1.7-alpha.1)
 
 **Environment**
 
@@ -26,7 +26,7 @@
 | Type       | Scenario                        | QPS Peak          | Cache Hit | Bloom Filter | DB Access |
 | ---------- | ------------------------------- | ----------------- | --------- | ------------ | --------- |
 | Cache Hit  | Hot shortlink (repeated access) | **719,997.22** | ✅ Yes    | ✅ Yes       | ❌ No     |
-| Cache Miss | Cold shortlink (random access)  | **595,980.01** | ❌ No     | ✅ Yes       | ✅ Yes    |
+| Cache Miss | Cold shortlink (random access)  | **610,543.39** | ❌ No     | ✅ Yes       | ✅ Yes    |
 
 > 💡 Even under cache miss, the system sustains nearly 600k QPS — demonstrating excellent performance with SQLite, `actix-web`, and async caching.
 
