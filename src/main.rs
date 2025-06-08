@@ -72,7 +72,9 @@ async fn main() -> std::io::Result<()> {
     // 输出预处理时间
     debug!(
         "Pre-startup processing completed in {} ms",
-        app_start_time.start_datetime.timestamp_millis()
+        chrono::Utc::now()
+            .signed_duration_since(app_start_time.start_datetime)
+            .num_milliseconds()
     );
 
     // 预处理完成 //
