@@ -9,7 +9,7 @@
   >
     <div
       v-if="isOpen"
-      class="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
       @click="handleBackdropClick"
     >
       <Transition
@@ -22,18 +22,18 @@
       >
         <div
           v-if="isOpen && !isClosing"
-          class="bg-white/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
+          class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-white/20 dark:border-gray-700/50 rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto"
         >
           <div class="flex items-center justify-between mb-6">
             <div>
-              <h3 class="text-xl font-bold text-gray-900">{{ $t('health.title') }}</h3>
-              <p class="text-sm text-gray-500 mt-1">{{ $t('health.description') }}</p>
+              <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ $t('health.title') }}</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $t('health.description') }}</p>
             </div>
             <button
               @click="handleClose"
-              class="p-2 hover:bg-gray-100/80 rounded-lg transition-all duration-200 hover:scale-110"
+              class="p-2 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 rounded-lg transition-all duration-200 hover:scale-110"
             >
-              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -47,11 +47,11 @@
           <div v-if="healthData" class="space-y-6">
             <!-- 总体状态 -->
             <div
-              class="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 backdrop-blur-sm rounded-xl border border-blue-200/30"
+              class="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 backdrop-blur-sm rounded-xl border border-blue-200/30 dark:border-blue-800/30"
             >
               <div class="flex items-center justify-between">
                 <div>
-                  <h4 class="font-semibold text-gray-900 mb-1">{{ $t('health.overallStatus') }}</h4>
+                  <h4 class="font-semibold text-gray-900 dark:text-white mb-1">{{ $t('health.overallStatus') }}</h4>
                   <div
                     :class="[
                       'inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium',
@@ -63,8 +63,8 @@
                   </div>
                 </div>
                 <div class="text-right">
-                  <p class="text-xs text-gray-500">{{ $t('health.responseTime') }}</p>
-                  <p class="text-lg font-bold text-green-600">{{ responseTime }}ms</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ $t('health.responseTime') }}</p>
+                  <p class="text-lg font-bold text-green-600 dark:text-green-400">{{ responseTime }}ms</p>
                 </div>
               </div>
             </div>
@@ -72,11 +72,11 @@
             <!-- 系统信息 -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div
-                class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg"
+                class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 dark:from-gray-800/90 dark:to-gray-900/90 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/50 shadow-lg"
               >
-                <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <h4 class="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                   <svg
-                    class="w-4 h-4 text-blue-600"
+                    class="w-4 h-4 text-blue-600 dark:text-blue-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -90,29 +90,29 @@
                   </svg>
                   {{ $t('health.uptime') }}
                 </h4>
-                <p class="text-2xl font-bold text-gray-900">{{ formattedUptime }}</p>
-                <p class="text-xs text-gray-500 mt-1">{{ $t('health.sinceLast') }}</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formattedUptime }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $t('health.sinceLast') }}</p>
               </div>
 
               <div
-                class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg"
+                class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 dark:from-gray-800/90 dark:to-gray-900/90 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/50 shadow-lg"
               >
-                <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <LinkIcon class="w-4 h-4 text-green-600" />
+                <h4 class="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <LinkIcon class="w-4 h-4 text-green-600 dark:text-green-400" />
                   {{ $t('health.totalLinks') }}
                 </h4>
-                <p class="text-2xl font-bold text-gray-900">{{ linksCount }}</p>
-                <p class="text-xs text-gray-500 mt-1">{{ $t('health.activeLinks') }}</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ linksCount }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $t('health.activeLinks') }}</p>
               </div>
             </div>
 
             <!-- 存储后端信息 -->
             <div
-              class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg"
+              class="p-4 bg-gradient-to-br from-white/90 to-gray-50/90 dark:from-gray-800/90 dark:to-gray-900/90 backdrop-blur-sm rounded-xl border border-white/30 dark:border-gray-700/50 shadow-lg"
             >
-              <h4 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <h4 class="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <svg
-                  class="w-4 h-4 text-purple-600"
+                  class="w-4 h-4 text-purple-600 dark:text-purple-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -128,13 +128,13 @@
               </h4>
               <div class="space-y-3">
                 <div class="flex justify-between items-center">
-                  <span class="text-sm text-gray-600">{{ $t('health.type') }}</span>
-                  <span class="font-mono text-sm bg-gray-200 px-2 py-1 rounded">
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ $t('health.type') }}</span>
+                  <span class="font-mono text-sm bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded text-gray-900 dark:text-gray-100">
                     {{ storageType }}
                   </span>
                 </div>
                 <div class="flex justify-between items-center">
-                  <span class="text-sm text-gray-600">{{ $t('health.status') }}</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ $t('health.status') }}</span>
                   <div
                     :class="[
                       'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
@@ -146,11 +146,13 @@
                   </div>
                 </div>
                 <div class="flex justify-between items-center">
-                  <span class="text-sm text-gray-600">{{ $t('health.clickTracking') }}</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ $t('health.clickTracking') }}</span>
                   <span
                     :class="[
                       'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
-                      supportClick ? 'text-green-600 bg-green-100' : 'text-gray-600 bg-gray-100',
+                      supportClick
+                        ? 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
+                        : 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800',
                     ]"
                   >
                     <CheckCircleIcon v-if="supportClick" class="w-3 h-3" />
@@ -162,10 +164,10 @@
             </div>
 
             <!-- 时间戳 -->
-            <div class="p-3 bg-gray-50/80 backdrop-blur-sm rounded-lg border border-gray-200/30">
+            <div class="p-3 bg-gray-50/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-200/30 dark:border-gray-700/30">
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600">{{ $t('health.lastUpdated') }}</span>
-                <span class="font-mono text-gray-800">{{ formatTimestamp(healthData.timestamp as string) }}</span>
+                <span class="text-gray-600 dark:text-gray-400">{{ $t('health.lastUpdated') }}</span>
+                <span class="font-mono text-gray-800 dark:text-gray-200">{{ formatTimestamp(healthData.timestamp as string) }}</span>
               </div>
             </div>
 
@@ -173,7 +175,7 @@
             <div class="flex justify-end pt-2">
               <button
                 @click="handleClose"
-                class="px-6 py-2 text-gray-700 bg-gray-100/70 hover:bg-gray-200/70 text-sm font-semibold rounded-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 hover:border-gray-300/50 transform hover:scale-105 active:scale-95"
+                class="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100/70 dark:bg-gray-800/70 hover:bg-gray-200/70 dark:hover:bg-gray-700/70 text-sm font-semibold rounded-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:border-gray-300/50 dark:hover:border-gray-600/50 transform hover:scale-105 active:scale-95"
               >
                 {{ $t('health.close') }}
               </button>
@@ -182,9 +184,9 @@
 
           <div v-else class="text-center py-8">
             <div
-              class="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mx-auto mb-4"
+              class="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 dark:border-blue-400 border-t-transparent mx-auto mb-4"
             ></div>
-            <p class="text-gray-500">{{ $t('health.loadingData') }}</p>
+            <p class="text-gray-500 dark:text-gray-400">{{ $t('health.loadingData') }}</p>
           </div>
         </div>
       </Transition>
@@ -255,13 +257,13 @@ const formatTimestamp = (timestamp: string) => {
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'healthy':
-      return 'text-green-600 bg-green-100'
+      return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
     case 'unhealthy':
-      return 'text-red-600 bg-red-100'
+      return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
     case 'degraded':
-      return 'text-yellow-600 bg-yellow-100'
+      return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
     default:
-      return 'text-gray-600 bg-gray-100'
+      return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
   }
 }
 

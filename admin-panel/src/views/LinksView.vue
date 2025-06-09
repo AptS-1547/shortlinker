@@ -2,44 +2,44 @@
   <div class="space-y-6">
     <!-- 页面标题 - 现代化设计 -->
     <div class="relative mb-6">
-      <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-blue-500/5 to-purple-500/5 rounded-xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-blue-500/5 to-purple-500/5 dark:from-indigo-400/10 dark:via-blue-400/10 dark:to-purple-400/10 rounded-xl"></div>
       <div class="relative p-4">
-        <h1 class="text-2xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-blue-900 bg-clip-text text-transparent">
+        <h1 class="text-2xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-blue-900 dark:from-gray-100 dark:via-indigo-300 dark:to-blue-300 bg-clip-text text-transparent">
           {{ $t('links.title') }}
         </h1>
-        <p class="text-gray-600 mt-1">{{ $t('links.description') }}</p>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">{{ $t('links.description') }}</p>
       </div>
     </div>
 
     <!-- 筛选器 - 现代化设计 -->
-    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
-      <div class="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-indigo-50/20 to-purple-50/30 rounded-xl"></div>
+    <div class="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+      <div class="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-indigo-50/20 to-purple-50/30 dark:from-blue-900/10 dark:via-indigo-900/10 dark:to-purple-900/10 rounded-xl"></div>
       <div
-        class="relative p-4 border-b border-gray-200/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 transition-all duration-300 rounded-t-xl"
+        class="relative p-4 border-b border-gray-200/50 dark:border-gray-700/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 dark:hover:from-gray-700/30 dark:hover:to-indigo-900/20 transition-all duration-300 rounded-t-xl"
         @click="toggleFilter"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 rounded-lg shadow-sm">
+            <div class="p-2 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/50 dark:to-blue-800/30 text-blue-600 dark:text-blue-400 rounded-lg shadow-sm">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"></path>
               </svg>
             </div>
             <div>
-              <h2 class="text-lg font-bold text-gray-900">{{ $t('links.filterTitle') }}</h2>
-              <p class="text-sm text-gray-600 mt-0.5">{{ $t('links.filterDescription') }}</p>
+              <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $t('links.filterTitle') }}</h2>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{{ $t('links.filterDescription') }}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <span
               v-if="hasActiveFilters"
-              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200/50 shadow-sm"
+              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-800 dark:text-blue-300 border border-blue-200/50 dark:border-blue-700/50 shadow-sm"
             >
               {{ $t('links.activeFilters', { count: activeFilterCount }) }}
             </span>
             <ChevronDownIcon
               :class="[
-                'w-5 h-5 text-gray-500 transition-transform duration-300',
+                'w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300',
                 { 'rotate-180': showFilter },
               ]"
             />
@@ -47,7 +47,7 @@
         </div>
       </div>
 
-      <!-- 筛选器内容保持原有功能，增强样式... -->
+      <!-- 筛选器内容 -->
       <div
         :class="[
           'overflow-hidden transition-all duration-300 ease-in-out',
@@ -57,20 +57,20 @@
         <div class="relative p-4">
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('common.search') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('common.search') }}</label>
               <input
                 v-model="filterForm.search"
                 type="text"
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                 :placeholder="$t('links.search.placeholder')"
               />
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.status') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('links.status') }}</label>
               <select
                 v-model="filterForm.status"
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100"
               >
                 <option value="">{{ $t('links.filterOptions.allLinks') }}</option>
                 <option value="active">{{ $t('links.filterOptions.activeOnly') }}</option>
@@ -81,28 +81,28 @@
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.createdAfter') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('links.createdAfter') }}</label>
               <input
                 v-model="filterForm.created_after"
                 type="date"
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100"
               />
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.createdBefore') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('links.createdBefore') }}</label>
               <input
                 v-model="filterForm.created_before"
                 type="date"
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100"
               />
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.pageSize') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('links.pageSize') }}</label>
               <select
                 v-model="filterForm.page_size"
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100"
               >
                 <option :value="10">10 per page</option>
                 <option :value="20">20 per page</option>
@@ -112,16 +112,16 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50 mt-4">
+          <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50 dark:border-gray-700/50 mt-4">
             <button
               @click="resetFilters"
-              class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
+              class="px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
             >
               {{ $t('common.reset') }}
             </button>
             <button
               @click="applyFilters"
-              class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-bold rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 uppercase tracking-wide text-sm"
+              class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500 text-white font-bold rounded-lg hover:from-indigo-600 hover:to-indigo-700 dark:hover:from-indigo-500 dark:hover:to-indigo-600 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 uppercase tracking-wide text-sm"
             >
               {{ $t('common.apply') }} {{ $t('common.filter') }}
             </button>
@@ -131,11 +131,11 @@
     </div>
 
     <!-- 创建/编辑链接表单 - 现代化设计 -->
-    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+    <div class="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
       <!-- 表单头部 -->
-      <div class="absolute inset-0 bg-gradient-to-br from-green-50/30 via-indigo-50/20 to-purple-50/30 rounded-xl"></div>
+      <div class="absolute inset-0 bg-gradient-to-br from-green-50/30 via-indigo-50/20 to-purple-50/30 dark:from-green-900/10 dark:via-indigo-900/10 dark:to-purple-900/10 rounded-xl"></div>
       <div
-        class="relative p-4 border-b border-gray-200/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 transition-all duration-300 rounded-t-xl"
+        class="relative p-4 border-b border-gray-200/50 dark:border-gray-700/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 dark:hover:from-gray-700/30 dark:hover:to-indigo-900/20 transition-all duration-300 rounded-t-xl"
         @click="toggleForm"
       >
         <div class="flex items-center justify-between">
@@ -143,7 +143,7 @@
             <div
               :class="[
                 'p-2 rounded-lg flex items-center justify-center transition-all duration-300 shadow-sm',
-                editingLink ? 'bg-gradient-to-br from-amber-100 to-orange-50 text-amber-700' : 'bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-700',
+                editingLink ? 'bg-gradient-to-br from-amber-100 to-orange-50 dark:from-amber-900/50 dark:to-orange-900/30 text-amber-700 dark:text-amber-400' : 'bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/50 dark:to-indigo-800/30 text-indigo-700 dark:text-indigo-400',
               ]"
             >
               <EditIcon
@@ -153,10 +153,10 @@
               <PlusIcon v-else className="w-5 h-5" />
             </div>
             <div>
-              <h2 class="text-lg font-bold text-gray-900">
+              <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {{ editingLink ? $t('links.editTitle') : $t('links.createTitle') }}
               </h2>
-              <p class="text-sm text-gray-600 mt-0.5">
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
                 {{ editingLink ? $t('links.editDescription') : $t('links.createDescription') }}
               </p>
             </div>
@@ -164,13 +164,13 @@
           <div class="flex items-center gap-2">
             <span
               v-if="editingLink"
-              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 border border-indigo-200/50 shadow-sm"
+              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 text-indigo-800 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-700/50 shadow-sm"
             >
               {{ $t('links.editing', { code: editingLink.short_code }) }}
             </span>
             <ChevronDownIcon
               :class="[
-                'w-5 h-5 text-gray-500 transition-transform duration-300',
+                'w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300',
                 { 'rotate-180': showForm },
               ]"
             />
@@ -178,7 +178,7 @@
         </div>
       </div>
 
-      <!-- 表单内容 - 保持原有功能，减小尺寸 -->
+      <!-- 表单内容 -->
       <div
         :class="[
           'overflow-hidden transition-all duration-300 ease-in-out',
@@ -189,53 +189,53 @@
           <form @submit.prevent="handleSave" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">
+                <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">
                   {{ $t('links.shortCodeOptional') }}
                 </label>
                 <input
                   v-model="formData.code"
                   type="text"
-                  class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 backdrop-blur-sm text-sm"
+                  class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                   :placeholder="$t('links.shortCodePlaceholder')"
                 />
-                <p class="text-xs text-gray-500 mt-1 font-medium">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
                   {{ $t('links.shortCodeHelp') }}
                 </p>
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">
+                <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">
                   {{ $t('links.expiresAtOptional') }}
                 </label>
                 <input
                   v-model="formData.expires_at"
                   type="datetime-local"
-                  class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                  class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100"
                 />
-                <p class="text-xs text-gray-500 mt-1 font-medium">{{ $t('links.expiresAtHelp') }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">{{ $t('links.expiresAtHelp') }}</p>
               </div>
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.targetUrlRequired') }}</label>
+              <label class="block text-xs font-bold text-gray-900 dark:text-gray-100 mb-1 uppercase tracking-wide">{{ $t('links.targetUrlRequired') }}</label>
               <input
                 v-model="formData.target"
                 type="url"
                 required
-                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 shadow-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                 :placeholder="$t('links.targetUrlPlaceholder')"
               />
-              <p class="text-xs text-gray-500 mt-1 font-medium">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
                 {{ $t('links.targetUrlHelp') }}
               </p>
             </div>
 
-            <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50">
+            <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50 dark:border-gray-700/50">
               <div class="flex items-center gap-2">
                 <button
                   type="button"
                   @click="collapseForm"
-                  class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
+                  class="px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('common.cancel') }}
                 </button>
@@ -243,7 +243,7 @@
                   v-if="editingLink"
                   type="button"
                   @click="cancelEdit"
-                  class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
+                  class="px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('links.clearEdit') }}
                 </button>
@@ -252,7 +252,7 @@
               <button
                 type="submit"
                 :disabled="loading || !formData.target"
-                class="px-6 py-2 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white font-bold rounded-lg hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 uppercase tracking-wide text-sm"
+                class="px-6 py-2 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-purple-500 text-white font-bold rounded-lg hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 dark:hover:from-indigo-500 dark:hover:via-indigo-600 dark:hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 uppercase tracking-wide text-sm"
               >
                 <span v-if="loading" class="flex items-center">
                   <SpinnerIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
@@ -269,44 +269,43 @@
     </div>
 
     <!-- 链接列表 - 现代化设计 -->
-    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
-      <div class="absolute inset-0 bg-gradient-to-br from-gray-50/30 via-blue-50/20 to-indigo-50/30 rounded-xl"></div>
-      <div class="relative p-4 border-b border-gray-200/50">
+    <div class="relative bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+      <div class="absolute inset-0 bg-gradient-to-br from-gray-50/30 via-blue-50/20 to-indigo-50/30 dark:from-gray-800/30 dark:via-blue-900/10 dark:to-indigo-900/10 rounded-xl"></div>
+      <div class="relative p-4 border-b border-gray-200/50 dark:border-gray-700/50">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg shadow-sm">
-              <LinkIcon className="w-5 h-5 text-gray-700" />
+            <div class="p-2 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 rounded-lg shadow-sm">
+              <LinkIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
             </div>
-            <h2 class="text-lg font-bold text-gray-900">{{ $t('links.shortLinks') }}</h2>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ $t('links.shortLinks') }}</h2>
           </div>
           <div class="flex items-center gap-4">
-            <span class="text-xs font-bold text-gray-600 bg-gradient-to-r from-gray-100 to-gray-50 px-2 py-1 rounded border border-gray-200/50">
+            <span class="text-xs font-bold text-gray-600 dark:text-gray-400 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 px-2 py-1 rounded border border-gray-200/50 dark:border-gray-600/50">
               {{ filteredLinks.length }}
               <span v-if="filteredLinks.length !== totalCount">of {{ totalCount }}</span>
               total
               <span v-if="hasActiveFilters">(filtered)</span>
             </span>
-            <span class="text-xs font-bold text-gray-600 bg-gradient-to-r from-indigo-100 to-indigo-50 px-2 py-1 rounded border border-indigo-200/50">
+            <span class="text-xs font-bold text-gray-600 dark:text-gray-400 bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/30 dark:to-indigo-800/20 px-2 py-1 rounded border border-indigo-200/50 dark:border-indigo-700/50">
               Page {{ currentPage }} of {{ totalPages }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- 表格内容保持原有功能，减小尺寸 -->
       <div class="relative p-4">
         <div v-if="loading && links.length === 0" class="text-center py-8">
           <div class="animate-spin mx-auto mb-4">
-            <SpinnerIcon className="h-8 w-8 text-indigo-500" />
+            <SpinnerIcon className="h-8 w-8 text-indigo-500 dark:text-indigo-400" />
           </div>
-          <p class="text-gray-500">{{ $t('common.loading') }}...</p>
+          <p class="text-gray-500 dark:text-gray-400">{{ $t('common.loading') }}...</p>
         </div>
 
         <div v-else-if="error" class="text-center py-8">
-          <div class="text-red-500 mb-4">{{ error }}</div>
+          <div class="text-red-500 dark:text-red-400 mb-4">{{ error }}</div>
           <button
             @click="() => fetchLinks()"
-            class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+            class="px-4 py-2 bg-indigo-500 dark:bg-indigo-400 text-white rounded-lg hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors"
           >
             {{ $t('common.retry') }}
           </button>
@@ -314,27 +313,27 @@
 
         <div v-else-if="filteredLinks.length === 0" class="text-center py-8">
           <div
-            class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center"
+            class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center"
           >
-            <LinkIcon className="w-8 h-8 text-gray-400" />
+            <LinkIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
           </div>
-          <h3 class="text-lg font-medium text-gray-900 mb-2">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
             {{ hasActiveFilters ? $t('links.noMatchingLinks') : $t('links.noLinksYet') }}
           </h3>
-          <p class="text-gray-700 mb-4">
+          <p class="text-gray-700 dark:text-gray-400 mb-4">
             {{ hasActiveFilters ? $t('links.noMatchingLinksDesc') : $t('links.noLinksYetDesc') }}
           </p>
           <div class="flex items-center justify-center gap-2">
             <button
               v-if="hasActiveFilters"
               @click="resetFilters"
-              class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              class="inline-flex items-center px-4 py-2 bg-gray-500 dark:bg-gray-600 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-500 transition-colors"
             >
               {{ $t('links.clearFilters') }}
             </button>
             <button
               @click="showFormAndFocus"
-              class="inline-flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+              class="inline-flex items-center px-4 py-2 bg-indigo-500 dark:bg-indigo-400 text-white rounded-lg hover:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors"
             >
               <PlusIcon className="w-4 h-4 mr-2" />
               {{ hasActiveFilters ? $t('links.createNewLink') : $t('links.createFirstLink') }}
@@ -345,19 +344,19 @@
         <div v-else class="overflow-x-auto">
           <table class="w-full">
             <thead>
-              <tr class="border-b-2 border-gray-200/70">
-                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.code') }}</th>
-                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.targetUrl') }}</th>
-                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.status') }}</th>
-                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.created') }}</th>
-                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.actions') }}</th>
+              <tr class="border-b-2 border-gray-200/70 dark:border-gray-700/70">
+                <th class="text-left py-3 px-4 font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide text-xs">{{ $t('links.table.code') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide text-xs">{{ $t('links.table.targetUrl') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide text-xs">{{ $t('links.table.status') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide text-xs">{{ $t('links.table.created') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide text-xs">{{ $t('links.table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="link in filteredLinks"
                 :key="link.short_code"
-                class="border-b border-gray-100/70 hover:bg-gradient-to-r hover:from-gray-50/80 hover:to-indigo-50/40 transition-all duration-300 group"
+                class="border-b border-gray-100/70 dark:border-gray-700/70 hover:bg-gradient-to-r hover:from-gray-50/80 hover:to-indigo-50/40 dark:hover:from-gray-700/50 dark:hover:to-indigo-900/20 transition-all duration-300 group"
               >
                 <td class="py-3 px-4">
                   <button
@@ -365,8 +364,8 @@
                     :class="[
                       'font-mono text-xs px-3 py-1.5 rounded-lg transition-all duration-300 border shadow-sm hover:shadow-md',
                       copiedLink === link.short_code
-                        ? 'bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 border-emerald-300 scale-105 shadow-md'
-                        : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-800 border-gray-200 hover:from-indigo-100 hover:to-indigo-50 hover:text-indigo-800 hover:border-indigo-300 group-hover:scale-105'
+                        ? 'bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 scale-105 shadow-md'
+                        : 'bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:from-indigo-100 hover:to-indigo-50 dark:hover:from-indigo-900/30 dark:hover:to-indigo-800/20 hover:text-indigo-800 dark:hover:text-indigo-300 hover:border-indigo-300 dark:hover:border-indigo-700 group-hover:scale-105'
                     ]"
                     :title="copiedLink === link.short_code ? $t('common.copied') : $t('links.copyLinkTitle')"
                   >
@@ -374,7 +373,7 @@
                       <span class="font-bold">{{ link.short_code }}</span>
                       <CheckCircleIcon
                         v-if="copiedLink === link.short_code"
-                        className="w-3 h-3 text-emerald-700"
+                        className="w-3 h-3 text-emerald-700 dark:text-emerald-400"
                       />
                       <CopyIcon
                         v-else
@@ -388,7 +387,7 @@
                     :href="link.target_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="text-indigo-600 hover:text-indigo-800 truncate block max-w-xs"
+                    class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 truncate block max-w-xs"
                   >
                     {{ link.target_url }}
                   </a>
@@ -400,34 +399,34 @@
                       :class="[
                         'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium w-fit',
                         isExpired(link.expires_at)
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-emerald-100 text-emerald-800',
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                          : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
                       ]"
                     >
                       {{ isExpired(link.expires_at) ? $t('links.expired') : $t('links.active') }}
                     </span>
                     <span
                       v-else
-                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 w-fit"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 w-fit"
                     >
                       {{ $t('links.permanent') }}
                     </span>
                     <span
                       v-if="link.expires_at"
-                      class="text-xs text-gray-500"
+                      class="text-xs text-gray-500 dark:text-gray-400"
                     >
                       {{ isExpired(link.expires_at) ? $t('links.expired') : $t('analytics.expires') }}: {{ formatDate(link.expires_at) }}
                     </span>
                   </div>
                 </td>
-                <td class="py-3 px-4 text-sm text-gray-600">
+                <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">
                   {{ formatDate(link.created_at) }}
                 </td>
                 <td class="py-3 px-4">
                   <div class="flex items-center gap-1">
                     <button
                       @click="startEdit(link)"
-                      class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      class="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                       :title="$t('common.edit') + ' ' + $t('links.title')"
                     >
                       <EditIcon className="w-4 h-4" />
@@ -435,7 +434,7 @@
 
                     <button
                       @click="confirmDelete(link)"
-                      class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      class="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                       :title="$t('common.delete') + ' ' + $t('links.title')"
                     >
                       <DeleteIcon className="w-4 h-4" />
@@ -446,17 +445,17 @@
             </tbody>
           </table>
 
-          <!-- 分页控件 - 现代化设计 -->
-          <div v-if="totalPages > 1" class="flex items-center justify-between mt-6 pt-4 border-t-2 border-gray-200/70">
+          <!-- 分页控件 -->
+          <div v-if="totalPages > 1" class="flex items-center justify-between mt-6 pt-4 border-t-2 border-gray-200/70 dark:border-gray-700/70">
             <div class="flex items-center gap-2">
               <button
                 @click="goToPreviousPage"
                 :disabled="!hasPrev"
-                class="px-4 py-2 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ $t('common.previous') }}
               </button>
-              <span class="text-sm text-gray-600">
+              <span class="text-sm text-gray-600 dark:text-gray-400">
                 {{ $t('links.pagination.showing', {
                   from: (currentPage - 1) * pageSize + 1,
                   to: Math.min(currentPage * pageSize, totalCount),
@@ -473,8 +472,8 @@
                 :class="[
                   'px-4 py-2 text-sm font-bold rounded-lg transition-all duration-300',
                   page === currentPage
-                    ? 'bg-indigo-500 text-white'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                    ? 'bg-indigo-500 dark:bg-indigo-400 text-white'
+                    : 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                 ]"
               >
                 {{ page }}
@@ -485,7 +484,7 @@
               <button
                 @click="goToNextPage"
                 :disabled="!hasNext"
-                class="px-4 py-2 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ $t('common.next') }}
               </button>
@@ -495,7 +494,7 @@
       </div>
     </div>
 
-    <!-- 删除确认模态框 - 现代化设计 -->
+    <!-- 删除确认模态框 -->
     <Transition
       name="modal-backdrop"
       enter-active-class="transition-opacity duration-300 ease-out"
@@ -507,7 +506,7 @@
     >
       <div
         v-if="showDeleteModal"
-        class="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4"
+        class="fixed inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4"
         @click="handleBackdropClick"
       >
         <Transition
@@ -521,30 +520,30 @@
         >
           <div
             v-if="showDeleteModal"
-            class="relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-200/50"
+            class="relative bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-200/50 dark:border-gray-700/50"
           >
-            <div class="absolute inset-0 bg-gradient-to-br from-white/60 to-red-50/30 rounded-2xl"></div>
+            <div class="absolute inset-0 bg-gradient-to-br from-white/60 to-red-50/30 dark:from-gray-800/60 dark:to-red-900/20 rounded-2xl"></div>
             <div class="relative text-center">
-              <div class="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-red-100 to-red-50 rounded-full flex items-center justify-center shadow-lg">
-                <DeleteIcon className="w-8 h-8 text-red-600" />
+              <div class="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/50 dark:to-red-800/30 rounded-full flex items-center justify-center shadow-lg">
+                <DeleteIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
               </div>
 
-              <h3 class="text-xl font-bold text-gray-900 mb-3">{{ $t('links.deleteLink') }}</h3>
-              <p class="text-sm text-gray-700 mb-8 leading-relaxed">
+              <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3">{{ $t('links.deleteLink') }}</h3>
+              <p class="text-sm text-gray-700 dark:text-gray-300 mb-8 leading-relaxed">
                 {{ $t('links.deleteConfirmation', { code: deletingLink?.short_code }) }}
               </p>
 
               <div class="flex justify-center space-x-4">
                 <button
                   @click="closeDeleteModal"
-                  class="px-6 py-3 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
+                  class="px-6 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 hover:from-gray-200 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('common.cancel') }}
                 </button>
                 <button
                   @click="handleDelete"
                   :disabled="loading"
-                  class="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 uppercase tracking-wide"
+                  class="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-red-500 to-red-600 dark:from-red-400 dark:to-red-500 hover:from-red-600 hover:to-red-700 dark:hover:from-red-500 dark:hover:to-red-600 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 uppercase tracking-wide"
                 >
                   {{ loading ? $t('links.deleting') : $t('common.delete') }}
                 </button>
@@ -555,10 +554,10 @@
       </div>
     </Transition>
 
-    <!-- 复制成功提示 Toast - 现代化设计 -->
+    <!-- 复制成功提示 Toast -->
     <div
       v-if="showCopyToast"
-      class="fixed top-6 right-6 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 ease-out border border-emerald-400/50"
+      class="fixed top-6 right-6 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 dark:from-emerald-400 dark:to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 ease-out border border-emerald-400/50 dark:border-emerald-500/50"
       :class="showCopyToast ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'"
     >
       <div class="flex items-center gap-3">

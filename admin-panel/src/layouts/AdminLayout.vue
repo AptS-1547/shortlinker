@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
     <!-- App Header -->
     <AppHeader
       :show-mobile-menu="showMobileMenu"
@@ -8,7 +8,7 @@
     />
 
     <!-- Navigation Tabs - Desktop -->
-    <div class="bg-gradient-to-r from-slate-700 to-slate-600 shadow-sm hidden sm:block">
+    <div class="bg-gradient-to-r from-slate-700 to-slate-600 dark:from-gray-800 dark:to-gray-700 shadow-sm hidden sm:block">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <nav class="flex items-center gap-2 py-3">
           <router-link
@@ -18,8 +18,8 @@
             :class="[
               'flex items-center space-x-2 px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ease-in-out transform hover:scale-105',
               $route.path === item.path
-                ? 'bg-white/15 text-white shadow-lg scale-105 backdrop-blur-sm'
-                : 'text-slate-300 hover:text-white hover:bg-white/8',
+                ? 'bg-white/15 dark:bg-white/20 text-white shadow-lg scale-105 backdrop-blur-sm'
+                : 'text-slate-300 dark:text-gray-400 hover:text-white hover:bg-white/8 dark:hover:bg-white/10',
             ]"
           >
             <component :is="item.icon" class="w-4 h-4 transition-transform duration-300" />
@@ -38,7 +38,7 @@
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-1"
     >
-      <div v-if="showMobileMenu" class="sm:hidden bg-gradient-to-r from-slate-700 to-slate-600 shadow-lg">
+      <div v-if="showMobileMenu" class="sm:hidden bg-gradient-to-r from-slate-700 to-slate-600 dark:from-gray-800 dark:to-gray-700 shadow-lg">
         <nav class="px-4 py-3 space-y-2">
           <router-link
             v-for="item in menuItems"
@@ -48,8 +48,8 @@
             :class="[
               'flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 w-full',
               $route.path === item.path
-                ? 'bg-white/15 text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-white/8',
+                ? 'bg-white/15 dark:bg-white/20 text-white shadow-md'
+                : 'text-slate-300 dark:text-gray-400 hover:text-white hover:bg-white/8 dark:hover:bg-white/10',
             ]"
           >
             <component :is="item.icon" class="w-5 h-5" />
@@ -59,7 +59,7 @@
           <!-- Mobile Logout -->
           <button
             @click="handleLogout"
-            class="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-sm text-slate-300 hover:text-white hover:bg-white/8 transition-all duration-200 w-full"
+            class="flex items-center space-x-3 px-4 py-3 rounded-lg font-medium text-sm text-slate-300 dark:text-gray-400 hover:text-white hover:bg-white/8 dark:hover:bg-white/10 transition-all duration-200 w-full"
           >
             <LogoutIcon className="w-5 h-5" />
             <span>{{ $t('layout.logout') }}</span>

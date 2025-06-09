@@ -211,6 +211,9 @@
     }
   },
   "theme": {
-    "switchTheme": ""
+    "switchTheme": "テーマを切り替え",
+    "light": "ライトテーマ",
+    "dark": "ダークテーマ",
+    "system": "システムテーマ"
   }
 }

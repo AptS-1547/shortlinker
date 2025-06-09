@@ -211,6 +211,9 @@
     }
   },
   "theme": {
-    "switchTheme": ""
+    "switchTheme": "切换主题",
+    "light": "浅色主题",
+    "dark": "深色主题",
+    "system": "系统主题"
   }
 }

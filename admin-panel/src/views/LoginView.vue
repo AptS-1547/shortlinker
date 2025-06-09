@@ -1,31 +1,31 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-purple-50/50 flex items-center justify-center px-4 relative overflow-hidden">
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-purple-50/50 dark:from-gray-900 dark:via-gray-800/90 dark:to-gray-900 flex items-center justify-center px-4 relative overflow-hidden">
     <!-- 背景装饰 -->
     <div class="absolute inset-0 overflow-hidden">
-      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full blur-3xl"></div>
-      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-blue-400/20 to-indigo-400/20 rounded-full blur-3xl"></div>
+      <div class="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 dark:from-indigo-600/30 dark:to-purple-600/30 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-blue-400/20 to-indigo-400/20 dark:from-blue-600/30 dark:to-indigo-600/30 rounded-full blur-3xl"></div>
     </div>
 
     <div class="relative max-w-md w-full space-y-8 z-10">
       <div class="text-center">
         <div class="w-20 h-20 mx-auto mb-8 relative group">
-          <div class="absolute inset-0 bg-gradient-to-br from-indigo-100 via-indigo-50 to-purple-50 rounded-3xl border-2 border-indigo-200/50 shadow-xl group-hover:shadow-2xl transition-all duration-300"></div>
-          <div class="absolute inset-2 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+          <div class="absolute inset-0 bg-gradient-to-br from-indigo-100 via-indigo-50 to-purple-50 dark:from-indigo-900/50 dark:via-indigo-800/30 dark:to-purple-900/50 rounded-3xl border-2 border-indigo-200/50 dark:border-indigo-700/50 shadow-xl group-hover:shadow-2xl transition-all duration-300"></div>
+          <div class="absolute inset-2 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-purple-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
             <LinkIcon className="w-10 h-10 text-white" />
           </div>
         </div>
-        <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent mb-3">
+        <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 dark:from-gray-100 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent mb-3">
           {{ $t('auth.title') }}
         </h2>
-        <p class="text-gray-600 text-lg">{{ $t('auth.description') }}</p>
+        <p class="text-gray-600 dark:text-gray-400 text-lg">{{ $t('auth.description') }}</p>
       </div>
 
       <form @submit="handleSubmit" class="space-y-8">
-        <div class="relative bg-white/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-200/50 shadow-2xl transition-all duration-300 hover:shadow-3xl hover:border-indigo-200/50">
-          <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-indigo-50/20 rounded-2xl"></div>
+        <div class="relative bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-200/50 dark:border-gray-700/50 shadow-2xl transition-all duration-300 hover:shadow-3xl hover:border-indigo-200/50 dark:hover:border-indigo-600/50">
+          <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-indigo-50/20 dark:from-gray-800/40 dark:to-indigo-900/20 rounded-2xl"></div>
           <div class="relative space-y-6">
             <div>
-              <label class="block text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide">
+              <label class="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">
                 {{ $t('auth.password') }}
               </label>
               <input
@@ -33,7 +33,7 @@
                 v-model="password"
                 :placeholder="$t('auth.passwordPlaceholder')"
                 :disabled="isSubmitting"
-                class="w-full px-5 py-4 bg-gray-50/80 border-2 border-gray-200/50 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md focus:shadow-lg backdrop-blur-sm"
+                class="w-full px-5 py-4 bg-gray-50/80 dark:bg-gray-700/80 border-2 border-gray-200/50 dark:border-gray-600/50 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 dark:focus:border-indigo-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md focus:shadow-lg backdrop-blur-sm"
                 required
               />
             </div>
@@ -43,25 +43,25 @@
               :class="[
                 'p-4 rounded-xl border-2 transition-all duration-300',
                 error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))
-                  ? 'bg-gradient-to-r from-emerald-50/80 to-teal-50/60 border-emerald-200/70 shadow-sm'
-                  : 'bg-gradient-to-r from-red-50/80 to-pink-50/60 border-red-200/70 shadow-sm',
+                  ? 'bg-gradient-to-r from-emerald-50/80 to-teal-50/60 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200/70 dark:border-emerald-700/50 shadow-sm'
+                  : 'bg-gradient-to-r from-red-50/80 to-pink-50/60 dark:from-red-900/20 dark:to-pink-900/20 border-red-200/70 dark:border-red-700/50 shadow-sm',
               ]"
             >
               <div class="flex items-center gap-3">
                 <div
                   v-if="error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))"
-                  class="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent"
+                  class="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 dark:border-emerald-400 border-t-transparent"
                 ></div>
                 <ExclamationTriangleIcon
                   v-else
-                  className="w-5 h-5 text-red-600"
+                  className="w-5 h-5 text-red-600 dark:text-red-400"
                 />
                 <p
                   :class="[
                     'text-sm font-medium',
                     error.includes($t('auth.authenticating')) || error.includes($t('auth.verifying'))
-                      ? 'text-emerald-800'
-                      : 'text-red-800',
+                      ? 'text-emerald-800 dark:text-emerald-300'
+                      : 'text-red-800 dark:text-red-300',
                   ]"
                 >
                   {{ error }}
@@ -72,7 +72,7 @@
             <button
               type="submit"
               :disabled="isSubmitting"
-              class="w-full px-8 py-4 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white font-bold rounded-xl hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 uppercase tracking-wide"
+              class="w-full px-8 py-4 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 dark:from-indigo-400 dark:via-indigo-500 dark:to-purple-500 text-white font-bold rounded-xl hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 dark:hover:from-indigo-500 dark:hover:via-indigo-600 dark:hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 uppercase tracking-wide"
             >
               <template v-if="isSubmitting">
                 <RefreshIcon className="w-5 h-5 mr-3 animate-spin inline" />
@@ -91,15 +91,15 @@
       </form>
 
       <!-- 服务器信息提示 - 现代化设计 -->
-      <div class="relative bg-white/80 backdrop-blur-sm rounded-xl p-6 border-2 border-gray-200/50 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-indigo-200/50">
-        <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-blue-50/20 rounded-xl"></div>
+      <div class="relative bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm rounded-xl p-6 border-2 border-gray-200/50 dark:border-gray-700/50 shadow-lg transition-all duration-300 hover:shadow-xl hover:border-indigo-200/50 dark:hover:border-indigo-600/50">
+        <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-blue-50/20 dark:from-gray-800/40 dark:to-blue-900/20 rounded-xl"></div>
         <div class="relative flex items-start gap-4">
-          <div class="p-2 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg shadow-sm">
-            <InfoIcon className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+          <div class="p-2 bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/50 dark:to-indigo-800/30 rounded-lg shadow-sm">
+            <InfoIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
           </div>
           <div>
-            <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">{{ $t('auth.serverConnection') }}</h4>
-            <p class="text-sm text-gray-700 leading-relaxed" v-html="$t('auth.serverConnectionDesc', { url: `<span class='font-mono bg-gradient-to-r from-gray-100 to-gray-50 px-2 py-1 rounded text-indigo-700 font-semibold border border-gray-200/50'>${apiBaseUrl}</span>` })">
+            <h4 class="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-2">{{ $t('auth.serverConnection') }}</h4>
+            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed" v-html="$t('auth.serverConnectionDesc', { url: `<span class='font-mono bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-600 px-2 py-1 rounded text-indigo-700 dark:text-indigo-300 font-semibold border border-gray-200/50 dark:border-gray-600/50'>${apiBaseUrl}</span>` })">
             </p>
           </div>
         </div>
@@ -108,10 +108,10 @@
       <!-- 项目信息 -->
       <div class="text-center space-y-4">
         <div class="flex items-center justify-center gap-3">
-          <div class="w-8 h-8 bg-gradient-to-br from-indigo-100 to-indigo-50 rounded-lg flex items-center justify-center shadow-sm">
-            <LinkIcon className="w-5 h-5 text-indigo-700" />
+          <div class="w-8 h-8 bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/50 dark:to-indigo-800/30 rounded-lg flex items-center justify-center shadow-sm">
+            <LinkIcon className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
           </div>
-          <h3 class="text-xl font-bold bg-gradient-to-r from-gray-800 via-indigo-800 to-purple-800 bg-clip-text text-transparent">
+          <h3 class="text-xl font-bold bg-gradient-to-r from-gray-800 via-indigo-800 to-purple-800 dark:from-gray-200 dark:via-indigo-300 dark:to-purple-300 bg-clip-text text-transparent">
             ShortLinker
           </h3>
         </div>
