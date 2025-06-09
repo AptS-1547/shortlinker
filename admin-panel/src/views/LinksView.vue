@@ -1,39 +1,45 @@
 <template>
   <div class="space-y-6">
-    <!-- 页面标题 -->
-    <div class="mb-4">
-      <h1 class="text-2xl font-bold text-gray-900">{{ $t('links.title') }}</h1>
-      <p class="text-gray-700">{{ $t('links.description') }}</p>
+    <!-- 页面标题 - 现代化设计 -->
+    <div class="relative mb-6">
+      <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-blue-500/5 to-purple-500/5 rounded-xl"></div>
+      <div class="relative p-4">
+        <h1 class="text-2xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-blue-900 bg-clip-text text-transparent">
+          {{ $t('links.title') }}
+        </h1>
+        <p class="text-gray-600 mt-1">{{ $t('links.description') }}</p>
+      </div>
     </div>
 
-    <!-- 筛选器 -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+    <!-- 筛选器 - 现代化设计 -->
+    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+      <div class="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-indigo-50/20 to-purple-50/30 rounded-xl"></div>
       <div
-        class="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+        class="relative p-4 border-b border-gray-200/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 transition-all duration-300 rounded-t-xl"
         @click="toggleFilter"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-blue-100 text-blue-600 rounded-lg">
+            <div class="p-2 bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 rounded-lg shadow-sm">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"></path>
               </svg>
             </div>
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">{{ $t('links.filterTitle') }}</h2>
-              <p class="text-sm text-gray-700 mt-1">{{ $t('links.filterDescription') }}</p>
+              <h2 class="text-lg font-bold text-gray-900">{{ $t('links.filterTitle') }}</h2>
+              <p class="text-sm text-gray-600 mt-0.5">{{ $t('links.filterDescription') }}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <span
               v-if="hasActiveFilters"
-              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"
+              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200/50 shadow-sm"
             >
               {{ $t('links.activeFilters', { count: activeFilterCount }) }}
             </span>
             <ChevronDownIcon
               :class="[
-                'w-5 h-5 text-gray-500 transition-transform duration-200',
+                'w-5 h-5 text-gray-500 transition-transform duration-300',
                 { 'rotate-180': showFilter },
               ]"
             />
@@ -41,29 +47,30 @@
         </div>
       </div>
 
+      <!-- 筛选器内容保持原有功能，增强样式... -->
       <div
         :class="[
           'overflow-hidden transition-all duration-300 ease-in-out',
           showFilter ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0',
         ]"
       >
-        <div class="p-4">
+        <div class="relative p-4">
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('common.search') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('common.search') }}</label>
               <input
                 v-model="filterForm.search"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 backdrop-blur-sm text-sm"
                 :placeholder="$t('links.search.placeholder')"
               />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('links.status') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.status') }}</label>
               <select
                 v-model="filterForm.status"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
               >
                 <option value="">{{ $t('links.filterOptions.allLinks') }}</option>
                 <option value="active">{{ $t('links.filterOptions.activeOnly') }}</option>
@@ -74,28 +81,28 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('links.createdAfter') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.createdAfter') }}</label>
               <input
                 v-model="filterForm.created_after"
                 type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
               />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('links.createdBefore') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.createdBefore') }}</label>
               <input
                 v-model="filterForm.created_before"
                 type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
               />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('links.pageSize') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.pageSize') }}</label>
               <select
                 v-model="filterForm.page_size"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
               >
                 <option :value="10">10 per page</option>
                 <option :value="20">20 per page</option>
@@ -105,18 +112,16 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
-            <div class="flex items-center gap-2">
-              <button
-                @click="resetFilters"
-                class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                {{ $t('common.reset') }}
-              </button>
-            </div>
+          <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50 mt-4">
+            <button
+              @click="resetFilters"
+              class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
+            >
+              {{ $t('common.reset') }}
+            </button>
             <button
               @click="applyFilters"
-              class="px-4 py-2 bg-indigo-500 text-white font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+              class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-bold rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 uppercase tracking-wide text-sm"
             >
               {{ $t('common.apply') }} {{ $t('common.filter') }}
             </button>
@@ -125,18 +130,20 @@
       </div>
     </div>
 
-    <!-- 创建/编辑链接表单 - 可折叠 -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+    <!-- 创建/编辑链接表单 - 现代化设计 -->
+    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+      <!-- 表单头部 -->
+      <div class="absolute inset-0 bg-gradient-to-br from-green-50/30 via-indigo-50/20 to-purple-50/30 rounded-xl"></div>
       <div
-        class="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+        class="relative p-4 border-b border-gray-200/50 cursor-pointer hover:bg-gradient-to-r hover:from-gray-50/50 hover:to-indigo-50/30 transition-all duration-300 rounded-t-xl"
         @click="toggleForm"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <div
               :class="[
-                'p-2 rounded-lg flex items-center justify-center transition-colors',
-                editingLink ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600',
+                'p-2 rounded-lg flex items-center justify-center transition-all duration-300 shadow-sm',
+                editingLink ? 'bg-gradient-to-br from-amber-100 to-orange-50 text-amber-700' : 'bg-gradient-to-br from-indigo-100 to-indigo-50 text-indigo-700',
               ]"
             >
               <EditIcon
@@ -146,10 +153,10 @@
               <PlusIcon v-else className="w-5 h-5" />
             </div>
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">
+              <h2 class="text-lg font-bold text-gray-900">
                 {{ editingLink ? $t('links.editTitle') : $t('links.createTitle') }}
               </h2>
-              <p class="text-sm text-gray-700 mt-1">
+              <p class="text-sm text-gray-600 mt-0.5">
                 {{ editingLink ? $t('links.editDescription') : $t('links.createDescription') }}
               </p>
             </div>
@@ -157,13 +164,13 @@
           <div class="flex items-center gap-2">
             <span
               v-if="editingLink"
-              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"
+              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 border border-indigo-200/50 shadow-sm"
             >
               {{ $t('links.editing', { code: editingLink.short_code }) }}
             </span>
             <ChevronDownIcon
               :class="[
-                'w-5 h-5 text-gray-500 transition-transform duration-200',
+                'w-5 h-5 text-gray-500 transition-transform duration-300',
                 { 'rotate-180': showForm },
               ]"
             />
@@ -171,64 +178,64 @@
         </div>
       </div>
 
-      <!-- 可折叠的表单内容 -->
+      <!-- 表单内容 - 保持原有功能，减小尺寸 -->
       <div
         :class="[
           'overflow-hidden transition-all duration-300 ease-in-out',
           showForm ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0',
         ]"
       >
-        <div class="p-4">
+        <div class="relative p-4">
           <form @submit.prevent="handleSave" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-900 mb-1">
+                <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">
                   {{ $t('links.shortCodeOptional') }}
                 </label>
                 <input
                   v-model="formData.code"
                   type="text"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm hover:shadow-md bg-white/80 backdrop-blur-sm text-sm"
                   :placeholder="$t('links.shortCodePlaceholder')"
                 />
-                <p class="text-xs text-gray-500 mt-1">
+                <p class="text-xs text-gray-500 mt-1 font-medium">
                   {{ $t('links.shortCodeHelp') }}
                 </p>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-900 mb-1">
+                <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">
                   {{ $t('links.expiresAtOptional') }}
                 </label>
                 <input
                   v-model="formData.expires_at"
                   type="datetime-local"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                  class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
                 />
-                <p class="text-xs text-gray-500 mt-1">{{ $t('links.expiresAtHelp') }}</p>
+                <p class="text-xs text-gray-500 mt-1 font-medium">{{ $t('links.expiresAtHelp') }}</p>
               </div>
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-900 mb-1">{{ $t('links.targetUrlRequired') }}</label>
+              <label class="block text-xs font-bold text-gray-900 mb-1 uppercase tracking-wide">{{ $t('links.targetUrlRequired') }}</label>
               <input
                 v-model="formData.target"
                 type="url"
                 required
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                class="w-full px-3 py-2 border-2 border-gray-200/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition-all duration-300 shadow-sm bg-white/80 backdrop-blur-sm text-sm"
                 :placeholder="$t('links.targetUrlPlaceholder')"
               />
-              <p class="text-xs text-gray-500 mt-1">
+              <p class="text-xs text-gray-500 mt-1 font-medium">
                 {{ $t('links.targetUrlHelp') }}
               </p>
             </div>
 
-            <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+            <div class="flex items-center justify-between pt-4 border-t-2 border-gray-200/50">
               <div class="flex items-center gap-2">
                 <button
                   type="button"
                   @click="collapseForm"
-                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('common.cancel') }}
                 </button>
@@ -236,7 +243,7 @@
                   v-if="editingLink"
                   type="button"
                   @click="cancelEdit"
-                  class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('links.clearEdit') }}
                 </button>
@@ -245,7 +252,7 @@
               <button
                 type="submit"
                 :disabled="loading || !formData.target"
-                class="px-5 py-2 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-medium rounded-lg hover:from-indigo-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 active:scale-95"
+                class="px-6 py-2 bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white font-bold rounded-lg hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 uppercase tracking-wide text-sm"
               >
                 <span v-if="loading" class="flex items-center">
                   <SpinnerIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
@@ -261,31 +268,33 @@
       </div>
     </div>
 
-    <!-- 链接列表 -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-      <div class="p-4 border-b border-gray-200">
+    <!-- 链接列表 - 现代化设计 -->
+    <div class="relative bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5">
+      <div class="absolute inset-0 bg-gradient-to-br from-gray-50/30 via-blue-50/20 to-indigo-50/30 rounded-xl"></div>
+      <div class="relative p-4 border-b border-gray-200/50">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-gray-100 rounded-lg">
-              <LinkIcon className="w-5 h-5 text-gray-600" />
+            <div class="p-2 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg shadow-sm">
+              <LinkIcon className="w-5 h-5 text-gray-700" />
             </div>
-            <h2 class="text-xl font-bold text-gray-900">{{ $t('links.shortLinks') }}</h2>
+            <h2 class="text-lg font-bold text-gray-900">{{ $t('links.shortLinks') }}</h2>
           </div>
           <div class="flex items-center gap-4">
-            <span class="text-sm text-gray-500">
+            <span class="text-xs font-bold text-gray-600 bg-gradient-to-r from-gray-100 to-gray-50 px-2 py-1 rounded border border-gray-200/50">
               {{ filteredLinks.length }}
               <span v-if="filteredLinks.length !== totalCount">of {{ totalCount }}</span>
               total
               <span v-if="hasActiveFilters">(filtered)</span>
             </span>
-            <span class="text-sm text-gray-500">
+            <span class="text-xs font-bold text-gray-600 bg-gradient-to-r from-indigo-100 to-indigo-50 px-2 py-1 rounded border border-indigo-200/50">
               Page {{ currentPage }} of {{ totalPages }}
             </span>
           </div>
         </div>
       </div>
 
-      <div class="p-4">
+      <!-- 表格内容保持原有功能，减小尺寸 -->
+      <div class="relative p-4">
         <div v-if="loading && links.length === 0" class="text-center py-8">
           <div class="animate-spin mx-auto mb-4">
             <SpinnerIcon className="h-8 w-8 text-indigo-500" />
@@ -336,36 +345,36 @@
         <div v-else class="overflow-x-auto">
           <table class="w-full">
             <thead>
-              <tr class="border-b border-gray-200">
-                <th class="text-left py-3 px-4 font-semibold text-gray-900">{{ $t('links.table.code') }}</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-900">{{ $t('links.table.targetUrl') }}</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-900">{{ $t('links.table.status') }}</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-900">{{ $t('links.table.created') }}</th>
-                <th class="text-left py-3 px-4 font-semibold text-gray-900">{{ $t('links.table.actions') }}</th>
+              <tr class="border-b-2 border-gray-200/70">
+                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.code') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.targetUrl') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.status') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.created') }}</th>
+                <th class="text-left py-3 px-4 font-bold text-gray-900 uppercase tracking-wide text-xs">{{ $t('links.table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="link in filteredLinks"
                 :key="link.short_code"
-                class="border-b border-gray-100 hover:bg-gray-50 transition-colors group"
+                class="border-b border-gray-100/70 hover:bg-gradient-to-r hover:from-gray-50/80 hover:to-indigo-50/40 transition-all duration-300 group"
               >
-                <td class="py-4 px-4">
+                <td class="py-3 px-4">
                   <button
                     @click="copyShortLink(link.short_code)"
                     :class="[
-                      'font-mono text-sm px-3 py-2 rounded-lg transition-all duration-200 border-2',
+                      'font-mono text-xs px-3 py-1.5 rounded-lg transition-all duration-300 border shadow-sm hover:shadow-md',
                       copiedLink === link.short_code
-                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300 scale-105'
-                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-indigo-100 hover:text-indigo-700 hover:border-indigo-300 group-hover:scale-105'
+                        ? 'bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-800 border-emerald-300 scale-105 shadow-md'
+                        : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-800 border-gray-200 hover:from-indigo-100 hover:to-indigo-50 hover:text-indigo-800 hover:border-indigo-300 group-hover:scale-105'
                     ]"
                     :title="copiedLink === link.short_code ? $t('common.copied') : $t('links.copyLinkTitle')"
                   >
-                    <div class="flex items-center gap-2">
-                      <span>{{ link.short_code }}</span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-bold">{{ link.short_code }}</span>
                       <CheckCircleIcon
                         v-if="copiedLink === link.short_code"
-                        className="w-3 h-3 text-emerald-600"
+                        className="w-3 h-3 text-emerald-700"
                       />
                       <CopyIcon
                         v-else
@@ -374,7 +383,7 @@
                     </div>
                   </button>
                 </td>
-                <td class="py-4 px-4">
+                <td class="py-3 px-4">
                   <a
                     :href="link.target_url"
                     target="_blank"
@@ -384,7 +393,7 @@
                     {{ link.target_url }}
                   </a>
                 </td>
-                <td class="py-4 px-4">
+                <td class="py-3 px-4">
                   <div class="flex flex-col gap-1">
                     <span
                       v-if="link.expires_at"
@@ -411,10 +420,10 @@
                     </span>
                   </div>
                 </td>
-                <td class="py-4 px-4 text-sm text-gray-600">
+                <td class="py-3 px-4 text-sm text-gray-600">
                   {{ formatDate(link.created_at) }}
                 </td>
-                <td class="py-4 px-4">
+                <td class="py-3 px-4">
                   <div class="flex items-center gap-1">
                     <button
                       @click="startEdit(link)"
@@ -437,13 +446,13 @@
             </tbody>
           </table>
 
-          <!-- 分页控件 -->
-          <div v-if="totalPages > 1" class="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+          <!-- 分页控件 - 现代化设计 -->
+          <div v-if="totalPages > 1" class="flex items-center justify-between mt-6 pt-4 border-t-2 border-gray-200/70">
             <div class="flex items-center gap-2">
               <button
                 @click="goToPreviousPage"
                 :disabled="!hasPrev"
-                class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ $t('common.previous') }}
               </button>
@@ -462,7 +471,7 @@
                 :key="page"
                 @click="goToSpecificPage(page)"
                 :class="[
-                  'px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                  'px-4 py-2 text-sm font-bold rounded-lg transition-all duration-300',
                   page === currentPage
                     ? 'bg-indigo-500 text-white'
                     : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
@@ -476,7 +485,7 @@
               <button
                 @click="goToNextPage"
                 :disabled="!hasNext"
-                class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-lg transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ $t('common.next') }}
               </button>
@@ -486,7 +495,7 @@
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- 删除确认模态框 - 现代化设计 -->
     <Transition
       name="modal-backdrop"
       enter-active-class="transition-opacity duration-300 ease-out"
@@ -498,7 +507,7 @@
     >
       <div
         v-if="showDeleteModal"
-        class="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4"
+        class="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4"
         @click="handleBackdropClick"
       >
         <Transition
@@ -512,31 +521,30 @@
         >
           <div
             v-if="showDeleteModal"
-            class="bg-white rounded-xl shadow-2xl max-w-md w-full p-5"
+            class="relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-200/50"
           >
-            <div class="text-center">
-              <div
-                class="w-10 h-10 mx-auto mb-3 bg-red-100 rounded-full flex items-center justify-center"
-              >
-                <DeleteIcon className="w-5 h-5 text-red-600" />
+            <div class="absolute inset-0 bg-gradient-to-br from-white/60 to-red-50/30 rounded-2xl"></div>
+            <div class="relative text-center">
+              <div class="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-red-100 to-red-50 rounded-full flex items-center justify-center shadow-lg">
+                <DeleteIcon className="w-8 h-8 text-red-600" />
               </div>
 
-              <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ $t('links.deleteLink') }}</h3>
-              <p class="text-sm text-gray-700 mb-4">
+              <h3 class="text-xl font-bold text-gray-900 mb-3">{{ $t('links.deleteLink') }}</h3>
+              <p class="text-sm text-gray-700 mb-8 leading-relaxed">
                 {{ $t('links.deleteConfirmation', { code: deletingLink?.short_code }) }}
               </p>
 
-              <div class="flex justify-center space-x-3">
+              <div class="flex justify-center space-x-4">
                 <button
                   @click="closeDeleteModal"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  class="px-6 py-3 text-sm font-bold text-gray-700 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md transform hover:scale-105 uppercase tracking-wide"
                 >
                   {{ $t('common.cancel') }}
                 </button>
                 <button
                   @click="handleDelete"
                   :disabled="loading"
-                  class="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-50"
+                  class="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 uppercase tracking-wide"
                 >
                   {{ loading ? $t('links.deleting') : $t('common.delete') }}
                 </button>
@@ -547,15 +555,15 @@
       </div>
     </Transition>
 
-    <!-- 复制成功提示 Toast -->
+    <!-- 复制成功提示 Toast - 现代化设计 -->
     <div
       v-if="showCopyToast"
-      class="fixed top-4 right-4 z-50 bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-xl transform transition-all duration-300 ease-out"
-      :class="showCopyToast ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'"
+      class="fixed top-6 right-6 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-4 rounded-2xl shadow-2xl transform transition-all duration-300 ease-out border border-emerald-400/50"
+      :class="showCopyToast ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'"
     >
-      <div class="flex items-center gap-2">
-        <CheckCircleIcon className="w-5 h-5" />
-        <span class="font-medium">{{ $t('links.linkCopied') }}</span>
+      <div class="flex items-center gap-3">
+        <CheckCircleIcon className="w-6 h-6" />
+        <span class="font-bold text-lg">{{ $t('links.linkCopied') }}</span>
       </div>
     </div>
   </div>
@@ -904,7 +912,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 确保表单动画平滑 */
+/* 现代化样式增强 */
 .max-h-0 {
   max-height: 0;
 }
@@ -913,41 +921,20 @@ onMounted(() => {
   max-height: 24rem;
 }
 
-/* 模态框背景动画 */
+/* 更流畅的模态框动画 */
 .modal-backdrop-enter-active {
-  transition: opacity 0.3s ease-out;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-backdrop-leave-active {
-  transition: opacity 0.2s ease-in;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.modal-backdrop-enter-from,
-.modal-backdrop-leave-to {
-  opacity: 0;
-}
-
-.modal-backdrop-enter-to,
-.modal-backdrop-leave-from {
-  opacity: 1;
-}
-
-/* 模态框内容动画 */
 .modal-content-enter-active {
-  transition: transform 0.3s ease-out;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-content-leave-active {
-  transition: transform 0.2s ease-in;
-}
-
-.modal-content-enter-from,
-.modal-content-leave-to {
-  transform: scale(0.95);
-}
-
-.modal-content-enter-to,
-.modal-content-leave-from {
-  transform: scale(1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 </style>

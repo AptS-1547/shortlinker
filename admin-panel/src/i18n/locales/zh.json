@@ -209,5 +209,8 @@
       "chinese": "中文",
       "japanese": "日本語"
     }
+  },
+  "theme": {
+    "switchTheme": ""
   }
 }
