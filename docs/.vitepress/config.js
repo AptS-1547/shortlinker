@@ -89,7 +89,7 @@ export default {
     ['meta', { name: 'og:locale', content: 'zh_CN' }],
     ['meta', { name: 'og:title', content: 'Shortlinker | 极简 URL 短链接服务' }],
     ['meta', { name: 'og:site_name', content: 'Shortlinker' }],
-    ['meta', { name: 'og:url', content: 'https://shortlinker.esap.cc/' }]
+    ['meta', { name: 'og:url', content: 'https://shortlinker.docs.ecaps.top' }],
   ],
   
   themeConfig: {

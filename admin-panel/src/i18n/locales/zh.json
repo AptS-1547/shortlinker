@@ -174,9 +174,9 @@
       "unknown": "未知"
     },
     "language": {
-      "switch": "切换语言",
+      "chinese": "中文",
       "english": "English",
-      "chinese": "中文"
+      "japanese": "日本語"
     }
   },
   "health": {
@@ -201,5 +201,13 @@
     "unhealthy": "异常",
     "degraded": "降级",
     "unknown": "未知"
+  },
+  "langswitcher": {
+    "language": {
+      "switch": "切换语言",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語"
+    }
   }
 }

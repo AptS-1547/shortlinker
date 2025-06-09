@@ -174,9 +174,9 @@
       "unknown": "Unknown"
     },
     "language": {
-      "switch": "Switch Language",
+      "chinese": "中文",
       "english": "English",
-      "chinese": "中文"
+      "japanese": "日本語"
     }
   },
   "health": {
@@ -201,5 +201,13 @@
     "unhealthy": "Unhealthy",
     "degraded": "Degraded",
     "unknown": "Unknown"
+  },
+  "langswitcher": {
+    "language": {
+      "switch": "Switch Language",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語"
+    }
   }
 }

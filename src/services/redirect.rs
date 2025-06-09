@@ -53,7 +53,7 @@ impl RedirectService {
                 Self::finish_redirect(link)
             }
             CacheResult::ExistsButNoValue => {
-                debug!("L2 ache miss for path: {}", capture_path);
+                debug!("L2 cache miss for path: {}", capture_path);
                 match storage.get(&capture_path).await {
                     Some(link) => {
                         Self::update_click(storage.clone(), capture_path.clone());
