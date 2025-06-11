@@ -196,7 +196,7 @@ impl Storage for FileStorage {
     async fn get_backend_config(&self) -> StorageConfig {
         StorageConfig {
             storage_type: "file".into(),
-            support_click: true,
+            support_click: false,
         }
     }
 

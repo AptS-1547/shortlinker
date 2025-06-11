@@ -10,7 +10,11 @@ pub async fn listen_for_shutdown() {
 
     // 调用点击管理器的 manual_flush
     let manager = get_click_manager();
-    manager.flush().await;
+    if let Some(manager) = manager {
+        manager.flush().await;
+    } else {
+        warn!("ClickManager is not initialized, skipping flush");
+    }
 
     warn!("ClickManager flushed successfully");
 

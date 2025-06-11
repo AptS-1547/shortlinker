@@ -431,7 +431,12 @@ impl Storage for SqliteStorage {
     }
 
     fn increment_click(&self, code: &str) -> Result<()> {
-        get_click_manager().increment(code);
+        if let Some(manager) = get_click_manager() {
+            // 使用全局点击管理器增加点击计数
+            manager.increment(code);
+        } else {
+            warn!("Global ClickManager is not initialized, click count will not be incremented.");
+        }
         Ok(())
     }
 

@@ -80,7 +80,7 @@ pub async fn prepare_server_startup() -> StartupContext {
         admin_prefix: env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string()),
         health_prefix: env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string()),
         frontend_prefix: env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string()),
-        enable_frontend: env::var("ENABLE_FRONTEND_ROUTES")
+        enable_frontend: env::var("ENABLE_ADMIN_PANEL")
             .map(|v| v == "true")
             .unwrap_or(false),
     };
@@ -111,11 +111,11 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
         warn!("Health API available at: {}", route_config.health_prefix);
     }
 
-    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_FRONTEND_ROUTES 未设置为 true
+    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_ADMIN_PANEL 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
         warn!(
-            "Frontend routes are disabled (ENABLE_FRONTEND_ROUTES is false or ADMIN_TOKEN not set)"
+            "Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)"
         );
     } else {
         warn!(

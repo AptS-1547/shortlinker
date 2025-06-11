@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 use tracing::debug;
 
-static ENABLE_FRONTEND_ROUTES: OnceLock<bool> = OnceLock::new();
+static ENABLE_ADMIN_PANEL: OnceLock<bool> = OnceLock::new();
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 
 #[derive(Clone)]
@@ -59,8 +59,8 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let enable_frontend_routes = ENABLE_FRONTEND_ROUTES.get_or_init(|| {
-                env::var("ENABLE_FRONTEND_ROUTES")
+            let enable_frontend_routes = ENABLE_ADMIN_PANEL.get_or_init(|| {
+                env::var("ENABLE_ADMIN_PANEL")
                     .map(|v| v == "true")
                     .unwrap_or(false)
             });

@@ -18,6 +18,10 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-latest
     steps:
+    - name: Get tag name
+      id: tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - uses: actions/checkout@v4
 
     - name: Setup Node.js
@@ -33,12 +37,26 @@ jobs:
       working-directory: admin-panel
       run: npm run build
 
+    - name: Package frontend
+      run: |
+        cd admin-panel/dist
+        tar -czf ../shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz .
+        cd ..
+        mv shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz ../
+
     - name: Upload frontend build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: frontend-dist
         path: admin-panel/dist
         # 仅保留最近一次构建的前端文件
+        retention-days: 1
+
+    - name: Upload frontend package
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-package
+        path: shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz
         retention-days: 1
 
   build-linux-windows:
@@ -252,7 +270,10 @@ jobs:
     - name: Create release directory
       run: |
         mkdir -p release
-        find artifacts -type f -exec cp {} release/ \;
+        # 复制所有二进制文件（排除前端原始文件目录）
+        find artifacts -name "shortlinker_*" -type f -exec cp {} release/ \;
+        # 复制前端打包文件
+        find artifacts -name "*.tar.gz" -type f -exec cp {} release/ \;
 
     - name: Generate checksums
       run: |
@@ -400,6 +421,10 @@ jobs:
           
           > 💡 **提示**：选择与您系统匹配的版本，下载后可直接运行！
           
+          ### 🌐 前端管理面板
+          
+          📥 [shortlinker-admin-panel.tar.gz](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz) - 独立前端文件包
+          
           <table>
           <tr>
           <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg" width="32" height="32"><br><b>Linux</b></td>
@@ -527,7 +552,7 @@ jobs:
         files: |
           release/*
         draft: false
-        prerelease: false
+        prerelease: ${{ contains(steps.tag.outputs.tag, 'alpha') || contains(steps.tag.outputs.tag, 'beta') || contains(steps.tag.outputs.tag, 'rc') || contains(steps.tag.outputs.tag, 'pre') }}
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

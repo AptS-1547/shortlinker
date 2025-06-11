@@ -49,7 +49,7 @@ export SERVER_PORT=8080
 | `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API 路由前缀 |
 | `HEALTH_TOKEN` | String | *(空)* | 健康检查 API 鉴权令牌，**为空时禁用** |
 | `HEALTH_ROUTE_PREFIX` | String | `/health` | 健康检查 API 路由前缀 |
-| `ENABLE_FRONTEND_ROUTES` | Boolean | `false` | 启用 Web 管理界面（需先构建且需同时设置 ADMIN_TOKEN） |
+| `ENABLE_ADMIN_PANEL` | Boolean | `false` | 启用 Web 管理界面（需先构建且需同时设置 ADMIN_TOKEN） |
 | `FRONTEND_ROUTE_PREFIX` | String | `/panel` | Web 管理界面路由前缀 |
 > **注意**：Web 管理界面是新推出的特性，可能仍在完善中。
 

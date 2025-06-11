@@ -2,7 +2,7 @@
 
 A modern web administration interface for managing the [Shortlinker](../README.md) URL shortening service.
 
-To enable this panel with Shortlinker, build the `dist` directory and set `ENABLE_FRONTEND_ROUTES=true` with an `ADMIN_TOKEN` in your environment variables or `.env` file. This feature is still experimental.
+To enable this panel with Shortlinker, build the `dist` directory and set `ENABLE_ADMIN_PANEL=true` with an `ADMIN_TOKEN` in your environment variables or `.env` file. This feature is still experimental.
 ## Features
 
 - 🎨 **Modern Interface** - Responsive design built with Vue 3 + Vite

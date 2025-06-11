@@ -2,7 +2,7 @@
 
 Shortlinker 提供了基于 Vue 3 的可选 Web 管理界面，位于 `admin-panel` 目录，可通过 Admin API 进行图形化管理。
 
-要在 Shortlinker 中启用该界面，需先构建 `admin-panel/dist` 并设置 `ENABLE_FRONTEND_ROUTES=true`（同时需要 `ADMIN_TOKEN`）。该特性尚在开发中，可能不够稳定。
+要在 Shortlinker 中启用该界面，需先构建 `admin-panel/dist` 并设置 `ENABLE_ADMIN_PANEL=true`（同时需要 `ADMIN_TOKEN`）。该特性尚在开发中，可能不够稳定。
 
 ## 主要功能
 

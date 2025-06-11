@@ -179,7 +179,7 @@ curl http://localhost:8080/health/live
 | `RANDOM_CODE_LENGTH` | `6` | 随机码长度 |
 | `ADMIN_TOKEN` | *(空)* | Admin API 令牌 |
 | `HEALTH_TOKEN` | *(空)* | 健康检查 API 令牌 |
-| `ENABLE_FRONTEND_ROUTES` | `false` | 启用 Web 管理界面（需先构建且需设置 ADMIN_TOKEN） |
+| `ENABLE_ADMIN_PANEL` | `false` | 启用 Web 管理界面（需先构建且需设置 ADMIN_TOKEN） |
 | `FRONTEND_ROUTE_PREFIX` | `/panel` | Web 管理界面路由前缀 |
 | `RUST_LOG` | `info` | 日志级别 |
 >**注意**：Web 管理界面是新推出的特性，可能尚不稳定。

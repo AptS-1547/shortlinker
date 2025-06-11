@@ -196,7 +196,7 @@ Configure using environment variables or `.env` file:
 | `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
-| `ENABLE_FRONTEND_ROUTES` | `false` | Serve web admin panel (requires build and ADMIN_TOKEN) |
+| `ENABLE_ADMIN_PANEL` | `false` | Serve web admin panel (requires build and ADMIN_TOKEN) |
 | `FRONTEND_ROUTE_PREFIX` | `/panel` | Web admin panel route prefix |
 | `RUST_LOG`           | `info`                 | Log level                                   |
 > **Note**: The web admin panel is a new feature and may be unstable.

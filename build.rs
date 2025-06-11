@@ -1,17 +1,9 @@
 use std::env;
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 fn main() {
     println!("cargo:rerun-if-changed=admin-panel/dist");
-
-    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| {
-        eprintln!("Error: OUT_DIR environment variable not set");
-        std::process::exit(1);
-    });
-    let dest_path = Path::new(&out_dir).join("static_files.rs");
-    let mut f = fs::File::create(&dest_path).unwrap();
 
     // 获取项目根目录
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -23,94 +15,7 @@ fn main() {
         eprintln!("  cd admin-panel && npm run build");
 
         create_fallback_files(&dist_path);
-        generate_fallback_static_files(&mut f);
-    } else {
-        generate_static_files_mapping(&mut f, &dist_path, &manifest_dir);
     }
-}
-
-fn generate_static_files_mapping<W: Write>(f: &mut W, dist_path: &Path, _manifest_dir: &str) {
-    writeln!(f, "// Auto-generated static files mapping").unwrap();
-    writeln!(f, "{{").unwrap(); // 开始代码块
-
-    // 处理 assets 目录
-    let assets_path = dist_path.join("assets");
-    if assets_path.exists() {
-        if let Ok(entries) = fs::read_dir(&assets_path) {
-            for entry in entries.flatten() {
-                let file_name = entry.file_name();
-                let file_name_str = file_name.to_string_lossy();
-                let file_path = entry.path();
-
-                // 只处理实际的资源文件，跳过 .map 文件
-                if file_name_str.ends_with(".css")
-                    || (file_name_str.ends_with(".js") && !file_name_str.ends_with(".map"))
-                {
-                    let key = format!("assets/{}", file_name_str);
-                    // 使用绝对路径，生成单行语句
-                    let absolute_path = file_path.to_string_lossy().replace("\\", "/"); // 处理 Windows 路径
-
-                    writeln!(
-                        f,
-                        r#"    files.insert("{}".to_string(), include_bytes!("{}"));"#,
-                        key, absolute_path
-                    )
-                    .unwrap();
-
-                    println!("cargo:rerun-if-changed={}", absolute_path);
-                    println!("  ✓ Added: {}", key);
-                }
-
-                // 如果是 .map 文件，也包含但标记为可选
-                if file_name_str.ends_with(".map") {
-                    let key = format!("assets/{}", file_name_str);
-                    let absolute_path = file_path.to_string_lossy().replace("\\", "/");
-
-                    writeln!(
-                        f,
-                        r#"    files.insert("{}".to_string(), include_bytes!("{}"));"#,
-                        key, absolute_path
-                    )
-                    .unwrap();
-
-                    println!("cargo:rerun-if-changed={}", absolute_path);
-                    println!("  ✓ Added: {} (source map)", key);
-                }
-            }
-        }
-    }
-
-    // 处理其他可能的静态文件
-    for entry in ["manifest.json", "robots.txt"].iter() {
-        let file_path = dist_path.join(entry);
-        if file_path.exists() {
-            let absolute_path = file_path.to_string_lossy().replace("\\", "/");
-
-            writeln!(
-                f,
-                r#"    files.insert("{}".to_string(), include_bytes!("{}"));"#,
-                entry, absolute_path
-            )
-            .unwrap();
-
-            println!("cargo:rerun-if-changed={}", absolute_path);
-            println!("  ✓ Added: {}", entry);
-        }
-    }
-
-    writeln!(f, "}}").unwrap(); // 结束代码块
-}
-
-fn generate_fallback_static_files<W: Write>(f: &mut W) {
-    writeln!(f, "// Fallback static files (admin panel not built)").unwrap();
-    writeln!(f, "{{").unwrap(); // 开始代码块
-    writeln!(
-        f,
-        r#"    files.insert("assets/fallback.css".to_string(), b"/* Admin panel not built */");"#
-    )
-    .unwrap();
-    writeln!(f, r#"    files.insert("assets/fallback.js".to_string(), b"console.log('Admin panel not built');");"#).unwrap();
-    writeln!(f, "}}").unwrap(); // 结束代码块
 }
 
 fn create_fallback_files(dist_path: &Path) {
