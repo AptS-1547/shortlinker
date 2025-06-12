@@ -13,6 +13,8 @@
 
 [English](README.md) • [中文](README.zh.md)
 
+![1749756794700](assets/admin-panel-dashboard.png)
+
 </div>
 
 ## 🚀 Benchmark (v0.1.7-alpha.1)

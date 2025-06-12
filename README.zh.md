@@ -2,34 +2,55 @@
 
 <div align="center">
 
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/AptS-1547/shortlinker)](https://github.com/AptS-1547/shortlinker/releases)
-[![Rust Release](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/rust-release.yml?label=rust%20release)](https://github.com/AptS-1547/shortlinker/actions/workflows/rust-release.yml)
-[![Docker Build](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/docker-image.yml?label=docker%20build)](https://github.com/AptS-1547/shortlinker/actions/workflows/docker-image.yml)
-[![CodeFactor](https://www.codefactor.io/repository/github/apts-1547/shortlinker/badge)](https://www.codefactor.io/repository/github/apts-1547/shortlinker)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker Pulls](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
+[![GitHub 最新发布](https://img.shields.io/github/v/release/AptS-1547/shortlinker)](https://github.com/AptS-1547/shortlinker/releases)
+[![Rust 构建状态](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/rust-release.yml?label=rust%20release)](https://github.com/AptS-1547/shortlinker/actions/workflows/rust-release.yml)
+[![Docker 构建状态](https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/docker-image.yml?label=docker%20build)](https://github.com/AptS-1547/shortlinker/actions/workflows/docker-image.yml)
+[![CodeFactor 评分](https://www.codefactor.io/repository/github/apts-1547/shortlinker/badge)](https://www.codefactor.io/repository/github/apts-1547/shortlinker)
+[![MIT 协议](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker 拉取数](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
 
-**一个极简主义的短链接服务，支持 HTTP 307 跳转，使用 Rust 编写，部署便捷、响应快速。**
+**一款极简主义的 URL 缩短服务，支持 HTTP 307 重定向，使用 Rust 构建，易于部署，极速响应。**
 
 [English](README.md) • [中文](README.zh.md)
 
+![管理面板界面](assets/admin-panel-dashboard.png)
+
 </div>
 
-## ✨ 功能特性
+## 🚀 性能基准（v0.1.7-alpha.1）
 
-- 🚀 **高性能**：基于 Rust + Actix-web 构建
-- 🎯 **动态管理**：支持运行时添加/删除短链，无需重启
-- 🎲 **智能短码**：支持自定义短码和随机生成
-- ⏰ **过期时间**：支持灵活的时间格式设置（v0.1.1+）
-- 💾 **多后端存储**：支持 SQLite 数据库、JSON 文件存储
-- 🔄 **跨平台**：支持 Windows、Linux、macOS
-- 🛡️ **Admin API**：HTTP API 管理接口（v0.0.5+）
-- 🏥 **健康监控**：内置健康检查端点
-- 🐳 **容器化**：优化的 Docker 镜像部署
-- 🎨 **美观 CLI**：彩色命令行界面
-- 🔌 **Unix 套接字**：支持 Unix 套接字绑定
+**测试环境**
 
-## 快速开始
+- 操作系统：Linux
+- CPU：12代 Intel Core i5-12500，单核
+- 压测工具：[`wrk`](https://github.com/wg/wrk)
+
+| 类型       | 场景                  | QPS 峰值         | 缓存命中 | 布隆过滤器 | 数据库访问 |
+|------------|-----------------------|------------------|-----------|--------------|--------------|
+| 命中缓存   | 热门链接（重复访问） | **719,997.22**   | ✅ 是     | ✅ 是         | ❌ 否        |
+| 未命中缓存 | 冷门链接（随机访问） | **610,543.39**   | ❌ 否     | ✅ 是         | ✅ 是        |
+
+> 💡 即使在缓存未命中时，系统仍能维持近 60 万 QPS，展示了 SQLite + actix-web + 异步缓存的卓越性能。
+
+---
+
+## ✨ 功能亮点
+
+- 🚀 **高性能**：Rust + actix-web 构建
+- 🔧 **运行时动态管理**：添加/删除链接无需重启服务
+- 🎲 **智能短码生成**：支持自定义和随机短码
+- ⏰ **支持过期时间**：灵活设置链接有效期（v0.1.1+）
+- 💾 **多种存储后端**：SQLite、JSON 文件
+- 🖥️ **跨平台支持**：Linux、Windows、macOS
+- 🛡️ **管理 API**：支持 Bearer Token 的 HTTP API（v0.0.5+）
+- 💉 **健康检查 API**：服务存活与就绪检查接口
+- 🐳 **Docker 镜像**：适配容器部署，体积小巧
+- 🎨 **美观 CLI**：带有颜色高亮的命令行工具
+- 🔌 **Unix Socket 支持**
+
+---
+
+## 🚀 快速开始
 
 ### 本地运行
 
@@ -37,215 +58,159 @@
 git clone https://github.com/AptS-1547/shortlinker
 cd shortlinker
 cargo run
-```
+````
 
 ### Docker 部署
 
 ```bash
-# TCP 端口
+# TCP 端口模式
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
 
-# Unix 套接字
+# Unix Socket 模式
 docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
   -e UNIX_SOCKET=/sock/shortlinker.sock e1saps/shortlinker
 ```
 
-## 使用示例
+---
 
-绑定域名后（如 `esap.cc`），可访问：
+## 🧪 使用示例
 
-- `https://esap.cc/github` → 自定义短链
-- `https://esap.cc/aB3dF1` → 随机短链
-- `https://esap.cc/` → 默认主页
+域名绑定后（如 `https://esap.cc`）：
 
-## 命令行管理
+* `https://esap.cc/github` → 自定义短链接
+* `https://esap.cc/aB3dF1` → 随机短链接
+* `https://esap.cc/` → 默认首页跳转
+
+---
+
+## 🔧 命令行管理示例
 
 ```bash
-# 启动服务器
+# 启动服务
 ./shortlinker
 
-# 添加短链
-./shortlinker add github https://github.com           # 自定义短码
-./shortlinker add https://github.com                  # 随机短码
-./shortlinker add github https://new-url.com --force  # 强制覆盖
+# 添加链接
+./shortlinker add github https://github.com             # 自定义短码
+./shortlinker add https://github.com                    # 随机短码
+./shortlinker add github https://new-url.com --force    # 覆盖已有短码
 
-# 使用相对时间格式（v0.1.1+）
-./shortlinker add daily https://example.com --expire 1d      # 1天后过期
-./shortlinker add weekly https://example.com --expire 1w     # 1周后过期
-./shortlinker add complex https://example.com --expire 1d2h30m  # 复杂格式
+# 设置相对时间（v0.1.1+）
+./shortlinker add daily https://example.com --expire 1d
+./shortlinker add weekly https://example.com --expire 1w
+./shortlinker add complex https://example.com --expire 1d2h30m
 
-# 管理短链
+# 管理操作
 ./shortlinker update github https://new-github.com --expire 30d
-./shortlinker list                    # 列出所有
-./shortlinker remove github           # 删除指定
+./shortlinker list
+./shortlinker remove github
 
-# 服务器控制
-./shortlinker start                   # 启动服务器
-./shortlinker stop                    # 停止服务器
-./shortlinker restart                 # 重启服务器
+# 服务控制
+./shortlinker start
+./shortlinker stop
+./shortlinker restart
 ```
 
-## Admin API (v0.0.5+)
+---
 
-通过 HTTP API 管理短链接，使用 Bearer 令牌认证。
+## 🔐 管理 API（v0.0.5+）
 
-### 设置
+启用管理功能：
 
 ```bash
-export ADMIN_TOKEN=your_secret_token
-export ADMIN_ROUTE_PREFIX=/admin  # 可选
+export ADMIN_TOKEN=你的管理密钥
+export ADMIN_ROUTE_PREFIX=/admin  # 可选前缀
 ```
 
-### 示例
+### API 示例
 
 ```bash
 # 获取所有链接
-curl -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link
+curl -H "Authorization: Bearer 你的管理密钥" http://localhost:8080/admin/link
 
-# 使用相对时间创建链接
+# 创建链接
 curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
+     -H "Authorization: Bearer 你的管理密钥" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
      http://localhost:8080/admin/link
-
-# 自动生成随机短码
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com","expires_at":"30d"}' \
-     http://localhost:8080/admin/link
-
-# 更新链接
-curl -X PUT \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://new-url.com"}' \
-     http://localhost:8080/admin/link/github
-
-# 删除链接
-curl -X DELETE \
-     -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link/github
 ```
 
-## 健康检查 API
+---
 
-监控服务健康状态和存储状态。
+## ❤️ 健康检查
 
 ```bash
-# 设置
-export HEALTH_TOKEN=your_health_token
+export HEALTH_TOKEN=你的健康密钥
 
-# 健康检查
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health
+# 总体健康检查
+curl -H "Authorization: Bearer $HEALTH_TOKEN" http://localhost:8080/health
 
 # 就绪检查
 curl http://localhost:8080/health/ready
 
-# 活跃性检查
+# 存活检查
 curl http://localhost:8080/health/live
 ```
 
-## 时间格式支持（v0.1.1+）
+---
 
-### 相对时间格式（推荐）
-```bash
-1s, 5m, 2h, 1d, 1w, 1M, 1y    # 单个单位
-1d2h30m                        # 组合格式
-```
+## 🕒 时间格式支持
 
-### RFC3339 格式
-```bash
-2024-12-31T23:59:59Z           # UTC 时间
-2024-12-31T23:59:59+08:00      # 带时区
-```
-
-## 配置选项
-
-通过环境变量或 `.env` 文件配置：
-
-| 环境变量 | 默认值 | 说明 |
-|----------|--------|------|
-| `SERVER_HOST` | `127.0.0.1` | 监听地址 |
-| `SERVER_PORT` | `8080` | 监听端口 |
-| `UNIX_SOCKET` | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
-| `CPU_COUNT` | *(自动)* | 工作线程数量（默认为CPU核心数） |
-| `STORAGE_BACKEND` | `sqlite` | 存储类型 (sqlite/file) |
-| `DB_FILE_NAME` | `links.db` | 数据库文件路径 |
-| `DEFAULT_URL` | `https://esap.cc/repo` | 默认跳转地址 |
-| `RANDOM_CODE_LENGTH` | `6` | 随机码长度 |
-| `ADMIN_TOKEN` | *(空)* | Admin API 令牌 |
-| `HEALTH_TOKEN` | *(空)* | 健康检查 API 令牌 |
-| `ENABLE_ADMIN_PANEL` | `false` | 启用 Web 管理界面（需先构建且需设置 ADMIN_TOKEN） |
-| `FRONTEND_ROUTE_PREFIX` | `/panel` | Web 管理界面路由前缀 |
-| `RUST_LOG` | `info` | 日志级别 |
->**注意**：Web 管理界面是新推出的特性，可能尚不稳定。
-
-### .env 示例
+### 相对时间（推荐）
 
 ```bash
-# 服务器 - TCP
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
-CPU_COUNT=4
-
-# 服务器 - Unix 套接字
-# UNIX_SOCKET=/tmp/shortlinker.sock
-
-# 存储
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=data/links.db
-
-# API
-ADMIN_TOKEN=your_admin_token
-HEALTH_TOKEN=your_health_token
-
-# 功能
-DEFAULT_URL=https://example.com
-RANDOM_CODE_LENGTH=8
-RUST_LOG=info
+1s, 5m, 2h, 1d, 1w, 1M, 1y
+1d2h30m  # 组合时间格式
 ```
 
-## 存储后端
-
-- **SQLite**（默认，v0.1.0+）：生产就绪，推荐使用
-- **文件存储**：基于 JSON 的简单存储，适合开发
+### 绝对时间（RFC3339）
 
 ```bash
-# SQLite（推荐）
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=links.db
-
-# 文件存储
-STORAGE_BACKEND=file
-DB_FILE_NAME=links.json
+2024-12-31T23:59:59Z
+2024-12-31T23:59:59+08:00
 ```
 
-## 部署配置
+---
 
-### 反向代理（Nginx）
+## ⚙️ 配置方式
+
+支持 `.env` 文件或环境变量：
+
+| 变量                      | 默认值                                          | 说明                 |
+| ----------------------- | -------------------------------------------- | ------------------ |
+| SERVER\_HOST            | 127.0.0.1                                    | 监听地址               |
+| SERVER\_PORT            | 8080                                         | 监听端口               |
+| UNIX\_SOCKET            | 空                                            | 使用 Unix Socket 时填写 |
+| CPU\_COUNT              | 自动                                           | 工作线程数              |
+| STORAGE\_BACKEND        | sqlite                                       | 存储方式（sqlite/file）  |
+| DB\_FILE\_NAME          | links.db                                     | 数据库路径              |
+| DEFAULT\_URL            | [https://esap.cc/repo](https://esap.cc/repo) | 默认跳转 URL           |
+| RANDOM\_CODE\_LENGTH    | 6                                            | 随机短码长度             |
+| ADMIN\_TOKEN            | 空                                            | 管理 API 密钥          |
+| HEALTH\_TOKEN           | 空                                            | 健康检查密钥             |
+| ENABLE\_ADMIN\_PANEL    | false                                        | 启用网页管理面板（实验性）      |
+| FRONTEND\_ROUTE\_PREFIX | /panel                                       | 面板路由前缀             |
+| RUST\_LOG               | info                                         | 日志等级               |
+
+---
+
+## 📦 存储选项
+
+* SQLite（推荐）：稳定、支持高并发
+* 文件（JSON）：适合开发测试
+
+---
+
+## 📡 部署示例
+
+### Nginx 反向代理
 
 ```nginx
-# TCP 端口
 server {
     listen 80;
     server_name esap.cc;
     location / {
         proxy_pass http://127.0.0.1:8080;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-}
-
-# Unix 套接字
-server {
-    listen 80;
-    server_name esap.cc;
-    location / {
-        proxy_pass http://unix:/tmp/shortlinker.sock;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 }
 ```
@@ -254,7 +219,7 @@ server {
 
 ```ini
 [Unit]
-Description=ShortLinker Service
+Description=ShortLinker 服务
 After=network.target
 
 [Service]
@@ -270,36 +235,43 @@ Environment=SERVER_PORT=8080
 WantedBy=multi-user.target
 ```
 
-## 开发
+---
+
+## 🔧 开发者指南
 
 ```bash
-# 开发编译
-cargo run
-
-# 生产编译
-cargo build --release
-
-# 运行测试
-cargo test
-
-# 代码质量
-cargo fmt && cargo clippy
+cargo run           # 开发运行
+cargo build --release  # 生产构建
+cargo test          # 运行测试
+cargo fmt && cargo clippy  # 格式化与静态检查
 ```
-## 相关模块
 
-- **Web 管理界面**：位于 `admin-panel/`，提供图形化管理 ([文档](/admin-panel/))
-- **Cloudflare Worker**：无服务器版本，位于 `cf-worker/` ([文档](/cf-worker/))
+---
 
+## 🧩 相关模块
 
-## 技术亮点
+* Web 管理面板：`admin-panel/`
+* Cloudflare Worker：无服务器版，位于 `cf-worker/`
 
-- **跨平台进程管理**：智能锁文件和信号处理
-- **热配置重载**：基于信号的重载（Unix）和文件触发（Windows）
-- **容器感知**：对 Docker 环境的特殊处理
-- **统一错误处理**：完整的错误类型系统，支持自动转换
-- **内存安全**：零成本抽象，保证线程安全
-- **高测试覆盖**：全面的单元测试和集成测试
+---
 
-## 许可证
+## 📜 协议
 
 MIT License © AptS:1547
+
+<pre>
+        ／＞　 フ
+       | 　_　_|    AptS:1547
+     ／` ミ＿xノ    — shortlinker assistant bot —
+    /　　　　 |
+   /　 ヽ　　 ﾉ      Rust / SQLite / Bloom / CLI
+   │　　|　|　|
+／￣|　　 |　|　|
+(￣ヽ＿_ヽ_)__)
+＼二)
+
+   「ready to 307 !」
+</pre>
+
+> [🔗 Visit Project Docs](https://esap.cc/docs)
+> [💬 Powered by AptS:1547](https://github.com/AptS-1547)
