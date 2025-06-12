@@ -21,11 +21,11 @@
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
-    "@tailwindcss/vite": "^4.1.8",
+    "@tailwindcss/vite": "^4.1.10",
     "axios": "^1.9.0",
     "pinia": "^3.0.3",
     "qrcode": "^1.5.4",
-    "tailwindcss": "^4.1.8",
+    "tailwindcss": "^4.1.10",
     "vue": "^3.5.16",
     "vue-i18n": "^11.1.5",
     "vue-i18n-extract": "^2.0.7",
@@ -34,7 +34,7 @@
   "devDependencies": {
     "@tsconfig/node22": "^22.0.2",
     "@types/jsdom": "^21.1.7",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.0.1",
     "@types/qrcode": "^1.5.5",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vitest/eslint-plugin": "^1.2.2",
@@ -56,5 +56,5 @@
     "vitest": "^3.2.3",
     "vue-tsc": "^2.2.10"
   },
-  "packageManager": "yarn@4.1.1+sha512.ec40d0639bb307441b945d9467139cbb88d14394baac760b52eca038b330d16542d66fef61574271534ace5a200518dabf3b53a85f1f9e4bfa37141b538a9590"
+  "packageManager": "yarn@4.9.2"
 }

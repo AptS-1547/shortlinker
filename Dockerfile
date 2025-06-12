@@ -1,14 +1,18 @@
 # 前端构建阶段
-FROM node:20-slim AS frontend-builder
+FROM node:22-alpine AS frontend-builder
+
+RUN apk add git
+RUN corepack enable && \
+    corepack prepare yarn@latest --activate
+
+COPY ./.git /app/.git
 
 WORKDIR /app/admin-panel
 
-# 复制前端文件
-COPY admin-panel/package*.json admin-panel/yarn.lock ./
-RUN npm install
-
-COPY admin-panel/ ./
-RUN npm run build
+# 复制前端依赖文件
+COPY ./admin-panel /app/admin-panel
+RUN yarn install --frozen-lockfile
+RUN yarn build:prod
 
 # 多阶段构建 - 构建阶段
 FROM rust:1.87-slim AS builder
