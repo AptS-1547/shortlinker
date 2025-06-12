@@ -22,7 +22,12 @@ jobs:
       id: tag
       run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整的 git 历史
+        fetch-tags: true  # 确保获取所有标签
+        submodules: true  # 初始化和更新子模块
 
     - name: Setup Node.js
       uses: actions/setup-node@v4

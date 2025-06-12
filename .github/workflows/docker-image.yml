@@ -25,6 +25,7 @@ jobs:
       with:
         fetch-depth: 0  # 获取完整的 git 历史
         fetch-tags: true  # 确保获取所有标签
+        submodules: true
 
     # - name: Set up QEMU
     #   uses: docker/setup-qemu-action@v3
