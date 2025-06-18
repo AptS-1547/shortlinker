@@ -11,9 +11,9 @@ use crate::{
     storages::models::StorageConfig,
 };
 
-mod backends;
+pub mod backends;
 pub mod click;
-mod models;
+pub mod models;
 pub mod register;
 
 pub use models::{CachePreference, SerializableShortLink, ShortLink};

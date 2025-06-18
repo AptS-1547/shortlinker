@@ -23,7 +23,7 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new_async() -> Result<Self> {
-        let db_path = env::var("SHORTLINKER_DB_PATH").unwrap_or_else(|_| "shortlinks.db".into());
+        let db_path = env::var("DATABASE_URL").unwrap_or_else(|_| "shortlinks.db".into());
 
         // 创建连接池
         let pool = SqlitePool::connect_with(

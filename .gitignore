@@ -22,6 +22,8 @@ target/
 
 .DS_Store
 
+.env
+
 shortlinks.db*
 links.db*
 links.json

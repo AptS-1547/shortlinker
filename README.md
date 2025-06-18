@@ -192,8 +192,8 @@ Configure using environment variables or `.env` file:
 | `SERVER_PORT`        | `8080`                 | Listen port                                 |
 | `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
 | `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `STORAGE_BACKEND`    | `sqlite`               | Storage type (sqlite/file)                  |
-| `DB_FILE_NAME`       | `links.db`             | Database file path                          |
+| `STORAGE_BACKEND`    | `sqlite`               | Storage type (See Documentation)          |
+| `DATABASE_URL`       | `links.db`             | Database URL (See Documentation)          |
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
 | `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
