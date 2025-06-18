@@ -29,15 +29,6 @@ jobs:
         fetch-tags: true  # 确保获取所有标签
         submodules: true  # 初始化和更新子模块
 
-    - name: Remove .git from admin-panel
-      run: |
-        if [ -d "admin-panel/.git" ]; then
-          echo "Removing .git directory from admin-panel"
-          rm -rf admin-panel/.git
-        else
-          echo ".git directory not found in admin-panel"
-        fi
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -47,9 +38,15 @@ jobs:
       working-directory: admin-panel
       run: npm install
 
+    - name: Generate version info from main project
+      working-directory: admin-panel
+      env:
+        GITHUB_REF: ${{ github.ref }}
+      run: npm run version
+
     - name: Build frontend
       working-directory: admin-panel
-      run: npm run build
+      run: npm run build:prod
 
     - name: Package frontend
       run: |
@@ -84,9 +81,6 @@ jobs:
           - target: x86_64-unknown-linux-musl
             name: linux_x86_64
             packages: musl-tools
-          - target: i686-unknown-linux-musl
-            name: linux_i686
-            packages: musl-tools gcc-multilib
           # Windows
           - target: x86_64-pc-windows-gnu
             name: windows_x86_64.exe
@@ -132,11 +126,6 @@ jobs:
     - name: Configure cross-compilation
       run: |
         case "${{ matrix.target }}" in
-          i686-unknown-linux-musl)
-            echo "CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
-            echo "CC_i686_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
-            echo "CFLAGS_i686_unknown_linux_musl=-m32" >> $GITHUB_ENV
-            ;;
           x86_64-unknown-linux-musl)
             echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
             echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
@@ -453,9 +442,6 @@ jobs:
           
           **ARM64** (树莓派4/服务器)  
           📥 [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_aarch64)
-          
-          **i686** (32位老设备)  
-          📥 [shortlinker-linux-i686](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_i686)
           
           </td>
           <td>
