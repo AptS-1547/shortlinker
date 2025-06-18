@@ -119,7 +119,10 @@ async fn main() -> std::io::Result<()> {
                     .route("/link", web::post().to(AdminService::post_link))
                     .route("/link/{code:.*}", web::get().to(AdminService::get_link))
                     .route("/link/{code:.*}", web::head().to(AdminService::get_link))
-                    .route("/link/{code:.*}", web::delete().to(AdminService::delete_link))
+                    .route(
+                        "/link/{code:.*}",
+                        web::delete().to(AdminService::delete_link),
+                    )
                     .route("/link/{code:.*}", web::put().to(AdminService::update_link))
                     .route(
                         "/auth/login",

@@ -114,9 +114,7 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_ADMIN_PANEL 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
-        warn!(
-            "Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)"
-        );
+        warn!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
     } else {
         warn!(
             "Frontend routes available at: {}",

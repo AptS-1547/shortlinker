@@ -83,8 +83,8 @@ impl ShortlinkerError {
 }
 
 // 为常见的错误类型实现 From trait
-impl From<rusqlite::Error> for ShortlinkerError {
-    fn from(err: rusqlite::Error) -> Self {
+impl From<sqlx::Error> for ShortlinkerError {
+    fn from(err: sqlx::Error) -> Self {
         ShortlinkerError::DatabaseOperation(err.to_string())
     }
 }
