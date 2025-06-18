@@ -29,6 +29,15 @@ jobs:
         fetch-tags: true  # 确保获取所有标签
         submodules: true  # 初始化和更新子模块
 
+    - name: Remove .git from admin-panel
+      run: |
+        if [ -d "admin-panel/.git" ]; then
+          echo "Removing .git directory from admin-panel"
+          rm -rf admin-panel/.git
+        else
+          echo ".git directory not found in admin-panel"
+        fi
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:

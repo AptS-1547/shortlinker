@@ -11,6 +11,7 @@ WORKDIR /app/admin-panel
 
 # 复制前端依赖文件
 COPY ./admin-panel /app/admin-panel
+RUN rm -rf .git
 RUN yarn install --frozen-lockfile
 RUN yarn build:prod
 
@@ -72,7 +73,7 @@ EXPOSE 8080
 ENV DOCKER_ENV=1
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
-ENV DB_FILE_NAME=/data/shortlinker.data
+ENV DATABASE_URL=sqlite:///data/shortlinker.db
 ENV RUST_LOG=info
 
 # 启动命令
