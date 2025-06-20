@@ -1,5 +1,5 @@
 use super::super::CliError;
-use crate::storages::{SerializableShortLink, ShortLink, Storage};
+use crate::storages::{ShortLink, Storage};
 use crate::utils::generate_random_code;
 use crate::utils::TimeParser;
 use colored::*;
@@ -18,22 +18,35 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
         println!("{}", "Short link list:".bold().green());
         println!();
         for (short_code, link) in &links {
+            let mut info_parts = vec![format!(
+                "{} -> {}",
+                short_code.cyan(),
+                link.target.blue().underline()
+            )];
+
             if let Some(expires_at) = link.expires_at {
-                println!(
-                    "  {} -> {} {}",
-                    short_code.cyan(),
-                    link.target.blue().underline(),
+                info_parts.push(
                     format!("(expires: {})", expires_at.format("%Y-%m-%d %H:%M:%S UTC"))
                         .dimmed()
                         .yellow()
-                );
-            } else {
-                println!(
-                    "  {} -> {}",
-                    short_code.cyan(),
-                    link.target.blue().underline()
+                        .to_string(),
                 );
             }
+
+            if link.password.is_some() {
+                info_parts.push("🔒".to_string());
+            }
+
+            if link.click > 0 {
+                info_parts.push(
+                    format!("(clicks: {})", link.click)
+                        .dimmed()
+                        .cyan()
+                        .to_string(),
+                );
+            }
+
+            println!("  {}", info_parts.join(" "));
         }
         println!();
         println!(
@@ -51,6 +64,7 @@ pub async fn add_link(
     target_url: String,
     force_overwrite: bool,
     expire_time: Option<String>,
+    password: Option<String>,
 ) -> Result<(), CliError> {
     // 验证 URL 格式
     if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
@@ -117,12 +131,13 @@ pub async fn add_link(
     } else {
         None
     };
-
     let link = ShortLink {
         code: final_short_code.clone(),
         target: target_url.clone(),
         created_at: chrono::Utc::now(),
         expires_at,
+        password,
+        click: 0,
     };
 
     storage
@@ -189,6 +204,7 @@ pub async fn update_link(
     short_code: String,
     target_url: String,
     expire_time: Option<String>,
+    password: Option<String>,
 ) -> Result<(), CliError> {
     // 验证 URL 格式
     if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
@@ -228,12 +244,13 @@ pub async fn update_link(
     } else {
         old_link.expires_at // 保持原有的过期时间
     };
-
     let updated_link = ShortLink {
         code: short_code.clone(),
         target: target_url.clone(),
         created_at: old_link.created_at, // 保持原有的创建时间
         expires_at,
+        password: password.or(old_link.password), // 如果提供新密码则更新，否则保持原密码
+        click: old_link.click,                    // 保持原有的点击计数
     };
 
     storage
@@ -273,19 +290,8 @@ pub async fn export_links(
     if links.is_empty() {
         println!("{} No short links to export", "ℹ".bold().blue());
         return Ok(());
-    }
-
-    // 转换为可序列化格式
-    let serializable_links: Vec<SerializableShortLink> = links
-        .values()
-        .map(|link| SerializableShortLink {
-            short_code: link.code.clone(),
-            target_url: link.target.clone(),
-            created_at: link.created_at.to_rfc3339(),
-            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-            click: 0, // 默认点击数为0
-        })
-        .collect();
+    } // 收集所有链接
+    let links_vec: Vec<&ShortLink> = links.values().collect();
 
     let output_path = file_path.unwrap_or_else(|| {
         format!(
@@ -300,9 +306,8 @@ pub async fn export_links(
             output_path, e
         ))
     })?;
-
     let writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &serializable_links)
+    serde_json::to_writer_pretty(writer, &links_vec)
         .map_err(|e| CliError::CommandError(format!("Failed to export JSON data: {}", e)))?;
 
     println!(
@@ -331,12 +336,11 @@ pub async fn import_links(
     let file = File::open(&file_path).map_err(|e| {
         CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
     })?;
-
     let reader = BufReader::new(file);
-    let serializable_links: Vec<SerializableShortLink> = serde_json::from_reader(reader)
+    let imported_links: Vec<ShortLink> = serde_json::from_reader(reader)
         .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?;
 
-    if serializable_links.is_empty() {
+    if imported_links.is_empty() {
         println!("{} Import file is empty", "ℹ".bold().blue());
         return Ok(());
     }
@@ -351,87 +355,48 @@ pub async fn import_links(
     let mut skipped_count = 0;
     let mut error_count = 0;
 
-    for serializable_link in serializable_links {
+    for imported_link in imported_links {
         // 检查短码是否已存在
-        if !force_overwrite && existing_links.contains_key(&serializable_link.short_code) {
+        if !force_overwrite && existing_links.contains_key(&imported_link.code) {
             println!(
                 "{} Skipping existing code: {} (use --force to overwrite)",
                 "⚠".bold().yellow(),
-                serializable_link.short_code.cyan()
+                imported_link.code.cyan()
             );
             skipped_count += 1;
             continue;
         }
 
-        // 解析时间
-        let created_at = match chrono::DateTime::parse_from_rfc3339(&serializable_link.created_at) {
-            Ok(dt) => dt.with_timezone(&chrono::Utc),
-            Err(e) => {
-                println!(
-                    "{} Skipping code '{}': failed to parse created_at - {}",
-                    "✗".bold().red(),
-                    serializable_link.short_code.cyan(),
-                    e
-                );
-                error_count += 1;
-                continue;
-            }
-        };
-
-        let expires_at = if let Some(expire_str) = serializable_link.expires_at {
-            match chrono::DateTime::parse_from_rfc3339(&expire_str) {
-                Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
-                Err(e) => {
-                    println!(
-                        "{} Skipping code '{}': failed to parse expiration - {}",
-                        "✗".bold().red(),
-                        serializable_link.short_code.cyan(),
-                        e
-                    );
-                    error_count += 1;
-                    continue;
-                }
-            }
-        } else {
-            None
-        };
-
         // 验证URL格式
-        if !serializable_link.target_url.starts_with("http://")
-            && !serializable_link.target_url.starts_with("https://")
+        if !imported_link.target.starts_with("http://")
+            && !imported_link.target.starts_with("https://")
         {
             println!(
                 "{} Skipping code '{}': invalid URL - {}",
                 "✗".bold().red(),
-                serializable_link.short_code.cyan(),
-                serializable_link.target_url
+                imported_link.code.cyan(),
+                imported_link.target
             );
             error_count += 1;
             continue;
         }
 
-        let link = ShortLink {
-            code: serializable_link.short_code.clone(),
-            target: serializable_link.target_url.clone(),
-            created_at,
-            expires_at,
-        };
-
-        match storage.set(link).await {
+        // 直接使用导入的链接，因为它已经是完整的 ShortLink 结构
+        match storage.set(imported_link.clone()).await {
             Ok(_) => {
                 imported_count += 1;
                 println!(
                     "{} Imported: {} -> {}",
                     "✓".bold().green(),
-                    serializable_link.short_code.cyan(),
-                    serializable_link.target_url.blue().underline()
+                    imported_link.code.cyan(),
+                    imported_link.target.blue().underline()
                 );
             }
             Err(e) => {
                 println!(
                     "{} Failed to import '{}': {}",
                     "✗".bold().red(),
-                    serializable_link.short_code.cyan(),
+                    imported_link.code.cyan(),
                     e
                 );
                 error_count += 1;

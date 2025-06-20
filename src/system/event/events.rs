@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use tracing::{warn, error};
+use tracing::{error, warn};
 
 /// 事件类型枚举，定义系统中可能发生的各种事件
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -71,10 +71,10 @@ pub enum EventPayload {
 pub trait EventHandler: Send + Sync {
     /// 处理事件的异步方法
     async fn handle(&self, event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-    
+
     /// 获取处理器名称
     fn name(&self) -> &str;
-    
+
     /// 获取感兴趣的事件类型
     fn interested_events(&self) -> Vec<EventType>;
 }
@@ -95,7 +95,7 @@ impl EventBus {
     /// 创建新的事件总线
     pub fn new(max_history: usize) -> Self {
         let (sender, _) = broadcast::channel(1000);
-        
+
         Self {
             handlers: Arc::new(Mutex::new(HashMap::new())),
             sender,
@@ -107,7 +107,7 @@ impl EventBus {
     /// 注册事件处理器
     pub fn register_handler(&self, handler: Arc<dyn EventHandler>) {
         let mut handlers = self.handlers.lock().unwrap();
-        
+
         for event_type in handler.interested_events() {
             handlers
                 .entry(event_type)
@@ -117,12 +117,15 @@ impl EventBus {
     }
 
     /// 发布事件
-    pub async fn publish(&self, event: Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn publish(
+        &self,
+        event: Event,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 添加到历史记录
         {
             let mut history = self.history.lock().unwrap();
             history.push(event.clone());
-            
+
             // 保持历史记录在限制范围内
             if history.len() > self.max_history {
                 history.remove(0);
@@ -248,7 +251,12 @@ impl Event {
     }
 
     /// 创建短链接访问事件
-    pub fn shortlink_accessed(code: &str, client_ip: Option<&str>, user_agent: Option<&str>, source: &str) -> Self {
+    pub fn shortlink_accessed(
+        code: &str,
+        client_ip: Option<&str>,
+        user_agent: Option<&str>,
+        source: &str,
+    ) -> Self {
         EventBuilder::new(EventType::ShortLinkAccessed, source)
             .with_payload(EventPayload::Access {
                 code: code.to_string(),
@@ -297,7 +305,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl EventHandler for TestHandler {
-        async fn handle(&self, _event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        async fn handle(
+            &self,
+            _event: &Event,
+        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             self.counter.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
@@ -314,12 +325,12 @@ mod tests {
     #[tokio::test]
     async fn test_event_bus() {
         let event_bus = EventBus::new(100);
-        
+
         let handler = Arc::new(TestHandler::new(
             "test_handler",
             vec![EventType::ShortLinkCreated, EventType::ShortLinkDeleted],
         ));
-        
+
         event_bus.register_handler(handler.clone());
 
         // 测试发布事件

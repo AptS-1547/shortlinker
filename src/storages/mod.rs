@@ -16,7 +16,7 @@ pub mod click;
 pub mod models;
 pub mod register;
 
-pub use models::{CachePreference, SerializableShortLink, ShortLink};
+pub use models::{CachePreference, ShortLink};
 use register::get_storage_plugin;
 
 #[async_trait::async_trait]

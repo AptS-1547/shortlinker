@@ -44,6 +44,7 @@ impl CliParser {
 
         let mut force_overwrite = false;
         let mut expire_time: Option<String> = None;
+        let mut password: Option<String> = None;
         let mut positional_args = Vec::new();
 
         let mut i = 0;
@@ -60,6 +61,16 @@ impl CliParser {
                     } else {
                         return Err(CliError::ParseError(
                             "--expire requires a time argument".to_string(),
+                        ));
+                    }
+                }
+                "--password" => {
+                    if i + 1 < args.len() {
+                        password = Some(args[i + 1].clone());
+                        i += 2;
+                    } else {
+                        return Err(CliError::ParseError(
+                            "--password requires a password argument".to_string(),
                         ));
                     }
                 }
@@ -85,6 +96,7 @@ impl CliParser {
             target_url,
             force_overwrite,
             expire_time,
+            password,
         })
     }
 
@@ -110,8 +122,9 @@ impl CliParser {
         let short_code = args[0].clone();
         let target_url = args[1].clone();
         let mut expire_time = None;
+        let mut password = None;
 
-        // Parse optional expire time argument
+        // Parse optional arguments
         let mut i = 2;
         while i < args.len() {
             match args[i].as_str() {
@@ -122,6 +135,16 @@ impl CliParser {
                     } else {
                         return Err(CliError::ParseError(
                             "--expire requires a time argument".to_string(),
+                        ));
+                    }
+                }
+                "--password" => {
+                    if i + 1 < args.len() {
+                        password = Some(args[i + 1].clone());
+                        i += 2;
+                    } else {
+                        return Err(CliError::ParseError(
+                            "--password requires a password argument".to_string(),
                         ));
                     }
                 }
@@ -138,6 +161,7 @@ impl CliParser {
             short_code,
             target_url,
             expire_time,
+            password,
         })
     }
 

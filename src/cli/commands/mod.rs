@@ -17,6 +17,7 @@ pub enum Command {
         target_url: String,
         force_overwrite: bool,
         expire_time: Option<String>,
+        password: Option<String>,
     },
     Remove {
         short_code: String,
@@ -25,6 +26,7 @@ pub enum Command {
         short_code: String,
         target_url: String,
         expire_time: Option<String>,
+        password: Option<String>,
     },
     Export {
         file_path: Option<String>,
@@ -48,6 +50,7 @@ impl Command {
                 target_url,
                 force_overwrite,
                 expire_time,
+                password,
             } => {
                 add_link(
                     storage,
@@ -55,6 +58,7 @@ impl Command {
                     target_url,
                     force_overwrite,
                     expire_time,
+                    password,
                 )
                 .await
             }
@@ -62,7 +66,8 @@ impl Command {
                 short_code,
                 target_url,
                 expire_time,
-            } => update_link(storage, short_code, target_url, expire_time).await,
+                password,
+            } => update_link(storage, short_code, target_url, expire_time, password).await,
             Command::Remove { short_code } => remove_link(storage, short_code).await,
             Command::Export { file_path } => export_links(storage, file_path).await,
             Command::Import {

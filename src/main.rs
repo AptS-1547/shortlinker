@@ -12,11 +12,11 @@ mod storages;
 mod system;
 mod utils;
 
-use crate::system::lifetime;
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
 };
+use crate::system::lifetime;
 
 // 配置结构体
 #[derive(Clone, Debug)]

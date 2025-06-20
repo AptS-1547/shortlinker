@@ -73,7 +73,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     cache.load_cache(links.clone()).await;
     debug!("L1/L2 cache initialized with {} links", links.len());
 
-    system::setup_reload_mechanism(cache.clone(), storage.clone());
+    system::setup_reload_mechanism(cache.clone(), storage.clone()).await;
 
     // 提取路由配置
     let route_config = RouteConfig {

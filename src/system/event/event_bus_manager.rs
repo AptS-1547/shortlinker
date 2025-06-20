@@ -1,6 +1,6 @@
-use std::sync::Arc;
-use once_cell::sync::Lazy;
 use crate::system::event::{EventBus, EventHandler};
+use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 /// 全局事件总线实例
 /// 使用 Lazy 确保线程安全的单例模式
@@ -38,7 +38,7 @@ impl EventBusManager {
             .take(5)
             .map(|e| format!("{:?} from {}", e.event_type, e.source))
             .collect();
-        
+
         (count, recent_events)
     }
 }
@@ -47,7 +47,10 @@ impl EventBusManager {
 #[macro_export]
 macro_rules! publish_event {
     ($event:expr) => {
-        if let Err(e) = $crate::system::event::event_bus_manager::GLOBAL_EVENT_BUS.publish($event).await {
+        if let Err(e) = $crate::system::event::event_bus_manager::GLOBAL_EVENT_BUS
+            .publish($event)
+            .await
+        {
             tracing::error!("Failed to publish event: {}", e);
         }
     };
@@ -57,7 +60,9 @@ macro_rules! publish_event {
 #[macro_export]
 macro_rules! publish_shortlink_created {
     ($code:expr, $target:expr, $source:expr) => {
-        $crate::publish_event!($crate::system::event::Event::shortlink_created($code, $target, $source));
+        $crate::publish_event!($crate::system::event::Event::shortlink_created(
+            $code, $target, $source
+        ));
     };
 }
 
@@ -65,7 +70,9 @@ macro_rules! publish_shortlink_created {
 #[macro_export]
 macro_rules! publish_shortlink_deleted {
     ($code:expr, $source:expr) => {
-        $crate::publish_event!($crate::system::event::Event::shortlink_deleted($code, $source));
+        $crate::publish_event!($crate::system::event::Event::shortlink_deleted(
+            $code, $source
+        ));
     };
 }
 
@@ -73,7 +80,9 @@ macro_rules! publish_shortlink_deleted {
 #[macro_export]
 macro_rules! publish_shortlink_updated {
     ($code:expr, $target:expr, $source:expr) => {
-        $crate::publish_event!($crate::system::event::Event::shortlink_updated($code, $target, $source));
+        $crate::publish_event!($crate::system::event::Event::shortlink_updated(
+            $code, $target, $source
+        ));
     };
 }
 
@@ -81,7 +90,12 @@ macro_rules! publish_shortlink_updated {
 #[macro_export]
 macro_rules! publish_shortlink_accessed {
     ($code:expr, $client_ip:expr, $user_agent:expr, $source:expr) => {
-        $crate::publish_event!($crate::system::event::Event::shortlink_accessed($code, $client_ip, $user_agent, $source));
+        $crate::publish_event!($crate::system::event::Event::shortlink_accessed(
+            $code,
+            $client_ip,
+            $user_agent,
+            $source
+        ));
     };
 }
 
@@ -93,10 +107,10 @@ mod tests {
     #[tokio::test]
     async fn test_global_event_bus() {
         let event_bus = EventBusManager::instance();
-        
+
         let event = Event::shortlink_created("test", "https://test.com", "test");
         event_bus.publish(event).await.unwrap();
-        
+
         let (count, _) = EventBusManager::get_history_stats();
         assert!(count > 0);
     }
@@ -107,15 +121,15 @@ mod tests {
         let code = "test123";
         let target = "https://example.com";
         let source = "test";
-        
+
         publish_shortlink_created!(code, target, source);
         publish_shortlink_updated!(code, "https://new-example.com", source);
         publish_shortlink_accessed!(code, Some("127.0.0.1"), Some("test-agent"), source);
         publish_shortlink_deleted!(code, source);
-        
+
         // 等待事件处理
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        
+
         let (count, _) = EventBusManager::get_history_stats();
         assert!(count >= 4);
     }

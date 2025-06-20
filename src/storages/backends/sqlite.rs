@@ -56,23 +56,14 @@ impl SqliteStorage {
                 short_code TEXT PRIMARY KEY,
                 target_url TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                expires_at TEXT
+                expires_at TEXT,
+                password TEXT,
+                click_count INTEGER DEFAULT 0 CHECK (click_count >= 0)
             )",
         )
         .execute(&self.pool)
         .await
         .map_err(|e| ShortlinkerError::database_operation(format!("创建表失败: {}", e)))?;
-
-        sqlx::query(
-            "CREATE TABLE IF NOT EXISTS links_meta (
-                short_code TEXT PRIMARY KEY,
-                click_count INTEGER DEFAULT 0,
-                FOREIGN KEY (short_code) REFERENCES short_links(short_code) ON DELETE CASCADE
-            )",
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("创建元信息表失败: {}", e)))?;
 
         // 为过期时间添加索引，用于快速查找过期链接
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_expires_at ON short_links(expires_at)")
@@ -98,6 +89,8 @@ impl SqliteStorage {
         target_url: String,
         created_at: String,
         expires_at: Option<String>,
+        password: Option<String>,
+        click_count: usize,
     ) -> Result<ShortLink> {
         let created_at = chrono::DateTime::parse_from_rfc3339(&created_at)
             .map_err(|e| ShortlinkerError::date_parse(format!("创建时间解析失败: {}", e)))?
@@ -114,6 +107,8 @@ impl SqliteStorage {
             target: target_url,
             created_at,
             expires_at,
+            password,
+            click: click_count,
         })
     }
 }
@@ -122,7 +117,9 @@ impl SqliteStorage {
 impl Storage for SqliteStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
         let result = sqlx::query(
-            "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = ?"
+            "SELECT short_code, target_url, created_at, expires_at, password, click_count
+             FROM short_links 
+             WHERE short_code = ?",
         )
         .bind(code)
         .fetch_optional(&self.pool)
@@ -134,8 +131,17 @@ impl Storage for SqliteStorage {
                 let target_url: String = row.get("target_url");
                 let created_at: String = row.get("created_at");
                 let expires_at: Option<String> = row.get("expires_at");
+                let password: Option<String> = row.get("password");
+                let click_count: i64 = row.get("click_count");
 
-                match Self::shortlink_from_row(short_code, target_url, created_at, expires_at) {
+                match Self::shortlink_from_row(
+                    short_code,
+                    target_url,
+                    created_at,
+                    expires_at,
+                    password,
+                    click_count.max(0) as usize,
+                ) {
                     Ok(link) => Some(link),
                     Err(e) => {
                         error!("Failed to parse short link data: {}", e);
@@ -156,10 +162,12 @@ impl Storage for SqliteStorage {
     async fn load_all(&self) -> HashMap<String, ShortLink> {
         let mut links = HashMap::new();
 
-        let result =
-            sqlx::query("SELECT short_code, target_url, created_at, expires_at FROM short_links")
-                .fetch_all(&self.pool)
-                .await;
+        let result = sqlx::query(
+            "SELECT short_code, target_url, created_at, expires_at, password, click_count
+             FROM short_links",
+        )
+        .fetch_all(&self.pool)
+        .await;
 
         match result {
             Ok(rows) => {
@@ -168,12 +176,16 @@ impl Storage for SqliteStorage {
                     let target_url: String = row.get("target_url");
                     let created_at: String = row.get("created_at");
                     let expires_at: Option<String> = row.get("expires_at");
+                    let password: Option<String> = row.get("password");
+                    let click_count: i64 = row.get("click_count");
 
                     match Self::shortlink_from_row(
                         short_code.clone(),
                         target_url,
                         created_at,
                         expires_at,
+                        password,
+                        click_count.max(0) as usize,
                     ) {
                         Ok(link) => {
                             links.insert(short_code, link);
@@ -216,10 +228,11 @@ impl Storage for SqliteStorage {
         if exists {
             // 更新现有记录
             sqlx::query(
-                "UPDATE short_links SET target_url = ?, expires_at = ? WHERE short_code = ?",
+                "UPDATE short_links SET target_url = ?, expires_at = ?, password = ? WHERE short_code = ?",
             )
             .bind(&link.target)
             .bind(&expires_at)
+            .bind(&link.password)
             .bind(&link.code)
             .execute(&mut *tx)
             .await
@@ -229,25 +242,18 @@ impl Storage for SqliteStorage {
         } else {
             // 插入新记录
             sqlx::query(
-                "INSERT INTO short_links (short_code, target_url, created_at, expires_at) VALUES (?, ?, ?, ?)"
+                "INSERT INTO short_links (short_code, target_url, created_at, expires_at, password, click_count) VALUES (?, ?, ?, ?, ?, 0)"
             )
             .bind(&link.code)
             .bind(&link.target)
             .bind(&created_at)
             .bind(&expires_at)
+            .bind(&link.password)
             .execute(&mut *tx)
             .await
             .map_err(|e| {
                 ShortlinkerError::database_operation(format!("插入短链接失败: {}", e))
             })?;
-
-            sqlx::query("INSERT INTO links_meta (short_code, click_count) VALUES (?, 0)")
-                .bind(&link.code)
-                .execute(&mut *tx)
-                .await
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("插入点击元信息失败: {}", e))
-                })?;
 
             info!("Short link created: {}", link.code);
         }
@@ -338,13 +344,10 @@ impl ClickSink for SqliteStorage {
 
         for (code, count) in updates {
             if let Err(e) = sqlx::query(
-                "INSERT INTO links_meta (short_code, click_count)
-                    VALUES (?, ?)
-                    ON CONFLICT(short_code) DO UPDATE SET click_count = click_count + ?",
+                "UPDATE short_links SET click_count = click_count + ? WHERE short_code = ?",
             )
+            .bind(count as i64)
             .bind(&code)
-            .bind(count as i64)
-            .bind(count as i64)
             .execute(&mut *tx)
             .await
             {

@@ -6,20 +6,13 @@ pub struct CachePreference {
     pub l2: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortLink {
     pub code: String,
     pub target: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SerializableShortLink {
-    pub short_code: String,
-    pub target_url: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
+    pub password: Option<String>,
 
     #[serde(default)]
     pub click: usize,

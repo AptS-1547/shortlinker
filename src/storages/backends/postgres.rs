@@ -47,7 +47,8 @@ impl PostgresStorage {
                 target_url TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL,
                 expires_at TIMESTAMPTZ,
-                click_count BIGINT DEFAULT 0
+                password TEXT,
+                click_count BIGINT DEFAULT 0 CHECK (click_count >= 0)
             )",
         )
         .execute(&self.pool)
@@ -62,12 +63,16 @@ impl PostgresStorage {
         target_url: String,
         created_at: DateTime<Utc>,
         expires_at: Option<DateTime<Utc>>,
+        password: Option<String>,
+        click_count: u64,
     ) -> ShortLink {
         ShortLink {
             code: short_code,
             target: target_url,
             created_at,
             expires_at,
+            password,
+            click: click_count as usize, // 将 u64 转换为 usize
         }
     }
 }
@@ -88,9 +93,16 @@ impl Storage for PostgresStorage {
                 let target_url: String = row.get("target_url");
                 let created_at: DateTime<Utc> = row.get("created_at");
                 let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
+                let password: Option<String> = row.get("password");
+                let click_count: i64 = row.get("click_count");
 
                 Some(Self::shortlink_from_row(
-                    short_code, target_url, created_at, expires_at,
+                    short_code,
+                    target_url,
+                    created_at,
+                    expires_at,
+                    password,
+                    click_count as u64, // 将 i64 转换为 u64
                 ))
             }
             Ok(None) => None,
@@ -114,12 +126,16 @@ impl Storage for PostgresStorage {
                     let target_url: String = row.get("target_url");
                     let created_at: DateTime<Utc> = row.get("created_at");
                     let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
+                    let password: Option<String> = row.get("password");
+                    let click_count: i64 = row.get("click_count");
 
                     let link = Self::shortlink_from_row(
                         short_code.clone(),
                         target_url,
                         created_at,
                         expires_at,
+                        password,
+                        click_count as u64, // 将 i64 转换为 u64
                     );
                     result.insert(short_code, link);
                 }

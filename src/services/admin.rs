@@ -18,14 +18,6 @@ pub struct LoginCredentials {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SerializableShortLink {
-    pub short_code: String,
-    pub target_url: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApiResponse<T> {
     pub code: i32,
     pub data: T,
@@ -36,6 +28,7 @@ pub struct PostNewLink {
     pub code: Option<String>,
     pub target: String,
     pub expires_at: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -61,6 +54,29 @@ pub struct PaginationInfo {
     pub page_size: usize,
     pub total: usize,
     pub total_pages: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LinkResponse {
+    pub code: String,
+    pub target: String,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+    pub password: Option<String>,
+    pub click_count: usize,
+}
+
+impl From<ShortLink> for LinkResponse {
+    fn from(link: ShortLink) -> Self {
+        Self {
+            code: link.code,
+            target: link.target,
+            created_at: link.created_at.to_rfc3339(),
+            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+            password: link.password,
+            click_count: link.click,
+        }
+    }
 }
 
 static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
@@ -103,15 +119,6 @@ impl AdminService {
         })
     }
 
-    fn to_serializable_link(code: String, link: ShortLink) -> SerializableShortLink {
-        SerializableShortLink {
-            short_code: code,
-            target_url: link.target,
-            created_at: link.created_at.to_rfc3339(),
-            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-        }
-    }
-
     pub async fn get_all_links(
         _req: HttpRequest,
         query: web::Query<GetLinksQuery>,
@@ -136,12 +143,15 @@ impl AdminService {
         let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
         let total_pages = total.div_ceil(page_size);
 
-        let paginated_links = Self::paginate_links(filtered_links, page, page_size);
-        let serializable_links = Self::serialize_links(paginated_links);
+        let paginated_links: Vec<LinkResponse> =
+            Self::paginate_links(filtered_links, page, page_size)
+                .into_iter()
+                .map(|(_, link)| LinkResponse::from(link))
+                .collect();
 
         info!(
             "Admin API: returning {} links (page {} of {}, total: {})",
-            serializable_links.len(),
+            paginated_links.len(),
             page,
             total_pages,
             total
@@ -151,7 +161,7 @@ impl AdminService {
             .append_header(("Content-Type", "application/json; charset=utf-8"))
             .json(PaginatedResponse {
                 code: 0,
-                data: serializable_links,
+                data: paginated_links,
                 pagination: PaginationInfo {
                     page,
                     page_size,
@@ -217,13 +227,6 @@ impl AdminService {
         }
     }
 
-    fn serialize_links(links: Vec<(String, ShortLink)>) -> Vec<SerializableShortLink> {
-        links
-            .into_iter()
-            .map(|(code, link)| Self::to_serializable_link(code, link))
-            .collect()
-    }
-
     pub async fn post_link(
         _req: HttpRequest,
         mut link: web::Json<PostNewLink>,
@@ -265,6 +268,8 @@ impl AdminService {
             target: link.target.clone(),
             created_at: chrono::Utc::now(),
             expires_at,
+            password: link.password.clone(),
+            click: 0,
         };
 
         match storage.set(new_link.clone()).await {
@@ -279,6 +284,7 @@ impl AdminService {
                             code: Some(new_link.code),
                             target: new_link.target,
                             expires_at: link.expires_at.clone(),
+                            password: new_link.password,
                         },
                     }))
             }
@@ -304,11 +310,7 @@ impl AdminService {
         info!("Admin API: get link request - code: {}", code);
 
         match storage.get(&code).await {
-            Some(link) => {
-                info!("Admin API: link retrieved - {}", code);
-                let serializable_link = Self::to_serializable_link(code.to_string(), link);
-                Ok(Self::success_response(serializable_link))
-            }
+            Some(link) => Ok(Self::success_response(LinkResponse::from(link))),
             None => {
                 info!("Admin API: link not found - {}", code);
                 Ok(Self::error_response(
@@ -387,6 +389,13 @@ impl AdminService {
             target: link.target.clone(),
             created_at: existing_link.created_at,
             expires_at,
+            // 如果请求中提供了密码字段，则使用新密码；否则保持原密码
+            password: if link.password.is_some() {
+                link.password.clone()
+            } else {
+                existing_link.password
+            },
+            click: existing_link.click, // 保持原有的点击计数
         };
 
         match storage.set(updated_link.clone()).await {
@@ -397,6 +406,7 @@ impl AdminService {
                     code: Some(updated_link.code),
                     target: updated_link.target,
                     expires_at: updated_link.expires_at.map(|dt| dt.to_rfc3339()),
+                    password: updated_link.password,
                 }))
             }
             Err(e) => {
