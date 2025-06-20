@@ -1,5 +1,5 @@
 use std::fs;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 // Unix平台的PID文件管理
 #[cfg(unix)]
@@ -8,6 +8,7 @@ pub fn init_lockfile() -> Result<(), std::io::Error> {
     use nix::unistd::Pid;
     use std::path::Path;
     use std::process;
+    use tracing::debug;
 
     let pid_file = "shortlinker.pid";
 
