@@ -33,11 +33,8 @@ impl RedisObjectCache {
         );
 
         let client = redis::Client::open(redis_url.clone())
-            .map_err(|e| {
-                error!("Failed to create Redis client: {}", e);
-                e
-            })
-            .ok();
+            .expect("Failed to create Redis client. Check REDIS_URL.")
+            .into();
 
         Self {
             client,
@@ -88,8 +85,10 @@ impl ObjectCache for RedisObjectCache {
             }
         };
 
-        match conn.get::<String, String>(redis_key).await {
-            Ok(data) => {
+        let result: redis::RedisResult<Option<String>> = conn.get(redis_key).await;
+
+        match result {
+            Ok(Some(data)) => {
                 match self.deserialize_link(&data).await {
                     Ok(link) => {
                         debug!("Successfully retrieved key: {}", key);
@@ -101,14 +100,13 @@ impl ObjectCache for RedisObjectCache {
                     }
                 }
             }
+            Ok(None) => {
+                debug!("Key not found in cache: {}", key);
+                CacheResult::NotFound
+            }
             Err(e) => {
-                if e.kind() == redis::ErrorKind::ResponseError && e.to_string().contains("nil") {
-                    debug!("Key not found in cache: {}", key);
-                    CacheResult::NotFound
-                } else {
-                    error!("Failed to get key '{}': {}", key, e);
-                    CacheResult::ExistsButNoValue
-                }
+                error!("Failed to get key '{}': {}", key, e);
+                CacheResult::ExistsButNoValue
             }
         }
     }
