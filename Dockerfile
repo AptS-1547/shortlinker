@@ -72,7 +72,7 @@ EXPOSE 8080
 ENV DOCKER_ENV=1
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
-ENV DATABASE_URL=sqlite:///data/shortlinker.db
+ENV DATABASE_URL=/data/shortlinker.db
 ENV RUST_LOG=info
 
 # 启动命令
