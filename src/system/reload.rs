@@ -1,7 +1,6 @@
 use crate::cache::{traits::BloomConfig, CompositeCacheTrait};
 use crate::storages::Storage;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
 
 pub async fn reload_all(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
@@ -34,33 +33,20 @@ pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) {
-    use signal_hook::consts::SIGUSR1;
-    use signal_hook_tokio::{Signals, SignalsInfo};
-    use tokio_stream::StreamExt;
-
-    let signals = Signals::new([SIGUSR1]).expect("Failed to create signal handler");
-    let handle = signals.handle();
-
-    let mut signals = signals.map(|signal| SignalsInfo::from(signal));
+    use tokio::signal::unix::{signal, SignalKind};
 
     tokio::spawn(async move {
-        while let Some(signal) = signals.next().await {
-            match signal {
-                SignalsInfo::Signal(SIGUSR1) => {
-                    tracing::info!("Received SIGUSR1, reloading...");
+        let mut stream = signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
 
-                    if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
-                        tracing::error!("Reload failed: {}", e);
-                    } else {
-                        tracing::info!("Reload successful");
-                    }
-                }
-                _ => {}
+        while let Some(_) = stream.recv().await {
+            tracing::info!("Received SIGUSR1, reloading...");
+
+            if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
+                tracing::error!("Reload failed: {}", e);
+            } else {
+                tracing::info!("Reload successful");
             }
         }
-
-        // 清理信号处理器
-        handle.close();
     });
 }
 
@@ -72,6 +58,7 @@ pub async fn setup_reload_mechanism(
 ) {
     use std::time::SystemTime;
     use tokio::fs;
+    use tokio::time::{sleep, Duration};
 
     let reload_file = "shortlinker.reload";
     let mut last_check = SystemTime::now();
