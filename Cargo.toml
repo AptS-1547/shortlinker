@@ -57,6 +57,7 @@ tracing-attributes = "0.1.29"
 anyhow = "1.0.98"
 rust-embed = "8.7.2"
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite", "postgres", "mysql", "chrono"] }
+uuid = { version = "1.0", features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
