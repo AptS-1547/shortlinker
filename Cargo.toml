@@ -62,6 +62,9 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite",
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
 nix = { version = "0.26", default-features = false, features = ["signal", "process"] }
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["fileapi", "handleapi", "namedpipeapi", "winbase", "winnt", "winerror", "errhandlingapi"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 actix-rt = "2.9"

@@ -1,10 +1,8 @@
 mod help;
 mod link_management;
-mod server;
 
 pub use help::*;
 pub use link_management::*;
-pub use server::*;
 
 use super::CliError;
 use crate::storages::Storage;
@@ -13,9 +11,6 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub enum Command {
     Help,
-    Start,
-    Stop,
-    Restart,
     List,
     Add {
         short_code: Option<String>,
@@ -47,9 +42,6 @@ impl Command {
                 show_help();
                 Ok(())
             }
-            Command::Start => start_server(),
-            Command::Stop => stop_server(),
-            Command::Restart => restart_server(),
             Command::List => list_links(storage).await,
             Command::Add {
                 short_code,

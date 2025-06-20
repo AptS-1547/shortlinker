@@ -20,12 +20,8 @@ impl CliParser {
         if args.len() < 2 {
             return Err(CliError::ParseError("No command provided".to_string()));
         }
-
         match args[1].as_str() {
             "help" | "--help" | "-h" => Ok(Command::Help),
-            "start" => Ok(Command::Start),
-            "stop" => Ok(Command::Stop),
-            "restart" => Ok(Command::Restart),
             "list" => Ok(Command::List),
             "add" => self.parse_add_command(&args[2..]),
             "remove" => self.parse_remove_command(&args[2..]),
