@@ -8,7 +8,7 @@ pub async fn reload_all(
     storage: Arc<dyn Storage + 'static>,
 ) -> anyhow::Result<()> {
     tracing::info!("Starting reload process...");
-    
+
     // 重新加载存储
     storage.reload().await?;
     let links = storage.load_all().await;
@@ -38,18 +38,17 @@ pub async fn setup_reload_mechanism(
     use signal_hook_tokio::{Signals, SignalsInfo};
     use tokio_stream::StreamExt;
 
-    let signals = Signals::new([SIGUSR1])
-        .expect("Failed to create signal handler");
+    let signals = Signals::new([SIGUSR1]).expect("Failed to create signal handler");
     let handle = signals.handle();
-    
+
     let mut signals = signals.map(|signal| SignalsInfo::from(signal));
-    
+
     tokio::spawn(async move {
         while let Some(signal) = signals.next().await {
             match signal {
                 SignalsInfo::Signal(SIGUSR1) => {
                     tracing::info!("Received SIGUSR1, reloading...");
-                    
+
                     if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
                         tracing::error!("Reload failed: {}", e);
                     } else {
@@ -59,7 +58,7 @@ pub async fn setup_reload_mechanism(
                 _ => {}
             }
         }
-        
+
         // 清理信号处理器
         handle.close();
     });
@@ -71,8 +70,8 @@ pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) {
-    use tokio::fs;
     use std::time::SystemTime;
+    use tokio::fs;
 
     let reload_file = "shortlinker.reload";
     let mut last_check = SystemTime::now();
@@ -82,7 +81,7 @@ pub async fn setup_reload_mechanism(
         loop {
             // 使用异步睡眠
             sleep(check_interval).await;
-            
+
             // 使用异步文件操作
             match fs::metadata(reload_file).await {
                 Ok(metadata) => {
@@ -90,12 +89,12 @@ pub async fn setup_reload_mechanism(
                         Ok(modified) => {
                             if modified > last_check {
                                 tracing::info!("Reload request detected, reloading...");
-                                
+
                                 match reload_all(cache.clone(), storage.clone()).await {
                                     Ok(_) => {
                                         tracing::info!("Reload successful");
                                         last_check = SystemTime::now();
-                                        
+
                                         // 异步删除文件
                                         if let Err(e) = fs::remove_file(reload_file).await {
                                             tracing::warn!("Failed to remove reload file: {}", e);

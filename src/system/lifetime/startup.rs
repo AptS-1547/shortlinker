@@ -35,6 +35,10 @@ pub async fn prepare_server_startup() -> StartupContext {
 
     crate::system::lockfile::init_lockfile().expect("Failed to initialize lockfile");
 
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     if cfg!(debug_assertions) {
         crate::storages::register::debug_storage_registry();
         crate::cache::register::debug_cache_registry();
