@@ -1,6 +1,5 @@
 pub mod commands;
 pub mod parser;
-pub mod process_manager;
 
 use crate::storages::StorageFactory;
 use colored::*;
@@ -13,7 +12,6 @@ pub enum CliError {
     StorageError(String),
     ParseError(String),
     CommandError(String),
-    ProcessError(String),
 }
 
 impl fmt::Display for CliError {
@@ -22,7 +20,6 @@ impl fmt::Display for CliError {
             CliError::StorageError(msg) => write!(f, "Storage error: {}", msg),
             CliError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             CliError::CommandError(msg) => write!(f, "Command error: {}", msg),
-            CliError::ProcessError(msg) => write!(f, "Process error: {}", msg),
         }
     }
 }

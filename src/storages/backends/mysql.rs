@@ -81,7 +81,8 @@ impl MySqlStorage {
                 target_url TEXT NOT NULL,
                 created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 expires_at TIMESTAMP(6) NULL,
-                click_count BIGINT DEFAULT 0,
+                password VARCHAR(255) NULL,
+                click_count BIGINT UNSIGNED DEFAULT 0,
                 INDEX idx_expires_at (expires_at),
                 INDEX idx_created_at (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
@@ -98,12 +99,16 @@ impl MySqlStorage {
         target_url: String,
         created_at: DateTime<Utc>,
         expires_at: Option<DateTime<Utc>>,
+        password: Option<String>,
+        click_count: u64,
     ) -> ShortLink {
         ShortLink {
             code: short_code,
             target: target_url,
             created_at,
             expires_at,
+            password,
+            click: click_count as usize, // 默认点击量为0
         }
     }
 }
@@ -124,9 +129,16 @@ impl Storage for MySqlStorage {
                 let target_url: String = row.get("target_url");
                 let created_at: DateTime<Utc> = row.get("created_at");
                 let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
+                let password: Option<String> = row.get("password");
+                let click_count: u64 = row.get("click_count");
 
                 Some(Self::shortlink_from_row(
-                    short_code, target_url, created_at, expires_at,
+                    short_code,
+                    target_url,
+                    created_at,
+                    expires_at,
+                    password,
+                    click_count,
                 ))
             }
             Ok(None) => None,
@@ -150,12 +162,16 @@ impl Storage for MySqlStorage {
                     let target_url: String = row.get("target_url");
                     let created_at: DateTime<Utc> = row.get("created_at");
                     let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
+                    let password: Option<String> = row.get("password");
+                    let click_count: u64 = row.get("click_count");
 
                     let link = Self::shortlink_from_row(
                         short_code.clone(),
                         target_url,
                         created_at,
                         expires_at,
+                        password,
+                        click_count,
                     );
                     result.insert(short_code, link);
                 }
@@ -259,7 +275,7 @@ impl ClickSink for MySqlStorage {
             if let Err(e) = sqlx::query(
                 "UPDATE short_links SET click_count = click_count + ? WHERE short_code = ?",
             )
-            .bind(count as i64)
+            .bind(count as u64)
             .bind(&code)
             .execute(&mut *tx)
             .await

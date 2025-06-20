@@ -16,6 +16,7 @@ use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
 };
+use crate::system::lifetime;
 
 // 配置结构体
 #[derive(Clone, Debug)]
@@ -33,7 +34,7 @@ async fn main() -> std::io::Result<()> {
 
     // CLI Mode
     if args.len() > 1 {
-        system::startup::cli_pre_startup().await;
+        lifetime::startup::cli_pre_startup().await;
         cli::run_cli().await;
         return Ok(());
     }
@@ -59,7 +60,7 @@ async fn main() -> std::io::Result<()> {
         .with_ansi(true)
         .init();
 
-    let startup = system::startup::prepare_server_startup().await;
+    let startup = lifetime::startup::prepare_server_startup().await;
 
     let cache = startup.cache.clone();
     let storage = startup.storage.clone();
@@ -213,7 +214,7 @@ async fn main() -> std::io::Result<()> {
         res = server => {
             res?;
         }
-        _ = system::shutdown::listen_for_shutdown() => {
+        _ = lifetime::shutdown::listen_for_shutdown() => {
             warn!("Graceful shutdown: all tasks completed");
         }
     }

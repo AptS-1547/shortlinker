@@ -5,7 +5,7 @@ use tracing::{error, info};
 
 use async_trait::async_trait;
 
-use super::{CachePreference, SerializableShortLink, ShortLink, Storage};
+use super::{CachePreference, ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 use crate::storages::models::StorageConfig;
 
@@ -31,27 +31,25 @@ impl FileStorage {
 
     fn load_from_file(&self) -> Result<HashMap<String, ShortLink>> {
         match fs::read_to_string(&self.file_path) {
-            Ok(content) => match serde_json::from_str::<Vec<SerializableShortLink>>(&content) {
+            Ok(content) => match serde_json::from_str::<Vec<ShortLink>>(&content) {
                 Ok(links) => {
                     let mut map = HashMap::new();
                     for link in links {
-                        let created_at = chrono::DateTime::parse_from_rfc3339(&link.created_at)
-                            .unwrap_or_else(|_| chrono::Utc::now().into())
-                            .with_timezone(&chrono::Utc);
+                        let created_at = link.created_at;
 
-                        let expires_at = link.expires_at.and_then(|s| {
-                            chrono::DateTime::parse_from_rfc3339(&s)
-                                .map(|dt| dt.with_timezone(&chrono::Utc))
-                                .ok()
-                        });
+                        let expires_at = link.expires_at;
+
+                        let password = link.password.clone();
 
                         map.insert(
-                            link.short_code.clone(),
+                            link.code.clone(),
                             ShortLink {
-                                code: link.short_code,
-                                target: link.target_url,
-                                created_at,
-                                expires_at,
+                                code: link.code,
+                                target: link.target,
+                                created_at: created_at,
+                                expires_at: expires_at,
+                                password: password,
+                                click: 0, // 点击量暂时不处理
                             },
                         );
                     }
@@ -82,16 +80,7 @@ impl FileStorage {
     }
 
     fn save_to_file(&self, links: &HashMap<String, ShortLink>) -> Result<()> {
-        let links_vec: Vec<SerializableShortLink> = links
-            .iter()
-            .map(|(_, link)| SerializableShortLink {
-                short_code: link.code.clone(),
-                target_url: link.target.clone(),
-                created_at: link.created_at.to_rfc3339(),
-                expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-                click: 0, // 点击量暂时不存储
-            })
-            .collect();
+        let links_vec: Vec<ShortLink> = links.values().cloned().collect();
 
         let json = serde_json::to_string_pretty(&links_vec)?;
         fs::write(&self.file_path, json)?;
@@ -136,6 +125,8 @@ impl Storage for FileStorage {
                             target: link.target,
                             created_at,
                             expires_at: link.expires_at,
+                            password: link.password,
+                            click: 0, // 保持点击量
                         },
                     );
                 } else {

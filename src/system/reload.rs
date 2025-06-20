@@ -1,12 +1,13 @@
 use crate::cache::{traits::BloomConfig, CompositeCacheTrait};
 use crate::storages::Storage;
 use std::sync::Arc;
-use std::thread;
 
 pub async fn reload_all(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) -> anyhow::Result<()> {
+    tracing::info!("Starting reload process...");
+
     // 重新加载存储
     storage.reload().await?;
     let links = storage.load_all().await;
@@ -22,24 +23,25 @@ pub async fn reload_all(
     // 加载缓存
     cache.load_cache(links).await;
 
+    tracing::info!("Reload process completed successfully");
     Ok(())
 }
 
 // Unix平台的信号监听
 #[cfg(unix)]
-pub fn setup_reload_mechanism(
+pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) {
-    use signal_hook::{consts::SIGUSR1, iterator::Signals};
+    use tokio::signal::unix::{signal, SignalKind};
 
-    thread::spawn(move || {
-        let mut signals = Signals::new([SIGUSR1]).unwrap();
-        for _ in signals.forever() {
+    tokio::spawn(async move {
+        let mut stream = signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
+
+        while let Some(_) = stream.recv().await {
             tracing::info!("Received SIGUSR1, reloading...");
 
-            if let Err(e) = futures::executor::block_on(reload_all(cache.clone(), storage.clone()))
-            {
+            if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
                 tracing::error!("Reload failed: {}", e);
             } else {
                 tracing::info!("Reload successful");
@@ -50,36 +52,54 @@ pub fn setup_reload_mechanism(
 
 // Windows平台的文件监听
 #[cfg(windows)]
-pub fn setup_reload_mechanism(
+pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) {
-    use std::fs;
-    use std::time::{Duration, SystemTime};
+    use std::time::SystemTime;
+    use tokio::fs;
+    use tokio::time::{sleep, Duration};
 
-    thread::spawn(move || {
-        let reload_file = "shortlinker.reload";
-        let mut last_check = SystemTime::now();
+    let reload_file = "shortlinker.reload";
+    let mut last_check = SystemTime::now();
+    let check_interval = Duration::from_secs(3);
 
+    tokio::spawn(async move {
         loop {
-            thread::sleep(Duration::from_millis(3000));
+            // 使用异步睡眠
+            sleep(check_interval).await;
 
-            if let Ok(metadata) = fs::metadata(reload_file) {
-                if let Ok(modified) = metadata.modified() {
-                    if modified > last_check {
-                        tracing::info!("Reload request detected, reloading...");
+            // 使用异步文件操作
+            match fs::metadata(reload_file).await {
+                Ok(metadata) => {
+                    match metadata.modified() {
+                        Ok(modified) => {
+                            if modified > last_check {
+                                tracing::info!("Reload request detected, reloading...");
 
-                        if let Err(e) =
-                            futures::executor::block_on(reload_all(cache.clone(), storage.clone()))
-                        {
-                            tracing::error!("Reload failed: {}", e);
-                        } else {
-                            tracing::info!("Reload successful");
+                                match reload_all(cache.clone(), storage.clone()).await {
+                                    Ok(_) => {
+                                        tracing::info!("Reload successful");
+                                        last_check = SystemTime::now();
+
+                                        // 异步删除文件
+                                        if let Err(e) = fs::remove_file(reload_file).await {
+                                            tracing::warn!("Failed to remove reload file: {}", e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Reload failed: {}", e);
+                                    }
+                                }
+                            }
                         }
-
-                        last_check = SystemTime::now();
-                        let _ = fs::remove_file(reload_file);
+                        Err(e) => {
+                            tracing::debug!("Failed to get file modification time: {}", e);
+                        }
                     }
+                }
+                Err(_) => {
+                    // 文件不存在，这是正常情况
                 }
             }
         }

@@ -25,6 +25,8 @@ impl Storage for SledStorage {
             target: "http://example.com".to_string(),
             expires_at: None,
             created_at: chrono::Utc::now(),
+            password: None,
+            click: 0, // 默认点击量为0
         };
 
         Some(link)
@@ -40,6 +42,8 @@ impl Storage for SledStorage {
                 target: "http://example.com".to_string(),
                 expires_at: None,
                 created_at: chrono::Utc::now(),
+                password: None,
+                click: 0, // 默认点击量为0
             },
         );
 

@@ -65,4 +65,8 @@ pub fn show_help() {
         "  {}    set expiration (RFC3339 or relative time)",
         "--expire".yellow()
     );
+    println!(
+        "  {}  set password protection for the link",
+        "--password".yellow()
+    );
 }
