@@ -6,7 +6,6 @@ use tracing::{debug, warn};
 mod cache;
 mod cli;
 mod errors;
-mod event;
 mod middleware;
 mod services;
 mod storages;

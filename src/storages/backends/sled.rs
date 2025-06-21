@@ -70,4 +70,8 @@ impl Storage for SledStorage {
             support_click: true,
         }
     }
+
+    fn increment_click(&self, _code: &str) -> Result<()> {
+        Ok(())
+    }
 }

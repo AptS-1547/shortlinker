@@ -8,6 +8,7 @@ use sqlx::{PgPool, Row};
 use tracing::{debug, error, info, warn};
 
 use crate::errors::{Result, ShortlinkerError};
+use crate::storages::click::global::get_click_manager;
 use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
 use crate::storages::{CachePreference, ShortLink, Storage};
@@ -21,8 +22,9 @@ pub struct PostgresStorage {
 
 impl PostgresStorage {
     pub async fn new_async() -> Result<Self> {
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| ShortlinkerError::database_config("DATABASE_URL not set".to_string()))?;
+        let database_url = env::var("DATABASE_URL").map_err(|_| {
+            ShortlinkerError::database_connection("DATABASE_URL not set".to_string())
+        })?;
 
         // 创建连接池
         let pool = PgPool::connect(&database_url).await.map_err(|e| {
@@ -199,6 +201,16 @@ impl Storage for PostgresStorage {
         Self: Clone + Sized,
     {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
+    }
+
+    fn increment_click(&self, code: &str) -> Result<()> {
+        if let Some(manager) = get_click_manager() {
+            // 使用全局点击管理器增加点击计数
+            manager.increment(code);
+        } else {
+            warn!("Global ClickManager is not initialized, click count will not be incremented.");
+        }
+        Ok(())
     }
 
     fn preferred_cache(&self) -> CachePreference {

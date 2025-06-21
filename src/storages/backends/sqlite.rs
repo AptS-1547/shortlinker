@@ -10,6 +10,7 @@ use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
 use async_trait::async_trait;
 
+use crate::storages::click::global::get_click_manager;
 
 // 注册 SQLite 存储插件
 // 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
@@ -312,6 +313,16 @@ impl Storage for SqliteStorage {
         Self: Clone + Sized,
     {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
+    }
+
+    fn increment_click(&self, code: &str) -> Result<()> {
+        if let Some(manager) = get_click_manager() {
+            // 使用全局点击管理器增加点击计数
+            manager.increment(code);
+        } else {
+            warn!("Global ClickManager is not initialized, click count will not be incremented.");
+        }
+        Ok(())
     }
 
     fn preferred_cache(&self) -> CachePreference {
