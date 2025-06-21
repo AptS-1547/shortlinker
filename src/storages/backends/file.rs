@@ -191,10 +191,6 @@ impl Storage for FileStorage {
         }
     }
 
-    fn increment_click(&self, _code: &str) -> Result<()> {
-        Ok(())
-    }
-
     fn preferred_cache(&self) -> CachePreference {
         CachePreference {
             l1: "null".into(),
