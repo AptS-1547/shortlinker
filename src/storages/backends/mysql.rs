@@ -8,7 +8,6 @@ use sqlx::{MySqlPool, Row};
 use tracing::{debug, error, info, warn};
 
 use crate::errors::{Result, ShortlinkerError};
-use crate::storages::click::global::get_click_manager;
 use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
 use crate::storages::{CachePreference, ShortLink, Storage};
@@ -241,16 +240,6 @@ impl Storage for MySqlStorage {
         Self: Clone + Sized,
     {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
-    }
-
-    fn increment_click(&self, code: &str) -> Result<()> {
-        if let Some(manager) = get_click_manager() {
-            // 使用全局点击管理器增加点击计数
-            manager.increment(code);
-        } else {
-            warn!("Global ClickManager is not initialized, click count will not be incremented.");
-        }
-        Ok(())
     }
 
     fn preferred_cache(&self) -> CachePreference {

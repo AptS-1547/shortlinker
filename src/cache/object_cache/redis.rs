@@ -32,7 +32,7 @@ impl RedisObjectCache {
             key_prefix, ttl
         );
 
-        let client = redis::Client::open(redis_url.clone())
+        let client = redis::Client::open(redis_url)
             .expect("Failed to create Redis client. Check REDIS_URL.")
             .into();
 
