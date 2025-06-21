@@ -33,6 +33,8 @@ pub trait Storage: Send + Sync {
         None
     }
 
+    fn increment_click(&self, code: &str) -> Result<()>;
+
     /// 缓存首选项
     fn preferred_cache(&self) -> CachePreference {
         CachePreference {

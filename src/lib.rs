@@ -5,7 +5,6 @@
 pub mod cache;
 pub mod cli;
 pub mod errors;
-mod event;
 pub mod middleware;
 pub mod services;
 pub mod storages;
