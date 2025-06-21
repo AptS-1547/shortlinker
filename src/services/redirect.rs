@@ -8,8 +8,8 @@ use tracing::debug;
 
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
-use crate::storages::{ShortLink, Storage};
 use crate::storages::click::global::get_click_manager;
+use crate::storages::{ShortLink, Storage};
 
 static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
     std::env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string())
@@ -43,17 +43,17 @@ impl RedirectService {
     ) -> HttpResponse {
         match cache.get(&capture_path).await {
             CacheResult::Found(link) => {
-                Self::update_click(capture_path.clone()).await;
-                Self::finish_redirect(link).await
+                Self::update_click(capture_path.clone());
+                Self::finish_redirect(link)
             }
             CacheResult::ExistsButNoValue => {
                 debug!("L2 cache miss for path: {}", capture_path);
                 match storage.get(&capture_path).await {
                     Some(link) => {
-                        Self::update_click(capture_path.clone()).await;
+                        Self::update_click(capture_path.clone());
                         cache.insert(capture_path.clone(), link.clone()).await;
 
-                        Self::finish_redirect(link).await
+                        Self::finish_redirect(link)
                     }
                     None => {
                         debug!("Redirect link not found: {}", capture_path);
@@ -74,18 +74,20 @@ impl RedirectService {
         }
     }
 
-    async fn update_click(code: String) {
-        match get_click_manager() {
-            Some(manager) => {
-                manager.increment(&code).await;
+    fn update_click(code: String) {
+        tokio::spawn(async move {
+            match get_click_manager() {
+                Some(manager) => {
+                    manager.increment(&code);
+                }
+                None => {
+                    debug!("Click manager not initialized, skipping increment for code: {}", code);
+                }
             }
-            None => {
-                debug!("Click manager not initialized, skipping increment for code: {}", code);
-            }
-        }
+        });
     }
 
-    async fn finish_redirect(link: ShortLink) -> HttpResponse {
+    fn finish_redirect(link: ShortLink) -> HttpResponse {
         if let Some(expires_at) = link.expires_at {
             if expires_at < chrono::Utc::now() {
                 return HttpResponse::build(StatusCode::NOT_FOUND)

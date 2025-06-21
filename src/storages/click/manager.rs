@@ -29,7 +29,7 @@ impl ClickManager {
     }
 
     /// 增加点击计数（线程安全，无锁）
-    pub async fn increment(&self, key: &str) {
+    pub fn increment(&self, key: &str) {
         *CLICK_BUFFER.entry(key.to_string()).or_insert(0) += 1;
     }
 

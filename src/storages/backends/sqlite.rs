@@ -10,7 +10,6 @@ use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
 use async_trait::async_trait;
 
-
 // 注册 SQLite 存储插件
 // 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
 declare_storage_plugin!("sqlite", SqliteStorage);
