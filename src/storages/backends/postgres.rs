@@ -22,9 +22,8 @@ pub struct PostgresStorage {
 
 impl PostgresStorage {
     pub async fn new_async() -> Result<Self> {
-        let database_url = env::var("DATABASE_URL").map_err(|_| {
-            ShortlinkerError::database_connection("DATABASE_URL not set".to_string())
-        })?;
+        let database_url = env::var("DATABASE_URL")
+            .map_err(|_| ShortlinkerError::database_config("DATABASE_URL not set".to_string()))?;
 
         // 创建连接池
         let pool = PgPool::connect(&database_url).await.map_err(|e| {

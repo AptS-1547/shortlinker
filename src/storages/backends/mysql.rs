@@ -40,9 +40,8 @@ pub struct MySqlStorage {
 
 impl MySqlStorage {
     pub async fn new_async() -> Result<Self> {
-        let database_url = env::var("DATABASE_URL").map_err(|_| {
-            ShortlinkerError::database_connection("DATABASE_URL not set".to_string())
-        })?;
+        let database_url = env::var("DATABASE_URL")
+            .map_err(|_| ShortlinkerError::database_config("DATABASE_URL not set".to_string()))?;
 
         // 从 URL 检测数据库类型
         let db_type = if database_url.contains("mariadb")

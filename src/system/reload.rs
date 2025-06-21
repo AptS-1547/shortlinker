@@ -36,7 +36,8 @@ pub async fn setup_reload_mechanism(
     use tokio::signal::unix::{signal, SignalKind};
 
     tokio::spawn(async move {
-        let mut stream = signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
+        let mut stream =
+            signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
 
         while let Some(_) = stream.recv().await {
             tracing::info!("Received SIGUSR1, reloading...");

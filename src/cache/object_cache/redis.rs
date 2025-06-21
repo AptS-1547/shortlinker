@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use redis::{aio::MultiplexedConnection, AsyncCommands};
 use serde_json;
 use std::env;
-use tracing::{debug, warn, error};
+use tracing::{debug, error, warn};
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
@@ -43,9 +43,7 @@ impl RedisObjectCache {
         }
     }
 
-    async fn get_connection(
-        &self,
-    ) -> Result<MultiplexedConnection, redis::RedisError> {
+    async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
         let client = if let Some(ref client) = self.client {
             client
         } else {
@@ -88,18 +86,16 @@ impl ObjectCache for RedisObjectCache {
         let result: redis::RedisResult<Option<String>> = conn.get(redis_key).await;
 
         match result {
-            Ok(Some(data)) => {
-                match self.deserialize_link(&data).await {
-                    Ok(link) => {
-                        debug!("Successfully retrieved key: {}", key);
-                        CacheResult::Found(link)
-                    }
-                    Err(e) => {
-                        error!("Failed to deserialize ShortLink for key '{}': {}", key, e);
-                        CacheResult::ExistsButNoValue
-                    }
+            Ok(Some(data)) => match self.deserialize_link(&data).await {
+                Ok(link) => {
+                    debug!("Successfully retrieved key: {}", key);
+                    CacheResult::Found(link)
                 }
-            }
+                Err(e) => {
+                    error!("Failed to deserialize ShortLink for key '{}': {}", key, e);
+                    CacheResult::ExistsButNoValue
+                }
+            },
             Ok(None) => {
                 debug!("Key not found in cache: {}", key);
                 CacheResult::NotFound
@@ -124,7 +120,10 @@ impl ObjectCache for RedisObjectCache {
 
         match self.serialize_link(&value).await {
             Ok(serialized_value) => {
-                match conn.set_ex::<String, String, ()>(redis_key, serialized_value, self.ttl).await {
+                match conn
+                    .set_ex::<String, String, ()>(redis_key, serialized_value, self.ttl)
+                    .await
+                {
                     Ok(_) => {
                         debug!("Successfully inserted key into cache: {}", key);
                     }
@@ -166,6 +165,6 @@ impl ObjectCache for RedisObjectCache {
 
     async fn invalidate_all(&self) {
         warn!("RedisObjectCache does not implement invalidate_all");
-        return
+        return;
     }
 }
