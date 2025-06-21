@@ -5,7 +5,6 @@ use actix_web::{web, HttpResponse, Responder};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tracing::debug;
-use tracing::instrument;
 
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
@@ -19,7 +18,6 @@ static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
 pub struct RedirectService {}
 
 impl RedirectService {
-    #[instrument(skip(cache, storage), fields(path = %path))]
     pub async fn handle_redirect(
         path: web::Path<String>,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
