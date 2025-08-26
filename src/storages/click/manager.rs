@@ -33,17 +33,15 @@ impl ClickManager {
         *CLICK_BUFFER.entry(key.to_string()).or_insert(0) += 1;
     }
 
-    /// 启动后台刷盘任务
-    pub fn start(self: Arc<Self>) {
-        tokio::spawn(async move {
-            loop {
-                sleep(self.flush_interval).await;
+    /// 启动后台刷盘任务（作为异步方法运行）
+    pub async fn start_background_task(&self) {
+        loop {
+            sleep(self.flush_interval).await;
 
-                debug!("ClickManager: Triggering flush to storage");
-                // 定期触发刷盘
-                self.flush_inner().await;
-            }
-        });
+            debug!("ClickManager: Triggering flush to storage");
+            // 定期触发刷盘
+            self.flush_inner().await;
+        }
     }
 
     pub async fn flush(&self) {

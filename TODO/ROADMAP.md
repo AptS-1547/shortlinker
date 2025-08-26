@@ -65,7 +65,7 @@
 - [ ] SaaS 模式部署样例（多用户 + 后台面板 + 资源隔离）。
 - [ ] 自定义短链子域名接入（动态 DNS / ACME）。
 - [ ] CDN 优化短链跳转路径（Nginx / Caddy 前置缓存）。
-- [ ] 与 CI/CD 系统整合（如 GitHub Actions 自动生成 release 短链）。
+- [X] 与 CI/CD 系统整合（如 GitHub Actions 自动生成 release 短链）。
 
 ---
 
