@@ -28,6 +28,7 @@ impl CliParser {
             "update" => self.parse_update_command(&args[2..]),
             "export" => self.parse_export_command(&args[2..]),
             "import" => self.parse_import_command(&args[2..]),
+            "generate-config" => self.parse_generate_config_command(&args[2..]),
             _ => Err(CliError::ParseError(format!(
                 "Unknown command: {}",
                 args[1]
@@ -199,5 +200,15 @@ impl CliParser {
             file_path,
             force_overwrite,
         })
+    }
+
+    pub fn parse_generate_config_command(&self, args: &[String]) -> Result<Command, CliError> {
+        let output_path = if !args.is_empty() {
+            Some(args[0].clone())
+        } else {
+            None
+        };
+
+        Ok(Command::GenerateConfig { output_path })
     }
 }

@@ -184,7 +184,58 @@ curl http://localhost:8080/health/live
 
 ## Configuration
 
-Configure using environment variables or `.env` file:
+**shortlinker now supports TOML configuration files!**
+
+Supports both TOML configuration files and environment variables. TOML configuration is clearer and more readable, so it's recommended.
+
+### TOML Configuration File
+
+Create a `config.toml` file:
+
+```toml
+[server]
+host = "0.0.0.0"
+port = 8080
+# unix_socket = "/tmp/shortlinker.sock"  # Optional: Unix Socket
+cpu_count = 4
+
+[storage]
+backend = "sqlite"
+database_url = "data/links.db"
+# db_file_name = "links.json"  # Only used when backend = "file"
+
+[cache]
+redis_url = "redis://127.0.0.1:6379/"
+redis_key_prefix = "shortlinker:"
+redis_ttl = 3600
+
+[api]
+admin_token = "your_admin_token"
+health_token = "your_health_token"
+
+[routes]
+admin_prefix = "/admin"
+health_prefix = "/health"
+frontend_prefix = "/panel"
+
+[features]
+enable_admin_panel = false
+random_code_length = 8
+default_url = "https://example.com"
+
+[logging]
+level = "info"
+```
+
+Configuration file search order:
+1. `config.toml`
+2. `shortlinker.toml`
+3. `config/config.toml`
+4. `/etc/shortlinker/config.toml`
+
+### Environment Variables (Backward Compatible)
+
+Still supports the original environment variable configuration method. Environment variables will override TOML configuration:
 
 | Variable               | Default                  | Description                                 |
 | ---------------------- | ------------------------ | ------------------------------------------- |
@@ -192,12 +243,18 @@ Configure using environment variables or `.env` file:
 | `SERVER_PORT`        | `8080`                 | Listen port                                 |
 | `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
 | `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `STORAGE_BACKEND`    | `sqlite`               | Storage type (See Documentation)          |
-| `DATABASE_URL`       | `links.db`             | Database URL (See Documentation)          |
+| `STORAGE_BACKEND`    | `sqlite`               | Storage type: sqlite, file, postgres, mysql |
+| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path                   |
+| `DB_FILE_NAME`       | `links.json`           | JSON file path (only when backend = "file") |
+| `REDIS_URL`          | `redis://127.0.0.1:6379/` | Redis connection URL                    |
+| `REDIS_KEY_PREFIX`   | `shortlinker:`         | Redis key prefix                            |
+| `REDIS_TTL`          | `3600`                 | Redis TTL in seconds                        |
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
 | `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
+| `ADMIN_ROUTE_PREFIX` | `/admin`               | Admin API route prefix                      |
+| `HEALTH_ROUTE_PREFIX`| `/health`              | Health API route prefix                     |
 | `ENABLE_ADMIN_PANEL` | `false` | Serve web admin panel (requires build and ADMIN_TOKEN) |
 | `FRONTEND_ROUTE_PREFIX` | `/panel` | Web admin panel route prefix |
 | `RUST_LOG`           | `info`                 | Log level                                   |

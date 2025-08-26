@@ -3,7 +3,6 @@ use crate::storages::{ShortLink, Storage};
 use crate::utils::generate_random_code;
 use crate::utils::TimeParser;
 use colored::*;
-use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
@@ -73,10 +72,8 @@ pub async fn add_link(
         ));
     }
 
-    let random_code_length: usize = env::var("RANDOM_CODE_LENGTH")
-        .unwrap_or_else(|_| "6".to_string())
-        .parse()
-        .unwrap_or(6);
+    let config = crate::config::get_config();
+    let random_code_length = config.features.random_code_length;
 
     let final_short_code = match short_code {
         Some(code) => code,
@@ -421,4 +418,24 @@ pub async fn import_links(
     }
 
     Ok(())
+}
+
+/// 生成示例配置文件
+pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError> {
+    let path = output_path.unwrap_or_else(|| "config.toml".to_string());
+    
+    println!("{} {}", "正在生成配置文件...".yellow(), path.blue());
+    
+    let config = crate::config::Config::default();
+    match config.save_to_file(&path) {
+        Ok(()) => {
+            println!("  {} {}", "配置文件生成成功".green(), path.blue());
+            println!("  {} {}", "请编辑配置文件并重启服务".yellow(), "🔧".blue());
+            Ok(())
+        }
+        Err(e) => {
+            println!("  {} {}", "配置文件生成失败".red(), e.to_string().red());
+            Err(CliError::CommandError(format!("无法写入配置文件: {}", e)))
+        }
+    }
 }

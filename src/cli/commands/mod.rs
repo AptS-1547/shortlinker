@@ -35,6 +35,9 @@ pub enum Command {
         file_path: String,
         force_overwrite: bool,
     },
+    GenerateConfig {
+        output_path: Option<String>,
+    },
 }
 
 impl Command {
@@ -74,6 +77,9 @@ impl Command {
                 file_path,
                 force_overwrite,
             } => import_links(storage, file_path, force_overwrite).await,
+            Command::GenerateConfig { output_path } => {
+                generate_config(output_path).await
+            }
         }
     }
 }

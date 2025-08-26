@@ -12,7 +12,7 @@ use crate::storages::click::global::get_click_manager;
 use crate::storages::{ShortLink, Storage};
 
 static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
-    std::env::var("DEFAULT_URL").unwrap_or_else(|_| "https://esap.cc/repo".to_string())
+    crate::config::get_config().features.default_url.clone()
 });
 
 pub struct RedirectService {}

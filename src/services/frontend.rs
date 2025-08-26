@@ -20,14 +20,15 @@ impl FrontendService {
     pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
         debug!("Serving frontend index page from dist");
 
+        let config = crate::config::get_config();
         let frontend_prefix = FRONTEND_ROUTE_PREFIX.get_or_init(|| {
-            env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string())
+            config.routes.frontend_prefix.clone()
         });
         let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| {
-            env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string())
+            config.routes.admin_prefix.clone()
         });
         let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| {
-            env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string())
+            config.routes.health_prefix.clone()
         });
 
         // 检查路径是否需要规范化（添加尾部斜杠）
@@ -119,14 +120,15 @@ impl FrontendService {
     pub async fn handle_spa_fallback(req: HttpRequest) -> Result<HttpResponse> {
         debug!("SPA fallback - serving index.html");
 
+        let config = crate::config::get_config();
         let frontend_prefix = FRONTEND_ROUTE_PREFIX.get_or_init(|| {
-            env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string())
+            config.routes.frontend_prefix.clone()
         });
         let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| {
-            env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string())
+            config.routes.admin_prefix.clone()
         });
         let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| {
-            env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string())
+            config.routes.health_prefix.clone()
         });
 
         // 检查路径是否需要规范化（添加尾部斜杠）

@@ -2,7 +2,6 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Responder, Result as ActixResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use tracing::{debug, error, info};
@@ -112,10 +111,7 @@ impl AdminService {
 
     fn get_random_code_length() -> usize {
         *RANDOM_CODE_LENGTH.get_or_init(|| {
-            env::var("RANDOM_CODE_LENGTH")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(6)
+            crate::config::get_config().features.random_code_length
         })
     }
 
@@ -424,9 +420,10 @@ impl AdminService {
         _req: HttpRequest,
         login_body: web::Json<LoginCredentials>,
     ) -> ActixResult<impl Responder> {
-        let admin_token = env::var("ADMIN_TOKEN").unwrap_or_default();
+        let config = crate::config::get_config();
+        let admin_token = &config.api.admin_token;
 
-        if login_body.password == admin_token {
+        if login_body.password == *admin_token {
             info!("Admin API: login successful");
             Ok(Self::success_response(serde_json::json!({
                 "message": "Login successful"

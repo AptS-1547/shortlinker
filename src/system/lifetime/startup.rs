@@ -1,4 +1,5 @@
 use crate::cache::{self, CompositeCacheTrait};
+use crate::config::get_config;
 use crate::storages::click::global::set_global_click_manager;
 use crate::storages::click::manager::ClickManager;
 use crate::storages::{Storage, StorageFactory};
@@ -86,13 +87,12 @@ pub async fn prepare_server_startup() -> StartupContext {
     system::setup_reload_mechanism(cache.clone(), storage.clone()).await;
 
     // 提取路由配置
+    let config = get_config();
     let route_config = RouteConfig {
-        admin_prefix: env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string()),
-        health_prefix: env::var("HEALTH_ROUTE_PREFIX").unwrap_or_else(|_| "/health".to_string()),
-        frontend_prefix: env::var("FRONTEND_ROUTE_PREFIX").unwrap_or_else(|_| "/panel".to_string()),
-        enable_frontend: env::var("ENABLE_ADMIN_PANEL")
-            .map(|v| v == "true")
-            .unwrap_or(false),
+        admin_prefix: config.routes.admin_prefix.clone(),
+        health_prefix: config.routes.health_prefix.clone(),
+        frontend_prefix: config.routes.frontend_prefix.clone(),
+        enable_frontend: config.features.enable_admin_panel,
     };
 
     check_compoment_enabled(&route_config);
@@ -105,8 +105,9 @@ pub async fn prepare_server_startup() -> StartupContext {
 }
 
 fn check_compoment_enabled(route_config: &RouteConfig) {
+    let config = get_config();
     // 检查 Admin API 是否启用
-    let admin_token = env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string());
+    let admin_token = &config.api.admin_token;
     if admin_token.is_empty() {
         warn!("Admin API is disabled (ADMIN_TOKEN not set)");
     } else {
@@ -114,7 +115,7 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     }
 
     // 检查 Health API 是否启用
-    let health_token = env::var("HEALTH_TOKEN").unwrap_or_default();
+    let health_token = &config.api.health_token;
     if health_token.is_empty() && admin_token.is_empty() {
         warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
     } else {

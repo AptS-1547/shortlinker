@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use redis::{aio::MultiplexedConnection, AsyncCommands};
 use serde_json;
-use std::env;
 use tracing::{debug, error, warn};
 
 use crate::cache::{CacheResult, ObjectCache};
@@ -18,14 +17,10 @@ pub struct RedisObjectCache {
 
 impl RedisObjectCache {
     pub fn new() -> Self {
-        let redis_url =
-            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/".to_string());
-        let key_prefix =
-            env::var("REDIS_KEY_PREFIX").unwrap_or_else(|_| "shortlinker:".to_string());
-        let ttl = env::var("REDIS_TTL")
-            .unwrap_or_else(|_| "3600".to_string()) // 默认1小时
-            .parse()
-            .unwrap_or(3600);
+        let config = crate::config::get_config();
+        let redis_url = config.cache.redis_url.clone();
+        let key_prefix = config.cache.redis_key_prefix.clone();
+        let ttl = config.cache.redis_ttl;
 
         debug!(
             "RedisObjectCache created with prefix: '{}', TTL: {}s",

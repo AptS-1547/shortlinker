@@ -2,7 +2,6 @@
 mod macros;
 
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 use tracing::error;
 
@@ -46,9 +45,10 @@ pub struct StorageFactory;
 
 impl StorageFactory {
     pub async fn create() -> Result<Arc<dyn Storage>> {
-        let backend = env::var("STORAGE_BACKEND").unwrap_or_else(|_| "sqlite".into());
+        let config = crate::config::get_config();
+        let backend = &config.storage.backend;
 
-        if let Some(ctor) = get_storage_plugin(&backend) {
+        if let Some(ctor) = get_storage_plugin(backend) {
             let storage = ctor().await?;
             Ok(Arc::from(storage))
         } else {

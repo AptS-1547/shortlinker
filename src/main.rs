@@ -5,6 +5,7 @@ use tracing::{debug, warn};
 
 mod cache;
 mod cli;
+mod config;
 mod errors;
 mod event;
 mod middleware;
@@ -21,7 +22,7 @@ use crate::system::lifetime;
 
 // 配置结构体
 #[derive(Clone, Debug)]
-struct Config {
+struct ServerConfig {
     server_host: String,
     server_port: u16,
     #[cfg(unix)]
@@ -31,6 +32,11 @@ struct Config {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
+    
+    // 初始化配置系统
+    crate::config::init_config();
+    let config = crate::config::get_config();
+    
     let args: Vec<String> = env::args().collect();
 
     // CLI Mode
@@ -52,7 +58,7 @@ async fn main() -> std::io::Result<()> {
     let stdout_log = std::io::stdout();
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
     let filter = tracing_subscriber::EnvFilter::new(
-        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+        config.logging.level.clone(),
     );
     tracing_subscriber::fmt()
         .with_writer(non_blocking_writer)
@@ -81,22 +87,15 @@ async fn main() -> std::io::Result<()> {
 
     // 预处理完成 //
 
-    // Load env configurations
-    let config = Config {
-        server_host: env::var("SERVER_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
-        server_port: env::var("SERVER_PORT")
-            .unwrap_or_else(|_| "8080".to_string())
-            .parse()
-            .unwrap(),
+    // Load server configurations from new config system
+    let server_config = ServerConfig {
+        server_host: config.server.host.clone(),
+        server_port: config.server.port,
         #[cfg(unix)]
-        unix_socket_path: env::var("UNIX_SOCKET").ok(),
+        unix_socket_path: config.server.unix_socket.clone(),
     };
 
-    let cpu_count = env::var("CPU_COUNT")
-        .unwrap_or_else(|_| num_cpus::get().to_string())
-        .parse::<usize>()
-        .unwrap_or_else(|_| num_cpus::get())
-        .min(32);
+    let cpu_count = config.server.cpu_count.min(32);
 
     warn!("Using {} CPU cores for the server", cpu_count);
 
@@ -188,14 +187,14 @@ async fn main() -> std::io::Result<()> {
     let server = {
         #[cfg(unix)]
         {
-            if let Some(ref socket_path) = config.unix_socket_path {
+            if let Some(ref socket_path) = server_config.unix_socket_path {
                 warn!("Starting server on Unix socket: {}", socket_path);
                 if std::path::Path::new(socket_path).exists() {
                     std::fs::remove_file(socket_path)?;
                 }
                 Some(server.bind_uds(socket_path)?)
             } else {
-                let bind_address = format!("{}:{}", config.server_host, config.server_port);
+                let bind_address = format!("{}:{}", server_config.server_host, server_config.server_port);
                 warn!("Starting server at http://{}", bind_address);
                 Some(server.bind(bind_address)?)
             }
@@ -203,7 +202,7 @@ async fn main() -> std::io::Result<()> {
 
         #[cfg(not(unix))]
         {
-            let bind_address = format!("{}:{}", config.server_host, config.server_port);
+            let bind_address = format!("{}:{}", server_config.server_host, server_config.server_port);
             warn!("Starting server at http://{}", bind_address);
             Some(server.bind(bind_address)?)
         }

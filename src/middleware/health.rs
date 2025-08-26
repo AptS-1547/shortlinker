@@ -7,7 +7,6 @@ use actix_web::{
     Error, HttpResponse,
 };
 use futures_util::future::{ready, LocalBoxFuture, Ready};
-use std::env;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use tracing::{debug, info};
@@ -59,9 +58,9 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let token = HEALTH_TOKEN.get_or_init(|| env::var("HEALTH_TOKEN").unwrap_or_default());
-            let admin_token =
-                ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
+            let config = crate::config::get_config();
+            let token = HEALTH_TOKEN.get_or_init(|| config.api.health_token.clone());
+            let admin_token = ADMIN_TOKEN.get_or_init(|| config.api.admin_token.clone());
 
             if token.is_empty() && admin_token.is_empty() {
                 return Ok(req.into_response(

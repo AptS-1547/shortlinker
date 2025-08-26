@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -21,11 +20,15 @@ pub struct PostgresStorage {
 
 impl PostgresStorage {
     pub async fn new_async() -> Result<Self> {
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| ShortlinkerError::database_config("DATABASE_URL not set".to_string()))?;
+        let config = crate::config::get_config();
+        let database_url = &config.storage.database_url;
+        
+        if database_url.is_empty() {
+            return Err(ShortlinkerError::database_config("DATABASE_URL not set".to_string()));
+        }
 
         // 创建连接池
-        let pool = PgPool::connect(&database_url).await.map_err(|e| {
+        let pool = PgPool::connect(database_url).await.map_err(|e| {
             ShortlinkerError::database_connection(format!("无法连接到PostgreSQL数据库: {}", e))
         })?;
 

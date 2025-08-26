@@ -7,7 +7,6 @@ use actix_web::{
     Error, HttpResponse,
 };
 use futures_util::future::{ready, LocalBoxFuture, Ready};
-use std::env;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use tracing::debug;
@@ -59,13 +58,11 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
+            let config = crate::config::get_config();
             let enable_frontend_routes = ENABLE_ADMIN_PANEL.get_or_init(|| {
-                env::var("ENABLE_ADMIN_PANEL")
-                    .map(|v| v == "true")
-                    .unwrap_or(false)
+                config.features.enable_admin_panel
             });
-            let admin_token =
-                ADMIN_TOKEN.get_or_init(|| env::var("ADMIN_TOKEN").unwrap_or_default());
+            let admin_token = ADMIN_TOKEN.get_or_init(|| config.api.admin_token.clone());
 
             if !enable_frontend_routes || admin_token.is_empty() {
                 return Ok(req.into_response(

@@ -174,7 +174,58 @@ curl http://localhost:8080/health/live
 
 ## ⚙️ 配置方式
 
-支持 `.env` 文件或环境变量：
+**shortlinker 现在支持 TOML 配置文件！**
+
+支持 TOML 配置文件和环境变量两种方式，TOML 配置更清晰易读，推荐使用。
+
+### TOML 配置文件
+
+创建 `config.toml` 文件：
+
+```toml
+[server]
+host = "0.0.0.0"
+port = 8080
+# unix_socket = "/tmp/shortlinker.sock"  # 可选：Unix Socket
+cpu_count = 4
+
+[storage]
+backend = "sqlite"
+database_url = "data/links.db"
+# db_file_name = "links.json"  # 仅当 backend = "file" 时使用
+
+[cache]
+redis_url = "redis://127.0.0.1:6379/"
+redis_key_prefix = "shortlinker:"
+redis_ttl = 3600
+
+[api]
+admin_token = "your_admin_token"
+health_token = "your_health_token"
+
+[routes]
+admin_prefix = "/admin"
+health_prefix = "/health"
+frontend_prefix = "/panel"
+
+[features]
+enable_admin_panel = false
+random_code_length = 8
+default_url = "https://example.com"
+
+[logging]
+level = "info"
+```
+
+配置文件查找顺序：
+1. `config.toml`
+2. `shortlinker.toml`  
+3. `config/config.toml`
+4. `/etc/shortlinker/config.toml`
+
+### 环境变量（向后兼容）
+
+仍然支持原有的环境变量配置方式，环境变量会覆盖 TOML 配置：
 
 | 变量                      | 默认值                                          | 说明                 |
 | ----------------------- | -------------------------------------------- | ------------------ |
@@ -183,11 +234,17 @@ curl http://localhost:8080/health/live
 | UNIX\_SOCKET            | 空                                            | 使用 Unix Socket 时填写 |
 | CPU\_COUNT              | 自动                                           | 工作线程数              |
 | STORAGE\_BACKEND        | sqlite                                       | 存储方式（sqlite/file）  |
-| DB\_FILE\_NAME          | links.db                                     | 数据库路径              |
-| DEFAULT\_URL            | [https://esap.cc/repo](https://esap.cc/repo) | 默认跳转 URL           |
+| DATABASE\_URL           | shortlinks.db                                | 数据库 URL            |
+| DB\_FILE\_NAME          | links.json                                   | JSON 文件路径         |
+| REDIS\_URL              | redis://127.0.0.1:6379/                     | Redis 连接地址        |
+| REDIS\_KEY\_PREFIX      | shortlinker:                                 | Redis 键前缀          |
+| REDIS\_TTL              | 3600                                         | Redis TTL(秒)       |
+| DEFAULT\_URL            | https://esap.cc/repo                         | 默认跳转 URL           |
 | RANDOM\_CODE\_LENGTH    | 6                                            | 随机短码长度             |
 | ADMIN\_TOKEN            | 空                                            | 管理 API 密钥          |
 | HEALTH\_TOKEN           | 空                                            | 健康检查密钥             |
+| ADMIN\_ROUTE\_PREFIX    | /admin                                       | 管理 API 路由前缀       |
+| HEALTH\_ROUTE\_PREFIX   | /health                                      | 健康检查路由前缀           |
 | ENABLE\_ADMIN\_PANEL    | false                                        | 启用网页管理面板（实验性）      |
 | FRONTEND\_ROUTE\_PREFIX | /panel                                       | 面板路由前缀             |
 | RUST\_LOG               | info                                         | 日志等级               |

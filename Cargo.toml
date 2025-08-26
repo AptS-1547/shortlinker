@@ -60,6 +60,7 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite",
 uuid = { version = "1.0", features = ["v4"] }
 redis = { version = "0.32.2", features = ["tokio-comp", "tokio-rustls-comp"] }
 rustls = "0.23.28"
+toml = "0.9"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

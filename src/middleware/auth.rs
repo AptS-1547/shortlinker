@@ -6,7 +6,7 @@ use actix_web::{
     Error, HttpResponse,
 };
 use futures_util::future::{ready, LocalBoxFuture, Ready};
-use std::{env, rc::Rc};
+use std::rc::Rc;
 use tracing::{debug, warn};
 
 /// Admin authentication middleware
@@ -25,10 +25,11 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
+        let config = crate::config::get_config();
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
-            admin_prefix: env::var("ADMIN_ROUTE_PREFIX").unwrap_or_else(|_| "/admin".to_string()),
-            admin_token: env::var("ADMIN_TOKEN").unwrap_or_else(|_| "".to_string()),
+            admin_prefix: config.routes.admin_prefix.clone(),
+            admin_token: config.api.admin_token.clone(),
         }))
     }
 }

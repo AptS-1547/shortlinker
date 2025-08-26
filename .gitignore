@@ -23,7 +23,9 @@ target/
 .DS_Store
 
 .env
+config.toml
 
+test.db*
 shortlinks.db*
 links.db*
 links.json

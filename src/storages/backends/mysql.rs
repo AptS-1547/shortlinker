@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -39,12 +38,16 @@ pub struct MySqlStorage {
 
 impl MySqlStorage {
     pub async fn new_async() -> Result<Self> {
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| ShortlinkerError::database_config("DATABASE_URL not set".to_string()))?;
+        let config = crate::config::get_config();
+        let database_url = &config.storage.database_url;
+        
+        if database_url.is_empty() {
+            return Err(ShortlinkerError::database_config("DATABASE_URL not set".to_string()));
+        }
 
         // 从 URL 检测数据库类型
         let db_type = if database_url.contains("mariadb")
-            || env::var("STORAGE_BACKEND").unwrap_or_default() == "mariadb"
+            || config.storage.backend == "mariadb"
         {
             "mariadb".to_string()
         } else {
@@ -52,7 +55,7 @@ impl MySqlStorage {
         };
 
         // 创建连接池
-        let pool = MySqlPool::connect(&database_url).await.map_err(|e| {
+        let pool = MySqlPool::connect(database_url).await.map_err(|e| {
             ShortlinkerError::database_connection(format!(
                 "无法连接到{}数据库: {}",
                 db_type.to_uppercase(),

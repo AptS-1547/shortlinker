@@ -58,6 +58,10 @@ pub fn show_help() {
         "  {} import <file path> [options]     # import links from JSON",
         program_name.cyan()
     );
+    println!(
+        "  {} generate-config [output path]   # generate sample config file",
+        program_name.cyan()
+    );
     println!();
     println!("{}", "Options:".bold());
     println!("  {}     force overwrite existing code", "--force".yellow());

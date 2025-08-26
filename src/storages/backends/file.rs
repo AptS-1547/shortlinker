@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use tracing::{error, info};
 
@@ -19,7 +18,8 @@ pub struct FileStorage {
 
 impl FileStorage {
     pub async fn new_async() -> Result<Self> {
-        let file_path = env::var("DB_FILE_NAME").unwrap_or_else(|_| "links.json".to_string());
+        let config = crate::config::get_config();
+        let file_path = config.storage.db_file_name.clone();
 
         // 如果不存在就初始化
         if fs::read_to_string(&file_path).is_err() {

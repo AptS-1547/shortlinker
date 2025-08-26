@@ -1,6 +1,5 @@
 use sqlx::{sqlite, sqlite::SqliteConnectOptions, Row, SqlitePool};
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
@@ -21,12 +20,13 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new_async() -> Result<Self> {
-        let db_path = env::var("DATABASE_URL").unwrap_or_else(|_| "shortlinks.db".into());
+        let config = crate::config::get_config();
+        let db_path = &config.storage.database_url;
 
         // 创建连接池
         let pool = SqlitePool::connect_with(
             SqliteConnectOptions::new()
-                .filename(&db_path)
+                .filename(db_path)
                 .create_if_missing(true)
                 .journal_mode(sqlite::SqliteJournalMode::Wal)
                 .synchronous(sqlite::SqliteSynchronous::Normal)
