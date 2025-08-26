@@ -15,7 +15,7 @@ RUN yarn install --frozen-lockfile
 RUN yarn build:prod
 
 # 多阶段构建 - 构建阶段
-FROM rust:1.87-slim AS builder
+FROM rust:1.89-slim AS builder
 
 # 安装构建依赖，包含完整的 OpenSSL 开发库
 RUN apt-get update && apt-get install -y \

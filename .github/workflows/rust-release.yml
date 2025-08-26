@@ -212,8 +212,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            name: macos_x86_64
           - target: aarch64-apple-darwin
             name: macos_aarch64
 
@@ -453,9 +451,6 @@ jobs:
           
           </td>
           <td>
-          
-          **Intel** (Intel Mac)  
-          📥 [shortlinker-macos-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_macos_x86_64)
           
           **Apple Silicon** (M1/M2/M3)  
           📥 [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_macos_aarch64)
