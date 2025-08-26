@@ -25,7 +25,7 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = crate::config::get_config();
+        let config = crate::system::app_config::get_config();
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
             admin_prefix: config.routes.admin_prefix.clone(),

@@ -111,7 +111,9 @@ impl AdminService {
 
     fn get_random_code_length() -> usize {
         *RANDOM_CODE_LENGTH.get_or_init(|| {
-            crate::config::get_config().features.random_code_length
+            crate::system::app_config::get_config()
+                .features
+                .random_code_length
         })
     }
 
@@ -420,7 +422,7 @@ impl AdminService {
         _req: HttpRequest,
         login_body: web::Json<LoginCredentials>,
     ) -> ActixResult<impl Responder> {
-        let config = crate::config::get_config();
+        let config = crate::system::app_config::get_config();
         let admin_token = &config.api.admin_token;
 
         if login_body.password == *admin_token {

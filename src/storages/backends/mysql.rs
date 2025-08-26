@@ -38,17 +38,17 @@ pub struct MySqlStorage {
 
 impl MySqlStorage {
     pub async fn new_async() -> Result<Self> {
-        let config = crate::config::get_config();
-        let database_url = &config.storage.database_url;
-        
+        let config = crate::system::app_config::get_config();
+        let database_url = &config.database.database_url;
+
         if database_url.is_empty() {
-            return Err(ShortlinkerError::database_config("DATABASE_URL not set".to_string()));
+            return Err(ShortlinkerError::database_config(
+                "DATABASE_URL not set".to_string(),
+            ));
         }
 
         // 从 URL 检测数据库类型
-        let db_type = if database_url.contains("mariadb")
-            || config.storage.backend == "mariadb"
-        {
+        let db_type = if database_url.contains("mariadb") || config.database.backend == "mariadb" {
             "mariadb".to_string()
         } else {
             "mysql".to_string()

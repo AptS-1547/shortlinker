@@ -1,9 +1,9 @@
 use crate::cache::{self, CompositeCacheTrait};
-use crate::config::get_config;
 use crate::storages::click::global::set_global_click_manager;
 use crate::storages::click::manager::ClickManager;
 use crate::storages::{Storage, StorageFactory};
 use crate::system;
+use crate::system::app_config::get_config;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,13 +57,13 @@ pub async fn prepare_server_startup() -> StartupContext {
     if let Some(sink) = storage.as_click_sink() {
         let mgr = Arc::new(ClickManager::new(sink, Duration::from_secs(30)));
         set_global_click_manager(mgr.clone());
-        
+
         // 启动后台任务，并保持强引用以确保任务不会被过早销毁
         let mgr_for_task = mgr.clone();
         tokio::spawn(async move {
             mgr_for_task.start_background_task().await;
         });
-        
+
         debug!("ClickManager initialized with a 30 seconds flush interval");
     } else {
         warn!("Click sink is not available, ClickManager will not be initialized");

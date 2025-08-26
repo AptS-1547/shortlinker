@@ -1,3 +1,4 @@
+pub mod app_config;
 pub mod lifetime;
 mod lockfile;
 pub mod reload;

@@ -58,10 +58,9 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let config = crate::config::get_config();
-            let enable_frontend_routes = ENABLE_ADMIN_PANEL.get_or_init(|| {
-                config.features.enable_admin_panel
-            });
+            let config = crate::system::app_config::get_config();
+            let enable_frontend_routes =
+                ENABLE_ADMIN_PANEL.get_or_init(|| config.features.enable_admin_panel);
             let admin_token = ADMIN_TOKEN.get_or_init(|| config.api.admin_token.clone());
 
             if !enable_frontend_routes || admin_token.is_empty() {

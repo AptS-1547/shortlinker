@@ -39,7 +39,7 @@ pub async fn setup_reload_mechanism(
         let mut stream =
             signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
 
-        while let Some(_) = stream.recv().await {
+        while (stream.recv().await).is_some() {
             tracing::info!("Received SIGUSR1, reloading...");
 
             if let Err(e) = reload_all(cache.clone(), storage.clone()).await {

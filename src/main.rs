@@ -5,7 +5,6 @@ use tracing::{debug, warn};
 
 mod cache;
 mod cli;
-mod config;
 mod errors;
 mod event;
 mod middleware;
@@ -32,11 +31,11 @@ struct ServerConfig {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    
+
     // 初始化配置系统
-    crate::config::init_config();
-    let config = crate::config::get_config();
-    
+    crate::system::app_config::init_config();
+    let config = crate::system::app_config::get_config();
+
     let args: Vec<String> = env::args().collect();
 
     // CLI Mode
@@ -57,9 +56,7 @@ async fn main() -> std::io::Result<()> {
     // 初始化日志
     let stdout_log = std::io::stdout();
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
-    let filter = tracing_subscriber::EnvFilter::new(
-        config.logging.level.clone(),
-    );
+    let filter = tracing_subscriber::EnvFilter::new(config.logging.level.clone());
     tracing_subscriber::fmt()
         .with_writer(non_blocking_writer)
         .with_env_filter(filter)
@@ -194,7 +191,10 @@ async fn main() -> std::io::Result<()> {
                 }
                 Some(server.bind_uds(socket_path)?)
             } else {
-                let bind_address = format!("{}:{}", server_config.server_host, server_config.server_port);
+                let bind_address = format!(
+                    "{}:{}",
+                    server_config.server_host, server_config.server_port
+                );
                 warn!("Starting server at http://{}", bind_address);
                 Some(server.bind(bind_address)?)
             }
@@ -202,7 +202,10 @@ async fn main() -> std::io::Result<()> {
 
         #[cfg(not(unix))]
         {
-            let bind_address = format!("{}:{}", server_config.server_host, server_config.server_port);
+            let bind_address = format!(
+                "{}:{}",
+                server_config.server_host, server_config.server_port
+            );
             warn!("Starting server at http://{}", bind_address);
             Some(server.bind(bind_address)?)
         }

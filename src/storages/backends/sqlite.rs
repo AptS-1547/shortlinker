@@ -20,8 +20,8 @@ pub struct SqliteStorage {
 
 impl SqliteStorage {
     pub async fn new_async() -> Result<Self> {
-        let config = crate::config::get_config();
-        let db_path = &config.storage.database_url;
+        let config = crate::system::app_config::get_config();
+        let db_path = &config.database.database_url;
 
         // 创建连接池
         let pool = SqlitePool::connect_with(

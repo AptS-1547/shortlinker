@@ -12,7 +12,10 @@ use crate::storages::click::global::get_click_manager;
 use crate::storages::{ShortLink, Storage};
 
 static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
-    crate::config::get_config().features.default_url.clone()
+    crate::system::app_config::get_config()
+        .features
+        .default_url
+        .clone()
 });
 
 pub struct RedirectService {}
@@ -81,7 +84,10 @@ impl RedirectService {
                     manager.increment(&code);
                 }
                 None => {
-                    debug!("Click manager not initialized, skipping increment for code: {}", code);
+                    debug!(
+                        "Click manager not initialized, skipping increment for code: {}",
+                        code
+                    );
                 }
             }
         });

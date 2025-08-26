@@ -77,9 +77,7 @@ impl Command {
                 file_path,
                 force_overwrite,
             } => import_links(storage, file_path, force_overwrite).await,
-            Command::GenerateConfig { output_path } => {
-                generate_config(output_path).await
-            }
+            Command::GenerateConfig { output_path } => generate_config(output_path).await,
         }
     }
 }

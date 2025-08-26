@@ -13,20 +13,32 @@ port = 8080
 cpu_count = 4
 
 [storage]
-# 存储后端类型：sqlite, file, postgres, mysql, mariadb
-backend = "sqlite"
+# 存储后端类型：sqlite, postgres, mysql, mariadb
+type = "sqlite"
 # 数据库连接 URL 或文件路径
 database_url = "shortlinks.db"
-# JSON 文件存储路径（仅当 backend = "file" 时使用）
-db_file_name = "links.json"
+# 数据库连接池大小
+pool_size = 10
+# 数据库连接超时（秒）
+timeout = 30
 
 [cache]
+# 缓存类型：memory, redis（目前仅支持 memory)
+type = "memory"
+# 默认缓存过期时间（秒）
+default_ttl = 3600
+
+[cache.redis]
 # Redis 连接 URL
-redis_url = "redis://127.0.0.1:6379/"
+url = "redis://127.0.0.1:6379/"
 # Redis 键前缀
-redis_key_prefix = "shortlinker:"
-# Redis TTL（秒）
-redis_ttl = 3600
+key_prefix = "shortlinker:"
+# Redis 连接池大小
+pool_size = 10
+
+[cache.memory]
+# 内存缓存最大容量（条目数）
+max_capacity = 10000
 
 [api]
 # 管理 API Token（留空禁用管理 API）

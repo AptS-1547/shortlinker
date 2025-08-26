@@ -20,11 +20,13 @@ pub struct PostgresStorage {
 
 impl PostgresStorage {
     pub async fn new_async() -> Result<Self> {
-        let config = crate::config::get_config();
-        let database_url = &config.storage.database_url;
-        
+        let config = crate::system::app_config::get_config();
+        let database_url = &config.database.database_url;
+
         if database_url.is_empty() {
-            return Err(ShortlinkerError::database_config("DATABASE_URL not set".to_string()));
+            return Err(ShortlinkerError::database_config(
+                "DATABASE_URL not set".to_string(),
+            ));
         }
 
         // 创建连接池

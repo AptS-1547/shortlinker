@@ -58,7 +58,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let config = crate::config::get_config();
+            let config = crate::system::app_config::get_config();
             let token = HEALTH_TOKEN.get_or_init(|| config.api.health_token.clone());
             let admin_token = ADMIN_TOKEN.get_or_init(|| config.api.admin_token.clone());
 

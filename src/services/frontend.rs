@@ -20,16 +20,11 @@ impl FrontendService {
     pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
         debug!("Serving frontend index page from dist");
 
-        let config = crate::config::get_config();
-        let frontend_prefix = FRONTEND_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.frontend_prefix.clone()
-        });
-        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.admin_prefix.clone()
-        });
-        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.health_prefix.clone()
-        });
+        let config = crate::system::app_config::get_config();
+        let frontend_prefix =
+            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
+        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| config.routes.admin_prefix.clone());
+        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| config.routes.health_prefix.clone());
 
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();
@@ -120,16 +115,11 @@ impl FrontendService {
     pub async fn handle_spa_fallback(req: HttpRequest) -> Result<HttpResponse> {
         debug!("SPA fallback - serving index.html");
 
-        let config = crate::config::get_config();
-        let frontend_prefix = FRONTEND_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.frontend_prefix.clone()
-        });
-        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.admin_prefix.clone()
-        });
-        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| {
-            config.routes.health_prefix.clone()
-        });
+        let config = crate::system::app_config::get_config();
+        let frontend_prefix =
+            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
+        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| config.routes.admin_prefix.clone());
+        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| config.routes.health_prefix.clone());
 
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();

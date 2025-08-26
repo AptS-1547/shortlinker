@@ -72,7 +72,7 @@ pub async fn add_link(
         ));
     }
 
-    let config = crate::config::get_config();
+    let config = crate::system::app_config::get_config();
     let random_code_length = config.features.random_code_length;
 
     let final_short_code = match short_code {
@@ -423,10 +423,10 @@ pub async fn import_links(
 /// 生成示例配置文件
 pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError> {
     let path = output_path.unwrap_or_else(|| "config.toml".to_string());
-    
+
     println!("{} {}", "正在生成配置文件...".yellow(), path.blue());
-    
-    let config = crate::config::Config::default();
+
+    let config = crate::system::app_config::AppConfig::default();
     match config.save_to_file(&path) {
         Ok(()) => {
             println!("  {} {}", "配置文件生成成功".green(), path.blue());

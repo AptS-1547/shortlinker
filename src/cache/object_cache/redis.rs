@@ -15,12 +15,18 @@ pub struct RedisObjectCache {
     ttl: u64, // TTL in seconds
 }
 
+impl Default for RedisObjectCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RedisObjectCache {
     pub fn new() -> Self {
-        let config = crate::config::get_config();
-        let redis_url = config.cache.redis_url.clone();
-        let key_prefix = config.cache.redis_key_prefix.clone();
-        let ttl = config.cache.redis_ttl;
+        let config = crate::system::app_config::get_config();
+        let redis_url = config.cache.redis.url.clone();
+        let key_prefix = config.cache.redis.key_prefix.clone();
+        let ttl = config.cache.default_ttl;
 
         debug!(
             "RedisObjectCache created with prefix: '{}', TTL: {}s",

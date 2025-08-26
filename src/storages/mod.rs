@@ -45,8 +45,8 @@ pub struct StorageFactory;
 
 impl StorageFactory {
     pub async fn create() -> Result<Arc<dyn Storage>> {
-        let config = crate::config::get_config();
-        let backend = &config.storage.backend;
+        let config = crate::system::app_config::get_config();
+        let backend = &config.database.backend;
 
         if let Some(ctor) = get_storage_plugin(backend) {
             let storage = ctor().await?;
