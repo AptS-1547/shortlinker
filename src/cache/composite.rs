@@ -1,4 +1,4 @@
-use crate::cache::register::{get_l1_plugin, get_l2_plugin};
+use crate::cache::register::{get_filter_plugin, get_object_cache_plugin};
 use crate::cache::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};
 use crate::errors::ShortlinkerError;
 use crate::storages::ShortLink;
@@ -7,36 +7,36 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct CompositeCache {
-    l1: Arc<dyn ExistenceFilter>,
-    l2: Arc<dyn ObjectCache>,
+    filter_plugin: Arc<dyn ExistenceFilter>,
+    object_cache: Arc<dyn ObjectCache>,
 }
 
 impl CompositeCache {
     pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
         let config = crate::system::app_config::get_config();
 
-        let l1_cache_name = "bloom";
-        let l2_cache_name = &config.cache.cache_type;
+        let filter_plugin_name = "bloom";
+        let object_cache_name = &config.cache.cache_type;
 
-        let l1_ctor = get_l1_plugin(l1_cache_name).ok_or_else(|| {
+        let filter_plugin_ctor = get_filter_plugin(filter_plugin_name).ok_or_else(|| {
             ShortlinkerError::cache_plugin_not_found(format!(
-                "L1 plugin not found: {}",
-                l1_cache_name
+                "Filter plugin not found: {}",
+                filter_plugin_name
             ))
         })?;
-        let l2_ctor = get_l2_plugin(l2_cache_name).ok_or_else(|| {
+        let object_cache_ctor = get_object_cache_plugin(object_cache_name).ok_or_else(|| {
             ShortlinkerError::cache_plugin_not_found(format!(
-                "L2 plugin not found: {}",
-                l2_cache_name
+                "Object Cache plugin not found: {}",
+                object_cache_name
             ))
         })?;
 
-        let l1 = l1_ctor().await?;
-        let l2 = l2_ctor().await?;
+        let filter_plugin = filter_plugin_ctor().await?;
+        let object_cache = object_cache_ctor().await?;
 
         Ok(Arc::new(Self {
-            l1: Arc::from(l1),
-            l2: Arc::from(l2),
+            filter_plugin: Arc::from(filter_plugin),
+            object_cache: Arc::from(object_cache),
         }))
     }
 }
@@ -44,36 +44,38 @@ impl CompositeCache {
 #[async_trait]
 impl CompositeCacheTrait for CompositeCache {
     async fn get(&self, key: &str) -> CacheResult {
-        if !self.l1.check(key).await {
+        if !self.filter_plugin.check(key).await {
             return CacheResult::NotFound;
         }
-        return self.l2.get(key).await;
+        return self.object_cache.get(key).await;
     }
 
     async fn insert(&self, key: String, value: ShortLink) {
-        self.l1.set(&key).await;
-        self.l2.insert(key, value).await;
+        self.filter_plugin.set(&key).await;
+        self.object_cache.insert(key, value).await;
     }
 
     async fn remove(&self, key: &str) {
-        self.l2.remove(key).await;
+        self.object_cache.remove(key).await;
     }
 
     async fn invalidate_all(&self) {
-        self.l2.invalidate_all().await;
+        self.object_cache.invalidate_all().await;
     }
 
     async fn load_cache(&self, links: HashMap<String, ShortLink>) {
-        self.l1
+        self.filter_plugin
             .bulk_set(&links.keys().cloned().collect::<Vec<_>>())
             .await;
 
-        // L2 需要先清空再加载
-        self.l2.invalidate_all().await;
-        self.l2.load_l2_cache(links).await;
+        // object_cache 需要先清空再加载
+        self.object_cache.invalidate_all().await;
+        self.object_cache.load_object_cache(links).await;
     }
 
     async fn reconfigure(&self, config: BloomConfig) {
-        self.l1.clear(config.capacity, config.fp_rate).await;
+        self.filter_plugin
+            .clear(config.capacity, config.fp_rate)
+            .await;
     }
 }

@@ -184,36 +184,67 @@ curl http://localhost:8080/health/live
 
 ```toml
 [server]
-host = "0.0.0.0"
+# 服务器监听地址
+host = "127.0.0.1"
+# 服务器监听端口
 port = 8080
-# unix_socket = "/tmp/shortlinker.sock"  # 可选：Unix Socket
+# Unix Socket 路径（如果设置了，会覆盖 host 和 port）
+# unix_socket = "/tmp/shortlinker.sock"
+# CPU 核心数量（默认为系统核心数）
 cpu_count = 4
 
 [storage]
-backend = "sqlite"
-database_url = "data/links.db"
-# db_file_name = "links.json"  # 仅当 backend = "file" 时使用
+# 存储后端类型：sqlite, postgres, mysql, mariadb
+type = "sqlite"
+# 数据库连接 URL 或文件路径
+database_url = "shortlinks.db"
+# 数据库连接池大小
+pool_size = 10
+# 数据库连接超时（秒）
+timeout = 30
 
 [cache]
-redis_url = "redis://127.0.0.1:6379/"
-redis_key_prefix = "shortlinker:"
-redis_ttl = 3600
+# 缓存类型：memory, redis（目前仅支持 memory)
+type = "memory"
+# 默认缓存过期时间（秒）
+default_ttl = 3600
+
+[cache.redis]
+# Redis 连接 URL
+url = "redis://127.0.0.1:6379/"
+# Redis 键前缀
+key_prefix = "shortlinker:"
+# Redis 连接池大小
+pool_size = 10
+
+[cache.memory]
+# 内存缓存最大容量（条目数）
+max_capacity = 10000
 
 [api]
-admin_token = "your_admin_token"
-health_token = "your_health_token"
+# 管理 API Token（留空禁用管理 API）
+admin_token = ""
+# 健康检查 API Token（留空则使用 admin_token）
+health_token = ""
 
 [routes]
+# 管理 API 路由前缀
 admin_prefix = "/admin"
+# 健康检查路由前缀
 health_prefix = "/health"
+# 前端面板路由前缀
 frontend_prefix = "/panel"
 
 [features]
+# 是否启用 Web 管理面板
 enable_admin_panel = false
-random_code_length = 8
-default_url = "https://example.com"
+# 随机短码长度
+random_code_length = 6
+# 默认跳转 URL
+default_url = "https://esap.cc/repo"
 
 [logging]
+# 日志等级：trace, debug, info, warn, error
 level = "info"
 ```
 
@@ -225,36 +256,41 @@ level = "info"
 
 ### 环境变量（向后兼容）
 
-仍然支持原有的环境变量配置方式，环境变量会覆盖 TOML 配置：
+仍然支持原有的环境变量配置方式，**环境变量会覆盖 TOML 配置**：
 
-| 变量                      | 默认值                                          | 说明                 |
-| ----------------------- | -------------------------------------------- | ------------------ |
-| SERVER\_HOST            | 127.0.0.1                                    | 监听地址               |
-| SERVER\_PORT            | 8080                                         | 监听端口               |
-| UNIX\_SOCKET            | 空                                            | 使用 Unix Socket 时填写 |
-| CPU\_COUNT              | 自动                                           | 工作线程数              |
-| STORAGE\_BACKEND        | sqlite                                       | 存储方式（sqlite/file）  |
-| DATABASE\_URL           | shortlinks.db                                | 数据库 URL            |
-| DB\_FILE\_NAME          | links.json                                   | JSON 文件路径         |
-| REDIS\_URL              | redis://127.0.0.1:6379/                     | Redis 连接地址        |
-| REDIS\_KEY\_PREFIX      | shortlinker:                                 | Redis 键前缀          |
-| REDIS\_TTL              | 3600                                         | Redis TTL(秒)       |
-| DEFAULT\_URL            | https://esap.cc/repo                         | 默认跳转 URL           |
-| RANDOM\_CODE\_LENGTH    | 6                                            | 随机短码长度             |
-| ADMIN\_TOKEN            | 空                                            | 管理 API 密钥          |
-| HEALTH\_TOKEN           | 空                                            | 健康检查密钥             |
-| ADMIN\_ROUTE\_PREFIX    | /admin                                       | 管理 API 路由前缀       |
-| HEALTH\_ROUTE\_PREFIX   | /health                                      | 健康检查路由前缀           |
-| ENABLE\_ADMIN\_PANEL    | false                                        | 启用网页管理面板（实验性）      |
-| FRONTEND\_ROUTE\_PREFIX | /panel                                       | 面板路由前缀             |
-| RUST\_LOG               | info                                         | 日志等级               |
+| 变量                      | 默认值                     | 说明                                        |
+| ----------------------- | ------------------------ | ------------------------------------------- |
+| `SERVER_HOST`           | `127.0.0.1`             | 监听地址                                      |
+| `SERVER_PORT`           | `8080`                  | 监听端口                                      |
+| `UNIX_SOCKET`           | *(empty)*               | Unix Socket 路径（会覆盖 HOST/PORT）            |
+| `CPU_COUNT`             | *(auto)*                | 工作线程数（默认为 CPU 核心数）                      |
+| `DATABASE_BACKEND`      | `sqlite`                | 存储类型：sqlite, postgres, mysql, mariadb    |
+| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径                            |
+| `DATABASE_POOL_SIZE`    | `10`                    | 数据库连接池大小                                 |
+| `DATABASE_TIMEOUT`      | `30`                    | 数据库连接超时（秒）                              |
+| `CACHE_TYPE`            | `memory`                | 缓存类型：memory, redis                       |
+| `CACHE_DEFAULT_TTL`     | `3600`                  | 默认缓存过期时间（秒）                             |
+| `REDIS_URL`             | `redis://127.0.0.1:6379/` | Redis 连接地址                             |
+| `REDIS_KEY_PREFIX`      | `shortlinker:`          | Redis 键前缀                                 |
+| `REDIS_POOL_SIZE`       | `10`                    | Redis 连接池大小                              |
+| `MEMORY_MAX_CAPACITY`   | `10000`                 | 内存缓存最大容量（条目数）                          |
+| `ADMIN_TOKEN`           | *(empty)*               | 管理 API 密钥                                |
+| `HEALTH_TOKEN`          | *(empty)*               | 健康检查密钥                                   |
+| `ADMIN_ROUTE_PREFIX`    | `/admin`                | 管理 API 路由前缀                             |
+| `HEALTH_ROUTE_PREFIX`   | `/health`               | 健康检查路由前缀                                |
+| `FRONTEND_ROUTE_PREFIX` | `/panel`                | Web 管理面板路由前缀                            |
+| `ENABLE_ADMIN_PANEL`    | `false`                 | 启用 Web 管理面板                             |
+| `RANDOM_CODE_LENGTH`    | `6`                     | 随机短码长度                                   |
+| `DEFAULT_URL`           | `https://esap.cc/repo`  | 默认跳转 URL                                 |
+| `RUST_LOG`              | `info`                  | 日志等级                                     |
 
 ---
 
 ## 📦 存储选项
 
 * SQLite（推荐）：稳定、支持高并发
-* 文件（JSON）：适合开发测试
+* MySQL / MariaDB
+* Postgres
 
 ---
 

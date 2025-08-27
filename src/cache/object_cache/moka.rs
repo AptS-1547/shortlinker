@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use moka::future::Cache;
+use tracing::debug;
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
@@ -13,18 +14,23 @@ pub struct MokaCacheWrapper {
 
 impl Default for MokaCacheWrapper {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("MokaCacheWrapper initialization failed")
     }
 }
 
 impl MokaCacheWrapper {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
+        let config = crate::system::app_config::get_config();
         let inner = Cache::builder()
-            .max_capacity(10_000)
-            .time_to_live(std::time::Duration::from_secs(900))
-            .time_to_idle(std::time::Duration::from_secs(300))
+            .max_capacity(config.cache.memory.max_capacity)
+            .time_to_live(std::time::Duration::from_secs(config.cache.default_ttl))
             .build();
-        Self { inner }
+
+        debug!(
+            "MokaCacheWrapper initialized with max capacity: {}",
+            config.cache.memory.max_capacity
+        );
+        Ok(Self { inner })
     }
 }
 

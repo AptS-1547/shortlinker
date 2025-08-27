@@ -11,14 +11,14 @@ pub struct NullObjectCache;
 
 impl Default for NullObjectCache {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("NullObjectCache initialization failed")
     }
 }
 
 impl NullObjectCache {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
         debug!("Using NullObjectCache: no L2 cache will be used");
-        NullObjectCache
+        Ok(NullObjectCache)
     }
 }
 

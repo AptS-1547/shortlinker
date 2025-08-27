@@ -16,49 +16,49 @@ pub type BoxedObjectCacheFuture =
     Pin<Box<dyn Future<Output = Result<Box<dyn ObjectCache>>> + Send>>;
 pub type ObjectCacheConstructor = Arc<dyn Fn() -> BoxedObjectCacheFuture + Send + Sync>;
 
-static CACHE_L1_REGISTRY: Lazy<RwLock<HashMap<String, ExistenceFilterConstructor>>> =
+static CACHE_FILTER_REGISTRY: Lazy<RwLock<HashMap<String, ExistenceFilterConstructor>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-static CACHE_L2_REGISTRY: Lazy<RwLock<HashMap<String, ObjectCacheConstructor>>> =
+static OBJECT_CACHE_REGISTRY: Lazy<RwLock<HashMap<String, ObjectCacheConstructor>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub fn register_l1_plugin<S: Into<String>>(name: S, constructor: ExistenceFilterConstructor) {
+pub fn register_filter_plugin<S: Into<String>>(name: S, constructor: ExistenceFilterConstructor) {
     let name = name.into();
-    let mut registry = CACHE_L1_REGISTRY.write().unwrap();
+    let mut registry = CACHE_FILTER_REGISTRY.write().unwrap();
     registry.insert(name, constructor);
 }
 
-pub fn get_l1_plugin(name: &str) -> Option<ExistenceFilterConstructor> {
-    CACHE_L1_REGISTRY.read().unwrap().get(name).cloned()
+pub fn get_filter_plugin(name: &str) -> Option<ExistenceFilterConstructor> {
+    CACHE_FILTER_REGISTRY.read().unwrap().get(name).cloned()
 }
 
-pub fn register_l2_plugin<S: Into<String>>(name: S, constructor: ObjectCacheConstructor) {
+pub fn register_object_cache_plugin<S: Into<String>>(name: S, constructor: ObjectCacheConstructor) {
     let name = name.into();
-    let mut registry = CACHE_L2_REGISTRY.write().unwrap();
+    let mut registry = OBJECT_CACHE_REGISTRY.write().unwrap();
     registry.insert(name, constructor);
 }
 
-pub fn get_l2_plugin(name: &str) -> Option<ObjectCacheConstructor> {
-    CACHE_L2_REGISTRY.read().unwrap().get(name).cloned()
+pub fn get_object_cache_plugin(name: &str) -> Option<ObjectCacheConstructor> {
+    OBJECT_CACHE_REGISTRY.read().unwrap().get(name).cloned()
 }
 
 pub fn debug_cache_registry() {
-    let l1_registry = CACHE_L1_REGISTRY.read().unwrap();
-    if l1_registry.is_empty() {
-        tracing::debug!("No L1 cache plugins registered.");
+    let filter_registry = CACHE_FILTER_REGISTRY.read().unwrap();
+    if filter_registry.is_empty() {
+        tracing::debug!("No Filter plugins registered.");
     } else {
-        tracing::debug!("Registered L1 cache plugins:");
-        for key in l1_registry.keys() {
+        tracing::debug!("Registered Filter plugins:");
+        for key in filter_registry.keys() {
             tracing::debug!(" - {}", key);
         }
     }
 
-    let l2_registry = CACHE_L2_REGISTRY.read().unwrap();
-    if l2_registry.is_empty() {
-        tracing::debug!("No L2 cache plugins registered.");
+    let object_cache_registry = OBJECT_CACHE_REGISTRY.read().unwrap();
+    if object_cache_registry.is_empty() {
+        tracing::debug!("No Object Cache plugins registered.");
     } else {
-        tracing::debug!("Registered L2 cache plugins:");
-        for key in l2_registry.keys() {
+        tracing::debug!("Registered Object Cache plugins:");
+        for key in object_cache_registry.keys() {
             tracing::debug!(" - {}", key);
         }
     }

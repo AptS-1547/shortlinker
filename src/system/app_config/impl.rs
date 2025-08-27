@@ -81,7 +81,7 @@ impl AppConfig {
         if let Ok(database_url) = env::var("DATABASE_URL") {
             self.database.database_url = database_url;
         }
-        if let Ok(pool_size) = env::var("DATABASE_POLL_SIZE") {
+        if let Ok(pool_size) = env::var("DATABASE_POOL_SIZE") {
             if let Ok(size) = pool_size.parse::<u32>() {
                 self.database.pool_size = size;
             } else {

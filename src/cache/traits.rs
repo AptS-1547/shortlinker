@@ -26,10 +26,10 @@ pub trait CompositeCacheTrait: Send + Sync {
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
-    /// 批量加载 L1 和 L2 缓存
+    /// 批量加载 Filter 和 Object Cache
     async fn load_cache(&self, links: HashMap<String, ShortLink>);
 
-    /// 重新初始化 L1 缓存
+    /// 重新初始化 Filter
     async fn reconfigure(&self, config: BloomConfig);
 }
 
@@ -40,13 +40,13 @@ pub trait ExistenceFilter: Send + Sync {
     /// - `true` 表示**可能存在**
     async fn check(&self, key: &str) -> bool;
 
-    /// 设置新值进入 L1 缓存（例如将 key 加入 Bloom Filter）
+    /// 设置新值进入 Filter（例如将 key 加入 Bloom Filter）
     async fn set(&self, key: &str);
 
     /// 批量设置（用于从数据库或持久层导入）
     async fn bulk_set(&self, keys: &[String]);
 
-    /// 清空整个 L1 缓存（重载、重建场景）
+    /// 清空整个 Filter（重载、重建场景）
     async fn clear(&self, count: usize, fp_rate: f64) {
         // 默认实现：子类可以选择覆盖
         tracing::debug!(
@@ -64,7 +64,7 @@ pub trait ObjectCache: Send + Sync {
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
-    async fn load_l2_cache(&self, _keys: HashMap<String, ShortLink>) {
+    async fn load_object_cache(&self, _keys: HashMap<String, ShortLink>) {
         // 默认实现：子类可以选择覆盖
         tracing::debug!("Not loading Object Cache, no operation defined");
     }

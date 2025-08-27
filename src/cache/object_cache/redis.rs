@@ -10,52 +10,65 @@ use crate::storages::ShortLink;
 declare_object_cache_plugin!("redis", RedisObjectCache);
 
 pub struct RedisObjectCache {
-    client: Option<redis::Client>,
+    client: redis::Client,
     key_prefix: String,
     ttl: u64, // TTL in seconds
 }
 
 impl Default for RedisObjectCache {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("RedisObjectCache initialization failed")
     }
 }
 
 impl RedisObjectCache {
-
     // TODO: 回退检测
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
         let config = crate::system::app_config::get_config();
-        let redis_url = config.cache.redis.url.clone();
-        let key_prefix = config.cache.redis.key_prefix.clone();
+        let redis_config = &config.cache.redis;
+
         let ttl = config.cache.default_ttl;
 
         debug!(
             "RedisObjectCache created with prefix: '{}', TTL: {}s",
-            key_prefix, ttl
+            redis_config.key_prefix, ttl
         );
 
-        let client = redis::Client::open(redis_url)
-            .expect("Failed to create Redis client. Check REDIS_URL.")
-            .into();
+        let client = redis::Client::open(redis_config.url.clone())
+            .expect("Failed to create Redis client. Check REDIS_URL.");
 
-        Self {
-            client,
-            key_prefix,
-            ttl,
+        // 测试 Redis 连接 - 使用同步连接进行简单测试
+        match client.get_connection() {
+            Ok(mut conn) => match redis::cmd("PING").query::<String>(&mut conn) {
+                Ok(response) => {
+                    debug!("Redis connection test successful: {}", response);
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to ping Redis server: {}. Check Redis server status and URL: {}",
+                        e, redis_config.url
+                    );
+                    return Err(format!("Redis ping failed: {e}"));
+                }
+            },
+            Err(e) => {
+                error!(
+                    "Failed to ping Redis server: {}. Check Redis server status and URL: {}",
+                    e, redis_config.url
+                );
+                return Err(format!("Redis ping failed: {e}"));
+            }
         }
+
+        Ok(Self {
+            client,
+            key_prefix: redis_config.key_prefix.clone(),
+            ttl: config.cache.default_ttl,
+        })
     }
 
     async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
-        let client = if let Some(ref client) = self.client {
-            client
-        } else {
-            return Err(redis::RedisError::from((
-                redis::ErrorKind::IoError,
-                "Redis client not available",
-            )));
-        };
-
+        let client = &self.client;
         let conn = client.get_multiplexed_tokio_connection().await?;
         Ok(conn)
     }

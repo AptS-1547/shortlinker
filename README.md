@@ -194,36 +194,67 @@ Create a `config.toml` file:
 
 ```toml
 [server]
-host = "0.0.0.0"
+# Server listening address
+host = "127.0.0.1"
+# Server listening port
 port = 8080
-# unix_socket = "/tmp/shortlinker.sock"  # Optional: Unix Socket
+# Unix Socket path (if set, overrides host and port)
+# unix_socket = "/tmp/shortlinker.sock"
+# CPU core count (defaults to system cores)
 cpu_count = 4
 
 [storage]
-backend = "sqlite"
-database_url = "data/links.db"
-# db_file_name = "links.json"  # Only used when backend = "file"
+# Storage backend type: sqlite, postgres, mysql, mariadb
+type = "sqlite"
+# Database connection URL or file path
+database_url = "shortlinks.db"
+# Database connection pool size
+pool_size = 10
+# Database connection timeout (seconds)
+timeout = 30
 
 [cache]
-redis_url = "redis://127.0.0.1:6379/"
-redis_key_prefix = "shortlinker:"
-redis_ttl = 3600
+# Cache type: memory, redis (currently only memory is supported)
+type = "memory"
+# Default cache expiration time (seconds)
+default_ttl = 3600
+
+[cache.redis]
+# Redis connection URL
+url = "redis://127.0.0.1:6379/"
+# Redis key prefix
+key_prefix = "shortlinker:"
+# Redis connection pool size
+pool_size = 10
+
+[cache.memory]
+# Memory cache maximum capacity (entries)
+max_capacity = 10000
 
 [api]
-admin_token = "your_admin_token"
-health_token = "your_health_token"
+# Admin API Token (leave empty to disable admin API)
+admin_token = ""
+# Health check API Token (leave empty to use admin_token)
+health_token = ""
 
 [routes]
+# Admin API route prefix
 admin_prefix = "/admin"
+# Health check route prefix
 health_prefix = "/health"
+# Frontend panel route prefix
 frontend_prefix = "/panel"
 
 [features]
+# Whether to enable Web admin panel
 enable_admin_panel = false
-random_code_length = 8
-default_url = "https://example.com"
+# Random short code length
+random_code_length = 6
+# Default redirect URL
+default_url = "https://esap.cc/repo"
 
 [logging]
+# Log level: trace, debug, info, warn, error
 level = "info"
 ```
 
@@ -235,7 +266,7 @@ Configuration file search order:
 
 ### Environment Variables (Backward Compatible)
 
-Still supports the original environment variable configuration method. Environment variables will override TOML configuration:
+Still supports the original environment variable configuration method. **Environment variables will override TOML configuration:**
 
 | Variable               | Default                  | Description                                 |
 | ---------------------- | ------------------------ | ------------------------------------------- |
@@ -243,21 +274,26 @@ Still supports the original environment variable configuration method. Environme
 | `SERVER_PORT`        | `8080`                 | Listen port                                 |
 | `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
 | `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `STORAGE_BACKEND`    | `sqlite`               | Storage type: sqlite, file, postgres, mysql |
+| `DATABASE_BACKEND`   | `sqlite`               | Storage type: sqlite, postgres, mysql, mariadb |
 | `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path                   |
-| `DB_FILE_NAME`       | `links.json`           | JSON file path (only when backend = "file") |
+| `DATABASE_POOL_SIZE` | `10`                   | Database connection pool size               |
+| `DATABASE_TIMEOUT`   | `30`                   | Database connection timeout (seconds)       |
+| `CACHE_TYPE`         | `memory`               | Cache type: memory, redis                   |
+| `CACHE_DEFAULT_TTL`  | `3600`                 | Default cache TTL in seconds                |
 | `REDIS_URL`          | `redis://127.0.0.1:6379/` | Redis connection URL                    |
 | `REDIS_KEY_PREFIX`   | `shortlinker:`         | Redis key prefix                            |
-| `REDIS_TTL`          | `3600`                 | Redis TTL in seconds                        |
-| `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
-| `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
+| `REDIS_POOL_SIZE`    | `10`                   | Redis connection pool size                  |
+| `MEMORY_MAX_CAPACITY`| `10000`                | Memory cache max capacity (entries)         |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
 | `ADMIN_ROUTE_PREFIX` | `/admin`               | Admin API route prefix                      |
 | `HEALTH_ROUTE_PREFIX`| `/health`              | Health API route prefix                     |
-| `ENABLE_ADMIN_PANEL` | `false` | Serve web admin panel (requires build and ADMIN_TOKEN) |
-| `FRONTEND_ROUTE_PREFIX` | `/panel` | Web admin panel route prefix |
+| `FRONTEND_ROUTE_PREFIX` | `/panel`            | Web admin panel route prefix                |
+| `ENABLE_ADMIN_PANEL` | `false`                | Enable web admin panel                      |
+| `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
+| `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
 | `RUST_LOG`           | `info`                 | Log level                                   |
+
 > **Note**: The web admin panel is a new feature and may be unstable.
 
 ### .env Example
@@ -288,7 +324,8 @@ RUST_LOG=info
 ## Storage Backends
 
 - **SQLite** (default, v0.1.0+): Production-ready, recommended
-- **File Storage**: Simple JSON-based storage for development
+- **MySQL / MariaDB** (v0.1.2+): Production-ready, recommended
+- **Postgres** (v0.1.3+): Production-ready, recommended
 
 ```bash
 # SQLite (recommended)
@@ -365,16 +402,6 @@ cargo fmt && cargo clippy
 
 - **Web Admin Panel**: GUI to manage links in `admin-panel/` ([docs](/admin-panel/))
 - **Cloudflare Worker**: Serverless version in `cf-worker/` ([docs](/cf-worker/))
-
-
-## Technical Highlights
-
-- **Cross-Platform Process Management**: Smart lock files and signal handling
-- **Hot Configuration Reload**: Signal-based reload (Unix) and file triggers (Windows)
-- **Container-Aware**: Special handling for Docker environments
-- **Unified Error Handling**: Comprehensive error types with automatic conversions
-- **Memory Safe**: Zero-cost abstractions with thread safety
-- **High Test Coverage**: Comprehensive unit and integration tests
 
 ## License
 
