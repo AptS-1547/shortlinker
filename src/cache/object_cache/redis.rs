@@ -22,6 +22,8 @@ impl Default for RedisObjectCache {
 }
 
 impl RedisObjectCache {
+
+    // TODO: 回退检测
     pub fn new() -> Self {
         let config = crate::system::app_config::get_config();
         let redis_url = config.cache.redis.url.clone();

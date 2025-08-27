@@ -1,7 +1,7 @@
 use crate::cache::register::{get_l1_plugin, get_l2_plugin};
 use crate::cache::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};
 use crate::errors::ShortlinkerError;
-use crate::storages::{CachePreference, ShortLink};
+use crate::storages::ShortLink;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,14 +12,23 @@ pub struct CompositeCache {
 }
 
 impl CompositeCache {
-    pub async fn create(
-        pref: CachePreference,
-    ) -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
-        let l1_ctor = get_l1_plugin(&pref.l1).ok_or_else(|| {
-            ShortlinkerError::cache_plugin_not_found(format!("L1 plugin not found: {}", &pref.l1))
+    pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
+        let config = crate::system::app_config::get_config();
+
+        let l1_cache_name = "bloom";
+        let l2_cache_name = &config.cache.cache_type;
+
+        let l1_ctor = get_l1_plugin(l1_cache_name).ok_or_else(|| {
+            ShortlinkerError::cache_plugin_not_found(format!(
+                "L1 plugin not found: {}",
+                l1_cache_name
+            ))
         })?;
-        let l2_ctor = get_l2_plugin(&pref.l2).ok_or_else(|| {
-            ShortlinkerError::cache_plugin_not_found(format!("L2 plugin not found: {}", &pref.l2))
+        let l2_ctor = get_l2_plugin(l2_cache_name).ok_or_else(|| {
+            ShortlinkerError::cache_plugin_not_found(format!(
+                "L2 plugin not found: {}",
+                l2_cache_name
+            ))
         })?;
 
         let l1 = l1_ctor().await?;

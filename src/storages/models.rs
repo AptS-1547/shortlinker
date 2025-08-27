@@ -1,11 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
-pub struct CachePreference {
-    pub l1: String,
-    pub l2: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortLink {
     pub code: String,

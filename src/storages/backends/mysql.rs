@@ -9,7 +9,7 @@ use tracing::{debug, error, info, warn};
 use crate::errors::{Result, ShortlinkerError};
 use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
-use crate::storages::{CachePreference, ShortLink, Storage};
+use crate::storages::{ShortLink, Storage};
 
 declare_storage_plugin!("mysql", MySqlStorage);
 
@@ -243,13 +243,6 @@ impl Storage for MySqlStorage {
         Self: Clone + Sized,
     {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
-    }
-
-    fn preferred_cache(&self) -> CachePreference {
-        CachePreference {
-            l1: "bloom".into(),
-            l2: "moka".into(),
-        }
     }
 }
 

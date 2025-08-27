@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use super::{CachePreference, ShortLink, Storage};
+use super::{ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
 use crate::storages::click::ClickSink;
 use crate::storages::models::StorageConfig;
@@ -311,13 +311,6 @@ impl Storage for SqliteStorage {
         Self: Clone + Sized,
     {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
-    }
-
-    fn preferred_cache(&self) -> CachePreference {
-        CachePreference {
-            l1: "bloom".into(),
-            l2: "moka".into(),
-        }
     }
 }
 

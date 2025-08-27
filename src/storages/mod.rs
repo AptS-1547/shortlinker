@@ -15,7 +15,7 @@ pub mod click;
 pub mod models;
 pub mod register;
 
-pub use models::{CachePreference, ShortLink};
+pub use models::ShortLink;
 use register::get_storage_plugin;
 
 #[async_trait::async_trait]
@@ -30,14 +30,6 @@ pub trait Storage: Send + Sync {
     /// 增加点击量计数器
     fn as_click_sink(&self) -> Option<Arc<dyn click::ClickSink>> {
         None
-    }
-
-    /// 缓存首选项
-    fn preferred_cache(&self) -> CachePreference {
-        CachePreference {
-            l1: "null".into(),
-            l2: "null".into(),
-        }
     }
 }
 

@@ -5,7 +5,7 @@ use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
 use crate::storages::ShortLink;
 
-declare_object_cache_plugin!("moka", MokaCacheWrapper);
+declare_object_cache_plugin!("memory", MokaCacheWrapper);
 
 pub struct MokaCacheWrapper {
     inner: Cache<String, ShortLink>,

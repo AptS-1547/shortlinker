@@ -70,7 +70,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     }
 
     // 初始化缓存
-    let cache = cache::CompositeCache::create(storage.preferred_cache().clone())
+    let cache = cache::CompositeCache::create()
         .await
         .expect("Failed to create cache");
 
