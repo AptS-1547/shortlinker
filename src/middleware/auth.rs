@@ -1,11 +1,11 @@
 use actix_service::{Service, Transform};
 use actix_web::{
+    Error, HttpResponse,
     body::EitherBody,
     dev::{ServiceRequest, ServiceResponse},
-    http::{header::CONTENT_TYPE, Method},
-    Error, HttpResponse,
+    http::{Method, header::CONTENT_TYPE},
 };
-use futures_util::future::{ready, LocalBoxFuture, Ready};
+use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use tracing::{debug, warn};
 

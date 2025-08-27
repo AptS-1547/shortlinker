@@ -4,7 +4,6 @@ use crate::storages::click::manager::ClickManager;
 use crate::storages::{Storage, StorageFactory};
 use crate::system;
 use crate::system::app_config::get_config;
-use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -26,14 +25,11 @@ pub struct RouteConfig {
 /// CLI 模式预处理
 pub async fn cli_pre_startup() {
     // CLI Mode
-    env::set_var("CLI_MODE", "true");
 }
 
 /// 准备服务器启动的上下文
 /// 包括存储、缓存和路由配置等
 pub async fn prepare_server_startup() -> StartupContext {
-    std::env::set_var("CLI_MODE", "false");
-
     crate::system::lockfile::init_lockfile().expect("Failed to initialize lockfile");
 
     rustls::crypto::ring::default_provider()

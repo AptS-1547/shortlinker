@@ -1,4 +1,4 @@
-use super::{commands::Command, CliError};
+use super::{CliError, commands::Command};
 use std::env;
 
 pub struct CliParser;
@@ -88,7 +88,7 @@ impl CliParser {
             _ => {
                 return Err(CliError::ParseError(
                     "Invalid number of arguments for add command".to_string(),
-                ))
+                ));
             }
         };
 

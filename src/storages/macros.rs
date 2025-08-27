@@ -4,7 +4,7 @@ macro_rules! declare_storage_plugin {
         #[ctor::ctor]
         fn __register_storage_plugin() {
             use std::sync::Arc;
-            use $crate::storages::{register::register_storage_plugin, Storage};
+            use $crate::storages::{Storage, register::register_storage_plugin};
 
             register_storage_plugin(
                 $name,

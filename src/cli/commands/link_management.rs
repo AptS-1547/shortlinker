@@ -1,7 +1,7 @@
 use super::super::CliError;
 use crate::storages::{ShortLink, Storage};
-use crate::utils::generate_random_code;
 use crate::utils::TimeParser;
+use crate::utils::generate_random_code;
 use colored::*;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -411,11 +411,10 @@ pub async fn import_links(
     );
 
     // Notify server to reload
-    if imported_count > 0 {
-        if let Err(e) = crate::system::notify_server() {
+    if imported_count > 0
+        && let Err(e) = crate::system::notify_server() {
             println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
         }
-    }
 
     Ok(())
 }

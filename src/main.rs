@@ -1,4 +1,4 @@
-use actix_web::{middleware::DefaultHeaders, web, App, HttpServer};
+use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use dotenv::dotenv;
 use std::env;
 use tracing::{debug, warn};

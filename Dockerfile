@@ -56,7 +56,7 @@ FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="1.0.0"
+LABEL version="0.2.0-alpha.2"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
@@ -70,10 +70,6 @@ EXPOSE 8080
 
 # 设置环境变量
 ENV DOCKER_ENV=1
-ENV SERVER_HOST=0.0.0.0
-ENV SERVER_PORT=8080
-ENV DATABASE_URL=/data/shortlinker.db
-ENV RUST_LOG=info
 
 # 启动命令
 ENTRYPOINT ["/shortlinker"]

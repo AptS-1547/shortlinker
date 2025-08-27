@@ -1,4 +1,4 @@
-use actix_web::{http::Method, http::StatusCode, test, web, App, HttpResponse};
+use actix_web::{App, HttpResponse, http::Method, http::StatusCode, test, web};
 use shortlinker::middleware::AdminAuth;
 use std::sync::Mutex;
 

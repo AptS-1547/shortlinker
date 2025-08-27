@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use redis::{aio::MultiplexedConnection, AsyncCommands};
+use redis::{AsyncCommands, aio::MultiplexedConnection};
 use serde_json;
 use tracing::{debug, error, warn};
 

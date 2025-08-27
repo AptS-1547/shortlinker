@@ -1,4 +1,4 @@
-use sqlx::{sqlite, sqlite::SqliteConnectOptions, Row, SqlitePool};
+use sqlx::{Row, SqlitePool, sqlite, sqlite::SqliteConnectOptions};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};

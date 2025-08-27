@@ -1,4 +1,4 @@
-use crate::cache::{traits::BloomConfig, CompositeCacheTrait};
+use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::storages::Storage;
 use std::sync::Arc;
 
@@ -33,7 +33,7 @@ pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
 ) {
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
 
     tokio::spawn(async move {
         let mut stream =
@@ -59,7 +59,7 @@ pub async fn setup_reload_mechanism(
 ) {
     use std::time::SystemTime;
     use tokio::fs;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     let reload_file = "shortlinker.reload";
     let mut last_check = SystemTime::now();

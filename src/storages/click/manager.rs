@@ -1,10 +1,10 @@
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tracing::debug;
 
 use crate::storages::click::ClickSink;

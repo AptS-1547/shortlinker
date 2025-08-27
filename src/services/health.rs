@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, web};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

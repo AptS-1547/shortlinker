@@ -15,7 +15,7 @@ declare_storage_plugin!("mysql", MySqlStorage);
 
 #[ctor::ctor]
 fn register_mariadb_alias() {
-    use crate::storages::{register::register_storage_plugin, Storage};
+    use crate::storages::{Storage, register::register_storage_plugin};
     use std::{future::Future, pin::Pin, sync::Arc};
 
     register_storage_plugin(

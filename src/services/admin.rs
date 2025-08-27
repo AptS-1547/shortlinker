@@ -1,5 +1,5 @@
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpRequest, HttpResponse, Responder, Result as ActixResult};
+use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use tracing::{debug, error, info};
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storages::{ShortLink, Storage};
 use crate::system::reload::reload_all;
-use crate::utils::{generate_random_code, TimeParser};
+use crate::utils::{TimeParser, generate_random_code};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LoginCredentials {
@@ -178,21 +178,17 @@ impl AdminService {
             .into_iter()
             .filter(|(_, link)| {
                 // Time filters
-                if let Some(created_after) = &query.created_after {
-                    if let Ok(after_time) = chrono::DateTime::parse_from_rfc3339(created_after) {
-                        if link.created_at < after_time.with_timezone(&chrono::Utc) {
+                if let Some(created_after) = &query.created_after
+                    && let Ok(after_time) = chrono::DateTime::parse_from_rfc3339(created_after)
+                        && link.created_at < after_time.with_timezone(&chrono::Utc) {
                             return false;
                         }
-                    }
-                }
 
-                if let Some(created_before) = &query.created_before {
-                    if let Ok(before_time) = chrono::DateTime::parse_from_rfc3339(created_before) {
-                        if link.created_at > before_time.with_timezone(&chrono::Utc) {
+                if let Some(created_before) = &query.created_before
+                    && let Ok(before_time) = chrono::DateTime::parse_from_rfc3339(created_before)
+                        && link.created_at > before_time.with_timezone(&chrono::Utc) {
                             return false;
                         }
-                    }
-                }
 
                 // Expiration status filter
                 let is_expired = link.expires_at.is_some_and(|exp| exp < now);

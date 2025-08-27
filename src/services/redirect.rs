@@ -1,7 +1,7 @@
 // Rust 化完成
 
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, web};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tracing::debug;
@@ -28,15 +28,15 @@ impl RedirectService {
     ) -> impl Responder {
         let captured_path = path.into_inner();
 
-        let response = if captured_path.is_empty() {
+        
+
+        if captured_path.is_empty() {
             HttpResponse::TemporaryRedirect()
                 .insert_header(("Location", DEFAULT_REDIRECT_URL.as_str()))
                 .finish()
         } else {
             Self::process_redirect(captured_path, cache, storage).await
-        };
-
-        response
+        }
     }
 
     async fn process_redirect(
@@ -94,14 +94,13 @@ impl RedirectService {
     }
 
     fn finish_redirect(link: ShortLink) -> HttpResponse {
-        if let Some(expires_at) = link.expires_at {
-            if expires_at < chrono::Utc::now() {
+        if let Some(expires_at) = link.expires_at
+            && expires_at < chrono::Utc::now() {
                 return HttpResponse::build(StatusCode::NOT_FOUND)
                     .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .insert_header(("Cache-Control", "public, max-age=60"))
                     .body("Not Found");
             }
-        }
 
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
             .insert_header(("Location", link.target))
