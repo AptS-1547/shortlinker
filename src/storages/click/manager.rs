@@ -52,6 +52,7 @@ impl ClickManager {
 
     async fn flush_inner(&self) {
         if CLICK_UPDATE_LOCK.swap(true, Ordering::SeqCst) {
+            debug!("ClickManager: flush already in progress, skipping");
             return; // 有其他 flush 正在进行
         }
 
@@ -62,6 +63,8 @@ impl ClickManager {
                 .collect::<Vec<_>>();
 
             if updates.is_empty() {
+                debug!("ClickManager: No clicks to flush");
+                CLICK_UPDATE_LOCK.store(false, Ordering::SeqCst);
                 return;
             }
             CLICK_BUFFER.clear();
@@ -74,5 +77,6 @@ impl ClickManager {
         }
 
         CLICK_UPDATE_LOCK.store(false, Ordering::SeqCst);
+        debug!("ClickManager: flush completed");
     }
 }
