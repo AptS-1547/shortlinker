@@ -68,6 +68,9 @@ uuid = { version = "1.0", features = ["v4"] }
 redis = { version = "0.32.2", features = ["tokio-comp", "tokio-rustls-comp"] }
 rustls = "0.23.28"
 toml = "0.9"
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+ratatui = "0.29.0"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

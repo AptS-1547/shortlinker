@@ -2,6 +2,8 @@ use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use dotenv::dotenv;
 use std::env;
 use tracing::{debug, warn};
+use color_eyre::Result;
+use colored::*;
 
 mod cache;
 #[cfg(feature = "cli")]
@@ -31,8 +33,23 @@ struct ServerConfig {
     unix_socket_path: Option<String>,
 }
 
+async fn handle_mode_error<T, E: std::fmt::Display>(
+    result: Result<T, E>, 
+    mode_name: &str
+) -> Result<(), color_eyre::Report> {
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            println!("{} {}: {}", mode_name, "Error".bold().red(), e);
+            Err(color_eyre::eyre::eyre!(e.to_string()))
+        }
+    }
+}
+
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
+    // 设置全局错误处理和日志
+    color_eyre::install()?;
     dotenv().ok();
 
     // 初始化配置系统
@@ -45,15 +62,13 @@ async fn main() -> std::io::Result<()> {
     #[cfg(feature = "cli")]
     if args.len() > 1 {
         lifetime::startup::cli_pre_startup().await;
-        cli::run_cli().await;
-        return Ok(());
+        return handle_mode_error(cli::run_cli().await, "CLI").await;
     }
 
     #[cfg(feature = "tui")]
     if args.len() > 1 && args[1] == "tui" {
         // TUI模式启动逻辑
-        tui::run_tui().await;
-        return Ok(());
+        return handle_mode_error(tui::run_tui(), "TUI").await;
     }
 
     // 服务器模式（默认）
@@ -72,7 +87,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 #[cfg(feature = "server")]
-async fn run_server(config: &crate::system::app_config::AppConfig) -> std::io::Result<()> {
+async fn run_server(config: &crate::system::app_config::AppConfig) -> Result<()> {
     // 记录程序启动时间
     let app_start_time = AppStartTime {
         start_datetime: chrono::Utc::now(),

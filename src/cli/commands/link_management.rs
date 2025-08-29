@@ -65,10 +65,10 @@ pub async fn add_link(
     expire_time: Option<String>,
     password: Option<String>,
 ) -> Result<(), CliError> {
-    // 验证 URL 格式
+    // Validate URL format
     if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
         return Err(CliError::CommandError(
-            "URL 必须以 http:// 或 https:// 开头".to_string(),
+            "URL must start with http:// or https://".to_string(),
         ));
     }
 
@@ -90,7 +90,7 @@ pub async fn add_link(
 
     let links = storage.load_all().await;
 
-    // 检查短码是否已存在
+    // Check if short code already exists
     if links.contains_key(&final_short_code) {
         if force_overwrite {
             println!(
@@ -120,7 +120,7 @@ pub async fn add_link(
             }
             Err(e) => {
                 return Err(CliError::CommandError(format!(
-                    "过期时间格式错误: {}。支持的格式：\n  - RFC3339: 2023-10-01T12:00:00Z\n  - 相对时间: 1d, 2w, 1y, 1d2h30m",
+                    "Invalid expiration time format: {}. Supported formats:\n  - RFC3339: 2023-10-01T12:00:00Z\n  - Relative time: 1d, 2w, 1y, 1d2h30m",
                     e
                 )));
             }
@@ -140,7 +140,7 @@ pub async fn add_link(
     storage
         .set(link)
         .await
-        .map_err(|e| CliError::CommandError(format!("保存失败: {}", e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to save: {}", e)))?;
 
     if let Some(expire) = expires_at {
         println!(
@@ -172,7 +172,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
 
     if !links.contains_key(&short_code) {
         return Err(CliError::CommandError(format!(
-            "短链接不存在: {}",
+            "Short link does not exist: {}",
             short_code
         )));
     }
@@ -180,7 +180,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
     storage
         .remove(&short_code)
         .await
-        .map_err(|e| CliError::CommandError(format!("删除失败: {}", e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to delete: {}", e)))?;
 
     println!(
         "{} Deleted short link: {}",
@@ -203,19 +203,19 @@ pub async fn update_link(
     expire_time: Option<String>,
     password: Option<String>,
 ) -> Result<(), CliError> {
-    // 验证 URL 格式
+    // Validate URL format
     if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
         return Err(CliError::CommandError(
-            "URL 必须以 http:// 或 https:// 开头".to_string(),
+            "URL must start with http:// or https://".to_string(),
         ));
     }
 
-    // 检查短码是否存在
+    // Check if short code exists
     let old_link = match storage.get(&short_code).await {
         Some(link) => link,
         None => {
             return Err(CliError::CommandError(format!(
-                "短链接不存在: {}",
+                "Short link does not exist: {}",
                 short_code
             )));
         }
@@ -225,7 +225,7 @@ pub async fn update_link(
         match TimeParser::parse_expire_time(&expire) {
             Ok(dt) => {
                 println!(
-                    "{} 过期时间解析为: {}",
+                    "{} Expiration parsed as: {}",
                     "ℹ".bold().blue(),
                     dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
                 );
@@ -233,27 +233,27 @@ pub async fn update_link(
             }
             Err(e) => {
                 return Err(CliError::CommandError(format!(
-                    "过期时间格式错误: {}。支持的格式：\n  - RFC3339: 2023-10-01T12:00:00Z\n  - 相对时间: 1d, 2w, 1y, 1d2h30m",
+                    "Invalid expiration time format: {}. Supported formats:\n  - RFC3339: 2023-10-01T12:00:00Z\n  - Relative time: 1d, 2w, 1y, 1d2h30m",
                     e
                 )));
             }
         }
     } else {
-        old_link.expires_at // 保持原有的过期时间
+        old_link.expires_at // Keep original expiration time
     };
     let updated_link = ShortLink {
         code: short_code.clone(),
         target: target_url.clone(),
-        created_at: old_link.created_at, // 保持原有的创建时间
+        created_at: old_link.created_at, // Keep original creation time
         expires_at,
-        password: password.or(old_link.password), // 如果提供新密码则更新，否则保持原密码
-        click: old_link.click,                    // 保持原有的点击计数
+        password: password.or(old_link.password), // Update password if provided, otherwise keep original
+        click: old_link.click,                    // Keep original click count
     };
 
     storage
         .set(updated_link)
         .await
-        .map_err(|e| CliError::CommandError(format!("更新失败: {}", e)))?;
+        .map_err(|e| CliError::CommandError(format!("Failed to update: {}", e)))?;
 
     println!(
         "{} Short link updated from {} to {}",
@@ -287,7 +287,7 @@ pub async fn export_links(
     if links.is_empty() {
         println!("{} No short links to export", "ℹ".bold().blue());
         return Ok(());
-    } // 收集所有链接
+    } // Collect all links
     let links_vec: Vec<&ShortLink> = links.values().collect();
 
     let output_path = file_path.unwrap_or_else(|| {
@@ -353,7 +353,7 @@ pub async fn import_links(
     let mut error_count = 0;
 
     for imported_link in imported_links {
-        // 检查短码是否已存在
+        // Check if short code already exists
         if !force_overwrite && existing_links.contains_key(&imported_link.code) {
             println!(
                 "{} Skipping existing code: {} (use --force to overwrite)",
@@ -364,7 +364,7 @@ pub async fn import_links(
             continue;
         }
 
-        // 验证URL格式
+        // Validate URL format
         if !imported_link.target.starts_with("http://")
             && !imported_link.target.starts_with("https://")
         {
@@ -378,7 +378,7 @@ pub async fn import_links(
             continue;
         }
 
-        // 直接使用导入的链接，因为它已经是完整的 ShortLink 结构
+        // Use the imported link directly since it's already a complete ShortLink structure
         match storage.set(imported_link.clone()).await {
             Ok(_) => {
                 imported_count += 1;
@@ -419,22 +419,22 @@ pub async fn import_links(
     Ok(())
 }
 
-/// 生成示例配置文件
+/// Generate example configuration file
 pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError> {
     let path = output_path.unwrap_or_else(|| "config.toml".to_string());
 
-    println!("{} {}", "正在生成配置文件...".yellow(), path.blue());
+    println!("{} {}", "Generating configuration file...".yellow(), path.blue());
 
     let config = crate::system::app_config::AppConfig::default();
     match config.save_to_file(&path) {
         Ok(()) => {
-            println!("  {} {}", "配置文件生成成功".green(), path.blue());
-            println!("  {} {}", "请编辑配置文件并重启服务".yellow(), "🔧".blue());
+            println!("  {} {}", "Configuration file generated successfully".green(), path.blue());
+            println!("  {} {}", "Please edit the configuration file and restart the service".yellow(), "🔧".blue());
             Ok(())
         }
         Err(e) => {
-            println!("  {} {}", "配置文件生成失败".red(), e.to_string().red());
-            Err(CliError::CommandError(format!("无法写入配置文件: {}", e)))
+            println!("  {} {}", "Failed to generate configuration file".red(), e.to_string().red());
+            Err(CliError::CommandError(format!("Unable to write configuration file: {}", e)))
         }
     }
 }

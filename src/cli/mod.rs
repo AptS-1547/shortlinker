@@ -2,10 +2,8 @@ pub mod commands;
 pub mod parser;
 
 use crate::storages::StorageFactory;
-use colored::*;
 use parser::CliParser;
 use std::fmt;
-use std::process;
 
 #[derive(Debug)]
 pub enum CliError {
@@ -32,14 +30,7 @@ impl From<crate::errors::ShortlinkerError> for CliError {
     }
 }
 
-pub async fn run_cli() {
-    if let Err(e) = run_cli_inner().await {
-        println!("{} {}", "Error:".bold().red(), e);
-        process::exit(1);
-    }
-}
-
-async fn run_cli_inner() -> Result<(), CliError> {
+pub async fn run_cli() -> Result<(), CliError> {
     let storage = StorageFactory::create()
         .await
         .map_err(|e| CliError::StorageError(e.to_string()))?;
