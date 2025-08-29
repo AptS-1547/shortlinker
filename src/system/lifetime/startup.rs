@@ -2,7 +2,6 @@ use crate::cache::{self, CompositeCacheTrait};
 use crate::storages::click::global::set_global_click_manager;
 use crate::storages::click::manager::ClickManager;
 use crate::storages::{Storage, StorageFactory};
-use crate::system;
 use crate::system::app_config::get_config;
 use std::sync::Arc;
 use std::time::Duration;
@@ -80,7 +79,8 @@ pub async fn prepare_server_startup() -> StartupContext {
     cache.load_cache(links.clone()).await;
     debug!("L1/L2 cache initialized with {} links", links.len());
 
-    system::setup_reload_mechanism(cache.clone(), storage.clone()).await;
+    #[cfg(any(feature = "cli", feature = "tui"))]
+    crate::system::setup_reload_mechanism(cache.clone(), storage.clone()).await;
 
     // 提取路由配置
     let config = get_config();

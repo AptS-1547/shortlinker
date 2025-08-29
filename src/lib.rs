@@ -3,6 +3,7 @@
 //! 这是一个高性能的短链接服务，支持命令行管理和Web API。
 
 pub mod cache;
+#[cfg(feature = "cli")]
 pub mod cli;
 pub mod errors;
 mod event;
@@ -10,6 +11,8 @@ pub mod middleware;
 pub mod services;
 pub mod storages;
 pub mod system;
+#[cfg(feature = "tui")]
+pub mod tui;
 pub mod utils;
 
 #[cfg(test)]

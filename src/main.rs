@@ -1,21 +1,21 @@
 use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
+use color_eyre::Result;
+use colored::*;
 use dotenv::dotenv;
 use std::env;
 use tracing::{debug, warn};
-use color_eyre::Result;
-use colored::*;
 
 mod cache;
 #[cfg(feature = "cli")]
 pub mod cli;
-#[cfg(feature = "tui")]
-pub mod tui;
 mod errors;
 mod event;
 mod middleware;
 mod services;
 mod storages;
 mod system;
+#[cfg(feature = "tui")]
+pub mod tui;
 mod utils;
 
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
@@ -34,8 +34,8 @@ struct ServerConfig {
 }
 
 async fn handle_mode_error<T, E: std::fmt::Display>(
-    result: Result<T, E>, 
-    mode_name: &str
+    result: Result<T, E>,
+    mode_name: &str,
 ) -> Result<(), color_eyre::Report> {
     match result {
         Ok(_) => Ok(()),
@@ -59,16 +59,16 @@ async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     // 根据编译features决定运行模式
+    #[cfg(feature = "tui")]
+    if args.len() > 1 && args[1] == "tui" {
+        // TUI模式启动逻辑
+        return handle_mode_error(tui::run_tui().await, "TUI").await;
+    }
+
     #[cfg(feature = "cli")]
     if args.len() > 1 {
         lifetime::startup::cli_pre_startup().await;
         return handle_mode_error(cli::run_cli().await, "CLI").await;
-    }
-
-    #[cfg(feature = "tui")]
-    if args.len() > 1 && args[1] == "tui" {
-        // TUI模式启动逻辑
-        return handle_mode_error(tui::run_tui(), "TUI").await;
     }
 
     // 服务器模式（默认）
@@ -95,7 +95,7 @@ async fn run_server(config: &crate::system::app_config::AppConfig) -> Result<()>
 
     // 启动前预处理 //
     debug!("Starting pre-startup processing...");
-    
+
     // 初始化日志
     let stdout_log = std::io::stdout();
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);

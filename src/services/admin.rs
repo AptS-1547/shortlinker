@@ -180,15 +180,17 @@ impl AdminService {
                 // Time filters
                 if let Some(created_after) = &query.created_after
                     && let Ok(after_time) = chrono::DateTime::parse_from_rfc3339(created_after)
-                        && link.created_at < after_time.with_timezone(&chrono::Utc) {
-                            return false;
-                        }
+                    && link.created_at < after_time.with_timezone(&chrono::Utc)
+                {
+                    return false;
+                }
 
                 if let Some(created_before) = &query.created_before
                     && let Ok(before_time) = chrono::DateTime::parse_from_rfc3339(created_before)
-                        && link.created_at > before_time.with_timezone(&chrono::Utc) {
-                            return false;
-                        }
+                    && link.created_at > before_time.with_timezone(&chrono::Utc)
+                {
+                    return false;
+                }
 
                 // Expiration status filter
                 let is_expired = link.expires_at.is_some_and(|exp| exp < now);
