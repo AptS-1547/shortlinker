@@ -5,6 +5,13 @@ description = "A minimalist URL shortener service supporting HTTP 307 redirectio
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 edition = "2024"
 
+[features]
+default = ["server"]  # 默认只包含服务器
+server = []           # 服务器功能（核心）
+cli = ["server"]      # CLI功能（依赖服务器）
+tui = ["server"]      # TUI功能（依赖服务器）
+full = ["server", "cli", "tui"]  # 全功能版本
+
 # 优化配置
 [profile.release]
 opt-level = "s"

@@ -49,7 +49,7 @@ ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z -C target-feature=+crt-static"
 
 # 静态链接编译 - 使用 musl 目标
 RUN touch src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl
+    cargo build --release --target x86_64-unknown-linux-musl --features cli
 
 # 运行阶段 - 使用scratch
 FROM scratch

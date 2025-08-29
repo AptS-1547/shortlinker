@@ -4,7 +4,10 @@ use std::env;
 use tracing::{debug, warn};
 
 mod cache;
-mod cli;
+#[cfg(feature = "cli")]
+pub mod cli;
+#[cfg(feature = "tui")]
+pub mod tui;
 mod errors;
 mod event;
 mod middleware;
@@ -38,21 +41,46 @@ async fn main() -> std::io::Result<()> {
 
     let args: Vec<String> = env::args().collect();
 
-    // CLI Mode
+    // 根据编译features决定运行模式
+    #[cfg(feature = "cli")]
     if args.len() > 1 {
         lifetime::startup::cli_pre_startup().await;
         cli::run_cli().await;
         return Ok(());
     }
 
+    #[cfg(feature = "tui")]
+    if args.len() > 1 && args[1] == "tui" {
+        // TUI模式启动逻辑
+        tui::run_tui().await;
+        return Ok(());
+    }
+
+    // 服务器模式（默认）
+    #[cfg(feature = "server")]
+    {
+        run_server(config).await?;
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        eprintln!("No features enabled. Please compile with --features server, cli, or tui");
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "server")]
+async fn run_server(config: &crate::system::app_config::AppConfig) -> std::io::Result<()> {
     // 记录程序启动时间
     let app_start_time = AppStartTime {
         start_datetime: chrono::Utc::now(),
     };
 
     // 启动前预处理 //
-
     debug!("Starting pre-startup processing...");
+    
     // 初始化日志
     let stdout_log = std::io::stdout();
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
@@ -224,4 +252,3 @@ async fn main() -> std::io::Result<()> {
 
     Ok(())
 }
-// DONE
