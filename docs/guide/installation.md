@@ -5,10 +5,12 @@
 ## 环境要求
 
 ### 运行环境
+
 - 操作系统：Linux、macOS、Windows
 - 网络连接：用于下载依赖
 
 ### 源码编译环境
+
 - **Rust**: >= 1.82.0 (必需)
 - **Git**: 用于克隆项目
 
@@ -58,7 +60,15 @@ rustc --version  # 应该 >= 1.82.0
 # 3. 克隆并编译
 git clone https://github.com/AptS-1547/shortlinker.git
 cd shortlinker
+
+# 基础编译（仅服务器功能）
 cargo build --release
+
+# 包含 TUI 界面编译
+cargo build --release --features tui
+
+# 全功能编译（服务器 + CLI + TUI）
+cargo build --release --features full
 
 # 4. 运行
 ./target/release/shortlinker
@@ -80,18 +90,21 @@ curl -I http://localhost:8080/
 ## 常见问题
 
 ### Rust 版本过低
+
 ```bash
 # 更新到最新版本
 rustup update
 ```
 
 ### 编译失败
+
 ```bash
 # 清理后重新编译
 cargo clean && cargo build --release
 ```
 
 ### 端口被占用
+
 ```bash
 # 使用其他端口
 SERVER_PORT=3000 ./shortlinker
@@ -100,6 +113,7 @@ SERVER_PORT=3000 ./shortlinker
 ## 下一步
 
 安装完成后，继续阅读：
+
 - 🚀 [快速开始](/guide/getting-started) - 学习基本使用
 - ⚙️ [配置说明](/config/) - 了解配置选项
 - 📋 [CLI 工具](/cli/) - 掌握命令行操作

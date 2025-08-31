@@ -4,7 +4,22 @@ Shortlinker 通过环境变量进行配置，支持 `.env` 文件和系统环境
 
 ## 配置方式
 
-### .env 文件（推荐）
+### TOML 配置文件（推荐）
+```toml
+# config.toml
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[storage]
+type = "sqlite"
+database_url = "shortlinks.db"
+
+[logging]
+level = "info"
+```
+
+### .env 文件
 ```bash
 # .env
 SERVER_HOST=127.0.0.1
@@ -36,8 +51,8 @@ export SERVER_PORT=8080
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `STORAGE_BACKEND` | String | `sqlite` | 存储类型：`sqlite`、`file`、`sled` |
-| `DB_FILE_NAME` | String | `links.db` | 数据库文件路径 |
+| `STORAGE_BACKEND` | String | `sqlite` | 存储类型：`sqlite`、`postgres`、`mysql`、`mariadb` |
+| `DATABASE_URL` | String | `shortlinks.db` | 数据库连接 URL 或文件路径 |
 
 > 详细的存储后端配置请参考 [存储后端](/config/storage)
 
@@ -51,7 +66,16 @@ export SERVER_PORT=8080
 | `HEALTH_ROUTE_PREFIX` | String | `/health` | 健康检查 API 路由前缀 |
 | `ENABLE_ADMIN_PANEL` | Boolean | `false` | 启用 Web 管理界面（需先构建且需同时设置 ADMIN_TOKEN） |
 | `FRONTEND_ROUTE_PREFIX` | String | `/panel` | Web 管理界面路由前缀 |
+
 > **注意**：Web 管理界面是新推出的特性，可能仍在完善中。
+
+### 点击统计配置
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `ENABLE_CLICK_TRACKING` | Boolean | `true` | 启用点击统计功能 |
+| `CLICK_FLUSH_INTERVAL` | Integer | `30` | 点击计数刷新间隔（秒） |
+| `MAX_CLICKS_BEFORE_FLUSH` | Integer | `100` | 点击上限（达到时触发刷新） |
 
 > 详细的 API 配置请参考 [Admin API](/api/admin) 和 [健康检查 API](/api/health)
 
@@ -70,9 +94,9 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 RUST_LOG=debug
 
-# 存储配置 - 文件存储便于调试
-STORAGE_BACKEND=file
-DB_FILE_NAME=dev-links.json
+# 存储配置 - SQLite 便于调试
+STORAGE_BACKEND=sqlite
+DATABASE_URL=dev-links.db
 
 # API 配置 - 开发环境使用简单token
 ADMIN_TOKEN=dev_admin

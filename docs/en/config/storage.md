@@ -6,29 +6,29 @@ Shortlinker supports multiple storage backends. You can choose the most suitable
 
 ## Storage Backend Comparison
 
-| Feature | SQLite | PostgreSQL | MySQL | MariaDB | File Storage | Sled |
-|----------|---------|------------|--------|---------|----------|------|
-| **Basic Features** | | | | | | |
-| Create Short Links | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Get Short Links | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Delete Short Links | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Batch Import | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Advanced Features** | | | | | | |
-| Click Counting | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Click Statistics Query | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Expiration Time | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Auto Expiration Cleanup | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| UTF-8/Emoji Support | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Performance Features** | | | | | | |
-| Concurrent Reads | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read |
-| Concurrent Writes | ⚠️ Single-write | ✅ Multi-write | ✅ Multi-write | ✅ Multi-write | ❌ Mutex | ✅ Multi-write |
-| Transaction Support | ✅ ACID | ✅ ACID | ✅ ACID | ✅ ACID | ❌ | ✅ ACID |
-| Connection Pool | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Operations Features** | | | | | | |
-| Hot Backup | ✅ File copy | ✅ pg_dump | ✅ mysqldump | ✅ mariadb-dump | ✅ File copy | ✅ |
-| Incremental Backup | ❌ | ✅ WAL | ✅ binlog | ✅ binlog | ❌ | ❌ |
-| Online Scaling | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Cluster Support | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Feature | SQLite | PostgreSQL | MySQL | MariaDB |
+|----------|---------|------------|--------|---------|
+| **Basic Features** | | | | |
+| Create Short Links | ✅ | ✅ | ✅ | ✅ |
+| Get Short Links | ✅ | ✅ | ✅ | ✅ |
+| Delete Short Links | ✅ | ✅ | ✅ | ✅ |
+| Batch Import | ✅ | ✅ | ✅ | ✅ |
+| **Advanced Features** | | | | |
+| Click Counting | ✅ | ✅ | ✅ | ✅ |
+| Click Statistics Query | ✅ | ✅ | ✅ | ✅ |
+| Expiration Time | ✅ | ✅ | ✅ | ✅ |
+| Auto Expiration Cleanup | ✅ | ✅ | ✅ | ✅ |
+| UTF-8/Emoji Support | ✅ | ✅ | ✅ | ✅ |
+| **Performance Features** | | | | |
+| Concurrent Reads | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read | ✅ Multi-read |
+| Concurrent Writes | ⚠️ Single-write | ✅ Multi-write | ✅ Multi-write | ✅ Multi-write |
+| Transaction Support | ✅ ACID | ✅ ACID | ✅ ACID | ✅ ACID |
+| Connection Pool | ✅ | ✅ | ✅ | ✅ |
+| **Operations Features** | | | | |
+| Hot Backup | ✅ File copy | ✅ pg_dump | ✅ mysqldump | ✅ mariadb-dump |
+| Incremental Backup | ❌ | ✅ WAL | ✅ binlog | ✅ binlog |
+| Online Scaling | ❌ | ✅ | ✅ | ✅ |
+| Cluster Support | ❌ | ✅ | ✅ | ✅ |
 
 ## Storage Backend Limitations
 
@@ -96,36 +96,6 @@ Shortlinker supports multiple storage backends. You can choose the most suitable
 
 - ✅ Uses utf8mb4 by default for full emoji support
 - ⚠️ Older versions may require manual character set configuration
-
-### File Storage Limitations
-
-**Important Limitations**:
-
-- ❌ **No click counting support**: Cannot record access statistics
-- ❌ **No concurrent write support**: File locking mechanism
-- ❌ **No auto-expiration support**: Requires manual cleanup
-- ⚠️ **Performance limitations**: Performance degrades when file size > 10MB
-
-**Applicable Range**:
-
-- ✅ Development and testing environments
-- ✅ Configuration file management
-- ✅ Less than 1000 records
-- ❌ Not recommended for production environments
-
-### Sled Limitations
-
-**Current Status**:
-
-- 🚧 Under development, not fully integrated yet
-- ✅ High-performance embedded database
-- ✅ Supports ACID transactions
-
-**Expected Limitations**:
-
-- ✅ Single-machine high performance
-- ❌ No SQL query support
-- ❌ No network access support
 
 ## Database Backend Configuration
 

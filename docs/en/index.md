@@ -22,7 +22,7 @@ features:
     details: Built with Rust, millisecond-level redirect response, supports high concurrency access
   - icon: 💾
     title: Multiple Storage Backends
-    details: Supports SQLite (default), JSON files, Sled database and other storage solutions
+    details: Supports SQLite (default), PostgreSQL, MySQL, MariaDB for production-grade database performance
   - icon: 🛡️
     title: Secure & Reliable
     details: Admin API authentication, health check monitoring, process protection mechanism
@@ -34,7 +34,7 @@ features:
     details: Add/remove short links at runtime without restarting the server
   - icon: 🎯
     title: Smart Management
-    details: Custom short codes, random generation, expiration time, CLI tool management
+    details: Custom short codes, random generation, expiration time, CLI tool management, TUI interface
 ---
 
 ## Design Philosophy
@@ -50,12 +50,14 @@ Command line tool management, environment variable configuration, one-click Dock
 
 ## Core Features
 
-- **Multiple Storage Backends**: SQLite database (default), JSON file storage, Sled embedded database
+- **Multiple Storage Backends**: SQLite database (default), PostgreSQL, MySQL, MariaDB for production-grade performance
 - **Admin API**: HTTP API management interface with authentication and custom route prefix support
 - **Health Monitoring**: Complete health check API with storage status and runtime monitoring
 - **Smart Expiration**: Supports flexible time format settings, automatic expiration and cleanup
 - **Cross-platform Support**: Windows, Linux, macOS, smart process locking to prevent duplicate startup
 - **Container Optimization**: Docker image deployment with container restart detection support
+- **TUI Interface**: Terminal user interface for interactive management and monitoring
+- **TOML Configuration**: Modern configuration file support with environment variable overrides
 
 ## Quick Experience
 
@@ -68,6 +70,9 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 
 # Access short link
 curl -L http://localhost:8080/github
+
+# Launch TUI interface (if compiled with TUI feature)
+./shortlinker tui
 ```
 
 ## Use Cases

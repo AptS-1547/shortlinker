@@ -5,10 +5,12 @@ Choose the installation method that suits you to quickly deploy Shortlinker.
 ## Requirements
 
 ### Runtime Environment
+
 - Operating System: Linux, macOS, Windows
 - Network Connection: Required for downloading dependencies
 
 ### Source Compilation Environment
+
 - **Rust**: >= 1.82.0 (required)
 - **Git**: For cloning the project
 
@@ -58,7 +60,15 @@ rustc --version  # Should be >= 1.82.0
 # 3. Clone and compile
 git clone https://github.com/AptS-1547/shortlinker.git
 cd shortlinker
+
+# Basic compilation (server only)
 cargo build --release
+
+# Compile with TUI interface
+cargo build --release --features tui
+
+# Full compilation (server + CLI + TUI)
+cargo build --release --features full
 
 # 4. Run
 ./target/release/shortlinker
@@ -80,18 +90,21 @@ curl -I http://localhost:8080/
 ## Common Issues
 
 ### Rust Version Too Old
+
 ```bash
 # Update to latest version
 rustup update
 ```
 
 ### Compilation Failed
+
 ```bash
 # Clean and rebuild
 cargo clean && cargo build --release
 ```
 
 ### Port Already in Use
+
 ```bash
 # Use a different port
 SERVER_PORT=3000 ./shortlinker
@@ -100,6 +113,7 @@ SERVER_PORT=3000 ./shortlinker
 ## Next Steps
 
 After installation, continue reading:
+
 - 🚀 [Quick Start](/en/guide/getting-started) - Learn basic usage
 - ⚙️ [Configuration](/en/config/) - Understand configuration options
 - 📋 [CLI Tools](/en/cli/) - Master command line operations

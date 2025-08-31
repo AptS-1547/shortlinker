@@ -22,7 +22,7 @@ features:
     details: 基于 Rust 构建，毫秒级重定向响应，支持高并发访问
   - icon: 💾
     title: 多存储后端
-    details: 支持 SQLite（默认）、JSON 文件、Sled 数据库等多种存储方案
+    details: 支持 SQLite（默认）、PostgreSQL、MySQL、MariaDB 等数据库存储方案
   - icon: 🛡️
     title: 安全可靠
     details: Admin API 鉴权、健康检查监控、进程保护机制
@@ -34,7 +34,7 @@ features:
     details: 运行时添加/删除短链，无需重启服务器
   - icon: 🎯
     title: 智能管理
-    details: 自定义短码、随机生成、过期时间、CLI 工具管理
+    details: 自定义短码、随机生成、过期时间、CLI 工具管理和 TUI 界面
 ---
 
 ## 设计理念
@@ -50,12 +50,14 @@ Rust 原生性能保障，SQLite 提供生产级数据库性能，异步并发�
 
 ## 核心特性
 
-- **多存储后端**：SQLite 数据库（默认）、JSON 文件存储、Sled 嵌入式数据库
+- **多存储后端**：SQLite 数据库（默认）、PostgreSQL、MySQL、MariaDB 等数据库存储
 - **Admin API**：HTTP API 管理接口，支持鉴权和自定义路由前缀
 - **健康监控**：完整的健康检查 API，支持存储状态和运行时间监控
 - **智能过期**：支持灵活的时间格式设置，自动失效和清理
 - **跨平台支持**：Windows、Linux、macOS，智能进程锁防止重复启动
 - **容器优化**：Docker 镜像部署，支持容器重启检测
+- **TUI 界面**：终端用户界面，支持交互式链接管理
+- **TOML 配置**：灵活的配置文件系统，支持环境变量覆盖
 
 ## 快速体验
 
@@ -63,8 +65,11 @@ Rust 原生性能保障，SQLite 提供生产级数据库性能，异步并发�
 # Docker 一键启动
 docker run -d -p 8080:8080 e1saps/shortlinker
 
-# 添加短链接
+# CLI 添加短链接
 ./shortlinker add github https://github.com
+
+# TUI 界面管理
+./shortlinker tui
 
 # 访问短链接
 curl -L http://localhost:8080/github

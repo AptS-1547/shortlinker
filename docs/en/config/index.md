@@ -4,15 +4,28 @@ Shortlinker is configured through environment variables, supporting both `.env` 
 
 ## Configuration Methods
 
-### .env File (Recommended)
+### TOML Configuration File
+
 ```bash
-# .env
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DEFAULT_URL=https://example.com
+# config.toml
+[server]
+host = "127.0.0.1"
+port = 8080
+default_url = "https://example.com"
+
+[storage]
+backend = "sqlite"
+database_url = "./data/links.db"
+
+[logging]
+level = "info"
+file = "./logs/shortlinker.log"
+max_size = "10MB"
+max_files = 5
 ```
 
 ### System Environment Variables
+
 ```bash
 export SERVER_HOST=0.0.0.0
 export SERVER_PORT=8080

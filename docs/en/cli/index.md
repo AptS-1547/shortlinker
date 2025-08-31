@@ -6,7 +6,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 
 - 🎨 **Colored Output** - Clear visual feedback
 - 🔄 **Real-time Sync** - Commands take effect immediately  
-- ⚡ **Fast Response** - Supports SQLite, file, Sled multiple storage backends
+- ⚡ **Fast Response** - Supports SQLite, PostgreSQL, MySQL, MariaDB storage backends
 - 🛡️ **Error Handling** - Detailed error messages and suggestions
 - 📦 **Import/Export** - JSON format backup and migration support
 
@@ -30,10 +30,12 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 | `list` | List all links | `./shortlinker list` |
 | `export` | Export data | `./shortlinker export backup.json` |
 | `import` | Import data | `./shortlinker import backup.json --force` |
+| `tui` | Launch TUI interface | `./shortlinker tui` |
 
 ## Quick Examples
 
 ### Basic Operations
+
 ```bash
 # Add short link
 ./shortlinker add docs https://docs.example.com
@@ -46,6 +48,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 ```
 
 ### Data Management
+
 ```bash
 # Export data
 ./shortlinker export backup.json
@@ -55,6 +58,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 ```
 
 ### Advanced Features
+
 ```bash
 # Random short code
 ./shortlinker add https://example.com
@@ -65,19 +69,25 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 
 # Force overwrite
 ./shortlinker add docs https://new-docs.com --force
+
+# Launch TUI interface
+./shortlinker tui
 ```
 
 ## Output Description
 
 ### Success Status
+
 - ✅ Green text indicates successful operation
 - 🔵 Blue text shows informational messages
 
-### Error Status  
+### Error Status
+
 - ❌ Red text shows error messages
 - 💡 Provides solution suggestions
 
 ### Example Output
+
 ```bash
 $ ./shortlinker add github https://github.com
 ✓ Added short link: github -> https://github.com
@@ -90,6 +100,7 @@ $ ./shortlinker add github https://gitlab.com
 ## Script Integration
 
 ### Batch Operations
+
 ```bash
 #!/bin/bash
 # Batch import links
@@ -99,6 +110,7 @@ done < links.csv
 ```
 
 ### Error Checking
+
 ```bash
 if ./shortlinker add test https://example.com; then
     echo "Added successfully"
