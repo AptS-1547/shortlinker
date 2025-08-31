@@ -16,6 +16,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub features: FeatureConfig,
     #[serde(default)]
+    pub click_manager: ClickManagerConfig,
+    #[serde(default)]
     pub logging: LoggingConfig,
 }
 
@@ -107,9 +109,29 @@ pub struct FeatureConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClickManagerConfig {
+    #[serde(default = "default_enable_click_tracking")]
+    pub enable_click_tracking: bool,
+    #[serde(default = "default_flush_interval")]
+    pub flush_interval: u64,
+    #[serde(default = "default_max_clicks_before_flush")]
+    pub max_clicks_before_flush: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
     #[serde(default = "default_log_level")]
     pub level: String,
+    #[serde(default = "default_log_format")]
+    pub format: String,
+    #[serde(default = "default_log_file")]
+    pub file: Option<String>,
+    #[serde(default = "default_max_size")]
+    pub max_size: u64,
+    #[serde(default = "default_max_backups")]
+    pub max_backups: u32,
+    #[serde(default = "default_enable_rotation")]
+    pub enable_rotation: bool,
 }
 
 // Default value functions
@@ -185,8 +207,40 @@ fn default_default_url() -> String {
     "https://esap.cc/repo".to_string()
 }
 
+fn default_enable_click_tracking() -> bool {
+    true
+}
+
+fn default_flush_interval() -> u64 {
+    30
+}
+
+fn default_max_clicks_before_flush() -> u64 {
+    100
+}
+
 fn default_log_level() -> String {
     "info".to_string()
+}
+
+fn default_log_format() -> String {
+    "text".to_string()
+}
+
+fn default_log_file() -> Option<String> {
+    None
+}
+
+fn default_max_size() -> u64 {
+    100
+}
+
+fn default_max_backups() -> u32 {
+    5
+}
+
+fn default_enable_rotation() -> bool {
+    true
 }
 
 impl Default for ServerConfig {
@@ -260,10 +314,25 @@ impl Default for FeatureConfig {
     }
 }
 
+impl Default for ClickManagerConfig {
+    fn default() -> Self {
+        Self {
+            enable_click_tracking: default_enable_click_tracking(),
+            flush_interval: default_flush_interval(),
+            max_clicks_before_flush: default_max_clicks_before_flush(),
+        }
+    }
+}
+
 impl Default for LoggingConfig {
     fn default() -> Self {
         Self {
             level: default_log_level(),
+            format: default_log_format(),
+            file: default_log_file(),
+            max_size: default_max_size(),
+            max_backups: default_max_backups(),
+            enable_rotation: default_enable_rotation(),
         }
     }
 }

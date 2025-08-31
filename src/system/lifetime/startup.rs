@@ -49,22 +49,31 @@ pub async fn prepare_server_startup() -> StartupContext {
     );
 
     // 初始化点击计数器
-    // TODO: 配置文件设置刷新时长
-    // TODO: 如果没有启用点击统计功能，则不初始化
-    // TODO: 时间 + 点击上限共同刷新
-    if let Some(sink) = storage.as_click_sink() {
-        let mgr = Arc::new(ClickManager::new(sink, Duration::from_secs(30)));
-        set_global_click_manager(mgr.clone());
+    // TODO: 点击上限刷新
+    let config = get_config();
+    if config.click_manager.enable_click_tracking {
+        if let Some(sink) = storage.as_click_sink() {
+            let mgr = Arc::new(ClickManager::new(
+                sink,
+                Duration::from_secs(config.click_manager.flush_interval),
+            ));
+            set_global_click_manager(mgr.clone());
 
-        // 启动后台任务，并保持强引用以确保任务不会被过早销毁
-        let mgr_for_task = mgr.clone();
-        tokio::spawn(async move {
-            mgr_for_task.start_background_task().await;
-        });
+            // 启动后台任务，并保持强引用以确保任务不会被过早销毁
+            let mgr_for_task = mgr.clone();
+            tokio::spawn(async move {
+                mgr_for_task.start_background_task().await;
+            });
 
-        debug!("ClickManager initialized with a 30 seconds flush interval");
+            debug!(
+                "ClickManager initialized with {} seconds flush interval",
+                config.click_manager.flush_interval
+            );
+        } else {
+            warn!("Click sink is not available, ClickManager will not be initialized");
+        }
     } else {
-        warn!("Click sink is not available, ClickManager will not be initialized");
+        warn!("Click tracking is disabled in configuration");
     }
 
     // 初始化缓存

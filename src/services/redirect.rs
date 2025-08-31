@@ -82,7 +82,7 @@ impl RedirectService {
                     manager.increment(&code);
                 }
                 None => {
-                    debug!(
+                    trace!(
                         "Click manager not initialized, skipping increment for code: {}",
                         code
                     );

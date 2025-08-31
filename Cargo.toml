@@ -50,7 +50,7 @@ sled = "0.34.7"
 tokio = { version = "1.45.1", default-features = false, features = ["rt-multi-thread", "macros"] }
 tracing = { version = "0.1.41", default-features = false }
 dashmap = "6.1.0"
-tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt", "ansi"] }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt", "ansi", "json"] }
 tracing-appender = "0.2.3"
 moka = { version = "0.12.10", default-features = false, features = ["future"] }
 colored = "3.0.0"

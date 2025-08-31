@@ -2,6 +2,7 @@ use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use color_eyre::Result;
 use dotenv::dotenv;
 use tracing::{debug, warn};
+use tracing_appender::rolling;
 
 #[cfg(any(feature = "cli", feature = "tui"))]
 use colored::Colorize;
@@ -101,15 +102,56 @@ async fn run_server(config: &crate::system::app_config::AppConfig) -> Result<()>
     debug!("Starting pre-startup processing...");
 
     // 初始化日志
-    let stdout_log = std::io::stdout();
-    let (non_blocking_writer, _guard) = tracing_appender::non_blocking(stdout_log);
+    let writer: Box<dyn std::io::Write + Send + Sync> =
+        if let Some(ref log_file) = config.logging.file {
+            if !log_file.is_empty() && config.logging.enable_rotation {
+                // 使用轮转日志
+                let dir = std::path::Path::new(log_file)
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."));
+                let filename = std::path::Path::new(log_file)
+                    .file_name()
+                    .unwrap_or(std::ffi::OsStr::new("shortlinker.log"));
+                let filename_str = filename.to_str().unwrap_or("shortlinker.log");
+                let appender = rolling::Builder::new()
+                    .rotation(rolling::Rotation::DAILY)
+                    .filename_prefix(filename_str.trim_end_matches(".log"))
+                    .filename_suffix("log")
+                    .max_log_files(config.logging.max_backups as usize)
+                    .build(dir)
+                    .expect("Failed to create rolling log appender");
+                Box::new(appender)
+            } else if !log_file.is_empty() {
+                // 不轮转，直接写入文件
+                let file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(log_file)
+                    .expect("Failed to open log file");
+                Box::new(file)
+            } else {
+                // 文件名为空，输出到控制台
+                Box::new(std::io::stdout())
+            }
+        } else {
+            // 输出到控制台
+            Box::new(std::io::stdout())
+        };
+
+    let (non_blocking_writer, _guard) = tracing_appender::non_blocking(writer);
     let filter = tracing_subscriber::EnvFilter::new(config.logging.level.clone());
-    tracing_subscriber::fmt()
+
+    let subscriber_builder = tracing_subscriber::fmt()
         .with_writer(non_blocking_writer)
         .with_env_filter(filter)
         .with_level(true)
-        .with_ansi(true)
-        .init();
+        .with_ansi(config.logging.file.as_ref().is_none_or(|f| f.is_empty()));
+
+    if config.logging.format == "json" {
+        subscriber_builder.json().init();
+    } else {
+        subscriber_builder.init();
+    }
 
     let startup = lifetime::startup::prepare_server_startup().await;
 

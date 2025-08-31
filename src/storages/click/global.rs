@@ -1,5 +1,5 @@
 use std::sync::{Arc, OnceLock};
-use tracing::warn;
+use tracing::trace;
 
 use super::manager::ClickManager;
 
@@ -13,11 +13,11 @@ pub fn set_global_click_manager(manager: Arc<ClickManager>) {
 }
 
 /// 获取全局点击管理器
-pub fn get_click_manager() -> Option<Arc<ClickManager>> {
+pub fn get_click_manager() -> Option<&'static Arc<ClickManager>> {
     match GLOBAL_CLICK_MANAGER.get() {
-        Some(manager) => Some(manager.clone()),
+        Some(manager) => Some(manager),
         None => {
-            warn!("GLOBAL_CLICK_MANAGER has not been initialized yet");
+            trace!("GLOBAL_CLICK_MANAGER has not been initialized yet");
             None
         }
     }
