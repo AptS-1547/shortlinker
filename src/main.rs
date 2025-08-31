@@ -1,22 +1,24 @@
 use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use color_eyre::Result;
-use colored::*;
 use dotenv::dotenv;
-use std::env;
 use tracing::{debug, warn};
 
+#[cfg(any(feature = "cli", feature = "tui"))]
+use colored::Colorize;
+
 mod cache;
-#[cfg(feature = "cli")]
-mod cli;
 mod errors;
 mod event;
 mod middleware;
 mod services;
 mod storages;
 mod system;
+mod utils;
+
+#[cfg(feature = "cli")]
+mod cli;
 #[cfg(feature = "tui")]
 mod tui;
-mod utils;
 
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::services::{
@@ -33,6 +35,7 @@ struct ServerConfig {
     unix_socket_path: Option<String>,
 }
 
+#[cfg(any(feature = "cli", feature = "tui"))]
 async fn handle_mode_error<T, E: std::fmt::Display>(
     result: Result<T, E>,
     mode_name: &str,
@@ -56,7 +59,8 @@ async fn main() -> Result<()> {
     crate::system::app_config::init_config();
     let config = crate::system::app_config::get_config();
 
-    let args: Vec<String> = env::args().collect();
+    #[cfg(any(feature = "cli", feature = "tui"))]
+    let args: Vec<String> = std::env::args().collect();
 
     // 根据编译features决定运行模式
     #[cfg(feature = "tui")]

@@ -88,7 +88,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::R
                         } else {
                             app.set_status("Link added successfully!".to_string());
                             app.current_screen = CurrentScreen::Main;
-                            app.refresh_links();
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("Failed to refresh links: {}", e));
+                            }
                         }
                     }
                     KeyCode::Backspace => {
@@ -148,7 +150,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::R
                         } else {
                             app.set_status("Link updated successfully!".to_string());
                             app.current_screen = CurrentScreen::Main;
-                            app.refresh_links();
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("Failed to refresh links: {}", e));
+                            }
                         }
                     }
                     KeyCode::Backspace => {
@@ -198,7 +202,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::R
                             app.set_error(format!("Failed to delete link: {}", e));
                         } else {
                             app.set_status("Link deleted successfully!".to_string());
-                            app.refresh_links();
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("Failed to refresh links: {}", e));
+                            }
                         }
                         app.current_screen = CurrentScreen::Main;
                     }
@@ -220,7 +226,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::R
                             app.set_error(format!("Failed to import links: {}", e));
                         } else {
                             app.set_status("Links imported successfully!".to_string());
-                            app.refresh_links();
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("Failed to refresh links: {}", e));
+                            }
                         }
                     }
                     KeyCode::Esc => {
@@ -232,7 +240,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::R
                     KeyCode::Char('y') | KeyCode::Char('Y') => {
                         return Ok(());
                     }
-                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Char('q') => {
+                    KeyCode::Char('n') | KeyCode::Char('N') => {
                         app.current_screen = CurrentScreen::Main;
                     }
                     _ => {}

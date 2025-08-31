@@ -2,7 +2,7 @@ use super::super::CliError;
 use crate::storages::{ShortLink, Storage};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
-use colored::*;
+use colored::Colorize;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;

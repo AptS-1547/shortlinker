@@ -16,13 +16,12 @@ pub fn notify_server() -> Result<()> {
             signal::kill(Pid::from_raw(pid), Signal::SIGUSR1).map_err(|e| {
                 ShortlinkerError::signal_operation(format!("Failed to send signal: {}", e))
             })?;
-            println!("Server reload notified");
             Ok(())
         }
-        Err(_) => {
-            println!("Warning: server process not found, please restart manually");
-            Ok(())
-        }
+        Err(e) => Err(ShortlinkerError::notify_server(format!(
+            "Failed to notify server: {}",
+            e
+        ))),
     }
 }
 
@@ -30,16 +29,10 @@ pub fn notify_server() -> Result<()> {
 pub fn notify_server() -> Result<()> {
     // On Windows use a trigger file
     match fs::write("shortlinker.reload", "") {
-        Ok(_) => {
-            println!("Server reload notified");
-            Ok(())
-        }
-        Err(e) => {
-            println!("Failed to notify server: {}", e);
-            Err(ShortlinkerError::file_operation(format!(
-                "Failed to notify server: {}",
-                e
-            )))
-        }
+        Ok(_) => Ok(()),
+        Err(e) => Err(ShortlinkerError::notify_server(format!(
+            "Failed to notify server: {}",
+            e
+        ))),
     }
 }

@@ -1,4 +1,4 @@
-use colored::*;
+use colored::Colorize;
 use std::env;
 
 pub fn show_help() {

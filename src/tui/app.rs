@@ -1,5 +1,7 @@
+use crate::errors::ShortlinkerError;
 use crate::storages::{ShortLink, Storage, StorageFactory};
 use crate::utils::{TimeParser, generate_random_code};
+
 use chrono::Utc;
 use std::collections::HashMap;
 use std::fs::File;
@@ -68,10 +70,17 @@ impl App {
         })
     }
 
-    pub fn refresh_links(&mut self) {
-        // This would need to be async, but we'll handle it in the main loop
-        // For now, we'll assume links are updated elsewhere
-        // TODO: Implement async refresh
+    pub async fn refresh_links(&mut self) -> Result<(), ShortlinkerError> {
+        // Refresh links from storage
+        self.links = self.storage.load_all().await;
+        // Notify server to reload
+        if let Err(e) = crate::system::notify_server() {
+            return Err(ShortlinkerError::notify_server(format!(
+                "Failed to notify server: {}",
+                e
+            )));
+        }
+        Ok(())
     }
 
     pub fn clear_inputs(&mut self) {

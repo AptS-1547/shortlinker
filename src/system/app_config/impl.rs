@@ -176,6 +176,7 @@ impl AppConfig {
     }
 
     /// Save current configuration to a TOML file
+    // TODO: 当默认配置文件不存在时，自动创建默认配置文件
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
         let content = toml::to_string_pretty(self)?;
         fs::write(path, content)?;
