@@ -1,6 +1,6 @@
 use crate::storages::ShortLink;
 use async_trait::async_trait;
-use tracing::debug;
+use tracing::trace;
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
@@ -17,7 +17,7 @@ impl Default for NullObjectCache {
 
 impl NullObjectCache {
     pub fn new() -> Result<Self, String> {
-        debug!("Using NullObjectCache: no L2 cache will be used");
+        trace!("Using NullObjectCache: no L2 cache will be used");
         Ok(NullObjectCache)
     }
 }
@@ -25,19 +25,19 @@ impl NullObjectCache {
 #[async_trait]
 impl ObjectCache for NullObjectCache {
     async fn get(&self, key: &str) -> CacheResult {
-        debug!("NullObjectCache.get called for key: {}", key);
+        trace!("NullObjectCache.get called for key: {}", key);
         CacheResult::NotFound
     }
 
     async fn insert(&self, key: String, _: ShortLink) {
-        debug!("NullObjectCache.insert called for key: {}", key);
+        trace!("NullObjectCache.insert called for key: {}", key);
     }
 
     async fn remove(&self, key: &str) {
-        debug!("NullObjectCache.remove called for key: {}", key);
+        trace!("NullObjectCache.remove called for key: {}", key);
     }
 
     async fn invalidate_all(&self) {
-        debug!("NullObjectCache.invalidate_all called, but no action taken");
+        trace!("NullObjectCache.invalidate_all called, but no action taken");
     }
 }

@@ -7,19 +7,19 @@ use tracing::debug;
 use crate::cache::ExistenceFilter;
 use crate::declare_existence_filter_plugin;
 
-declare_existence_filter_plugin!("bloom", BloomExistenceFilterCache);
+declare_existence_filter_plugin!("bloom", BloomExistenceFilterPlugin);
 
-pub struct BloomExistenceFilterCache {
+pub struct BloomExistenceFilterPlugin {
     inner: Arc<RwLock<Bloom<str>>>,
 }
 
-impl Default for BloomExistenceFilterCache {
+impl Default for BloomExistenceFilterPlugin {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BloomExistenceFilterCache {
+impl BloomExistenceFilterPlugin {
     pub fn new() -> Self {
         let bloom = Bloom::new_for_fp_rate(10_000, 0.001)
             .unwrap_or_else(|_| panic!("Failed to create bloom filter"));
@@ -30,7 +30,7 @@ impl BloomExistenceFilterCache {
 }
 
 #[async_trait]
-impl ExistenceFilter for BloomExistenceFilterCache {
+impl ExistenceFilter for BloomExistenceFilterPlugin {
     async fn check(&self, key: &str) -> bool {
         let bloom = self.inner.read().await;
         bloom.check(key)

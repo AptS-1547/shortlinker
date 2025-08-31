@@ -1,41 +1,42 @@
 use async_trait::async_trait;
-use tracing::debug;
+use tracing::trace;
 
 use crate::cache::ExistenceFilter;
 use crate::declare_existence_filter_plugin;
 
-declare_existence_filter_plugin!("null", NullExistenceFilterL1Cache);
+declare_existence_filter_plugin!("null", NullExistenceFilterPlugin);
 
-pub struct NullExistenceFilterL1Cache;
+pub struct NullExistenceFilterPlugin;
 
-impl Default for NullExistenceFilterL1Cache {
+impl Default for NullExistenceFilterPlugin {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl NullExistenceFilterL1Cache {
+impl NullExistenceFilterPlugin {
     pub fn new() -> Self {
-        debug!("Using NullExistenceFilterL1Cache: no L1 cache will be used");
-        NullExistenceFilterL1Cache
+        trace!("Using NullExistenceFilterPlugin: no L1 cache will be used");
+        NullExistenceFilterPlugin
     }
 }
 
 #[async_trait]
-impl ExistenceFilter for NullExistenceFilterL1Cache {
+impl ExistenceFilter for NullExistenceFilterPlugin {
     async fn check(&self, _key: &str) -> bool {
+        trace!("NullExistenceFilterPlugin: always return true for check");
         true
     }
 
     async fn set(&self, _key: &str) {
-        // noop
+        trace!("NullExistenceFilterPlugin: skip set");
     }
 
     async fn bulk_set(&self, _keys: &[String]) {
-        debug!("NullExistenceFilterL1Cache: skip bulk_set");
+        trace!("NullExistenceFilterPlugin: skip bulk_set");
     }
 
     async fn clear(&self, _count: usize, _fp_rate: f64) {
-        debug!("NullExistenceFilterL1Cache: skip clear");
+        trace!("NullExistenceFilterPlugin: skip clear");
     }
 }

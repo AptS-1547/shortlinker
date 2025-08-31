@@ -1,7 +1,7 @@
 use sqlx::{Row, SqlitePool, sqlite, sqlite::SqliteConnectOptions};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use super::{ShortLink, Storage};
 use crate::errors::{Result, ShortlinkerError};
@@ -340,7 +340,7 @@ impl ClickSink for SqliteStorage {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to commit: {}", e))?;
 
-        debug!("click counts flushed to DB.");
+        trace!("click counts flushed to DB.");
         Ok(())
     }
 }

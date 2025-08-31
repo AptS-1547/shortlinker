@@ -95,7 +95,7 @@ pub async fn setup_reload_mechanism(
                             }
                         }
                         Err(e) => {
-                            tracing::debug!("Failed to get file modification time: {}", e);
+                            tracing::error!("Failed to get file modification time: {}", e);
                         }
                     }
                 }

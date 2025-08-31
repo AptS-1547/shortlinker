@@ -2,7 +2,7 @@ use actix_web::{HttpRequest, HttpResponse, Result};
 use rust_embed::Embed;
 use std::env;
 use std::sync::OnceLock;
-use tracing::debug;
+use tracing::{debug, trace};
 
 // 使用 RustEmbed 自动嵌入静态文件
 #[derive(Embed)]
@@ -18,7 +18,7 @@ static HEALTH_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 impl FrontendService {
     /// 处理前端首页 - 服务构建好的 index.html
     pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
-        debug!("Serving frontend index page from dist");
+        trace!("Serving frontend index page from dist");
 
         let config = crate::system::app_config::get_config();
         let frontend_prefix =
@@ -29,7 +29,7 @@ impl FrontendService {
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();
         if path == frontend_prefix && !path.ends_with('/') {
-            debug!("Redirecting {} to {}/", path, path);
+            trace!("Redirecting {} to {}/", path, path);
             return Ok(HttpResponse::Found()
                 .append_header(("Location", format!("{}/", path)))
                 .finish());
@@ -68,7 +68,7 @@ impl FrontendService {
     /// 处理静态资源文件
     pub async fn handle_static(req: HttpRequest) -> Result<HttpResponse> {
         let path = req.match_info().query("path");
-        debug!("Serving static file: {}", path);
+        trace!("Serving static file: {}", path);
 
         // 根据文件扩展名确定 Content-Type
         let content_type = Self::get_content_type(path);
@@ -88,7 +88,7 @@ impl FrontendService {
 
     /// 处理 favicon.ico 请求
     pub async fn handle_favicon(_req: HttpRequest) -> Result<HttpResponse> {
-        debug!("Serving favicon");
+        trace!("Serving favicon");
 
         match FrontendAssets::get("favicon.ico") {
             Some(favicon_data) => Ok(HttpResponse::Ok()
@@ -103,7 +103,7 @@ impl FrontendService {
 
     /// 处理管理面板页面 - 重定向到根路径或直接服务
     pub async fn handle_admin_panel(_req: HttpRequest) -> Result<HttpResponse> {
-        debug!("Redirecting to admin panel");
+        trace!("Redirecting to admin panel");
 
         // 如果访问 /admin，重定向到根路径（前端路由会处理）
         Ok(HttpResponse::Found()
@@ -113,7 +113,7 @@ impl FrontendService {
 
     /// 处理所有未匹配的路由，返回 index.html（用于 SPA 路由）
     pub async fn handle_spa_fallback(req: HttpRequest) -> Result<HttpResponse> {
-        debug!("SPA fallback - serving index.html");
+        trace!("SPA fallback - serving index.html");
 
         let config = crate::system::app_config::get_config();
         let frontend_prefix =
@@ -124,7 +124,7 @@ impl FrontendService {
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();
         if path == frontend_prefix && !path.ends_with('/') {
-            debug!("Redirecting {} to {}/", path, path);
+            trace!("Redirecting {} to {}/", path, path);
             return Ok(HttpResponse::Found()
                 .append_header(("Location", format!("{}/", path)))
                 .finish());

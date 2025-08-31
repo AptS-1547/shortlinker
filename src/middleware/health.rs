@@ -9,7 +9,7 @@ use actix_web::{
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use std::sync::OnceLock;
-use tracing::{debug, info};
+use tracing::{info, trace};
 
 static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
@@ -101,7 +101,7 @@ where
                 ));
             }
 
-            debug!("Health auth passed");
+            trace!("Health auth passed");
             let res = srv.call(req).await?.map_into_left_body();
             Ok(res)
         })

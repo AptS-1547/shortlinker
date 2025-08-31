@@ -49,7 +49,7 @@ pub trait ExistenceFilter: Send + Sync {
     /// 清空整个 Filter（重载、重建场景）
     async fn clear(&self, count: usize, fp_rate: f64) {
         // 默认实现：子类可以选择覆盖
-        tracing::debug!(
+        tracing::trace!(
             "Not clearing Existence Filter, no operation defined. Count: {}, FP Rate: {}",
             count,
             fp_rate
@@ -66,6 +66,6 @@ pub trait ObjectCache: Send + Sync {
 
     async fn load_object_cache(&self, _keys: HashMap<String, ShortLink>) {
         // 默认实现：子类可以选择覆盖
-        tracing::debug!("Not loading Object Cache, no operation defined");
+        tracing::trace!("Not loading Object Cache, no operation defined");
     }
 }

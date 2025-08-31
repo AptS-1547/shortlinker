@@ -7,7 +7,7 @@ use actix_web::{
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
-use tracing::{debug, warn};
+use tracing::{trace, warn};
 
 /// Admin authentication middleware
 #[derive(Clone)]
@@ -132,7 +132,7 @@ where
 
             // Allow login endpoint to pass through without authentication
             if Self::is_login_endpoint(&req, &admin_prefix) {
-                debug!("Login endpoint accessed - bypassing authentication");
+                trace!("Login endpoint accessed - bypassing authentication");
                 let response = srv.call(req).await?.map_into_left_body();
                 return Ok(response);
             }
@@ -142,7 +142,7 @@ where
                 return Ok(Self::handle_unauthorized(req));
             }
 
-            debug!("Admin authentication successful");
+            trace!("Admin authentication successful");
 
             // Process the request with the next service
             let response = srv.call(req).await?.map_into_left_body();

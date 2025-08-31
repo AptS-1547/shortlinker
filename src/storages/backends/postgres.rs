@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::errors::{Result, ShortlinkerError};
 use crate::storages::click::ClickSink;
@@ -233,7 +233,7 @@ impl ClickSink for PostgresStorage {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to commit: {}", e))?;
 
-        debug!("click counts flushed to PostgreSQL DB.");
+        trace!("click counts flushed to PostgreSQL DB.");
         Ok(())
     }
 }

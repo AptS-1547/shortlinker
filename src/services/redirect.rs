@@ -4,7 +4,7 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, Responder, web};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
@@ -48,7 +48,7 @@ impl RedirectService {
                 Self::finish_redirect(link)
             }
             CacheResult::ExistsButNoValue => {
-                debug!("L2 cache miss for path: {}", capture_path);
+                trace!("L2 cache miss for path: {}", capture_path);
                 match storage.get(&capture_path).await {
                     Some(link) => {
                         Self::update_click(capture_path.clone());

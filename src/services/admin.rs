@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use tracing::{debug, error, info};
+use tracing::{error, info, trace};
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storages::{ShortLink, Storage};
@@ -122,13 +122,13 @@ impl AdminService {
         query: web::Query<GetLinksQuery>,
         storage: web::Data<Arc<dyn Storage>>,
     ) -> ActixResult<impl Responder> {
-        debug!(
+        trace!(
             "Admin API: request to list all links with filters: {:?}",
             query
         );
 
         let all_links = storage.load_all().await;
-        debug!("Admin API: retrieved {} total links", all_links.len());
+        trace!("Admin API: retrieved {} total links", all_links.len());
 
         let now = chrono::Utc::now();
         let mut filtered_links = Self::filter_links(all_links, &query, now);
@@ -231,7 +231,7 @@ impl AdminService {
     ) -> ActixResult<impl Responder> {
         // Generate code if not provided
         if link.code.as_ref().is_none_or(|c| c.is_empty()) {
-            debug!("Admin API: no code provided, generating a new one");
+            trace!("Admin API: no code provided, generating a new one");
             let random_code = generate_random_code(Self::get_random_code_length());
             link.code = Some(random_code);
         } else {

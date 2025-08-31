@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use redis::{AsyncCommands, aio::MultiplexedConnection};
 use serde_json;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
@@ -104,7 +104,7 @@ impl ObjectCache for RedisObjectCache {
         match result {
             Ok(Some(data)) => match self.deserialize_link(&data).await {
                 Ok(link) => {
-                    debug!("Successfully retrieved key: {}", key);
+                    trace!("Successfully retrieved key: {}", key);
                     CacheResult::Found(link)
                 }
                 Err(e) => {
@@ -113,7 +113,7 @@ impl ObjectCache for RedisObjectCache {
                 }
             },
             Ok(None) => {
-                debug!("Key not found in cache: {}", key);
+                trace!("Key not found in cache: {}", key);
                 CacheResult::NotFound
             }
             Err(e) => {
@@ -141,7 +141,7 @@ impl ObjectCache for RedisObjectCache {
                     .await
                 {
                     Ok(_) => {
-                        debug!("Successfully inserted key into cache: {}", key);
+                        trace!("Successfully inserted key into cache: {}", key);
                     }
                     Err(e) => {
                         error!("Failed to insert key '{}' into cache: {}", key, e);
@@ -168,9 +168,9 @@ impl ObjectCache for RedisObjectCache {
         match conn.del::<String, i32>(redis_key).await {
             Ok(deleted_count) => {
                 if deleted_count > 0 {
-                    debug!("Successfully removed key from cache: {}", key);
+                    trace!("Successfully removed key from cache: {}", key);
                 } else {
-                    debug!("Key not found in cache for removal: {}", key);
+                    trace!("Key not found in cache for removal: {}", key);
                 }
             }
             Err(e) => {

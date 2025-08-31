@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 mod cache;
 #[cfg(feature = "cli")]
-pub mod cli;
+mod cli;
 mod errors;
 mod event;
 mod middleware;
@@ -15,7 +15,7 @@ mod services;
 mod storages;
 mod system;
 #[cfg(feature = "tui")]
-pub mod tui;
+mod tui;
 mod utils;
 
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};

@@ -49,6 +49,9 @@ pub async fn prepare_server_startup() -> StartupContext {
     );
 
     // 初始化点击计数器
+    // TODO: 配置文件设置刷新时长
+    // TODO: 如果没有启用点击统计功能，则不初始化
+    // TODO: 时间 + 点击上限共同刷新
     if let Some(sink) = storage.as_click_sink() {
         let mgr = Arc::new(ClickManager::new(sink, Duration::from_secs(30)));
         set_global_click_manager(mgr.clone());

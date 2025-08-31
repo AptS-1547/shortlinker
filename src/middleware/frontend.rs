@@ -9,7 +9,7 @@ use actix_web::{
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use std::sync::OnceLock;
-use tracing::debug;
+use tracing::trace;
 
 static ENABLE_ADMIN_PANEL: OnceLock<bool> = OnceLock::new();
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
@@ -72,7 +72,7 @@ where
                 ));
             }
 
-            debug!("Processing frontend request: {}", req.path());
+            trace!("Processing frontend request: {}", req.path());
             let res = srv.call(req).await?.map_into_left_body();
             Ok(res)
         })
