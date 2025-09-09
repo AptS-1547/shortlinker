@@ -22,6 +22,7 @@ pub struct RouteConfig {
 }
 
 /// CLI 模式预处理
+#[cfg(any(feature = "cli", feature = "tui"))]
 pub async fn cli_pre_startup() {
     // CLI Mode
 }
@@ -56,6 +57,7 @@ pub async fn prepare_server_startup() -> StartupContext {
             let mgr = Arc::new(ClickManager::new(
                 sink,
                 Duration::from_secs(config.click_manager.flush_interval),
+                config.click_manager.max_clicks_before_flush as usize,
             ));
             set_global_click_manager(mgr.clone());
 
@@ -66,8 +68,8 @@ pub async fn prepare_server_startup() -> StartupContext {
             });
 
             debug!(
-                "ClickManager initialized with {} seconds flush interval",
-                config.click_manager.flush_interval
+                "ClickManager initialized with {} seconds and {} max clicks before flush",
+                config.click_manager.flush_interval, config.click_manager.max_clicks_before_flush
             );
         } else {
             warn!("Click sink is not available, ClickManager will not be initialized");

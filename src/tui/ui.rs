@@ -339,12 +339,10 @@ fn draw_edit_link_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 "•".repeat(app.password_input.len())
             }
+        } else if link.password.is_some() {
+            "••••••••".to_string()
         } else {
-            if link.password.is_some() {
-                "••••••••".to_string()
-            } else {
-                String::new()
-            }
+            String::new()
         };
 
         let password = Paragraph::new(password_text).block(
