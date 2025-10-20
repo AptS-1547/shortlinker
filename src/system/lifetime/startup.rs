@@ -30,7 +30,7 @@ pub async fn cli_tui_pre_startup() {
 /// 准备服务器启动的上下文
 /// 包括存储、缓存和路由配置等
 pub async fn prepare_server_startup() -> StartupContext {
-    crate::system::lockfile::init_lockfile().expect("Failed to initialize lockfile");
+    crate::system::platform::init_lockfile().expect("Failed to initialize lockfile");
 
     rustls::crypto::ring::default_provider()
         .install_default()
@@ -94,7 +94,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     debug!("L1/L2 cache initialized with {} links", links.len());
 
     #[cfg(any(feature = "cli", feature = "tui"))]
-    crate::system::setup_reload_mechanism(cache.clone(), storage.clone()).await;
+    crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;
 
     // 提取路由配置
     let config = get_config();

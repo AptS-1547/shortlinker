@@ -160,7 +160,7 @@ pub async fn add_link(
     }
 
     // Notify server to reload
-    if let Err(e) = crate::system::notify_server() {
+    if let Err(e) = crate::system::platform::notify_server() {
         println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
@@ -189,7 +189,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
     );
 
     // Notify server to reload
-    if let Err(e) = crate::system::notify_server() {
+    if let Err(e) = crate::system::platform::notify_server() {
         println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
@@ -271,7 +271,7 @@ pub async fn update_link(
     }
 
     // Notify server to reload
-    if let Err(e) = crate::system::notify_server() {
+    if let Err(e) = crate::system::platform::notify_server() {
         println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
@@ -412,7 +412,7 @@ pub async fn import_links(
 
     // Notify server to reload
     if imported_count > 0
-        && let Err(e) = crate::system::notify_server()
+        && let Err(e) = crate::system::platform::notify_server()
     {
         println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }

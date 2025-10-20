@@ -1,7 +1,13 @@
+//! Legacy lockfile module
+//!
+//! **DEPRECATED**: Use `system::platform` instead.
+//! This module is kept for backward compatibility only.
+
 use std::fs;
 use tracing::{error, info};
 
 // Unix平台的PID文件管理
+#[deprecated(since = "0.2.1", note = "Use system::platform::init_lockfile instead")]
 #[cfg(unix)]
 pub fn init_lockfile() -> Result<(), std::io::Error> {
     use nix::sys::signal;
@@ -56,6 +62,7 @@ pub fn init_lockfile() -> Result<(), std::io::Error> {
 }
 
 // Windows平台的锁文件管理
+#[deprecated(since = "0.2.1", note = "Use system::platform::init_lockfile instead")]
 #[cfg(windows)]
 pub fn init_lockfile() -> Result<(), std::io::Error> {
     use std::io::{self, Write};
@@ -92,6 +99,7 @@ pub fn init_lockfile() -> Result<(), std::io::Error> {
 }
 
 // 清理锁文件
+#[deprecated(since = "0.2.1", note = "Use system::platform::cleanup_lockfile instead")]
 #[cfg(unix)]
 pub fn cleanup_lockfile() {
     let pid_file = "shortlinker.pid";
@@ -102,6 +110,7 @@ pub fn cleanup_lockfile() {
     }
 }
 
+#[deprecated(since = "0.2.1", note = "Use system::platform::cleanup_lockfile instead")]
 #[cfg(windows)]
 pub fn cleanup_lockfile() {
     let lock_file = ".shortlinker.lock";

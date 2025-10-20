@@ -1,7 +1,19 @@
+//! Reload operations module
+//!
+//! This module provides:
+//! - `reload_all`: Manual cache/storage reload function (used by admin API)
+//! - `setup_reload_mechanism`: **DEPRECATED** - Use `system::platform::setup_reload_mechanism` instead
+//!
+//! The automatic reload mechanism has been moved to the platform abstraction layer.
+
 use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::storages::Storage;
 use std::sync::Arc;
 
+/// Manually reload cache and storage
+///
+/// This function is used by the admin API to reload data after modifications.
+/// For automatic reload mechanisms (signals/polling), use `system::platform::setup_reload_mechanism`.
 pub async fn reload_all(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
     storage: Arc<dyn Storage + 'static>,
@@ -28,6 +40,10 @@ pub async fn reload_all(
 }
 
 // Unix平台的信号监听
+#[deprecated(
+    since = "0.2.1",
+    note = "Use system::platform::setup_reload_mechanism instead"
+)]
 #[cfg(unix)]
 pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
@@ -52,6 +68,10 @@ pub async fn setup_reload_mechanism(
 }
 
 // Windows平台的文件监听
+#[deprecated(
+    since = "0.2.1",
+    note = "Use system::platform::setup_reload_mechanism instead"
+)]
 #[cfg(windows)]
 pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,

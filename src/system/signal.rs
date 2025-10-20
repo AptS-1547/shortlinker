@@ -1,6 +1,12 @@
+//! Legacy signal module
+//!
+//! **DEPRECATED**: Use `system::platform` instead.
+//! This module is kept for backward compatibility only.
+
 use crate::errors::{Result, ShortlinkerError};
 use std::fs;
 
+#[deprecated(since = "0.2.1", note = "Use system::platform::notify_server instead")]
 #[cfg(unix)]
 pub fn notify_server() -> Result<()> {
     use nix::sys::signal::{self, Signal};
@@ -25,6 +31,7 @@ pub fn notify_server() -> Result<()> {
     }
 }
 
+#[deprecated(since = "0.2.1", note = "Use system::platform::notify_server instead")]
 #[cfg(windows)]
 pub fn notify_server() -> Result<()> {
     // On Windows use a trigger file

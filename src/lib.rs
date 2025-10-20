@@ -1,6 +1,20 @@
-//! shortlinker - 短链接服务
+//! Shortlinker - A high-performance URL shortener service
 //!
-//! 这是一个高性能的短链接服务，支持命令行管理和Web API。
+//! This library provides the core functionality for the Shortlinker service,
+//! including caching, storage backends, HTTP services, and management interfaces.
+//!
+//! # Features
+//! - **server**: HTTP server mode (default)
+//! - **cli**: Command-line interface
+//! - **tui**: Terminal user interface
+//! - **full**: All features enabled
+//!
+//! # Architecture
+//! - `cache`: Multi-level caching (L1 + L2 + Bloom filter)
+//! - `storages`: Storage backends (SQLite, PostgreSQL, MySQL, Sled)
+//! - `services`: HTTP services (Admin, Health, Frontend, Redirect)
+//! - `middleware`: Authentication and guards
+//! - `system`: Platform abstraction, lifecycle management, and mode routing
 
 pub mod cache;
 #[cfg(feature = "cli")]

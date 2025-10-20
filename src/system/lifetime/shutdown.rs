@@ -18,6 +18,6 @@ pub async fn listen_for_shutdown() {
 
     warn!("ClickManager flushed successfully");
 
-    crate::system::lockfile::cleanup_lockfile();
+    crate::system::platform::cleanup_lockfile();
     warn!("Lockfile cleaned up, shutting down...");
 }

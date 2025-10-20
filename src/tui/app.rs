@@ -74,7 +74,7 @@ impl App {
         // Refresh links from storage
         self.links = self.storage.load_all().await;
         // Notify server to reload
-        if let Err(e) = crate::system::notify_server() {
+        if let Err(e) = crate::system::platform::notify_server() {
             return Err(ShortlinkerError::notify_server(format!(
                 "Failed to notify server: {}",
                 e
