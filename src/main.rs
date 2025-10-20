@@ -4,9 +4,6 @@ use dotenv::dotenv;
 use tracing::{debug, warn};
 use tracing_appender::rolling;
 
-#[cfg(any(feature = "cli", feature = "tui"))]
-use colored::Colorize;
-
 mod cache;
 mod errors;
 mod event;
@@ -39,41 +36,38 @@ struct ServerConfig {
 #[cfg(any(feature = "cli", feature = "tui"))]
 async fn handle_mode_error<T, E: std::fmt::Display>(
     result: Result<T, E>,
-    mode_name: &str,
 ) -> Result<(), color_eyre::Report> {
     match result {
         Ok(_) => Ok(()),
-        Err(e) => {
-            println!("{} {}: {}", mode_name, "Error".bold().red(), e);
-            Err(color_eyre::eyre::eyre!(e.to_string()))
-        }
+        Err(e) => Err(color_eyre::eyre::eyre!(e.to_string())),
     }
 }
 
 #[actix_web::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), color_eyre::Report> {
     // 设置全局错误处理和日志
     color_eyre::install()?;
     dotenv().ok();
+
+    let args: Vec<String> = std::env::args().collect();
 
     // 初始化配置系统
     crate::system::app_config::init_config();
     let config = crate::system::app_config::get_config();
 
-    #[cfg(any(feature = "cli", feature = "tui"))]
-    let args: Vec<String> = std::env::args().collect();
-
     // 根据编译features决定运行模式
     #[cfg(feature = "tui")]
     if args.len() > 1 && args[1] == "tui" {
         // TUI模式启动逻辑
-        return handle_mode_error(tui::run_tui().await, "TUI").await;
+        lifetime::startup::cli_tui_pre_startup().await;
+        return handle_mode_error(tui::run_tui().await).await;
     }
 
     #[cfg(feature = "cli")]
+    // TODO: -c --config 参数用来指定 config 文件
     if args.len() > 1 {
-        lifetime::startup::cli_pre_startup().await;
-        return handle_mode_error(cli::run_cli().await, "CLI").await;
+        lifetime::startup::cli_tui_pre_startup().await;
+        return handle_mode_error(cli::run_cli().await).await;
     }
 
     // 服务器模式（默认）

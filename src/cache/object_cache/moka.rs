@@ -44,8 +44,8 @@ impl ObjectCache for MokaCacheWrapper {
         }
     }
 
-    async fn insert(&self, key: String, value: ShortLink) {
-        self.inner.insert(key, value).await;
+    async fn insert(&self, key: &str, value: ShortLink) {
+        self.inner.insert(key.to_string(), value).await;
     }
 
     async fn remove(&self, key: &str) {

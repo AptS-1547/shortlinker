@@ -8,6 +8,7 @@ use tracing::{debug, warn};
 use super::AppConfig;
 
 static CONFIG: OnceLock<AppConfig> = OnceLock::new();
+static CONFIG_PATH: OnceLock<String> = OnceLock::new();
 
 impl AppConfig {
     /// Load configuration from TOML file with environment variable fallback
@@ -19,29 +20,22 @@ impl AppConfig {
 
     /// Load configuration from TOML file
     fn load_from_file() -> Self {
-        let config_paths = [
-            "config.toml",
-            "shortlinker.toml",
-            "config/config.toml",
-            "/etc/shortlinker/config.toml",
-        ];
+        let config_path = "config.toml";
 
-        for path in &config_paths {
-            if Path::new(path).exists() {
-                debug!("Loading config from: {}", path);
-                match fs::read_to_string(path) {
-                    Ok(content) => match toml::from_str::<AppConfig>(&content) {
-                        Ok(config) => {
-                            debug!("Successfully loaded config from: {}", path);
-                            return config;
-                        }
-                        Err(e) => {
-                            warn!("Failed to parse config file {}: {}", path, e);
-                        }
-                    },
-                    Err(e) => {
-                        warn!("Failed to read config file {}: {}", path, e);
+        if Path::new(config_path).exists() {
+            debug!("Loading config from: {}", config_path);
+            match fs::read_to_string(config_path) {
+                Ok(content) => match toml::from_str::<AppConfig>(&content) {
+                    Ok(config) => {
+                        debug!("Successfully loaded config from: {}", config_path);
+                        return config;
                     }
+                    Err(e) => {
+                        warn!("Failed to parse config file {}: {}", config_path, e);
+                    }
+                },
+                Err(e) => {
+                    warn!("Failed to read config file {}: {}", config_path, e);
                 }
             }
         }

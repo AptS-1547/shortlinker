@@ -21,10 +21,10 @@ pub struct RouteConfig {
     pub enable_frontend: bool,
 }
 
-/// CLI 模式预处理
+/// CLI / TUI 模式预处理
 #[cfg(any(feature = "cli", feature = "tui"))]
-pub async fn cli_pre_startup() {
-    // CLI Mode
+pub async fn cli_tui_pre_startup() {
+    // CLI / TUI Mode
 }
 
 /// 准备服务器启动的上下文

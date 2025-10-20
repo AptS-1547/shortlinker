@@ -50,8 +50,8 @@ impl CompositeCacheTrait for CompositeCache {
         return self.object_cache.get(key).await;
     }
 
-    async fn insert(&self, key: String, value: ShortLink) {
-        self.filter_plugin.set(&key).await;
+    async fn insert(&self, key: &str, value: ShortLink) {
+        self.filter_plugin.set(key).await;
         self.object_cache.insert(key, value).await;
     }
 

@@ -122,8 +122,8 @@ impl ObjectCache for RedisObjectCache {
         }
     }
 
-    async fn insert(&self, key: String, value: ShortLink) {
-        let redis_key = self.make_key(&key);
+    async fn insert(&self, key: &str, value: ShortLink) {
+        let redis_key = self.make_key(key);
 
         let mut conn = match self.get_connection().await {
             Ok(c) => c,

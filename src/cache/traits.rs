@@ -22,7 +22,7 @@ pub enum CacheResult {
 #[async_trait]
 pub trait CompositeCacheTrait: Send + Sync {
     async fn get(&self, key: &str) -> CacheResult;
-    async fn insert(&self, key: String, value: ShortLink);
+    async fn insert(&self, key: &str, value: ShortLink);
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
@@ -60,7 +60,7 @@ pub trait ExistenceFilter: Send + Sync {
 #[async_trait]
 pub trait ObjectCache: Send + Sync {
     async fn get(&self, key: &str) -> CacheResult;
-    async fn insert(&self, key: String, value: ShortLink);
+    async fn insert(&self, key: &str, value: ShortLink);
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 

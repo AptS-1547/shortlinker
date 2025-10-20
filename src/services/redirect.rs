@@ -44,20 +44,20 @@ impl RedirectService {
     ) -> HttpResponse {
         match cache.get(&capture_path).await {
             CacheResult::Found(link) => {
-                Self::update_click(capture_path.clone());
+                Self::update_click(&capture_path);
                 Self::finish_redirect(link)
             }
             CacheResult::ExistsButNoValue => {
-                trace!("L2 cache miss for path: {}", capture_path);
+                trace!("L2 cache miss for path: {}", &capture_path);
                 match storage.get(&capture_path).await {
                     Some(link) => {
-                        Self::update_click(capture_path.clone());
-                        cache.insert(capture_path.clone(), link.clone()).await;
+                        Self::update_click(&capture_path);
+                        cache.insert(&capture_path, link.clone()).await;
 
                         Self::finish_redirect(link)
                     }
                     None => {
-                        debug!("Redirect link not found: {}", capture_path);
+                        debug!("Redirect link not found: {}", &capture_path);
                         HttpResponse::build(StatusCode::NOT_FOUND)
                             .insert_header(("Content-Type", "text/html; charset=utf-8"))
                             .insert_header(("Cache-Control", "public, max-age=60")) // 缓存404
@@ -66,7 +66,7 @@ impl RedirectService {
                 }
             }
             CacheResult::NotFound => {
-                debug!("Cache not found for path: {}", capture_path);
+                debug!("Cache not found for path: {}", &capture_path);
                 HttpResponse::build(StatusCode::NOT_FOUND)
                     .insert_header(("Content-Type", "text/html; charset=utf-8"))
                     .insert_header(("Cache-Control", "public, max-age=60"))
@@ -75,7 +75,8 @@ impl RedirectService {
         }
     }
 
-    fn update_click(code: String) {
+    fn update_click(code: &str) {
+        let code = code.to_string();
         tokio::spawn(async move {
             match get_click_manager() {
                 Some(manager) => {
