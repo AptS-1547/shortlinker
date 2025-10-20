@@ -15,7 +15,7 @@ RUN yarn install --frozen-lockfile
 RUN yarn build:prod
 
 # 多阶段构建 - 构建阶段
-FROM rust:1.89-slim AS builder
+FROM rust:1.90-slim AS builder
 
 # 安装构建依赖，包含完整的 OpenSSL 开发库
 RUN apt-get update && apt-get install -y \
@@ -56,7 +56,7 @@ FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="0.2.0-alpha.3"
+LABEL version="0.2.2"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
