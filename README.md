@@ -188,6 +188,22 @@ curl http://localhost:8080/health/live
 
 Supports both TOML configuration files and environment variables. TOML configuration is clearer and more readable, so it's recommended.
 
+### Custom Configuration File Path
+
+You can specify a custom configuration file path using the `-c` or `--config` parameter:
+
+```bash
+# Use custom config file
+./shortlinker -c /path/to/your/config.toml
+./shortlinker --config /path/to/your/config.toml
+
+# If the specified file doesn't exist, it will be created automatically with default settings
+./shortlinker -c /etc/shortlinker/custom.toml
+# [INFO] Configuration file not found: /etc/shortlinker/custom.toml
+# [INFO] Creating default configuration file...
+# [INFO] Default configuration file created at: /etc/shortlinker/custom.toml
+```
+
 ### TOML Configuration File
 
 Create a `config.toml` file:
@@ -258,11 +274,15 @@ default_url = "https://esap.cc/repo"
 level = "info"
 ```
 
-Configuration file search order:
-1. `config.toml`
-2. `shortlinker.toml`
-3. `config/config.toml`
-4. `/etc/shortlinker/config.toml`
+**Configuration file loading:**
+
+When using `-c/--config` parameter:
+- Uses the specified path (auto-creates if not exists)
+- Example: `./shortlinker -c /path/to/config.toml`
+
+When no parameter is specified:
+- Only searches for `config.toml` in the current directory
+- If not found, uses in-memory default configuration
 
 ### Environment Variables (Backward Compatible)
 

@@ -57,7 +57,8 @@ impl FrontendService {
                 let processed_html = fallback_html
                     .replace("%BASE_PATH%", frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
                     .body(processed_html))

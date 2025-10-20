@@ -42,12 +42,27 @@ curl -H "Authorization: Bearer your_health_token" \
     "storage": {
       "status": "healthy",
       "links_count": 42,
-      "backend": "sqlite"
+      "backend": {
+        "storage_type": "sqlite",
+        "support_click": true
+      }
     }
   },
   "response_time_ms": 15
 }
 ```
+
+**响应字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `status` | String | 总体健康状态：`healthy` 或 `unhealthy` |
+| `timestamp` | RFC3339 | 检查时的时间戳 |
+| `uptime` | Integer | 服务运行时长（秒） |
+| `checks.storage.status` | String | 存储后端健康状态 |
+| `checks.storage.links_count` | Integer | 当前存储的短链接数量 |
+| `checks.storage.backend` | Object | 存储后端配置信息 |
+| `response_time_ms` | Integer | 健康检查响应时间（毫秒） |
 
 ### GET /health/ready - 就绪检查
 

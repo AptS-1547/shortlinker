@@ -8,6 +8,38 @@ Please complete any installation method from the [Installation Guide](/en/guide/
 
 ## Step 1: Basic Configuration
 
+### Method 1: Using TOML Configuration File (Recommended)
+
+Create `config.toml` file:
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[features]
+default_url = "https://example.com"
+
+# Optional: Enable admin and monitoring features
+# [api]
+# admin_token = "your_admin_token"
+# health_token = "your_health_token"
+```
+
+Or use a custom path:
+
+```bash
+# Use -c or --config to specify config file path
+./shortlinker -c /etc/shortlinker/myconfig.toml
+
+# If the file doesn't exist, it will be created automatically with defaults
+./shortlinker -c ./custom.toml
+# [INFO] Configuration file not found: ./custom.toml
+# [INFO] Creating default configuration file...
+```
+
+### Method 2: Using Environment Variables
+
 Create configuration file `.env`:
 
 ```bash

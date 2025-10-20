@@ -103,6 +103,26 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker help
 ```
 
+### tui - Launch Terminal User Interface
+
+```bash
+./shortlinker tui
+```
+
+**TUI Mode Features**:
+- Interactive visual interface
+- Real-time view of all short links
+- Keyboard navigation and operations
+- Display link details (click count, expiration time, etc.)
+
+**Keyboard Shortcuts**:
+- `↑/↓` or `j/k`: Move selection up/down
+- `Enter`: View details
+- `q` or `Esc`: Exit
+- `r`: Refresh list
+
+> 💡 **Tip**: TUI mode is ideal for quick browsing and link management. For detailed usage, see [TUI User Guide](/en/cli/tui)
+
 **Output Format**:
 ```bash
 Short links list:

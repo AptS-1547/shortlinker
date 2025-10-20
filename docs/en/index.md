@@ -37,6 +37,16 @@ features:
     details: Custom short codes, random generation, expiration time, CLI tool management, TUI interface
 ---
 
+:::warning ⚠️ v0.2.x Version Notice
+The current version (v0.2.x) is undergoing **significant feature adjustments and refactoring** with frequent updates, which may include API changes or functionality modifications.
+
+**Recommendations**:
+- 📌 **Production**: Use stable version tags (e.g., `v0.1.x`)
+- 🔄 **Development**: Follow the latest version to experience new features
+- 📖 **Documentation**: Documentation may lag behind code implementation; actual functionality prevails
+- 🐛 **Issue Reporting**: Please report issues via [GitHub Issues](https://github.com/AptS-1547/shortlinker/issues)
+:::
+
 ## Design Philosophy
 
 ### Minimalism

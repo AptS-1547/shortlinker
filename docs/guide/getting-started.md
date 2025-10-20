@@ -8,6 +8,38 @@
 
 ## 第一步：基础配置
 
+### 方式一：使用 TOML 配置文件（推荐）
+
+创建 `config.toml` 文件：
+
+```toml
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[features]
+default_url = "https://example.com"
+
+# 可选：启用管理和监控功能
+# [api]
+# admin_token = "your_admin_token"
+# health_token = "your_health_token"
+```
+
+或者使用自定义路径：
+
+```bash
+# 使用 -c 或 --config 指定配置文件路径
+./shortlinker -c /etc/shortlinker/myconfig.toml
+
+# 如果文件不存在，会自动创建默认配置
+./shortlinker -c ./custom.toml
+# [INFO] Configuration file not found: ./custom.toml
+# [INFO] Creating default configuration file...
+```
+
+### 方式二：使用环境变量
+
 创建配置文件 `.env`：
 
 ```bash

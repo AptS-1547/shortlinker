@@ -42,12 +42,27 @@ curl -H "Authorization: Bearer your_health_token" \
     "storage": {
       "status": "healthy",
       "links_count": 42,
-      "backend": "sqlite"
+      "backend": {
+        "storage_type": "sqlite",
+        "support_click": true
+      }
     }
   },
   "response_time_ms": 15
 }
 ```
+
+**Response Field Description**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | String | Overall health status: `healthy` or `unhealthy` |
+| `timestamp` | RFC3339 | Timestamp of the check |
+| `uptime` | Integer | Service uptime in seconds |
+| `checks.storage.status` | String | Storage backend health status |
+| `checks.storage.links_count` | Integer | Number of short links stored |
+| `checks.storage.backend` | Object | Storage backend configuration |
+| `response_time_ms` | Integer | Health check response time in milliseconds |
 
 ### GET /health/ready - Readiness Check
 

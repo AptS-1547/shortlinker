@@ -178,6 +178,22 @@ curl http://localhost:8080/health/live
 
 支持 TOML 配置文件和环境变量两种方式，TOML 配置更清晰易读，推荐使用。
 
+### 自定义配置文件路径
+
+可以使用 `-c` 或 `--config` 参数指定自定义配置文件路径：
+
+```bash
+# 使用自定义配置文件
+./shortlinker -c /path/to/your/config.toml
+./shortlinker --config /path/to/your/config.toml
+
+# 如果指定的文件不存在，会自动创建默认配置
+./shortlinker -c /etc/shortlinker/custom.toml
+# [INFO] Configuration file not found: /etc/shortlinker/custom.toml
+# [INFO] Creating default configuration file...
+# [INFO] Default configuration file created at: /etc/shortlinker/custom.toml
+```
+
 ### TOML 配置文件
 
 创建 `config.toml` 文件：
@@ -248,11 +264,15 @@ default_url = "https://esap.cc/repo"
 level = "info"
 ```
 
-配置文件查找顺序：
-1. `config.toml`
-2. `shortlinker.toml`  
-3. `config/config.toml`
-4. `/etc/shortlinker/config.toml`
+**配置文件加载规则：**
+
+使用 `-c/--config` 参数时：
+- 使用指定的路径（不存在则自动创建）
+- 示例：`./shortlinker -c /path/to/config.toml`
+
+不使用参数时：
+- 只在当前目录查找 `config.toml`
+- 找不到则使用内存中的默认配置
 
 ### 环境变量（向后兼容）
 
