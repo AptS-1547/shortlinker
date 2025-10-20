@@ -1,12 +1,11 @@
 //! Server mode
 //!
 //! This module contains the HTTP server startup logic.
-//! It configures logging, initializes the server, and sets up routes.
+//! It configures and starts the HTTP server with all necessary routes.
 
 use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use color_eyre::Result;
 use tracing::{debug, warn};
-use tracing_appender::rolling;
 
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::services::{
@@ -27,10 +26,11 @@ pub struct ServerConfig {
 ///
 /// This function:
 /// 1. Records startup time
-/// 2. Initializes logging system
-/// 3. Prepares server components (cache, storage, routes)
-/// 4. Configures and starts the HTTP server
-/// 5. Listens for graceful shutdown signals
+/// 2. Prepares server components (cache, storage, routes)
+/// 3. Configures and starts the HTTP server
+/// 4. Listens for graceful shutdown signals
+///
+/// **Note**: Logging system must be initialized before calling this function
 pub async fn run_server(config: &crate::system::app_config::AppConfig) -> Result<()> {
     // Record application start time
     let app_start_time = AppStartTime {
@@ -38,58 +38,6 @@ pub async fn run_server(config: &crate::system::app_config::AppConfig) -> Result
     };
 
     debug!("Starting pre-startup processing...");
-
-    // Initialize logging system
-    let writer: Box<dyn std::io::Write + Send + Sync> =
-        if let Some(ref log_file) = config.logging.file {
-            if !log_file.is_empty() && config.logging.enable_rotation {
-                // Use rolling log files
-                let dir = std::path::Path::new(log_file)
-                    .parent()
-                    .unwrap_or(std::path::Path::new("."));
-                let filename = std::path::Path::new(log_file)
-                    .file_name()
-                    .unwrap_or(std::ffi::OsStr::new("shortlinker.log"));
-                let filename_str = filename.to_str().unwrap_or("shortlinker.log");
-                let appender = rolling::Builder::new()
-                    .rotation(rolling::Rotation::DAILY)
-                    .filename_prefix(filename_str.trim_end_matches(".log"))
-                    .filename_suffix("log")
-                    .max_log_files(config.logging.max_backups as usize)
-                    .build(dir)
-                    .expect("Failed to create rolling log appender");
-                Box::new(appender)
-            } else if !log_file.is_empty() {
-                // Non-rotating, append to file
-                let file = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(log_file)
-                    .expect("Failed to open log file");
-                Box::new(file)
-            } else {
-                // Empty filename, output to console
-                Box::new(std::io::stdout())
-            }
-        } else {
-            // Output to console
-            Box::new(std::io::stdout())
-        };
-
-    let (non_blocking_writer, _guard) = tracing_appender::non_blocking(writer);
-    let filter = tracing_subscriber::EnvFilter::new(config.logging.level.clone());
-
-    let subscriber_builder = tracing_subscriber::fmt()
-        .with_writer(non_blocking_writer)
-        .with_env_filter(filter)
-        .with_level(true)
-        .with_ansi(config.logging.file.as_ref().is_none_or(|f| f.is_empty()));
-
-    if config.logging.format == "json" {
-        subscriber_builder.json().init();
-    } else {
-        subscriber_builder.init();
-    }
 
     // Prepare server startup (cache, storage, routes)
     let startup = lifetime::startup::prepare_server_startup().await;

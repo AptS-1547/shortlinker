@@ -32,6 +32,10 @@ mod tui;
 /// - `./shortlinker tui` -> TUI mode (if compiled with tui feature)
 /// - `./shortlinker <args>` -> CLI mode (if compiled with cli feature)
 /// - `./shortlinker` -> Server mode (default, if compiled with server feature)
+///
+/// # Configuration
+/// - `-c <path>` or `--config <path>` -> Use custom configuration file
+/// - No config flag -> Use default "config.toml" if it exists
 #[actix_web::main]
 async fn main() -> Result<(), color_eyre::Report> {
     // Setup global error handling
@@ -40,15 +44,24 @@ async fn main() -> Result<(), color_eyre::Report> {
     // Load environment variables
     dotenv().ok();
 
-    // Initialize configuration system
-    crate::system::app_config::init_config();
-    let config = crate::system::app_config::get_config();
-
-    // Parse command-line arguments
+    // 1. Parse command-line arguments
     let args: Vec<String> = std::env::args().collect();
 
-    // Detect and run appropriate mode
-    match system::modes::detect_mode(&args) {
+    // 2. Parse configuration file path
+    let config_path = system::args::parse_config_path(&args);
+
+    // 3. Initialize configuration system
+    crate::system::app_config::init_config(config_path);
+    let config = crate::system::app_config::get_config();
+
+    // 4. Initialize logging system based on config
+    let _log_guard = system::logging::init_logging(config);
+
+    // 5. Filter out config arguments for mode detection
+    let filtered_args = system::args::filter_config_args(&args);
+
+    // 6. Detect and run appropriate mode
+    match system::modes::detect_mode(&filtered_args) {
         #[cfg(feature = "tui")]
         system::modes::Mode::Tui => {
             system::modes::run_tui()

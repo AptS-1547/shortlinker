@@ -5,10 +5,13 @@
 //! - Lifecycle management (startup, shutdown)
 //! - Platform abstraction (signals, locks, reload mechanisms)
 //! - Execution mode routing (server, cli, tui)
+//! - Command-line argument parsing
+//! - Logging system initialization
 
 pub mod app_config;
+pub mod args;
 pub mod lifetime;
+pub mod logging;
 pub mod modes;
 pub mod platform;
-// Still needed for manual reload_all in admin API
-pub mod reload;
+pub mod reload; // Still needed for manual reload_all in admin API

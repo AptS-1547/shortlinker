@@ -50,7 +50,6 @@ pub async fn prepare_server_startup() -> StartupContext {
     );
 
     // 初始化点击计数器
-    // TODO: 点击上限刷新
     let config = get_config();
     if config.click_manager.enable_click_tracking {
         if let Some(sink) = storage.as_click_sink() {
