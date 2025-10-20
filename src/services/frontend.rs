@@ -42,7 +42,8 @@ impl FrontendService {
                 let processed_html = html_content
                     .replace("%BASE_PATH%", frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
 
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
@@ -138,7 +139,8 @@ impl FrontendService {
                 let processed_html = html_content
                     .replace("%BASE_PATH%", frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix);
+                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
 
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")

@@ -3,7 +3,7 @@ FROM node:22-alpine AS frontend-builder
 
 RUN apk add git
 RUN corepack enable && \
-    corepack prepare yarn@latest --activate
+    corepack prepare yarn@4.9.2 --activate
 
 COPY ./.git /app/.git
 

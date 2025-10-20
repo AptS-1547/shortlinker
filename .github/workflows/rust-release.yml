@@ -36,12 +36,6 @@ jobs:
       working-directory: admin-panel
       run: npm install
 
-    - name: Generate version info from main project
-      working-directory: admin-panel
-      env:
-        GITHUB_REF: ${{ github.ref }}
-      run: npm run version
-
     - name: Build frontend
       working-directory: admin-panel
       run: npm run build:prod
