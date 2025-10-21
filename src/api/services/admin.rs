@@ -423,12 +423,13 @@ impl AdminService {
         if login_body.password == *admin_token {
             info!("Admin API: login successful");
 
-            // TODO: Make SameSite policy configurable for different deployment scenarios
-            // Currently using Strict, but this can be moved to config for flexibility
+            // Use Lax SameSite policy to allow cross-origin requests (localhost:3000 -> localhost:8080)
+            // In production with same origin, consider using Strict for better security
+            // Cookie path is "/" to make it available for all endpoints (including health checks)
             let cookie = Cookie::build("sl_admin", admin_token.clone())
-                .path(&config.routes.admin_prefix)
+                .path("/")
                 .http_only(true)
-                .same_site(SameSite::Strict)
+                .same_site(SameSite::Lax)
                 .finish();
 
             Ok(HttpResponse::Ok()
@@ -452,11 +453,10 @@ impl AdminService {
     pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
         info!("Admin API: logout request");
 
-        let config = crate::system::app_config::get_config();
-
         // Create a cookie with Max-Age=0 to delete it
+        // Must use the same path as login cookie ("/")
         let cookie = Cookie::build("sl_admin", "")
-            .path(&config.routes.admin_prefix)
+            .path("/")
             .http_only(true)
             .max_age(actix_web::cookie::time::Duration::ZERO)
             .finish();

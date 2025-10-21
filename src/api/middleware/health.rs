@@ -1,19 +1,62 @@
 use actix_service::{Service, Transform};
-use actix_web::{
-    Error, HttpResponse,
-    body::EitherBody,
-    dev::{ServiceRequest, ServiceResponse},
-    http::StatusCode,
-    http::header::CONTENT_TYPE,
-};
-use futures_util::future::{LocalBoxFuture, Ready, ready};
+use actix_web::{Error, body::EitherBody, dev::ServiceRequest, dev::ServiceResponse};
+use futures_util::future::{Ready, ready};
 use std::rc::Rc;
-use std::sync::OnceLock;
-use tracing::{info, trace};
+use tracing::trace;
 
-static HEALTH_TOKEN: OnceLock<String> = OnceLock::new();
-static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
+use super::common::{AuthStrategy, GenericAuthMiddleware, extract_token_from_service_request};
 
+/// Health check authentication strategy
+#[derive(Clone)]
+pub struct HealthAuthStrategy {
+    health_token: String,
+    admin_token: String,
+}
+
+impl HealthAuthStrategy {
+    pub fn new(health_token: String, admin_token: String) -> Self {
+        Self {
+            health_token,
+            admin_token,
+        }
+    }
+}
+
+impl AuthStrategy for HealthAuthStrategy {
+    fn requires_auth(&self, _req: &ServiceRequest) -> bool {
+        // If both tokens are empty, health endpoints are disabled
+        !self.health_token.is_empty() || !self.admin_token.is_empty()
+    }
+
+    fn validate_request(&self, req: &ServiceRequest) -> bool {
+        // Try to extract token from cookie first (sl_admin), then fallback to bearer header
+        let token = extract_token_from_service_request(req, "sl_admin").or_else(|| {
+            // Fallback to Bearer token if cookie not found
+            req.headers()
+                .get("Authorization")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|s| s.strip_prefix("Bearer "))
+                .map(|val| val.to_string())
+        });
+
+        match token {
+            Some(t) if t == self.health_token || t == self.admin_token => {
+                trace!("Health token validation successful");
+                true
+            }
+            _ => {
+                trace!("Health token validation failed");
+                false
+            }
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "HealthAuth"
+    }
+}
+
+/// Health check authentication middleware
 #[derive(Clone)]
 pub struct HealthAuth;
 
@@ -25,12 +68,19 @@ where
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
-    type Transform = HealthAuthMiddleware<S>;
+    type Transform = GenericAuthMiddleware<S, HealthAuthStrategy>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(HealthAuthMiddleware {
+        let config = crate::system::app_config::get_config();
+        let strategy = HealthAuthStrategy::new(
+            config.api.health_token.clone(),
+            config.api.admin_token.clone(),
+        );
+
+        ready(Ok(GenericAuthMiddleware {
             service: Rc::new(service),
+            strategy,
         }))
     }
 }

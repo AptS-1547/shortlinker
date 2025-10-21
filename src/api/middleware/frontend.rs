@@ -1,19 +1,46 @@
 use actix_service::{Service, Transform};
-use actix_web::{
-    Error, HttpResponse,
-    body::EitherBody,
-    dev::{ServiceRequest, ServiceResponse},
-    http::StatusCode,
-    http::header::CONTENT_TYPE,
-};
-use futures_util::future::{LocalBoxFuture, Ready, ready};
+use actix_web::{Error, body::EitherBody, dev::ServiceRequest, dev::ServiceResponse};
+use futures_util::future::{Ready, ready};
 use std::rc::Rc;
-use std::sync::OnceLock;
-use tracing::trace;
 
-static ENABLE_ADMIN_PANEL: OnceLock<bool> = OnceLock::new();
-static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
+use super::common::{AuthStrategy, GenericAuthMiddleware};
 
+/// Frontend guard strategy
+/// This is not an authentication middleware, but a feature toggle
+#[derive(Clone)]
+pub struct FrontendGuardStrategy {
+    enable_admin_panel: bool,
+    admin_token: String,
+}
+
+impl FrontendGuardStrategy {
+    pub fn new(enable_admin_panel: bool, admin_token: String) -> Self {
+        Self {
+            enable_admin_panel,
+            admin_token,
+        }
+    }
+}
+
+impl AuthStrategy for FrontendGuardStrategy {
+    fn requires_auth(&self, _req: &ServiceRequest) -> bool {
+        // Frontend routes require the feature to be enabled
+        // If not enabled, return 404
+        self.enable_admin_panel && !self.admin_token.is_empty()
+    }
+
+    fn validate_request(&self, _req: &ServiceRequest) -> bool {
+        // FrontendGuard doesn't validate anything
+        // It only checks if the feature is enabled
+        true
+    }
+
+    fn name(&self) -> &'static str {
+        "FrontendGuard"
+    }
+}
+
+/// Frontend guard middleware
 #[derive(Clone)]
 pub struct FrontendGuard;
 
@@ -25,12 +52,19 @@ where
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
-    type Transform = FrontendGuardMiddleware<S>;
+    type Transform = GenericAuthMiddleware<S, FrontendGuardStrategy>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(FrontendGuardMiddleware {
+        let config = crate::system::app_config::get_config();
+        let strategy = FrontendGuardStrategy::new(
+            config.features.enable_admin_panel,
+            config.api.admin_token.clone(),
+        );
+
+        ready(Ok(GenericAuthMiddleware {
             service: Rc::new(service),
+            strategy,
         }))
     }
 }

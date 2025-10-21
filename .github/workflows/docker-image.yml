@@ -60,8 +60,10 @@ jobs:
           ${{ env.REGISTRY_IMAGE_DOCKERHUB }}
           ${{ env.REGISTRY_IMAGE_GHCR }}
         tags: |
-          type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable=${{ !contains(github.ref, '-') && startsWith(github.ref, 'refs/tags/v') }}
         labels: |
           org.opencontainers.image.title=Shortlinker
           org.opencontainers.image.description=A simple, fast, and secure URL shortener written in Rust
