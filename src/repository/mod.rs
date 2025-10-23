@@ -1,6 +1,3 @@
-#[macro_use]
-mod macros;
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
@@ -13,10 +10,8 @@ use crate::{
 pub mod backends;
 pub mod click;
 pub mod models;
-pub mod register;
 
 pub use models::ShortLink;
-use register::get_repository_plugin;
 
 #[async_trait::async_trait]
 pub trait Repository: Send + Sync {
@@ -39,18 +34,24 @@ impl RepositoryFactory {
     pub async fn create() -> Result<Arc<dyn Repository>> {
         let config = crate::system::app_config::get_config();
         let backend = &config.database.backend;
+        let database_url = &config.database.database_url;
 
-        if let Some(ctor) = get_repository_plugin(backend) {
-            let repository = ctor().await?;
-            Ok(Arc::from(repository))
-        } else {
-            error!("Failed to create repository backend: {}", backend);
-            let available_backends = register::get_repository_plugin_names();
-            error!("Available repository backends: {:?}", available_backends);
-            Err(ShortlinkerError::storage_plugin_not_found(format!(
-                "Unknown repository backend: {}",
-                backend
-            )))
+        match backend.as_str() {
+            "sqlite" | "mysql" | "postgres" | "mariadb" => {
+                let repository = backends::sea_orm::SeaOrmRepository::new(database_url, backend).await?;
+                Ok(Arc::new(repository) as Arc<dyn Repository>)
+            }
+            "sled" => {
+                let repository = backends::sled::SledStorage::new_async().await?;
+                Ok(Arc::new(repository) as Arc<dyn Repository>)
+            }
+            _ => {
+                error!("Unknown repository backend: {}", backend);
+                Err(ShortlinkerError::storage_plugin_not_found(format!(
+                    "Unknown repository backend: {}. Supported: sqlite, mysql, postgres, mariadb, sled",
+                    backend
+                )))
+            }
         }
     }
 }

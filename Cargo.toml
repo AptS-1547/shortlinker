@@ -13,6 +13,14 @@ tui = ["server"]      # TUI功能（依赖服务器）
 full = ["server", "cli", "tui"]  # 全功能版本
 
 # 优化配置
+[profile.dev]
+opt-level = 1
+lto = false
+codegen-units = 16
+panic = "unwind"
+strip = false
+incremental = true
+
 [profile.release]
 opt-level = "s"
 lto = true
@@ -37,7 +45,11 @@ name = "shortlinker"
 path = "src/main.rs"
 build = "build.rs"
 
+[workspace]
+members = [".", "migration"]
+
 [dependencies]
+migration = { path = "migration" }
 actix-web = "4.0"
 dotenv = "0.15"
 serde = { version = "1.0", features = ["derive"] }
@@ -63,7 +75,6 @@ ctor = "0.5.0"
 tracing-attributes = "0.1.29"
 anyhow = "1.0.98"
 rust-embed = "8.7.2"
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite", "postgres", "mysql", "chrono"] }
 uuid = { version = "1.0", features = ["v4"] }
 redis = { version = "0.32.2", features = ["tokio-comp", "tokio-rustls-comp"] }
 rustls = "0.23.28"
@@ -71,7 +82,7 @@ toml = "0.9"
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
 ratatui = "0.29.0"
-sea-orm = { version = "1.1.17", features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls"] }
+sea-orm = { version = "2.0.0-rc", features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

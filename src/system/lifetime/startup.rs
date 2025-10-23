@@ -36,11 +36,6 @@ pub async fn prepare_server_startup() -> StartupContext {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    if cfg!(debug_assertions) {
-        crate::repository::register::debug_repository_registry();
-        crate::cache::register::debug_cache_registry();
-    }
-
     let repository = RepositoryFactory::create()
         .await
         .expect("Failed to create repository backend");

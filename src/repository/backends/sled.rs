@@ -4,10 +4,6 @@ use std::collections::HashMap;
 use crate::repository::{ShortLink, Repository};
 use crate::{errors::Result, repository::models::StorageConfig};
 
-// 注册 sled 存储插件
-// 这样子可以在应用启动时自动注册 sled 存储插件
-declare_repository_plugin!("sled", SledStorage);
-
 pub struct SledStorage;
 
 impl SledStorage {
