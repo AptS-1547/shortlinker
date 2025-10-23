@@ -45,7 +45,7 @@ impl SeaOrmRepository {
         repository.run_migrations().await?;
 
         warn!(
-            "{} Storage initialized.",
+            "{} Repository initialized.",
             repository.backend_name.to_uppercase()
         );
         Ok(repository)
