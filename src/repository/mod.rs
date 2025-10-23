@@ -1,11 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
 
-use crate::{
-    errors::{Result, ShortlinkerError},
-    repository::models::StorageConfig,
-};
+use crate::{errors::Result, repository::models::StorageConfig};
 
 pub mod backends;
 pub mod click;
@@ -33,25 +29,12 @@ pub struct RepositoryFactory;
 impl RepositoryFactory {
     pub async fn create() -> Result<Arc<dyn Repository>> {
         let config = crate::system::app_config::get_config();
-        let backend = &config.database.backend;
         let database_url = &config.database.database_url;
 
-        match backend.as_str() {
-            "sqlite" | "mysql" | "postgres" | "mariadb" => {
-                let repository = backends::sea_orm::SeaOrmRepository::new(database_url, backend).await?;
-                Ok(Arc::new(repository) as Arc<dyn Repository>)
-            }
-            "sled" => {
-                let repository = backends::sled::SledStorage::new_async().await?;
-                Ok(Arc::new(repository) as Arc<dyn Repository>)
-            }
-            _ => {
-                error!("Unknown repository backend: {}", backend);
-                Err(ShortlinkerError::storage_plugin_not_found(format!(
-                    "Unknown repository backend: {}. Supported: sqlite, mysql, postgres, mariadb, sled",
-                    backend
-                )))
-            }
-        }
+        // 从 URL 自动推断数据库类型
+        let backend = backends::infer_backend_from_url(database_url)?;
+
+        let repository = backends::sea_orm::SeaOrmRepository::new(database_url, &backend).await?;
+        Ok(Arc::new(repository) as Arc<dyn Repository>)
     }
 }

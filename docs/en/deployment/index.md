@@ -55,8 +55,8 @@ cargo build --release
 User Request → Reverse Proxy → Shortlinker Service → Data Storage
     ↓             ↓                ↓                   ↓
   Browser        Nginx           Docker             SQLite(default)
-  curl           Caddy           systemd            JSON files
-  API            Apache          Binary             Sled database
+  curl           Caddy           systemd            MariaDB
+  API            Apache          Binary             MySQL/PostgreSQL
 ```
 
 ## Security Recommendations
@@ -71,7 +71,7 @@ User Request → Reverse Proxy → Shortlinker Service → Data Storage
 - **Response Time**: < 1ms (SQLite local storage)
 - **Concurrency Support**: Thousands of concurrent connections
 - **Memory Usage**: Extremely low memory footprint
-- **Storage Format**: SQLite database (default), supports JSON files and Sled database
+- **Storage Format**: SQLite database (default), supports MySQL, PostgreSQL, MariaDB
 
 ## Next Steps
 

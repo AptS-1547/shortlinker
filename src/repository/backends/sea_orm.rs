@@ -22,33 +22,32 @@ pub struct SeaOrmRepository {
 }
 
 impl SeaOrmRepository {
-    pub async fn new(database_url: &str, backend: &str) -> Result<Self> {
+    pub async fn new(database_url: &str, backend_name: &str) -> Result<Self> {
         if database_url.is_empty() {
             return Err(ShortlinkerError::database_config(
                 "DATABASE_URL 未设置".to_string(),
             ));
         }
 
-        // 规范化 backend 名称
-        let backend_name = match backend {
-            "mariadb" => "mysql",
-            other => other,
-        }
-        .to_string();
-
         // 根据不同数据库类型配置连接选项
         let db = if backend_name == "sqlite" {
             Self::connect_sqlite(database_url).await?
         } else {
-            Self::connect_generic(database_url, &backend_name).await?
+            Self::connect_generic(database_url, backend_name).await?
         };
 
-        let repository = SeaOrmRepository { db, backend_name };
+        let repository = SeaOrmRepository {
+            db,
+            backend_name: backend_name.to_string(),
+        };
 
         // 运行迁移
         repository.run_migrations().await?;
 
-        warn!("{} Storage initialized.", repository.backend_name.to_uppercase());
+        warn!(
+            "{} Storage initialized.",
+            repository.backend_name.to_uppercase()
+        );
         Ok(repository)
     }
 
@@ -139,6 +138,97 @@ impl SeaOrmRepository {
             click_count: if is_new { Set(0) } else { NotSet },
         }
     }
+
+    /// 使用 ON CONFLICT 的原子 upsert（适用于 SQLite 和 PostgreSQL）
+    async fn upsert_with_on_conflict(&self, link: &ShortLink) -> Result<()> {
+        use sea_orm::sea_query::OnConflict;
+        use sea_orm::InsertResult;
+
+        let active_model = Self::shortlink_to_active_model(link, true);
+
+        let result: std::result::Result<InsertResult<short_link::ActiveModel>, sea_orm::DbErr> =
+            short_link::Entity::insert(active_model)
+                .on_conflict(
+                    OnConflict::column(short_link::Column::ShortCode)
+                        .update_columns([
+                            short_link::Column::TargetUrl,
+                            short_link::Column::ExpiresAt,
+                            short_link::Column::Password,
+                        ])
+                        .to_owned(),
+                )
+                .exec(&self.db)
+                .await;
+
+        match result {
+            Ok(_) => {
+                info!("Short link upserted: {}", link.code);
+                Ok(())
+            }
+            Err(e) => Err(ShortlinkerError::database_operation(format!(
+                "Upsert 短链接失败: {}",
+                e
+            ))),
+        }
+    }
+
+    /// 使用 try-insert-then-update 的 upsert（适用于 MySQL 和 fallback）
+    async fn upsert_with_fallback(&self, link: &ShortLink) -> Result<()> {
+        // 先尝试插入
+        let active_model = Self::shortlink_to_active_model(link, true);
+        let insert_result = active_model.clone().insert(&self.db).await;
+
+        match insert_result {
+            Ok(_) => {
+                info!("Short link created: {}", link.code);
+                Ok(())
+            }
+            Err(sea_orm::DbErr::Exec(sea_orm::RuntimeErr::SqlxError(sqlx_err))) => {
+                // 检查是否是唯一约束冲突错误
+                if Self::is_unique_violation(&sqlx_err) {
+                    // 如果是唯一冲突，执行更新
+                    let update_model = Self::shortlink_to_active_model(link, false);
+                    update_model.update(&self.db).await.map_err(|e| {
+                        ShortlinkerError::database_operation(format!("更新短链接失败: {}", e))
+                    })?;
+                    info!("Short link updated: {}", link.code);
+                    Ok(())
+                } else {
+                    // 其他错误直接返回
+                    Err(ShortlinkerError::database_operation(format!(
+                        "插入短链接失败: {}",
+                        sqlx_err
+                    )))
+                }
+            }
+            Err(e) => Err(ShortlinkerError::database_operation(format!(
+                "插入短链接失败: {}",
+                e
+            ))),
+        }
+    }
+
+    /// 判断是否是唯一约束冲突错误
+    fn is_unique_violation(err: &sea_orm::sqlx::Error) -> bool {
+        use sea_orm::sqlx::Error;
+
+        match err {
+            Error::Database(db_err) => {
+                let code = db_err.code();
+                // SQLite: SQLITE_CONSTRAINT (code 2067)
+                // MySQL: ER_DUP_ENTRY (code 1062)
+                // PostgreSQL: unique_violation (code 23505)
+                code.as_ref()
+                    .map(|c| {
+                        c == "2067"  // SQLite
+                            || c == "1062"  // MySQL
+                            || c == "23505" // PostgreSQL
+                    })
+                    .unwrap_or(false)
+            }
+            _ => false,
+        }
+    }
 }
 
 #[async_trait]
@@ -178,30 +268,23 @@ impl Repository for SeaOrmRepository {
     }
 
     async fn set(&self, link: ShortLink) -> Result<()> {
-        // 检查记录是否存在
-        let exists = short_link::Entity::find_by_id(&link.code)
-            .one(&self.db)
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("检查记录失败: {}", e)))?
-            .is_some();
-
-        if exists {
-            // 更新现有记录
-            let active_model = Self::shortlink_to_active_model(&link, false);
-            active_model.update(&self.db).await.map_err(|e| {
-                ShortlinkerError::database_operation(format!("更新短链接失败: {}", e))
-            })?;
-            info!("Short link updated: {}", link.code);
-        } else {
-            // 插入新记录
-            let active_model = Self::shortlink_to_active_model(&link, true);
-            active_model.insert(&self.db).await.map_err(|e| {
-                ShortlinkerError::database_operation(format!("插入短链接失败: {}", e))
-            })?;
-            info!("Short link created: {}", link.code);
+        // 使用原子化的 upsert 操作，避免竞态条件
+        match self.backend_name.as_str() {
+            "sqlite" | "postgres" => {
+                // SQLite 和 PostgreSQL 支持 ON CONFLICT
+                self.upsert_with_on_conflict(&link).await
+            }
+            "mysql" => {
+                // MySQL 使用 INSERT ... ON DUPLICATE KEY UPDATE
+                // 但 sea-orm 的 OnConflict 不完全支持 MySQL 语法
+                // 所以我们使用 insert 尝试，失败则 update
+                self.upsert_with_fallback(&link).await
+            }
+            _ => {
+                // 其他情况使用 fallback 策略
+                self.upsert_with_fallback(&link).await
+            }
         }
-
-        Ok(())
     }
 
     async fn remove(&self, code: &str) -> Result<()> {

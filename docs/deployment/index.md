@@ -55,8 +55,8 @@ cargo build --release
 用户请求 → 反向代理 → Shortlinker 服务 → 数据存储
     ↓           ↓              ↓           ↓
   浏览器      Nginx         Docker      SQLite(默认)
-  curl        Caddy         systemd     JSON文件
-  API         Apache        Binary      Sled数据库
+  curl        Caddy         systemd     MySQL/PostgreSQL
+  API         Apache        Binary      MariaDB
 ```
 
 ## 安全建议
@@ -71,7 +71,7 @@ cargo build --release
 - **响应时间**: < 1ms（SQLite 本地存储）
 - **并发支持**: 数千个并发连接
 - **内存使用**: 极低内存占用
-- **存储格式**: SQLite 数据库（默认），支持 JSON 文件和 Sled 数据库
+- **存储格式**: SQLite 数据库（默认），支持 MySQL、PostgreSQL、MariaDB
 
 ## 下一步
 
