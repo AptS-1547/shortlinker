@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
-use crate::storages::ShortLink;
+use crate::repository::ShortLink;
 
 declare_object_cache_plugin!("memory", MokaCacheWrapper);
 

@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use super::{ShortLink, Storage};
-use crate::{errors::Result, storages::models::StorageConfig};
+use crate::repository::{ShortLink, Repository};
+use crate::{errors::Result, repository::models::StorageConfig};
 
 // 注册 sled 存储插件
 // 这样子可以在应用启动时自动注册 sled 存储插件
-declare_storage_plugin!("sled", SledStorage);
+declare_repository_plugin!("sled", SledStorage);
 
 pub struct SledStorage;
 
@@ -17,7 +17,7 @@ impl SledStorage {
 }
 
 #[async_trait]
-impl Storage for SledStorage {
+impl Repository for SledStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
         println!("FileStorage::get called with {}", code);
         let link = ShortLink {

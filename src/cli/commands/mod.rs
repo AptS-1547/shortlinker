@@ -5,7 +5,7 @@ pub use help::*;
 pub use link_management::*;
 
 use super::CliError;
-use crate::storages::Storage;
+use crate::repository::Repository;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -41,13 +41,13 @@ pub enum Command {
 }
 
 impl Command {
-    pub async fn execute(self, storage: Arc<dyn Storage>) -> Result<(), CliError> {
+    pub async fn execute(self, repository: Arc<dyn Repository>) -> Result<(), CliError> {
         match self {
             Command::Help => {
                 show_help();
                 Ok(())
             }
-            Command::List => list_links(storage).await,
+            Command::List => list_links(repository).await,
             Command::Add {
                 short_code,
                 target_url,
@@ -56,7 +56,7 @@ impl Command {
                 password,
             } => {
                 add_link(
-                    storage,
+                    repository,
                     short_code,
                     target_url,
                     force_overwrite,
@@ -70,13 +70,13 @@ impl Command {
                 target_url,
                 expire_time,
                 password,
-            } => update_link(storage, short_code, target_url, expire_time, password).await,
-            Command::Remove { short_code } => remove_link(storage, short_code).await,
-            Command::Export { file_path } => export_links(storage, file_path).await,
+            } => update_link(repository, short_code, target_url, expire_time, password).await,
+            Command::Remove { short_code } => remove_link(repository, short_code).await,
+            Command::Export { file_path } => export_links(repository, file_path).await,
             Command::Import {
                 file_path,
                 force_overwrite,
-            } => import_links(storage, file_path, force_overwrite).await,
+            } => import_links(repository, file_path, force_overwrite).await,
             Command::GenerateConfig { output_path } => generate_config(output_path).await,
         }
     }

@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
 
-use super::{ShortLink, Storage};
+use crate::repository::{ShortLink, Repository};
 use crate::errors::{Result, ShortlinkerError};
-use crate::storages::click::ClickSink;
-use crate::storages::models::StorageConfig;
+use crate::repository::click::ClickSink;
+use crate::repository::models::StorageConfig;
 use async_trait::async_trait;
 
 // 注册 SQLite 存储插件
 // 该函数在应用启动时调用，注册 SQLite 存储插件到存储插件注册表
-declare_storage_plugin!("sqlite", SqliteStorage);
+declare_repository_plugin!("sqlite", SqliteStorage);
 
 #[derive(Clone)]
 pub struct SqliteStorage {
@@ -39,13 +39,13 @@ impl SqliteStorage {
         .await
         .map_err(|e| ShortlinkerError::database_connection(format!("无法连接到数据库: {}", e)))?;
 
-        let storage = SqliteStorage { pool };
+        let repository = SqliteStorage { pool };
 
         // Initialize database tables
-        storage.init_db().await?;
+        repository.init_db().await?;
         warn!("SqliteStorage initialized, database path: {}", db_path);
 
-        Ok(storage)
+        Ok(repository)
     }
 
     async fn init_db(&self) -> Result<()> {
@@ -112,7 +112,7 @@ impl SqliteStorage {
 }
 
 #[async_trait]
-impl Storage for SqliteStorage {
+impl Repository for SqliteStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
         let result = sqlx::query(
             "SELECT short_code, target_url, created_at, expires_at, password, click_count

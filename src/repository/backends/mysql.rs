@@ -3,22 +3,40 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{PgPool, Row};
+use sqlx::{MySqlPool, Row};
 use tracing::{error, info, trace, warn};
 
 use crate::errors::{Result, ShortlinkerError};
-use crate::storages::click::ClickSink;
-use crate::storages::models::StorageConfig;
-use crate::storages::{ShortLink, Storage};
+use crate::repository::click::ClickSink;
+use crate::repository::models::StorageConfig;
+use crate::repository::{ShortLink, Repository};
 
-declare_storage_plugin!("postgres", PostgresStorage);
+declare_repository_plugin!("mysql", MySqlStorage);
 
-#[derive(Clone)]
-pub struct PostgresStorage {
-    pool: PgPool,
+#[ctor::ctor]
+fn register_mariadb_alias() {
+    use crate::repository::{Repository, register::register_repository_plugin};
+    use std::{future::Future, pin::Pin, sync::Arc};
+
+    register_repository_plugin(
+        "mariadb",
+        Arc::new(|| {
+            Box::pin(async {
+                let repository = MySqlStorage::new_async().await?;
+                Ok(Box::new(repository) as Box<dyn Repository>)
+            })
+                as Pin<Box<dyn Future<Output = crate::errors::Result<Box<dyn Repository>>> + Send>>
+        }),
+    );
 }
 
-impl PostgresStorage {
+#[derive(Clone)]
+pub struct MySqlStorage {
+    pool: MySqlPool,
+    db_type: String, // "mysql" 或 "mariadb"
+}
+
+impl MySqlStorage {
     pub async fn new_async() -> Result<Self> {
         let config = crate::system::app_config::get_config();
         let database_url = &config.database.database_url;
@@ -29,30 +47,46 @@ impl PostgresStorage {
             ));
         }
 
+        // 从 URL 检测数据库类型
+        let db_type = if database_url.contains("mariadb") || config.database.backend == "mariadb" {
+            "mariadb".to_string()
+        } else {
+            "mysql".to_string()
+        };
+
         // 创建连接池
-        let pool = PgPool::connect(database_url).await.map_err(|e| {
-            ShortlinkerError::database_connection(format!("无法连接到PostgreSQL数据库: {}", e))
+        let pool = MySqlPool::connect(database_url).await.map_err(|e| {
+            ShortlinkerError::database_connection(format!(
+                "无法连接到{}数据库: {}",
+                db_type.to_uppercase(),
+                e
+            ))
         })?;
 
-        let storage = PostgresStorage { pool };
+        let repository = MySqlStorage {
+            pool,
+            db_type: db_type.clone(),
+        };
 
         // 初始化数据库表
-        storage.init_db().await?;
+        repository.init_db().await?;
 
-        warn!("PostgresStorage initialized. Ensure your DATABASE_URL is set correctly.");
-        Ok(storage)
+        warn!("{} Storage initialized.", db_type.to_uppercase());
+        Ok(repository)
     }
 
     async fn init_db(&self) -> Result<()> {
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS short_links (
-                short_code TEXT PRIMARY KEY,
+                short_code VARCHAR(255) PRIMARY KEY,
                 target_url TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL,
-                expires_at TIMESTAMPTZ,
-                password TEXT,
-                click_count BIGINT DEFAULT 0 CHECK (click_count >= 0)
-            )",
+                created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+                expires_at TIMESTAMP(6) NULL,
+                password VARCHAR(255) NULL,
+                click_count BIGINT UNSIGNED DEFAULT 0,
+                INDEX idx_expires_at (expires_at),
+                INDEX idx_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         )
         .execute(&self.pool)
         .await
@@ -75,16 +109,16 @@ impl PostgresStorage {
             created_at,
             expires_at,
             password,
-            click: click_count as usize, // 将 u64 转换为 usize
+            click: click_count as usize, // 默认点击量为0
         }
     }
 }
 
 #[async_trait]
-impl Storage for PostgresStorage {
+impl Repository for MySqlStorage {
     async fn get(&self, code: &str) -> Option<ShortLink> {
         let result = sqlx::query(
-            "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = $1"
+            "SELECT short_code, target_url, created_at, expires_at FROM short_links WHERE short_code = ?"
         )
         .bind(code)
         .fetch_optional(&self.pool)
@@ -97,7 +131,7 @@ impl Storage for PostgresStorage {
                 let created_at: DateTime<Utc> = row.get("created_at");
                 let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
                 let password: Option<String> = row.get("password");
-                let click_count: i64 = row.get("click_count");
+                let click_count: u64 = row.get("click_count");
 
                 Some(Self::shortlink_from_row(
                     short_code,
@@ -105,7 +139,7 @@ impl Storage for PostgresStorage {
                     created_at,
                     expires_at,
                     password,
-                    click_count as u64, // 将 i64 转换为 u64
+                    click_count,
                 ))
             }
             Ok(None) => None,
@@ -130,7 +164,7 @@ impl Storage for PostgresStorage {
                     let created_at: DateTime<Utc> = row.get("created_at");
                     let expires_at: Option<DateTime<Utc>> = row.get("expires_at");
                     let password: Option<String> = row.get("password");
-                    let click_count: i64 = row.get("click_count");
+                    let click_count: u64 = row.get("click_count");
 
                     let link = Self::shortlink_from_row(
                         short_code.clone(),
@@ -138,7 +172,7 @@ impl Storage for PostgresStorage {
                         created_at,
                         expires_at,
                         password,
-                        click_count as u64, // 将 i64 转换为 u64
+                        click_count,
                     );
                     result.insert(short_code, link);
                 }
@@ -154,8 +188,8 @@ impl Storage for PostgresStorage {
     async fn set(&self, link: ShortLink) -> Result<()> {
         sqlx::query(
             "INSERT INTO short_links (short_code, target_url, created_at, expires_at)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT(short_code) DO UPDATE SET target_url = $2, expires_at = $4",
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE target_url = VALUES(target_url), expires_at = VALUES(expires_at)"
         )
         .bind(&link.code)
         .bind(&link.target)
@@ -163,14 +197,16 @@ impl Storage for PostgresStorage {
         .bind(link.expires_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("插入/更新短链接失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("插入/更新短链接失败: {}", e))
+        })?;
 
         info!("Short link upserted: {}", link.code);
         Ok(())
     }
 
     async fn remove(&self, code: &str) -> Result<()> {
-        let result = sqlx::query("DELETE FROM short_links WHERE short_code = $1")
+        let result = sqlx::query("DELETE FROM short_links WHERE short_code = ?")
             .bind(code)
             .execute(&self.pool)
             .await
@@ -188,13 +224,16 @@ impl Storage for PostgresStorage {
     }
 
     async fn reload(&self) -> Result<()> {
-        info!("Reloading links from PostgreSQL storage");
+        info!(
+            "Reloading links from {} storage",
+            self.db_type.to_uppercase()
+        );
         Ok(())
     }
 
     async fn get_backend_config(&self) -> StorageConfig {
         StorageConfig {
-            storage_type: "postgres".into(),
+            storage_type: self.db_type.clone(),
             support_click: true,
         }
     }
@@ -208,7 +247,7 @@ impl Storage for PostgresStorage {
 }
 
 #[async_trait]
-impl ClickSink for PostgresStorage {
+impl ClickSink for MySqlStorage {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
         let mut tx = self
             .pool
@@ -218,9 +257,9 @@ impl ClickSink for PostgresStorage {
 
         for (code, count) in updates {
             if let Err(e) = sqlx::query(
-                "UPDATE short_links SET click_count = click_count + $1 WHERE short_code = $2",
+                "UPDATE short_links SET click_count = click_count + ? WHERE short_code = ?",
             )
-            .bind(count as i64)
+            .bind(count as u64)
             .bind(&code)
             .execute(&mut *tx)
             .await
@@ -233,7 +272,7 @@ impl ClickSink for PostgresStorage {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to commit: {}", e))?;
 
-        trace!("click counts flushed to PostgreSQL DB.");
+        trace!("click counts flushed to {}.", self.db_type.to_uppercase());
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use tracing::error;
 
 use crate::{
     errors::{Result, ShortlinkerError},
-    storages::models::StorageConfig,
+    repository::models::StorageConfig,
 };
 
 pub mod backends;
@@ -16,10 +16,10 @@ pub mod models;
 pub mod register;
 
 pub use models::ShortLink;
-use register::get_storage_plugin;
+use register::get_repository_plugin;
 
 #[async_trait::async_trait]
-pub trait Storage: Send + Sync {
+pub trait Repository: Send + Sync {
     async fn get(&self, code: &str) -> Option<ShortLink>;
     async fn load_all(&self) -> HashMap<String, ShortLink>;
     async fn set(&self, link: ShortLink) -> Result<()>;
@@ -33,22 +33,22 @@ pub trait Storage: Send + Sync {
     }
 }
 
-pub struct StorageFactory;
+pub struct RepositoryFactory;
 
-impl StorageFactory {
-    pub async fn create() -> Result<Arc<dyn Storage>> {
+impl RepositoryFactory {
+    pub async fn create() -> Result<Arc<dyn Repository>> {
         let config = crate::system::app_config::get_config();
         let backend = &config.database.backend;
 
-        if let Some(ctor) = get_storage_plugin(backend) {
-            let storage = ctor().await?;
-            Ok(Arc::from(storage))
+        if let Some(ctor) = get_repository_plugin(backend) {
+            let repository = ctor().await?;
+            Ok(Arc::from(repository))
         } else {
-            error!("Failed to create storage backend: {}", backend);
-            let available_backends = register::get_storage_plugin_names();
-            error!("Available storage backends: {:?}", available_backends);
+            error!("Failed to create repository backend: {}", backend);
+            let available_backends = register::get_repository_plugin_names();
+            error!("Available repository backends: {:?}", available_backends);
             Err(ShortlinkerError::storage_plugin_not_found(format!(
-                "Unknown storage backend: {}",
+                "Unknown repository backend: {}",
                 backend
             )))
         }

@@ -16,7 +16,12 @@ cpu_count = 4
 # 存储后端类型：sqlite, postgres, mysql, mariadb
 type = "sqlite"
 # 数据库连接 URL 或文件路径
-database_url = "shortlinks.db"
+# sqlite:///:memory: 表示使用内存数据库
+# sqlite:///path/to/dbfile.db 表示使用文件数据库
+# mysql://user:password@host:port/dbname 表示使用 MySQL 数据库
+# postgres://user:password@host:port/dbname 表示使用 PostgreSQL 数据库
+
+database_url = "sqlite://shortlinks.db"
 # 数据库连接池大小
 pool_size = 10
 # 数据库连接超时（秒）

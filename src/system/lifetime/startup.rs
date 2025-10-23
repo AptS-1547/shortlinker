@@ -1,14 +1,14 @@
 use crate::cache::{self, CompositeCacheTrait};
-use crate::storages::click::global::set_global_click_manager;
-use crate::storages::click::manager::ClickManager;
-use crate::storages::{Storage, StorageFactory};
+use crate::repository::click::global::set_global_click_manager;
+use crate::repository::click::manager::ClickManager;
+use crate::repository::{Repository, RepositoryFactory};
 use crate::system::app_config::get_config;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
 
 pub struct StartupContext {
-    pub storage: Arc<dyn Storage>,
+    pub repository: Arc<dyn Repository>,
     pub cache: Arc<dyn CompositeCacheTrait>,
     pub route_config: RouteConfig,
 }
@@ -37,22 +37,22 @@ pub async fn prepare_server_startup() -> StartupContext {
         .expect("Failed to install rustls crypto provider");
 
     if cfg!(debug_assertions) {
-        crate::storages::register::debug_storage_registry();
+        crate::repository::register::debug_repository_registry();
         crate::cache::register::debug_cache_registry();
     }
 
-    let storage = StorageFactory::create()
+    let repository = RepositoryFactory::create()
         .await
-        .expect("Failed to create storage backend");
+        .expect("Failed to create repository backend");
     warn!(
-        "Using storage backend: {}",
-        storage.get_backend_config().await.storage_type
+        "Using repository backend: {}",
+        repository.get_backend_config().await.storage_type
     );
 
     // 初始化点击计数器
     let config = get_config();
     if config.click_manager.enable_click_tracking {
-        if let Some(sink) = storage.as_click_sink() {
+        if let Some(sink) = repository.as_click_sink() {
             let mgr = Arc::new(ClickManager::new(
                 sink,
                 Duration::from_secs(config.click_manager.flush_interval),
@@ -82,7 +82,7 @@ pub async fn prepare_server_startup() -> StartupContext {
         .await
         .expect("Failed to create cache");
 
-    let links = storage.load_all().await;
+    let links = repository.load_all().await;
     cache
         .reconfigure(cache::traits::BloomConfig {
             capacity: links.len(),
@@ -93,7 +93,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     debug!("L1/L2 cache initialized with {} links", links.len());
 
     #[cfg(any(feature = "cli", feature = "tui"))]
-    crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;
+    crate::system::platform::setup_reload_mechanism(cache.clone(), repository.clone()).await;
 
     // 提取路由配置
     let config = get_config();
@@ -107,7 +107,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     check_compoment_enabled(&route_config);
 
     StartupContext {
-        storage,
+        repository,
         cache,
         route_config,
     }

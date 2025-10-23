@@ -16,7 +16,7 @@ mod errors;
 mod event;
 mod middleware;
 mod services;
-mod storages;
+mod repository;
 mod system;
 mod utils;
 

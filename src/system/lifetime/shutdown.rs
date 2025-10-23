@@ -1,7 +1,7 @@
 use tokio::signal;
 use tracing::warn;
 
-use crate::storages::click::global::get_click_manager;
+use crate::repository::click::global::get_click_manager;
 
 pub async fn listen_for_shutdown() {
     // 等待 Ctrl+C 信号

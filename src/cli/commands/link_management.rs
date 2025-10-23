@@ -1,5 +1,5 @@
 use super::super::CliError;
-use crate::storages::{ShortLink, Storage};
+use crate::repository::{ShortLink, Repository};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
 use colored::Colorize;
@@ -8,8 +8,8 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 
-pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
-    let links = storage.load_all().await;
+pub async fn list_links(repository: Arc<dyn Repository>) -> Result<(), CliError> {
+    let links = repository.load_all().await;
 
     if links.is_empty() {
         println!("{} No short links found", "ℹ".bold().blue());
@@ -58,7 +58,7 @@ pub async fn list_links(storage: Arc<dyn Storage>) -> Result<(), CliError> {
 }
 
 pub async fn add_link(
-    storage: Arc<dyn Storage>,
+    repository: Arc<dyn Repository>,
     short_code: Option<String>,
     target_url: String,
     force_overwrite: bool,
@@ -88,7 +88,7 @@ pub async fn add_link(
         }
     };
 
-    let links = storage.load_all().await;
+    let links = repository.load_all().await;
 
     // Check if short code already exists
     if links.contains_key(&final_short_code) {
@@ -137,7 +137,7 @@ pub async fn add_link(
         click: 0,
     };
 
-    storage
+    repository
         .set(link)
         .await
         .map_err(|e| CliError::CommandError(format!("Failed to save: {}", e)))?;
@@ -167,8 +167,8 @@ pub async fn add_link(
     Ok(())
 }
 
-pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Result<(), CliError> {
-    let links = storage.load_all().await;
+pub async fn remove_link(repository: Arc<dyn Repository>, short_code: String) -> Result<(), CliError> {
+    let links = repository.load_all().await;
 
     if !links.contains_key(&short_code) {
         return Err(CliError::CommandError(format!(
@@ -177,7 +177,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
         )));
     }
 
-    storage
+    repository
         .remove(&short_code)
         .await
         .map_err(|e| CliError::CommandError(format!("Failed to delete: {}", e)))?;
@@ -197,7 +197,7 @@ pub async fn remove_link(storage: Arc<dyn Storage>, short_code: String) -> Resul
 }
 
 pub async fn update_link(
-    storage: Arc<dyn Storage>,
+    repository: Arc<dyn Repository>,
     short_code: String,
     target_url: String,
     expire_time: Option<String>,
@@ -211,7 +211,7 @@ pub async fn update_link(
     }
 
     // Check if short code exists
-    let old_link = match storage.get(&short_code).await {
+    let old_link = match repository.get(&short_code).await {
         Some(link) => link,
         None => {
             return Err(CliError::CommandError(format!(
@@ -250,7 +250,7 @@ pub async fn update_link(
         click: old_link.click,                    // Keep original click count
     };
 
-    storage
+    repository
         .set(updated_link)
         .await
         .map_err(|e| CliError::CommandError(format!("Failed to update: {}", e)))?;
@@ -279,10 +279,10 @@ pub async fn update_link(
 }
 
 pub async fn export_links(
-    storage: Arc<dyn Storage>,
+    repository: Arc<dyn Repository>,
     file_path: Option<String>,
 ) -> Result<(), CliError> {
-    let links = storage.load_all().await;
+    let links = repository.load_all().await;
 
     if links.is_empty() {
         println!("{} No short links to export", "ℹ".bold().blue());
@@ -318,7 +318,7 @@ pub async fn export_links(
 }
 
 pub async fn import_links(
-    storage: Arc<dyn Storage>,
+    repository: Arc<dyn Repository>,
     file_path: String,
     force_overwrite: bool,
 ) -> Result<(), CliError> {
@@ -343,7 +343,7 @@ pub async fn import_links(
     }
 
     let existing_links = if !force_overwrite {
-        storage.load_all().await
+        repository.load_all().await
     } else {
         std::collections::HashMap::new()
     };
@@ -379,7 +379,7 @@ pub async fn import_links(
         }
 
         // Use the imported link directly since it's already a complete ShortLink structure
-        match storage.set(imported_link.clone()).await {
+        match repository.set(imported_link.clone()).await {
             Ok(_) => {
                 imported_count += 1;
                 println!(

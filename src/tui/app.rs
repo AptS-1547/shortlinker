@@ -1,5 +1,5 @@
 use crate::errors::ShortlinkerError;
-use crate::storages::{ShortLink, Storage, StorageFactory};
+use crate::repository::{ShortLink, Repository, RepositoryFactory};
 use crate::utils::{TimeParser, generate_random_code};
 
 use chrono::Utc;
@@ -25,7 +25,7 @@ pub enum CurrentlyEditing {
 }
 
 pub struct App {
-    pub storage: Arc<dyn Storage>,
+    pub repository: Arc<dyn Repository>,
     pub links: HashMap<String, ShortLink>,
     pub current_screen: CurrentScreen,
     pub currently_editing: Option<CurrentlyEditing>,
@@ -49,11 +49,11 @@ pub struct App {
 
 impl App {
     pub async fn new() -> Result<App, Box<dyn std::error::Error>> {
-        let storage = StorageFactory::create().await?;
-        let links = storage.load_all().await;
+        let repository = RepositoryFactory::create().await?;
+        let links = repository.load_all().await;
 
         Ok(App {
-            storage,
+            repository,
             links,
             current_screen: CurrentScreen::Main,
             currently_editing: None,
@@ -71,8 +71,8 @@ impl App {
     }
 
     pub async fn refresh_links(&mut self) -> Result<(), ShortlinkerError> {
-        // Refresh links from storage
-        self.links = self.storage.load_all().await;
+        // Refresh links from repository
+        self.links = self.repository.load_all().await;
         // Notify server to reload
         if let Err(e) = crate::system::platform::notify_server() {
             return Err(ShortlinkerError::notify_server(format!(
@@ -197,7 +197,7 @@ impl App {
             click: 0,
         };
 
-        self.storage.set(link).await?;
+        self.repository.set(link).await?;
         self.clear_inputs();
         Ok(())
     }
@@ -244,7 +244,7 @@ impl App {
             click: link.click,
         };
 
-        self.storage.set(updated_link).await?;
+        self.repository.set(updated_link).await?;
         self.clear_inputs();
         Ok(())
     }
@@ -255,7 +255,7 @@ impl App {
             None => return Err("No link selected".into()),
         };
 
-        self.storage.remove(&link.code).await?;
+        self.repository.remove(&link.code).await?;
 
         // Adjust selection if necessary
         if self.selected_index >= self.links.len() && self.selected_index > 0 {
@@ -281,7 +281,7 @@ impl App {
         let imported_links: Vec<ShortLink> = serde_json::from_reader(reader)?;
 
         for link in imported_links {
-            self.storage.set(link).await?;
+            self.repository.set(link).await?;
         }
 
         Ok(())

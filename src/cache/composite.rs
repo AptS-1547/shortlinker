@@ -1,7 +1,7 @@
 use crate::cache::register::{get_filter_plugin, get_object_cache_plugin};
 use crate::cache::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};
 use crate::errors::ShortlinkerError;
-use crate::storages::ShortLink;
+use crate::repository::ShortLink;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -18,7 +18,7 @@
 
 use crate::cache::CompositeCacheTrait;
 use crate::errors::Result;
-use crate::storages::Storage;
+use crate::repository::Repository;
 use std::sync::Arc;
 
 #[cfg(unix)]
@@ -59,10 +59,10 @@ pub trait PlatformOps {
     /// On Unix: Sets up a signal handler for SIGUSR1
     /// On Windows: Sets up a file polling mechanism
     ///
-    /// When triggered, reloads the cache and storage
+    /// When triggered, reloads the cache and repository
     fn setup_reload_mechanism(
         cache: Arc<dyn CompositeCacheTrait + 'static>,
-        storage: Arc<dyn Storage + 'static>,
+        repository: Arc<dyn Repository + 'static>,
     ) -> impl std::future::Future<Output = ()> + Send;
 }
 

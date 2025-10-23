@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use tracing::{error, info, trace};
 
 use crate::cache::traits::CompositeCacheTrait;
-use crate::storages::{ShortLink, Storage};
+use crate::repository::{ShortLink, Repository};
 use crate::system::reload::reload_all;
 use crate::utils::{TimeParser, generate_random_code};
 
@@ -120,14 +120,14 @@ impl AdminService {
     pub async fn get_all_links(
         _req: HttpRequest,
         query: web::Query<GetLinksQuery>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> ActixResult<impl Responder> {
         trace!(
             "Admin API: request to list all links with filters: {:?}",
             query
         );
 
-        let all_links = storage.load_all().await;
+        let all_links = repository.load_all().await;
         trace!("Admin API: retrieved {} total links", all_links.len());
 
         let now = chrono::Utc::now();
@@ -227,7 +227,7 @@ impl AdminService {
         _req: HttpRequest,
         mut link: web::Json<PostNewLink>,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> ActixResult<impl Responder> {
         // Generate code if not provided
         if link.code.as_ref().is_none_or(|c| c.is_empty()) {
@@ -268,10 +268,10 @@ impl AdminService {
             click: 0,
         };
 
-        match storage.set(new_link.clone()).await {
+        match repository.set(new_link.clone()).await {
             Ok(_) => {
                 info!("Admin API: link created - {}", new_link.code);
-                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+                let _ = reload_all(cache.get_ref().clone(), repository.get_ref().clone()).await;
                 Ok(HttpResponse::Created()
                     .append_header(("Content-Type", "application/json; charset=utf-8"))
                     .json(ApiResponse {
@@ -301,11 +301,11 @@ impl AdminService {
     pub async fn get_link(
         _req: HttpRequest,
         code: web::Path<String>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> ActixResult<impl Responder> {
         info!("Admin API: get link request - code: {}", code);
 
-        match storage.get(&code).await {
+        match repository.get(&code).await {
             Some(link) => Ok(Self::success_response(LinkResponse::from(link))),
             None => {
                 info!("Admin API: link not found - {}", code);
@@ -321,14 +321,14 @@ impl AdminService {
         _req: HttpRequest,
         code: web::Path<String>,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> ActixResult<impl Responder> {
         info!("Admin API: delete link request - code: {}", code);
 
-        match storage.remove(&code).await {
+        match repository.remove(&code).await {
             Ok(_) => {
                 info!("Admin API: link deleted - {}", code);
-                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+                let _ = reload_all(cache.get_ref().clone(), repository.get_ref().clone()).await;
                 Ok(Self::success_response(serde_json::json!({
                     "message": "Link deleted successfully"
                 })))
@@ -349,7 +349,7 @@ impl AdminService {
         code: web::Path<String>,
         link: web::Json<PostNewLink>,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> ActixResult<impl Responder> {
         info!(
             "Admin API: update link request - code: {}, target: {}",
@@ -357,7 +357,7 @@ impl AdminService {
         );
 
         // Get existing link to preserve creation time
-        let existing_link = match storage.get(&code).await {
+        let existing_link = match repository.get(&code).await {
             Some(link) => link,
             None => {
                 info!("Admin API: attempt to update nonexistent link - {}", code);
@@ -394,10 +394,10 @@ impl AdminService {
             click: existing_link.click, // 保持原有的点击计数
         };
 
-        match storage.set(updated_link.clone()).await {
+        match repository.set(updated_link.clone()).await {
             Ok(_) => {
                 info!("Admin API: link updated - {}", code);
-                let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+                let _ = reload_all(cache.get_ref().clone(), repository.get_ref().clone()).await;
                 Ok(Self::success_response(PostNewLink {
                     code: Some(updated_link.code),
                     target: updated_link.target,
