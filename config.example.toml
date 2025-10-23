@@ -5,34 +5,43 @@
 [server]
 # 服务器监听地址
 host = "127.0.0.1"
+
 # 服务器监听端口
 port = 8080
+
 # Unix Socket 路径（如果设置了，会覆盖 host 和 port）
 # unix_socket = "/tmp/shortlinker.sock"
 # CPU 核心数量（默认为系统核心数）
 cpu_count = 4
 
 [storage]
-# 存储后端类型：sqlite, postgres, mysql, mariadb
-type = "sqlite"
 # 数据库连接 URL 或文件路径
-database_url = "shortlinks.db"
+# sqlite:///:memory: 表示使用内存数据库
+# sqlite:///path/to/dbfile.db 表示使用文件数据库
+# mysql://user:password@host:port/dbname 表示使用 MySQL 数据库
+# postgres://user:password@host:port/dbname 表示使用 PostgreSQL 数据库
+database_url = "sqlite://shortlinks.db"
+
 # 数据库连接池大小
 pool_size = 10
+
 # 数据库连接超时（秒）
 timeout = 30
 
 [cache]
 # 缓存类型：memory, redis（目前仅支持 memory)
 type = "memory"
+
 # 默认缓存过期时间（秒）
 default_ttl = 3600
 
 [cache.redis]
 # Redis 连接 URL
 url = "redis://127.0.0.1:6379/"
+
 # Redis 键前缀
 key_prefix = "shortlinker:"
+
 # Redis 连接池大小
 pool_size = 10
 
@@ -43,43 +52,55 @@ max_capacity = 10000
 [api]
 # 管理 API Token（留空禁用管理 API）
 admin_token = ""
+
 # 健康检查 API Token（留空则使用 admin_token）
 health_token = ""
 
 [routes]
 # 管理 API 路由前缀
 admin_prefix = "/admin"
+
 # 健康检查路由前缀
 health_prefix = "/health"
+
 # 前端面板路由前缀
 frontend_prefix = "/panel"
 
 [features]
 # 是否启用 Web 管理面板
 enable_admin_panel = false
+
 # 随机短码长度
 random_code_length = 6
+
 # 默认跳转 URL
 default_url = "https://esap.cc/repo"
 
 [click_manager]
 # 是否启用点击统计功能
 enable_click_tracking = true
+
 # 点击管理器刷新间隔（秒）
 flush_interval = 30
+
 # 点击上限（达到此数量时刷新）
 max_clicks_before_flush = 100
 
 [logging]
 # 日志等级：trace, debug, info, warn, error
 level = "info"
+
 # 日志输出格式：text, json
 format = "text"
+
 # 日志文件路径（留空则输出到控制台）
 file = "shortlinker.log"
+
 # 日志文件最大大小（MB）
 max_size = 100
+
 # 保留的日志文件数量
 max_backups = 5
+
 # 是否启用日志轮转
 enable_rotation = true

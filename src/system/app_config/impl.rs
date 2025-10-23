@@ -113,9 +113,6 @@ impl AppConfig {
         }
 
         // Database config
-        if let Ok(backend) = env::var("DATABASE_BACKEND") {
-            self.database.backend = backend;
-        }
         if let Ok(database_url) = env::var("DATABASE_URL") {
             self.database.database_url = database_url;
         }

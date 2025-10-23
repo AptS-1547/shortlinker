@@ -37,9 +37,6 @@ pub struct ServerConfig {
 /// 数据库连接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    #[serde(rename = "type")]
-    #[serde(default = "default_database_backend")]
-    pub backend: String,
     #[serde(default = "default_database_url")]
     pub database_url: String,
     #[serde(default = "default_database_pool_size")]
@@ -257,7 +254,6 @@ impl Default for ServerConfig {
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
-            backend: default_database_backend(),
             database_url: default_database_url(),
             pool_size: default_database_pool_size(),
             timeout: default_database_timeout(),

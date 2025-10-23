@@ -8,8 +8,8 @@ use tracing::{debug, trace};
 
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
-use crate::storages::click::global::get_click_manager;
-use crate::storages::{ShortLink, Storage};
+use crate::repository::click::global::get_click_manager;
+use crate::repository::{ShortLink, Repository};
 
 static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
     crate::system::app_config::get_config()
@@ -24,7 +24,7 @@ impl RedirectService {
     pub async fn handle_redirect(
         path: web::Path<String>,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> impl Responder {
         let captured_path = path.into_inner();
 
@@ -33,14 +33,14 @@ impl RedirectService {
                 .insert_header(("Location", DEFAULT_REDIRECT_URL.as_str()))
                 .finish()
         } else {
-            Self::process_redirect(captured_path, cache, storage).await
+            Self::process_redirect(captured_path, cache, repository).await
         }
     }
 
     async fn process_redirect(
         capture_path: String,
         cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
     ) -> HttpResponse {
         match cache.get(&capture_path).await {
             CacheResult::Found(link) => {
@@ -49,7 +49,7 @@ impl RedirectService {
             }
             CacheResult::ExistsButNoValue => {
                 trace!("L2 cache miss for path: {}", &capture_path);
-                match storage.get(&capture_path).await {
+                match repository.get(&capture_path).await {
                     Some(link) => {
                         Self::update_click(&capture_path);
                         cache.insert(&capture_path, link.clone()).await;

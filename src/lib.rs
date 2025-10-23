@@ -23,7 +23,7 @@ pub mod errors;
 mod event;
 pub mod middleware;
 pub mod services;
-pub mod storages;
+pub mod repository;
 pub mod system;
 #[cfg(feature = "tui")]
 pub mod tui;

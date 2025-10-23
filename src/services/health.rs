@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{error, info, trace};
 
-use crate::storages::Storage;
+use crate::repository::Repository;
 use crate::utils::TimeParser;
 
 // 应用启动时间结构体
@@ -17,7 +17,7 @@ pub struct HealthService;
 
 impl HealthService {
     pub async fn health_check(
-        storage: web::Data<Arc<dyn Storage>>,
+        repository: web::Data<Arc<dyn Repository>>,
         app_start_time: web::Data<AppStartTime>,
     ) -> impl Responder {
         let start_time = Instant::now();
@@ -25,21 +25,21 @@ impl HealthService {
 
         // 检查存储健康状况
         let storage_status =
-            match tokio::time::timeout(Duration::from_secs(5), storage.load_all()).await {
+            match tokio::time::timeout(Duration::from_secs(5), repository.load_all()).await {
                 Ok(links) => {
-                    trace!("Storage health check passed, {} links found", links.len());
+                    trace!("Repository health check passed, {} links found", links.len());
                     json!({
                         "status": "healthy",
                         "links_count": links.len(),
-                        "backend": storage.get_backend_config().await
+                        "backend": repository.get_backend_config().await
                     })
                 }
                 Err(_) => {
-                    error!("Storage health check timeout");
+                    error!("Repository health check timeout");
                     json!({
                         "status": "unhealthy",
                         "error": "timeout",
-                        "backend": storage.get_backend_config().await
+                        "backend": repository.get_backend_config().await
                     })
                 }
             };
@@ -59,7 +59,7 @@ impl HealthService {
             "timestamp": now.to_rfc3339(),
             "uptime": uptime_seconds,
             "checks": {
-                "storage": storage_status,
+                "repository": storage_status,
             },
             "response_time_ms": start_time.elapsed().as_millis()
         });

@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace};
 
-use crate::storages::click::ClickSink;
+use crate::repository::click::ClickSink;
 
 // 全局缓冲区，用于临时计数点击
 pub static CLICK_BUFFER: Lazy<DashMap<String, usize>> = Lazy::new(DashMap::new);

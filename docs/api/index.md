@@ -128,10 +128,10 @@ def check_short_link(base_url, short_code):
 
 ## 性能特征
 
-- **响应时间**: < 1ms（SQLite/文件存储）
+- **响应时间**: < 1ms（SQLite 本地存储）
 - **并发支持**: 数千个并发连接
 - **内存使用**: 极低内存占用
-- **存储后端**: 支持 SQLite、文件、Sled 多种存储
+- **存储后端**: 支持 SQLite、MySQL、PostgreSQL、MariaDB
 
 ## 监控和日志
 

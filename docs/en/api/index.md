@@ -128,10 +128,10 @@ All responses include `Cache-Control: no-cache, no-store, must-revalidate` heade
 
 ## Performance Characteristics
 
-- **Response Time**: < 1ms (SQLite/file storage)
+- **Response Time**: < 1ms (SQLite local storage)
 - **Concurrency Support**: Thousands of concurrent connections
 - **Memory Usage**: Extremely low memory footprint
-- **Storage Backends**: Supports SQLite, file, Sled multiple storage types
+- **Storage Backends**: Supports SQLite, MySQL, PostgreSQL, MariaDB multiple storage types
 
 ## Monitoring and Logging
 

@@ -26,7 +26,7 @@ pub struct ServerConfig {
 ///
 /// This function:
 /// 1. Records startup time
-/// 2. Prepares server components (cache, storage, routes)
+/// 2. Prepares server components (cache, repository, routes)
 /// 3. Configures and starts the HTTP server
 /// 4. Listens for graceful shutdown signals
 ///
@@ -39,11 +39,11 @@ pub async fn run_server(config: &crate::system::app_config::AppConfig) -> Result
 
     debug!("Starting pre-startup processing...");
 
-    // Prepare server startup (cache, storage, routes)
+    // Prepare server startup (cache, repository, routes)
     let startup = lifetime::startup::prepare_server_startup().await;
 
     let cache = startup.cache.clone();
-    let storage = startup.storage.clone();
+    let repository = startup.repository.clone();
     let route = startup.route_config.clone();
 
     let admin_prefix = route.admin_prefix;
@@ -72,7 +72,7 @@ pub async fn run_server(config: &crate::system::app_config::AppConfig) -> Result
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(cache.clone()))
-            .app_data(web::Data::new(storage.clone()))
+            .app_data(web::Data::new(repository.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024))
             .wrap(

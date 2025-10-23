@@ -1,6 +1,6 @@
 [package]
 name = "shortlinker"
-version = "0.2.2"
+version = "0.2.3-alpha.1"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 edition = "2024"
@@ -13,6 +13,14 @@ tui = ["server"]      # TUI功能（依赖服务器）
 full = ["server", "cli", "tui"]  # 全功能版本
 
 # 优化配置
+[profile.dev]
+opt-level = 1
+lto = false
+codegen-units = 16
+panic = "unwind"
+strip = false
+incremental = true
+
 [profile.release]
 opt-level = "s"
 lto = true
@@ -37,7 +45,11 @@ name = "shortlinker"
 path = "src/main.rs"
 build = "build.rs"
 
+[workspace]
+members = [".", "migration"]
+
 [dependencies]
+migration = { path = "migration" }
 actix-web = "4.0"
 dotenv = "0.15"
 serde = { version = "1.0", features = ["derive"] }
@@ -46,7 +58,6 @@ rand = { version = "0.9.1", default-features = false, features = ["std", "std_rn
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 async-trait = "0.1.88"
 futures = "0.3.31"
-sled = "0.34.7"
 tokio = { version = "1.45.1", default-features = false, features = ["rt-multi-thread", "macros"] }
 tracing = { version = "0.1.41", default-features = false }
 dashmap = "6.1.0"
@@ -63,7 +74,6 @@ ctor = "0.5.0"
 tracing-attributes = "0.1.29"
 anyhow = "1.0.98"
 rust-embed = "8.7.2"
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "sqlite", "postgres", "mysql", "chrono"] }
 uuid = { version = "1.0", features = ["v4"] }
 redis = { version = "0.32.2", features = ["tokio-comp", "tokio-rustls-comp"] }
 rustls = "0.23.28"
@@ -71,6 +81,7 @@ toml = "0.9"
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
 ratatui = "0.29.0"
+sea-orm = { version = "2.0.0-rc", features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

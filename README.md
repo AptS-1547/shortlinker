@@ -221,8 +221,15 @@ cpu_count = 4
 
 [storage]
 # Storage backend type: sqlite, postgres, mysql, mariadb
+# 💡 This field is now OPTIONAL - the database type can be automatically inferred from DATABASE_URL
+# If specified, it will override auto-detection
 type = "sqlite"
 # Database connection URL or file path
+# The database type is automatically detected from the URL scheme:
+# - sqlite:// or .db/.sqlite files → SQLite
+# - postgres:// or postgresql:// → PostgreSQL
+# - mysql:// → MySQL
+# - mariadb:// → MariaDB (uses MySQL protocol)
 database_url = "shortlinks.db"
 # Database connection pool size
 pool_size = 10
@@ -294,8 +301,8 @@ Still supports the original environment variable configuration method. **Environ
 | `SERVER_PORT`        | `8080`                 | Listen port                                 |
 | `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
 | `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `DATABASE_BACKEND`   | `sqlite`               | Storage type: sqlite, postgres, mysql, mariadb |
-| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path                   |
+| `DATABASE_BACKEND`   | *(auto-detect)*        | Storage type: sqlite, postgres, mysql, mariadb. **OPTIONAL**: Auto-detected from DATABASE_URL if not set |
+| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path. **Supports auto-detection** from URL scheme |
 | `DATABASE_POOL_SIZE` | `10`                   | Database connection pool size               |
 | `DATABASE_TIMEOUT`   | `30`                   | Database connection timeout (seconds)       |
 | `CACHE_TYPE`         | `memory`               | Cache type: memory, redis                   |
@@ -327,9 +334,19 @@ CPU_COUNT=4
 # Server - Unix socket
 # UNIX_SOCKET=/tmp/shortlinker.sock
 
-# Storage
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=data/links.db
+# Storage (DATABASE_BACKEND is optional - auto-detected from DATABASE_URL)
+# SQLite (file path or URL)
+DATABASE_URL=data/links.db
+# Or: DATABASE_URL=sqlite://data/links.db
+
+# PostgreSQL
+# DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
+
+# MySQL
+# DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
+
+# MariaDB
+# DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
 
 # APIs
 ADMIN_TOKEN=your_admin_token
@@ -343,19 +360,40 @@ RUST_LOG=info
 
 ## Storage Backends
 
-- **SQLite** (default, v0.1.0+): Production-ready, recommended
-- **MySQL / MariaDB** (v0.1.2+): Production-ready, recommended
-- **Postgres** (v0.1.3+): Production-ready, recommended
+Shortlinker now uses **Sea-ORM** for database operations, providing:
+- ✅ **Atomic upsert operations** (prevents race conditions)
+- ✅ **Auto-detection from DATABASE_URL** (no need to specify DATABASE_BACKEND)
+- ✅ **Auto-create SQLite database** files if they don't exist
+- ✅ **Automatic schema migrations**
+
+### Supported Databases
+
+- **SQLite** (default): Production-ready, recommended for single-node deployments
+- **MySQL / MariaDB**: Production-ready, recommended for multi-node deployments
+- **PostgreSQL**: Production-ready, recommended for enterprise deployments
+
+### Database URL Examples
 
 ```bash
-# SQLite (recommended)
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=links.db
+# SQLite - Auto-detected
+DATABASE_URL=links.db                    # Relative path
+DATABASE_URL=/var/lib/shortlinker/links.db  # Absolute path
+DATABASE_URL=sqlite://data/links.db      # Explicit SQLite URL
 
-# File storage
-STORAGE_BACKEND=file
-DB_FILE_NAME=links.json
+# PostgreSQL - Auto-detected
+DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
+DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
+
+# MySQL - Auto-detected
+DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
+DATABASE_URL=mysql://user:pass@host:3306/db?charset=utf8mb4
+
+# MariaDB - Auto-detected (uses MySQL protocol)
+DATABASE_URL=mariadb://user:pass@localhost:3306/shortlinker
 ```
+
+> 💡 **Tip**: The `DATABASE_BACKEND` environment variable is now **optional**. The database type is automatically inferred from your `DATABASE_URL`. Only specify it if you need to override auto-detection.
+
 
 ## Deployment
 

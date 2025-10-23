@@ -211,8 +211,15 @@ cpu_count = 4
 
 [storage]
 # 存储后端类型：sqlite, postgres, mysql, mariadb
+# 💡 此字段现在是可选的 - 数据库类型可以从 DATABASE_URL 自动推断
+# 如果指定，将覆盖自动检测
 type = "sqlite"
 # 数据库连接 URL 或文件路径
+# 数据库类型会从 URL scheme 自动检测：
+# - sqlite:// 或 .db/.sqlite 文件 → SQLite
+# - postgres:// 或 postgresql:// → PostgreSQL
+# - mysql:// → MySQL
+# - mariadb:// → MariaDB（使用 MySQL 协议）
 database_url = "shortlinks.db"
 # 数据库连接池大小
 pool_size = 10
@@ -284,8 +291,8 @@ level = "info"
 | `SERVER_PORT`           | `8080`                  | 监听端口                                      |
 | `UNIX_SOCKET`           | *(empty)*               | Unix Socket 路径（会覆盖 HOST/PORT）            |
 | `CPU_COUNT`             | *(auto)*                | 工作线程数（默认为 CPU 核心数）                      |
-| `DATABASE_BACKEND`      | `sqlite`                | 存储类型：sqlite, postgres, mysql, mariadb    |
-| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径                            |
+| `DATABASE_BACKEND`      | *(auto-detect)*         | 存储类型：sqlite, postgres, mysql, mariadb。**可选**：不设置则从 DATABASE_URL 自动检测 |
+| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径。**支持自动检测** URL scheme    |
 | `DATABASE_POOL_SIZE`    | `10`                    | 数据库连接池大小                                 |
 | `DATABASE_TIMEOUT`      | `30`                    | 数据库连接超时（秒）                              |
 | `CACHE_TYPE`            | `memory`                | 缓存类型：memory, redis                       |
@@ -306,11 +313,41 @@ level = "info"
 
 ---
 
-## 📦 存储选项
+## 📦 存储后端
 
-* SQLite（推荐）：稳定、支持高并发
-* MySQL / MariaDB
-* Postgres
+Shortlinker 现在使用 **Sea-ORM** 进行数据库操作，提供：
+- ✅ **原子化 upsert 操作**（防止竞态条件）
+- ✅ **从 DATABASE_URL 自动检测数据库类型**（无需指定 DATABASE_BACKEND）
+- ✅ **自动创建 SQLite 数据库文件**（如果不存在）
+- ✅ **自动执行数据库模式迁移**
+
+### 支持的数据库
+
+- **SQLite**（默认）：生产就绪，推荐用于单节点部署
+- **MySQL / MariaDB**：生产就绪，推荐用于多节点部署
+- **PostgreSQL**：生产就绪，推荐用于企业级部署
+
+### 数据库 URL 示例
+
+```bash
+# SQLite - 自动检测
+DATABASE_URL=links.db                    # 相对路径
+DATABASE_URL=/var/lib/shortlinker/links.db  # 绝对路径
+DATABASE_URL=sqlite://data/links.db      # 显式 SQLite URL
+
+# PostgreSQL - 自动检测
+DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
+DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
+
+# MySQL - 自动检测
+DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
+DATABASE_URL=mysql://user:pass@host:3306/db?charset=utf8mb4
+
+# MariaDB - 自动检测（使用 MySQL 协议）
+DATABASE_URL=mariadb://user:pass@localhost:3306/shortlinker
+```
+
+> 💡 **提示**：`DATABASE_BACKEND` 环境变量现在是**可选的**。数据库类型会从 `DATABASE_URL` 自动推断。只有在需要覆盖自动检测时才需要指定。
 
 ---
 

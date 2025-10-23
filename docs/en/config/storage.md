@@ -246,60 +246,12 @@ docker run --name mariadb-shortlinker \
 - Modern MySQL alternative
 - Better performance and open source licensing needs
 
-## Non-Database Backend Configuration
-
-### File Storage
-
-**File Storage Features**:
-
-- **Simple and Intuitive**: Human-readable JSON format
-- **Easy to Debug**: Direct file viewing and editing
-- **Version Control**: Can be managed with Git
-- **Zero Dependencies**: No additional tools required
-
-**File Storage Use Cases**:
-
-- Development and testing environments
-- Small-scale deployment (< 1,000 links)
-- Scenarios requiring manual link editing
-
-**File Format**:
-
-```json
-[
-  {
-    "short_code": "github",
-    "target_url": "https://github.com",
-    "created_at": "2024-01-01T00:00:00Z",
-    "expires_at": null
-  }
-]
-```
-
-### Sled Database Storage (Planned)
-
-**Sled Features**:
-
-- **High Concurrency**: Excellent concurrent read-write performance
-- **Transaction Support**: ACID transaction guarantee
-- **Compressed Storage**: Automatic data compression
-- **Crash Recovery**: Automatic recovery mechanism
-
-**Sled Use Cases**:
-
-- High concurrency access scenarios
-- Large-scale link management (10,000+ links)
-- High-performance requirement environments
 
 ## Storage Backend Selection Guide
 
 ### Selection by Deployment Scale
 
 ```bash
-# Small scale deployment (< 1,000 links)
-STORAGE_BACKEND=file
-DATABASE_URL=links.json
-
 # Medium scale (1,000 - 100,000 links)
 STORAGE_BACKEND=sqlite
 DATABASE_URL=./links.db
@@ -312,10 +264,6 @@ DATABASE_URL=postgresql://user:pass@host:5432/db
 ### Selection by Use Case
 
 ```bash
-# Development environment
-STORAGE_BACKEND=file
-DATABASE_URL=dev-links.json
-
 # Testing environment
 STORAGE_BACKEND=sqlite
 DATABASE_URL=:memory:
@@ -352,7 +300,6 @@ STORAGE_BACKEND=postgres  # recommended
 | PostgreSQL | 0.2ms | 0.5ms | 1.2ms |
 | MySQL | 0.15ms | 0.4ms | 1.0ms |
 | MariaDB | 0.15ms | 0.4ms | 1.0ms |
-| File Storage | 0.05ms | 0.1ms | 0.2ms |
 
 ### Write Performance (Including Click Counting)
 
@@ -362,7 +309,6 @@ STORAGE_BACKEND=postgres  # recommended
 | PostgreSQL | 10,000 | 100,000 | 50,000 |
 | MySQL | 8,000 | 80,000 | 40,000 |
 | MariaDB | 8,500 | 85,000 | 42,000 |
-| File Storage | 100 | 500 | ❌ |
 
 ### Concurrent Performance (50 Concurrent Users)
 
@@ -372,21 +318,10 @@ STORAGE_BACKEND=postgres  # recommended
 | PostgreSQL | 15,000 | < 0.01% | 3ms |
 | MySQL | 12,000 | < 0.01% | 4ms |
 | MariaDB | 12,500 | < 0.01% | 4ms |
-| File Storage | 500 | < 1% | 100ms |
 
 > 📊 **Test Environment**: 4-core 8GB memory, Docker container based
 
 ## Version Migration
-
-### Upgrading from v0.0.x to v0.1.0+
-
-v0.1.0+ uses SQLite by default. To continue using file storage:
-
-```bash
-# Explicitly configure file storage
-STORAGE_BACKEND=file
-DATABASE_URL=links.json
-```
 
 ### Data Migration
 
@@ -402,16 +337,6 @@ sqlite3 links.db "PRAGMA integrity_check;"
 
 # Database corruption repair
 sqlite3 links.db ".dump" | sqlite3 new_links.db
-```
-
-### File Storage Issues
-
-```bash
-# Validate JSON format
-jq . links.json
-
-# Fix format errors
-jq '.' links.json > fixed.json && mv fixed.json links.json
 ```
 
 ### Permission Issues

@@ -95,8 +95,8 @@ impl ShortlinkerError {
 }
 
 // 为常见的错误类型实现 From trait
-impl From<sqlx::Error> for ShortlinkerError {
-    fn from(err: sqlx::Error) -> Self {
+impl From<sea_orm::DbErr> for ShortlinkerError {
+    fn from(err: sea_orm::DbErr) -> Self {
         ShortlinkerError::DatabaseOperation(err.to_string())
     }
 }

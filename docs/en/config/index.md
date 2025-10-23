@@ -49,9 +49,12 @@ export SERVER_PORT=8080
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `STORAGE_BACKEND` | String | `sqlite` | Storage type: `sqlite`, `file`, `sled` |
-| `DB_FILE_NAME` | String | `links.db` | Database file path |
+| `DATABASE_URL` | String | `shortlinks.db` | Database connection URL or file path. Supports auto-detection from URL scheme |
+| `DATABASE_POOL_SIZE` | Number | `10` | Database connection pool size |
+| `DATABASE_TIMEOUT` | Number | `30` | Database connection timeout (seconds) |
 
+> **Note**: Database type is auto-detected from `DATABASE_URL`. Supported: SQLite, MySQL, PostgreSQL, MariaDB.
+>
 > For detailed storage backend configuration, see [Storage Backends](/en/config/storage)
 
 ### API Configuration
@@ -83,9 +86,9 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 RUST_LOG=debug
 
-# Storage configuration - file storage for easy debugging
-STORAGE_BACKEND=file
-DB_FILE_NAME=dev-links.json
+# Storage configuration - SQLite for development
+STORAGE_BACKEND=sqlite
+DB_FILE_NAME=dev-links.db
 
 # API configuration - simple tokens for development
 ADMIN_TOKEN=dev_admin

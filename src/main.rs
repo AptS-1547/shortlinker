@@ -16,7 +16,7 @@ mod errors;
 mod event;
 mod middleware;
 mod services;
-mod storages;
+mod repository;
 mod system;
 mod utils;
 
@@ -48,40 +48,40 @@ async fn main() -> Result<(), color_eyre::Report> {
     let args: Vec<String> = std::env::args().collect();
 
     // 2. Parse configuration file path
-    let config_path = system::args::parse_config_path(&args);
+    let config_path = crate::system::args::parse_config_path(&args);
 
     // 3. Initialize configuration system
     crate::system::app_config::init_config(config_path);
     let config = crate::system::app_config::get_config();
 
     // 4. Initialize logging system based on config
-    let _log_guard = system::logging::init_logging(config);
+    let _log_guard = crate::system::logging::init_logging(config);
 
     // 5. Filter out config arguments for mode detection
-    let filtered_args = system::args::filter_config_args(&args);
+    let filtered_args = crate::system::args::filter_config_args(&args);
 
     // 6. Detect and run appropriate mode
-    match system::modes::detect_mode(&filtered_args) {
+    match crate::system::modes::detect_mode(&filtered_args) {
         #[cfg(feature = "tui")]
-        system::modes::Mode::Tui => {
-            system::modes::run_tui()
+        crate::system::modes::Mode::Tui => {
+            crate::system::modes::run_tui()
                 .await
                 .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
         }
 
         #[cfg(feature = "cli")]
-        system::modes::Mode::Cli => {
-            system::modes::run_cli()
+        crate::system::modes::Mode::Cli => {
+            crate::system::modes::run_cli()
                 .await
                 .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
         }
 
         #[cfg(feature = "server")]
-        system::modes::Mode::Server => {
-            system::modes::run_server(config).await?;
+        crate::system::modes::Mode::Server => {
+            crate::system::modes::run_server(config).await?;
         }
 
-        system::modes::Mode::Unknown => {
+        crate::system::modes::Mode::Unknown => {
             eprintln!("Error: No features enabled");
             eprintln!("Please compile with one of: --features server, cli, tui, or full");
             std::process::exit(1);

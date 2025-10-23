@@ -148,7 +148,6 @@ CMD ["/shortlinker"]
 ```
 data/
 ├── links.db            # SQLite database file
-├── links.json          # JSON file storage (if used)
 └── backup/            # Backup directory (optional)
     └── links.db.20240101
 ```

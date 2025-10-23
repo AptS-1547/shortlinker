@@ -1,8 +1,21 @@
 # 存储后端配置
 
-Shortlinker 支持多种存储后端，您可以根据需求选择最适合的存储方案。所有后端均基于异步连接池，支持高并发和生产环境部署。
+Shortlinker 支持多种存储后端，您可以根据需求选择最适合的存储方案。所有数据库后端均基于 **Sea-ORM** 和异步连接池，支持高并发和生产环境部署。
 
 > 📋 **配置方法**：存储相关的环境变量配置请参考 [环境变量配置](/config/)
+
+## Sea-ORM 数据库层
+
+从 v0.2.0 开始，Shortlinker 使用 **Sea-ORM** 作为数据库抽象层，提供：
+
+- ✅ **原子化 upsert 操作**：防止竞态条件，确保并发安全
+- ✅ **自动数据库类型检测**：从 `DATABASE_URL` 自动推断数据库类型
+- ✅ **自动创建 SQLite 数据库**：首次运行时自动创建数据库文件
+- ✅ **自动 schema 迁移**：无需手动运行 SQL 脚本
+- ✅ **统一接口**：所有数据库使用相同的代码路径
+- ✅ **类型安全**：编译时检查数据库操作
+
+> 💡 **提示**：`DATABASE_BACKEND` 环境变量现在是**可选的**。数据库类型会从 `DATABASE_URL` 的 scheme 自动推断（`sqlite://`、`postgres://`、`mysql://`、`mariadb://`）。只有在需要覆盖自动检测时才需要显式指定。
 
 ## 存储后端功能对比
 
@@ -137,23 +150,39 @@ Shortlinker 支持多种存储后端，您可以根据需求选择最适合的�
 - ✅ 高性能本地查询
 - ✅ 自动索引优化
 - ✅ 文件级备份
+- ✅ **自动创建数据库文件**（Sea-ORM）
+- ✅ **原子 upsert 操作**（使用 ON CONFLICT）
 - ⚠️ 单写并发限制
 
 **配置示例**：
 
 ```bash
-STORAGE_BACKEND=sqlite
-DATABASE_URL=./data/links.db
+# DATABASE_BACKEND 是可选的（会自动检测）
+# DATABASE_BACKEND=sqlite
 
-# 相对路径（推荐）
+# 相对路径（自动创建）
 DATABASE_URL=./shortlinker.db
+DATABASE_URL=data/links.db
 
 # 绝对路径
 DATABASE_URL=/var/lib/shortlinker/links.db
 
+# 显式 SQLite URL（推荐）
+DATABASE_URL=sqlite://./data/links.db
+DATABASE_URL=sqlite:///absolute/path/to/links.db
+
 # 内存数据库（测试用）
 DATABASE_URL=:memory:
+DATABASE_URL=sqlite::memory:
 ```
+
+**性能优化**（自动应用）：
+
+- WAL（Write-Ahead Logging）模式
+- 优化的 cache_size（-64000）
+- 内存临时存储
+- MMAP 启用（512MB）
+- 自动 checkpoint（每1000次写入）
 
 **适用场景**：
 
@@ -171,12 +200,17 @@ DATABASE_URL=:memory:
 - ✅ 丰富的索引类型
 - ✅ 水平扩展支持
 - ✅ 成熟的监控生态
+- ✅ **原子 upsert 操作**（使用 ON CONFLICT）
 
 **配置示例**：
 
 ```bash
-STORAGE_BACKEND=postgres
+# DATABASE_BACKEND 是可选的（会自动检测）
+# DATABASE_BACKEND=postgres
+
+# 标准连接 URL
 DATABASE_URL=postgresql://user:password@localhost:5432/shortlinker
+DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
 
 # 生产环境示例
 DATABASE_URL=postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require
@@ -209,15 +243,19 @@ docker run --name postgres-shortlinker \
 - ✅ 丰富的引擎选择（InnoDB）
 - ✅ 完整的备份恢复方案
 - ✅ UTF-8 完全支持
+- ✅ **原子 upsert 操作**（使用 try-insert-then-update）
 
 **配置示例**：
 
 ```bash
-STORAGE_BACKEND=mysql
+# DATABASE_BACKEND 是可选的（会自动检测）
+# DATABASE_BACKEND=mysql
+
+# 标准连接 URL
 DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
 
 # 生产环境示例
-DATABASE_URL=mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod
+DATABASE_URL=mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod?charset=utf8mb4
 ```
 
 **Docker 快速启动**：
@@ -247,15 +285,19 @@ docker run --name mysql-shortlinker \
 - ✅ 增强的 JSON 支持
 - ✅ 更好的性能监控
 - ✅ 活跃的社区支持
+- ✅ **原子 upsert 操作**（使用 MySQL 协议）
 
 **配置示例**：
 
 ```bash
-STORAGE_BACKEND=mariadb
-DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
+# DATABASE_BACKEND 是可选的（会自动检测为 mysql）
+# DATABASE_BACKEND=mariadb
 
-# 注意：MariaDB 使用相同的 mysql:// 协议
-DATABASE_URL=mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod
+# MariaDB 使用 mariadb:// scheme（自动转换为 MySQL 协议）
+DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
+
+# 也可以使用 mysql:// scheme（向后兼容）
+DATABASE_URL=mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod?charset=utf8mb4
 ```
 
 **Docker 快速启动**：
@@ -275,86 +317,48 @@ docker run --name mariadb-shortlinker \
 - MySQL 的现代化替代
 - 需要更好的性能和开源许可
 
-## 非数据库后端配置
-
-## 文件存储
-
-### 特点
-
-- **简单直观**：人类可读的 JSON 格式
-- **易于调试**：直接查看和编辑文件
-- **版本控制**：可纳入 Git 管理
-- **零依赖**：无需额外工具
-
-### 适用场景
-
-- 开发和测试环境
-- 小规模部署（< 1,000 链接）
-- 需要手动编辑链接的场景
-
-### 文件格式
-
-```json
-[
-  {
-    "short_code": "github",
-    "target_url": "https://github.com",
-    "created_at": "2024-01-01T00:00:00Z",
-    "expires_at": null
-  }
-]
-```
-
-## Sled 数据库存储（计划中）
-
-### Sled 特点
-
-- **高并发**：优秀的并发读写性能
-- **事务支持**：ACID 事务保证
-- **压缩存储**：自动数据压缩
-- **崩溃恢复**：自动恢复机制
-
-### Sled 适用场景
-
-- 高并发访问场景
-- 大规模链接管理（10,000+ 链接）
-- 性能要求较高的环境
-
 ## 存储后端选择指南
 
 ### 按部署规模选择
 
 ```bash
-# 小规模部署（< 1,000 链接）
-STORAGE_BACKEND=file
-DATABASE_URL=links.json
-
-# 中等规模（1,000 - 100,000 链接）
-STORAGE_BACKEND=sqlite
+# 小规模部署（< 10,000 链接）
+# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=./links.db
+# 或使用显式 URL
+DATABASE_URL=sqlite://./links.db
+
+# 中等规模（10,000 - 100,000 链接）
+# DATABASE_BACKEND 可选，会自动检测
+DATABASE_URL=sqlite://./links.db
+# 或使用 MySQL/MariaDB
+DATABASE_URL=mysql://user:pass@host:3306/db
 
 # 大规模（> 100,000 链接）
-STORAGE_BACKEND=postgres  # 或 mysql/mariadb
+# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=postgresql://user:pass@host:5432/db
+# 或使用 MySQL/MariaDB
+DATABASE_URL=mysql://user:pass@host:3306/db
 ```
 
 ### 按使用场景选择
 
 ```bash
 # 开发环境
-STORAGE_BACKEND=file
-DATABASE_URL=dev-links.json
+# DATABASE_BACKEND 可选，会自动检测
+DATABASE_URL=dev-links.db
+DATABASE_URL=sqlite://./dev.db
 
 # 测试环境
-STORAGE_BACKEND=sqlite
+# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=:memory:
 
 # 生产环境（单机）
-STORAGE_BACKEND=sqlite
+# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=/data/links.db
 
 # 生产环境（集群）
-STORAGE_BACKEND=postgres
+# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 ```
 
@@ -362,13 +366,17 @@ DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 
 ```bash
 # 低并发（< 100 QPS）
-STORAGE_BACKEND=sqlite
+# DATABASE_BACKEND=sqlite  # 可选，会自动检测
+DATABASE_URL=links.db
 
 # 中等并发（100-1000 QPS）
-STORAGE_BACKEND=sqlite  # 或 mysql/mariadb
+# DATABASE_BACKEND=sqlite  # 或 mysql/mariadb，可选，会自动检测
+DATABASE_URL=sqlite://links.db
+# DATABASE_URL=mysql://user:pass@host:3306/db
 
 # 高并发（> 1000 QPS）
-STORAGE_BACKEND=postgres  # 推荐
+# DATABASE_BACKEND=postgres  # 可选，会自动检测（推荐）
+DATABASE_URL=postgres://user:pass@host:5432/shortlinker
 ```
 
 ## 性能对比数据
@@ -376,38 +384,48 @@ STORAGE_BACKEND=postgres  # 推荐
 ### 读取性能
 
 - **SQLite**: ~0.1ms（索引查询）
-- **文件存储**: ~0.05ms（内存哈希表）
-- **Sled**: ~0.1ms（B+ 树查询）
 
 ### 写入性能
 
 - **SQLite**: ~1ms（单个事务）
-- **文件存储**: ~10ms（重写整个文件）
-- **Sled**: ~0.5ms（LSM 树写入）
 
 ### 并发性能
 
 - **SQLite**: 多读单写
-- **文件存储**: 互斥访问
-- **Sled**: 多读多写
 
 > 💡 **性能提示**：通过 `CPU_COUNT` 环境变量调整工作线程数可优化并发处理能力。推荐设置为等于或略小于 CPU 核心数。
 
 ## 版本迁移
 
-### 从 v0.0.x 升级到 v0.1.0+
+### 从 v0.1.x 升级到 v0.2.0+
 
-v0.1.0+ 版本默认使用 SQLite，如需继续使用文件存储：
+v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
+
+**新特性**：
+- ✅ 原子化 upsert 操作（防止竞态条件）
+- ✅ 从 DATABASE_URL 自动检测数据库类型
+- ✅ SQLite 数据库文件自动创建
+- ✅ 自动 schema 迁移
+
+**配置变更**：
+- `DATABASE_BACKEND` 现在是**可选的**（推荐省略，让系统自动检测）
+
+**数据迁移**：
+
+系统会自动检测并迁移数据，无需手动操作。从 v0.1.x 的 SQLite/MySQL/PostgreSQL 数据库升级时，Sea-ORM 会自动运行 schema 迁移。
+
+**推荐配置**（v0.2.0+）：
 
 ```bash
-# 显式配置文件存储
-STORAGE_BACKEND=file
-DATABASE_URL=links.json
+# SQLite（推荐）
+DATABASE_URL=sqlite://./data/links.db
+
+# PostgreSQL
+DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
+
+# MySQL
+DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
 ```
-
-### 数据迁移
-
-系统会自动检测并迁移数据，无需手动操作。
 
 ## 故障排除
 
@@ -419,16 +437,6 @@ sqlite3 links.db "PRAGMA integrity_check;"
 
 # 数据库损坏修复
 sqlite3 links.db ".dump" | sqlite3 new_links.db
-```
-
-### 文件存储问题
-
-```bash
-# 验证 JSON 格式
-jq . links.json
-
-# 修复格式错误
-jq '.' links.json > fixed.json && mv fixed.json links.json
 ```
 
 ### 权限问题
