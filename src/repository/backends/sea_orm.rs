@@ -139,7 +139,7 @@ impl SeaOrmRepository {
         }
     }
 
-    /// 使用 ON CONFLICT 的原子 upsert（适用于 SQLite 和 PostgreSQL）
+    /// 使用 ON CONFLICT 的原子 upsert
     async fn upsert_with_on_conflict(&self, link: &ShortLink) -> Result<()> {
         use sea_orm::sea_query::OnConflict;
         use sea_orm::InsertResult;
@@ -172,7 +172,7 @@ impl SeaOrmRepository {
         }
     }
 
-    /// 使用 try-insert-then-update 的 upsert（适用于 MySQL 和 fallback）
+    /// 使用 try-insert-then-update 的 upsert
     async fn upsert_with_fallback(&self, link: &ShortLink) -> Result<()> {
         // 先尝试插入
         let active_model = Self::shortlink_to_active_model(link, true);
@@ -270,18 +270,13 @@ impl Repository for SeaOrmRepository {
     async fn set(&self, link: ShortLink) -> Result<()> {
         // 使用原子化的 upsert 操作，避免竞态条件
         match self.backend_name.as_str() {
-            "sqlite" | "postgres" => {
-                // SQLite 和 PostgreSQL 支持 ON CONFLICT
+            "sqlite" | "postgres" | "mysql" => {
+                // These backends support ON CONFLICT or equivalent upsert syntax.
                 self.upsert_with_on_conflict(&link).await
             }
-            "mysql" => {
-                // MySQL 使用 INSERT ... ON DUPLICATE KEY UPDATE
-                // 但 sea-orm 的 OnConflict 不完全支持 MySQL 语法
-                // 所以我们使用 insert 尝试，失败则 update
-                self.upsert_with_fallback(&link).await
-            }
             _ => {
-                // 其他情况使用 fallback 策略
+                // Fallback for other databases, if any.
+                warn!("Using fallback upsert for backend: {}", self.backend_name);
                 self.upsert_with_fallback(&link).await
             }
         }
