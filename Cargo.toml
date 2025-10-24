@@ -1,6 +1,6 @@
 [package]
 name = "shortlinker"
-version = "0.2.3-alpha.1"
+version = "0.2.3-alpha.2"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 edition = "2024"

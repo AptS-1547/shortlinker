@@ -36,6 +36,7 @@ WORKDIR /app
 
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
+COPY migrations ./migrations
 COPY src ./src
 
 # 从前端构建阶段复制构建产物
@@ -56,7 +57,7 @@ FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="0.2.3-alpha.1"
+LABEL version="0.2.3-alpha.2"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 
