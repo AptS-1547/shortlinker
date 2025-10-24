@@ -1,33 +1,41 @@
-use std::{error::Error, io};
+//! Terminal User Interface (TUI) module
+//!
+//! Provides an interactive terminal interface for managing short links
+
+use std::io;
 
 use ratatui::{
     Terminal,
     backend::{Backend, CrosstermBackend},
     crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+        event::{self, DisableMouseCapture, EnableMouseCapture, Event},
         execute,
         terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
 };
 
 mod app;
+mod event_handler;
+mod input_handler;
 mod ui;
-use app::{App, CurrentScreen, CurrentlyEditing};
+
+use app::App;
 use ui::ui;
 
-pub async fn run_tui() -> Result<(), Box<dyn Error>> {
-    // setup terminal
+/// Run the TUI application
+pub async fn run_tui() -> Result<(), Box<dyn std::error::Error>> {
+    // Setup terminal
     enable_raw_mode()?;
-    let mut stderr = io::stderr(); // This is a special case. Normally using stdout is fine
+    let mut stderr = io::stderr();
     execute!(stderr, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stderr);
     let mut terminal = Terminal::new(backend)?;
 
-    // create app and run it
+    // Create app and run it
     let mut app = App::new().await?;
     let res = run_app(&mut terminal, &mut app).await;
 
-    // restore terminal
+    // Restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -37,214 +45,24 @@ pub async fn run_tui() -> Result<(), Box<dyn Error>> {
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err)
+        eprintln!("Error: {:?}", err);
     }
 
     Ok(())
 }
 
+/// Main application loop
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     loop {
+        // Render UI
         terminal.draw(|f| ui(f, app))?;
 
+        // Handle events
         if let Event::Key(key) = event::read()? {
-            match app.current_screen {
-                CurrentScreen::Main => match key.code {
-                    KeyCode::Up => {
-                        app.move_selection_up();
-                    }
-                    KeyCode::Down => {
-                        app.move_selection_down();
-                    }
-                    KeyCode::Char('a') => {
-                        app.current_screen = CurrentScreen::AddLink;
-                        app.currently_editing = Some(CurrentlyEditing::ShortCode);
-                        app.clear_inputs();
-                    }
-                    KeyCode::Char('e') => {
-                        if !app.links.is_empty() {
-                            app.current_screen = CurrentScreen::EditLink;
-                            app.currently_editing = Some(CurrentlyEditing::TargetUrl);
-                            app.clear_inputs();
-                        }
-                    }
-                    KeyCode::Char('d') => {
-                        if !app.links.is_empty() {
-                            app.current_screen = CurrentScreen::DeleteConfirm;
-                        }
-                    }
-                    KeyCode::Char('x') => {
-                        app.current_screen = CurrentScreen::ExportImport;
-                    }
-                    KeyCode::Char('q') => {
-                        app.current_screen = CurrentScreen::Exiting;
-                    }
-                    _ => {}
-                },
-                CurrentScreen::AddLink => match key.code {
-                    KeyCode::Enter => {
-                        if let Err(e) = app.save_new_link().await {
-                            app.set_error(format!("Failed to save link: {}", e));
-                        } else {
-                            app.set_status("Link added successfully!".to_string());
-                            app.current_screen = CurrentScreen::Main;
-                            if let Err(e) = app.refresh_links().await {
-                                app.set_error(format!("Failed to refresh links: {}", e));
-                            }
-                        }
-                    }
-                    KeyCode::Backspace => {
-                        if let Some(editing) = &app.currently_editing {
-                            match editing {
-                                CurrentlyEditing::ShortCode => {
-                                    app.short_code_input.pop();
-                                }
-                                CurrentlyEditing::TargetUrl => {
-                                    app.target_url_input.pop();
-                                }
-                                CurrentlyEditing::ExpireTime => {
-                                    app.expire_time_input.pop();
-                                }
-                                CurrentlyEditing::Password => {
-                                    app.password_input.pop();
-                                }
-                            }
-                        }
-                    }
-                    KeyCode::Esc => {
-                        app.current_screen = CurrentScreen::Main;
-                        app.clear_inputs();
-                    }
-                    KeyCode::Tab => {
-                        app.toggle_editing();
-                    }
-                    KeyCode::Char(' ') => {
-                        if matches!(app.currently_editing, Some(CurrentlyEditing::ShortCode)) {
-                            app.force_overwrite = !app.force_overwrite;
-                        }
-                    }
-                    KeyCode::Char(value) => {
-                        if let Some(editing) = &app.currently_editing {
-                            match editing {
-                                CurrentlyEditing::ShortCode => {
-                                    app.short_code_input.push(value);
-                                }
-                                CurrentlyEditing::TargetUrl => {
-                                    app.target_url_input.push(value);
-                                }
-                                CurrentlyEditing::ExpireTime => {
-                                    app.expire_time_input.push(value);
-                                }
-                                CurrentlyEditing::Password => {
-                                    app.password_input.push(value);
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-                CurrentScreen::EditLink => match key.code {
-                    KeyCode::Enter => {
-                        if let Err(e) = app.update_selected_link().await {
-                            app.set_error(format!("Failed to update link: {}", e));
-                        } else {
-                            app.set_status("Link updated successfully!".to_string());
-                            app.current_screen = CurrentScreen::Main;
-                            if let Err(e) = app.refresh_links().await {
-                                app.set_error(format!("Failed to refresh links: {}", e));
-                            }
-                        }
-                    }
-                    KeyCode::Backspace => {
-                        if let Some(editing) = &app.currently_editing {
-                            match editing {
-                                CurrentlyEditing::TargetUrl => {
-                                    app.target_url_input.pop();
-                                }
-                                CurrentlyEditing::ExpireTime => {
-                                    app.expire_time_input.pop();
-                                }
-                                CurrentlyEditing::Password => {
-                                    app.password_input.pop();
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    KeyCode::Esc => {
-                        app.current_screen = CurrentScreen::Main;
-                        app.clear_inputs();
-                    }
-                    KeyCode::Tab => {
-                        app.toggle_editing();
-                    }
-                    KeyCode::Char(value) => {
-                        if let Some(editing) = &app.currently_editing {
-                            match editing {
-                                CurrentlyEditing::TargetUrl => {
-                                    app.target_url_input.push(value);
-                                }
-                                CurrentlyEditing::ExpireTime => {
-                                    app.expire_time_input.push(value);
-                                }
-                                CurrentlyEditing::Password => {
-                                    app.password_input.push(value);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-                CurrentScreen::DeleteConfirm => match key.code {
-                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                        if let Err(e) = app.delete_selected_link().await {
-                            app.set_error(format!("Failed to delete link: {}", e));
-                        } else {
-                            app.set_status("Link deleted successfully!".to_string());
-                            if let Err(e) = app.refresh_links().await {
-                                app.set_error(format!("Failed to refresh links: {}", e));
-                            }
-                        }
-                        app.current_screen = CurrentScreen::Main;
-                    }
-                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                        app.current_screen = CurrentScreen::Main;
-                    }
-                    _ => {}
-                },
-                CurrentScreen::ExportImport => match key.code {
-                    KeyCode::Char('e') => {
-                        if let Err(e) = app.export_links().await {
-                            app.set_error(format!("Failed to export links: {}", e));
-                        } else {
-                            app.set_status(format!("Links exported to: {}", app.export_path));
-                        }
-                    }
-                    KeyCode::Char('i') => {
-                        if let Err(e) = app.import_links().await {
-                            app.set_error(format!("Failed to import links: {}", e));
-                        } else {
-                            app.set_status("Links imported successfully!".to_string());
-                            if let Err(e) = app.refresh_links().await {
-                                app.set_error(format!("Failed to refresh links: {}", e));
-                            }
-                        }
-                    }
-                    KeyCode::Esc => {
-                        app.current_screen = CurrentScreen::Main;
-                    }
-                    _ => {}
-                },
-                CurrentScreen::Exiting => match key.code {
-                    KeyCode::Char('y') | KeyCode::Char('Y') => {
-                        return Ok(());
-                    }
-                    KeyCode::Char('n') | KeyCode::Char('N') => {
-                        app.current_screen = CurrentScreen::Main;
-                    }
-                    _ => {}
-                },
+            let should_exit = event_handler::handle_key_event(app, key.code).await?;
+
+            if should_exit {
+                return Ok(());
             }
         }
     }

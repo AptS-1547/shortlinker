@@ -7,7 +7,6 @@
 //!
 //! Mode selection is based on command-line arguments and compile-time features.
 
-use color_eyre::Result;
 use dotenv::dotenv;
 
 // Core modules
@@ -37,48 +36,70 @@ mod tui;
 /// - `-c <path>` or `--config <path>` -> Use custom configuration file
 /// - No config flag -> Use default "config.toml" if it exists
 #[actix_web::main]
-async fn main() -> Result<(), color_eyre::Report> {
-    // Setup global error handling
-    color_eyre::install()?;
-
+async fn main() -> anyhow::Result<()> {
     // Load environment variables
     dotenv().ok();
 
     // 1. Parse command-line arguments
     let args: Vec<String> = std::env::args().collect();
 
-    // 2. Parse configuration file path
+    // 2. Detect mode early for panic handler
+    let filtered_args = crate::system::args::filter_config_args(&args);
+    let mode = crate::system::modes::detect_mode(&filtered_args);
+
+    // 3. Install panic hook based on mode
+    let panic_mode = match mode {
+        #[cfg(feature = "server")]
+        crate::system::modes::Mode::Server => crate::system::panic_handler::RunMode::Server,
+        #[cfg(feature = "cli")]
+        crate::system::modes::Mode::Cli => crate::system::panic_handler::RunMode::Cli,
+        #[cfg(feature = "tui")]
+        crate::system::modes::Mode::Tui => crate::system::panic_handler::RunMode::Tui,
+        crate::system::modes::Mode::Unknown => crate::system::panic_handler::RunMode::Cli,
+    };
+    crate::system::panic_handler::install_panic_hook(panic_mode);
+
+    // 4. Parse configuration file path
     let config_path = crate::system::args::parse_config_path(&args);
 
-    // 3. Initialize configuration system
+    // 5. Initialize configuration system
     crate::system::app_config::init_config(config_path);
     let config = crate::system::app_config::get_config();
 
-    // 4. Initialize logging system based on config
+    // 6. Initialize logging system based on config
     let _log_guard = crate::system::logging::init_logging(config);
 
-    // 5. Filter out config arguments for mode detection
-    let filtered_args = crate::system::args::filter_config_args(&args);
-
-    // 6. Detect and run appropriate mode
-    match crate::system::modes::detect_mode(&filtered_args) {
+    // 7. Run appropriate mode
+    match mode {
         #[cfg(feature = "tui")]
         crate::system::modes::Mode::Tui => {
-            crate::system::modes::run_tui()
-                .await
-                .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+            if let Err(e) = crate::system::modes::run_tui().await {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
         }
 
         #[cfg(feature = "cli")]
         crate::system::modes::Mode::Cli => {
-            crate::system::modes::run_cli()
-                .await
-                .map_err(|e| color_eyre::eyre::eyre!(e.to_string()))?;
+            if let Err(e) = crate::system::modes::run_cli().await {
+                #[cfg(feature = "server")]
+                eprintln!("{}", e.format_colored());
+
+                #[cfg(not(feature = "server"))]
+                eprintln!("Error: {}", e);
+
+                std::process::exit(1);
+            }
         }
 
         #[cfg(feature = "server")]
         crate::system::modes::Mode::Server => {
-            crate::system::modes::run_server(config).await?;
+            if let Err(e) = crate::system::modes::run_server(config).await {
+                use crate::errors::ShortlinkerError;
+                // 尝试转换为 ShortlinkerError 以获得更好的显示
+                eprintln!("Server error: {:#}", e);
+                std::process::exit(1);
+            }
         }
 
         crate::system::modes::Mode::Unknown => {

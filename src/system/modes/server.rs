@@ -4,7 +4,7 @@
 //! It configures and starts the HTTP server with all necessary routes.
 
 use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
-use color_eyre::Result;
+use anyhow::Result;
 use tracing::{debug, warn};
 
 use crate::middleware::{AdminAuth, FrontendGuard, HealthAuth};

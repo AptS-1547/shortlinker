@@ -17,23 +17,87 @@ pub enum ShortlinkerError {
     NotifyServer(String),
 }
 
+impl ShortlinkerError {
+    /// 获取错误代码
+    pub fn code(&self) -> &'static str {
+        match self {
+            ShortlinkerError::CacheConnection(_) => "E001",
+            ShortlinkerError::CachePluginNotFound(_) => "E002",
+            ShortlinkerError::DatabaseConfig(_) => "E003",
+            ShortlinkerError::DatabaseConnection(_) => "E004",
+            ShortlinkerError::DatabaseOperation(_) => "E005",
+            ShortlinkerError::FileOperation(_) => "E006",
+            ShortlinkerError::Validation(_) => "E007",
+            ShortlinkerError::NotFound(_) => "E008",
+            ShortlinkerError::Serialization(_) => "E009",
+            ShortlinkerError::SignalOperation(_) => "E010",
+            ShortlinkerError::StoragePluginNotFound(_) => "E011",
+            ShortlinkerError::DateParse(_) => "E012",
+            ShortlinkerError::NotifyServer(_) => "E013",
+        }
+    }
+
+    /// 获取错误类型名称
+    pub fn error_type(&self) -> &'static str {
+        match self {
+            ShortlinkerError::CacheConnection(_) => "Cache Connection Error",
+            ShortlinkerError::CachePluginNotFound(_) => "Cache Plugin Not Found",
+            ShortlinkerError::DatabaseConfig(_) => "Database Configuration Error",
+            ShortlinkerError::DatabaseConnection(_) => "Database Connection Error",
+            ShortlinkerError::DatabaseOperation(_) => "Database Operation Error",
+            ShortlinkerError::FileOperation(_) => "File Operation Error",
+            ShortlinkerError::Validation(_) => "Validation Error",
+            ShortlinkerError::NotFound(_) => "Resource Not Found",
+            ShortlinkerError::Serialization(_) => "Serialization Error",
+            ShortlinkerError::SignalOperation(_) => "Signal Operation Error",
+            ShortlinkerError::StoragePluginNotFound(_) => "Storage Plugin Not Found",
+            ShortlinkerError::DateParse(_) => "Date Parse Error",
+            ShortlinkerError::NotifyServer(_) => "Notify Server Error",
+        }
+    }
+
+    /// 获取错误详情
+    pub fn message(&self) -> &str {
+        match self {
+            ShortlinkerError::CacheConnection(msg) => msg,
+            ShortlinkerError::CachePluginNotFound(msg) => msg,
+            ShortlinkerError::DatabaseConfig(msg) => msg,
+            ShortlinkerError::DatabaseConnection(msg) => msg,
+            ShortlinkerError::DatabaseOperation(msg) => msg,
+            ShortlinkerError::FileOperation(msg) => msg,
+            ShortlinkerError::Validation(msg) => msg,
+            ShortlinkerError::NotFound(msg) => msg,
+            ShortlinkerError::Serialization(msg) => msg,
+            ShortlinkerError::SignalOperation(msg) => msg,
+            ShortlinkerError::StoragePluginNotFound(msg) => msg,
+            ShortlinkerError::DateParse(msg) => msg,
+            ShortlinkerError::NotifyServer(msg) => msg,
+        }
+    }
+
+    /// 格式化为彩色输出（用于 Server 模式）
+    #[cfg(feature = "server")]
+    pub fn format_colored(&self) -> String {
+        use colored::Colorize;
+        format!(
+            "{} {} {}\n  {}",
+            "[ERROR]".red().bold(),
+            self.code().yellow(),
+            self.error_type().red(),
+            self.message().white()
+        )
+    }
+
+    /// 格式化为简洁输出（用于 CLI/TUI 模式）
+    pub fn format_simple(&self) -> String {
+        format!("{}: {}", self.error_type(), self.message())
+    }
+}
+
 impl fmt::Display for ShortlinkerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ShortlinkerError::CacheConnection(msg) => write!(f, "缓存连接错误: {msg}"),
-            ShortlinkerError::CachePluginNotFound(msg) => write!(f, "缓存插件未找到: {}", msg),
-            ShortlinkerError::DatabaseConfig(msg) => write!(f, "数据库配置错误: {}", msg),
-            ShortlinkerError::DatabaseConnection(msg) => write!(f, "数据库连接错误: {}", msg),
-            ShortlinkerError::DatabaseOperation(msg) => write!(f, "数据库操作错误: {}", msg),
-            ShortlinkerError::FileOperation(msg) => write!(f, "文件操作错误: {}", msg),
-            ShortlinkerError::Validation(msg) => write!(f, "验证错误: {}", msg),
-            ShortlinkerError::NotFound(msg) => write!(f, "资源未找到: {}", msg),
-            ShortlinkerError::Serialization(msg) => write!(f, "序列化错误: {}", msg),
-            ShortlinkerError::SignalOperation(msg) => write!(f, "信号操作错误: {}", msg),
-            ShortlinkerError::StoragePluginNotFound(msg) => write!(f, "存储插件未找到: {}", msg),
-            ShortlinkerError::DateParse(msg) => write!(f, "日期解析错误: {}", msg),
-            ShortlinkerError::NotifyServer(msg) => write!(f, "通知服务器错误: {}", msg),
-        }
+        // 默认使用简洁格式
+        write!(f, "{}", self.format_simple())
     }
 }
 

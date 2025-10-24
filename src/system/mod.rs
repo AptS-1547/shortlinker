@@ -13,5 +13,6 @@ pub mod args;
 pub mod lifetime;
 pub mod logging;
 pub mod modes;
+pub mod panic_handler;
 pub mod platform;
 pub mod reload; // Still needed for manual reload_all in admin API
