@@ -3,7 +3,7 @@
 //! This module provides functions to initialize the tracing/logging system
 //! based on application configuration.
 
-use super::app_config::AppConfig;
+use crate::config::AppConfig;
 use tracing_appender::rolling;
 use tracing_subscriber;
 

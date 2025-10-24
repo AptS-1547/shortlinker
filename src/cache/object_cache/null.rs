@@ -1,4 +1,4 @@
-use crate::repository::ShortLink;
+use crate::storage::ShortLink;
 use async_trait::async_trait;
 use tracing::trace;
 

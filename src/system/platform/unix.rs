@@ -7,7 +7,7 @@
 
 use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::errors::{Result, ShortlinkerError};
-use crate::repository::Repository;
+use crate::storage::SeaOrmStorage;
 use std::fs;
 use std::sync::Arc;
 use tracing::{debug, error, info};
@@ -103,7 +103,7 @@ impl PlatformOps for UnixPlatform {
 
     async fn setup_reload_mechanism(
         cache: Arc<dyn CompositeCacheTrait + 'static>,
-        repository: Arc<dyn Repository + 'static>,
+        storage: Arc<SeaOrmStorage>,
     ) {
         use tokio::signal::unix::{SignalKind, signal};
 
@@ -114,7 +114,7 @@ impl PlatformOps for UnixPlatform {
             while (stream.recv().await).is_some() {
                 info!("Received SIGUSR1, reloading...");
 
-                if let Err(e) = reload_all(cache.clone(), repository.clone()).await {
+                if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
                     error!("Reload failed: {}", e);
                 } else {
                     info!("Reload successful");
@@ -124,19 +124,19 @@ impl PlatformOps for UnixPlatform {
     }
 }
 
-/// Reload cache and repository
+/// Reload cache and storage
 ///
 /// This function is called when a reload signal is received.
-/// It reloads the repository backend and rebuilds the cache.
+/// It reloads the storage backend and rebuilds the cache.
 async fn reload_all(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
-    repository: Arc<dyn Repository + 'static>,
+    storage: Arc<SeaOrmStorage>,
 ) -> anyhow::Result<()> {
     info!("Starting reload process...");
 
-    // Reload repository backend
-    repository.reload().await?;
-    let links = repository.load_all().await;
+    // Reload storage backend
+    storage.reload().await?;
+    let links = storage.load_all().await;
 
     // Reconfigure cache with new capacity
     cache
@@ -173,7 +173,7 @@ pub fn notify_server() -> Result<()> {
 /// Setup SIGUSR1 signal handler for reload
 pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
-    repository: Arc<dyn Repository + 'static>,
+    storage: Arc<SeaOrmStorage>,
 ) {
-    UnixPlatform::setup_reload_mechanism(cache, repository).await
+    UnixPlatform::setup_reload_mechanism(cache, storage).await
 }

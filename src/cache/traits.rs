@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::repository::ShortLink;
+use crate::storage::ShortLink;
 use async_trait::async_trait;
 
 pub struct BloomConfig {

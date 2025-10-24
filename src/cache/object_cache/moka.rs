@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
-use crate::repository::ShortLink;
+use crate::storage::ShortLink;
 
 declare_object_cache_plugin!("memory", MokaCacheWrapper);
 
@@ -20,7 +20,7 @@ impl Default for MokaCacheWrapper {
 
 impl MokaCacheWrapper {
     pub fn new() -> Result<Self, String> {
-        let config = crate::system::app_config::get_config();
+        let config = crate::config::get_config();
         let inner = Cache::builder()
             .max_capacity(config.cache.memory.max_capacity)
             .time_to_live(std::time::Duration::from_secs(config.cache.default_ttl))

@@ -1,7 +1,7 @@
 use crate::cache::register::{get_filter_plugin, get_object_cache_plugin};
 use crate::cache::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};
 use crate::errors::ShortlinkerError;
-use crate::repository::ShortLink;
+use crate::storage::ShortLink;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ pub struct CompositeCache {
 
 impl CompositeCache {
     pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
-        let config = crate::system::app_config::get_config();
+        let config = crate::config::get_config();
 
         let filter_plugin_name = "bloom";
         let object_cache_name = &config.cache.cache_type;

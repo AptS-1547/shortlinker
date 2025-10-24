@@ -1,18 +1,12 @@
 //! System-level modules
 //!
-//! This module contains system-level functionality:
-//! - Configuration management
-//! - Lifecycle management (startup, shutdown)
-//! - Platform abstraction (signals, locks, reload mechanisms)
-//! - Execution mode routing (server, cli, tui)
-//! - Command-line argument parsing
+//! This module contains system-level utilities:
+//! - Platform abstraction (signals, locks)
 //! - Logging system initialization
+//! - Panic handler
+//! - Hot reload functionality
 
-pub mod app_config;
-pub mod args;
-pub mod lifetime;
 pub mod logging;
-pub mod modes;
 pub mod panic_handler;
 pub mod platform;
-pub mod reload; // Still needed for manual reload_all in admin API
+pub mod reload;

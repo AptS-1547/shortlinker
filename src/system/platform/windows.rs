@@ -10,7 +10,7 @@
 
 use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::errors::{Result, ShortlinkerError};
-use crate::repository::Repository;
+use crate::storage::SeaOrmStorage;
 use std::fs;
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -79,7 +79,7 @@ impl PlatformOps for WindowsPlatform {
 
     async fn setup_reload_mechanism(
         cache: Arc<dyn CompositeCacheTrait + 'static>,
-        repository: Arc<dyn Repository + 'static>,
+        storage: Arc<SeaOrmStorage>,
     ) {
         use std::time::SystemTime;
         use tokio::fs;
@@ -102,7 +102,7 @@ impl PlatformOps for WindowsPlatform {
                                 if modified > last_check {
                                     info!("Reload request detected, reloading...");
 
-                                    match reload_all(cache.clone(), repository.clone()).await {
+                                    match reload_all(cache.clone(), storage.clone()).await {
                                         Ok(_) => {
                                             info!("Reload successful");
                                             last_check = SystemTime::now();
@@ -132,19 +132,19 @@ impl PlatformOps for WindowsPlatform {
     }
 }
 
-/// Reload cache and repository
+/// Reload cache and storage
 ///
 /// This function is called when a reload trigger is detected.
-/// It reloads the repository backend and rebuilds the cache.
+/// It reloads the storage backend and rebuilds the cache.
 async fn reload_all(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
-    repository: Arc<dyn Repository + 'static>,
+    storage: Arc<SeaOrmStorage>,
 ) -> anyhow::Result<()> {
     info!("Starting reload process...");
 
-    // Reload repository backend
-    repository.reload().await?;
-    let links = repository.load_all().await;
+    // Reload storage backend
+    storage.reload().await?;
+    let links = storage.load_all().await;
 
     // Reconfigure cache with new capacity
     cache
@@ -182,7 +182,7 @@ pub fn notify_server() -> Result<()> {
 /// Setup file polling for reload
 pub async fn setup_reload_mechanism(
     cache: Arc<dyn CompositeCacheTrait + 'static>,
-    repository: Arc<dyn Repository + 'static>,
+    storage: Arc<SeaOrmStorage>,
 ) {
-    WindowsPlatform::setup_reload_mechanism(cache, repository).await
+    WindowsPlatform::setup_reload_mechanism(cache, storage).await
 }

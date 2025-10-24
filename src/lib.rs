@@ -11,22 +11,24 @@
 //!
 //! # Architecture
 //! - `cache`: Multi-level caching (L1 + L2 + Bloom filter)
-//! - `storages`: Storage backends (SQLite, PostgreSQL, MySQL, Sled)
-//! - `services`: HTTP services (Admin, Health, Frontend, Redirect)
-//! - `middleware`: Authentication and guards
-//! - `system`: Platform abstraction, lifecycle management, and mode routing
+//! - `storage`: Storage backends and data access
+//! - `analytics`: Click tracking and statistics
+//! - `api`: HTTP services and middleware
+//! - `interfaces`: User interfaces (CLI, TUI)
+//! - `config`: Configuration management
+//! - `runtime`: Application lifecycle and execution modes
+//! - `system`: Platform abstraction and system utilities
 
+pub mod analytics;
+pub mod api;
 pub mod cache;
-#[cfg(feature = "cli")]
-pub mod cli;
+pub mod config;
 pub mod errors;
 mod event;
-pub mod middleware;
-pub mod repository;
-pub mod services;
+pub mod interfaces;
+pub mod runtime;
+pub mod storage;
 pub mod system;
-#[cfg(feature = "tui")]
-pub mod tui;
 pub mod utils;
 
 #[cfg(test)]

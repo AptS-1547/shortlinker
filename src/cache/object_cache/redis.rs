@@ -5,7 +5,7 @@ use tracing::{debug, error, trace, warn};
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
-use crate::repository::ShortLink;
+use crate::storage::ShortLink;
 
 declare_object_cache_plugin!("redis", RedisObjectCache);
 
@@ -23,7 +23,7 @@ impl Default for RedisObjectCache {
 
 impl RedisObjectCache {
     pub fn new() -> Result<Self, String> {
-        let config = crate::system::app_config::get_config();
+        let config = crate::config::get_config();
         let redis_config = &config.cache.redis;
 
         let ttl = config.cache.default_ttl;
