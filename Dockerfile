@@ -36,7 +36,7 @@ WORKDIR /app
 
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
-COPY migrations ./migrations
+COPY migration ./migration
 COPY src ./src
 
 # 从前端构建阶段复制构建产物
