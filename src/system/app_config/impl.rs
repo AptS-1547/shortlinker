@@ -78,10 +78,10 @@ impl AppConfig {
         let content = toml::to_string_pretty(&default_config)?;
 
         // Create parent directories if needed
-        if let Some(parent) = Path::new(path).parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = Path::new(path).parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
         }
 
         fs::write(path, content)?;
@@ -159,7 +159,10 @@ impl AppConfig {
             if let Ok(capacity) = memory_max_capacity.parse() {
                 self.cache.memory.max_capacity = capacity;
             } else {
-                eprintln!("[ERROR] Invalid MEMORY_MAX_CAPACITY: {}", memory_max_capacity);
+                eprintln!(
+                    "[ERROR] Invalid MEMORY_MAX_CAPACITY: {}",
+                    memory_max_capacity
+                );
             }
         }
 
@@ -215,10 +218,10 @@ impl AppConfig {
         let content = toml::to_string_pretty(self)?;
 
         // Create parent directories if needed
-        if let Some(parent) = path.as_ref().parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+        if let Some(parent) = path.as_ref().parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
         }
 
         fs::write(path, content)?;

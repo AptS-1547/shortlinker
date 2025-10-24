@@ -1,5 +1,5 @@
 use crate::errors::ShortlinkerError;
-use crate::repository::{ShortLink, Repository, RepositoryFactory};
+use crate::repository::{Repository, RepositoryFactory, ShortLink};
 use crate::utils::{TimeParser, generate_random_code};
 
 use chrono::Utc;
@@ -18,8 +18,8 @@ pub enum CurrentScreen {
     Search,
     Help,
     ViewDetails,
-    FileBrowser,     // 文件浏览器
-    ExportFileName,  // 输入导出文件名
+    FileBrowser,    // 文件浏览器
+    ExportFileName, // 输入导出文件名
 }
 
 pub enum CurrentlyEditing {
@@ -47,7 +47,7 @@ pub struct App {
 
     // Search functionality
     pub search_input: String,
-    pub filtered_links: Vec<String>,  // List of codes matching search
+    pub filtered_links: Vec<String>, // List of codes matching search
     pub is_searching: bool,
 
     // UI state
@@ -60,10 +60,10 @@ pub struct App {
     pub import_path: String,
 
     // File browser state
-    pub current_dir: std::path::PathBuf,  // 当前浏览目录
-    pub dir_entries: Vec<std::path::PathBuf>,  // 目录中的文件/文件夹列表
-    pub browser_selected_index: usize,    // 文件浏览器选中索引
-    pub export_filename_input: String,    // 导出文件名输入
+    pub current_dir: std::path::PathBuf,      // 当前浏览目录
+    pub dir_entries: Vec<std::path::PathBuf>, // 目录中的文件/文件夹列表
+    pub browser_selected_index: usize,        // 文件浏览器选中索引
+    pub export_filename_input: String,        // 导出文件名输入
 }
 
 impl App {
@@ -72,8 +72,7 @@ impl App {
         let links = repository.load_all().await;
 
         // 初始化当前目录为用户主目录或当前工作目录
-        let current_dir = std::env::current_dir()
-            .unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
         Ok(App {
             repository,
@@ -211,7 +210,9 @@ impl App {
         if !self.target_url_input.starts_with("http://")
             && !self.target_url_input.starts_with("https://")
         {
-            return Err(ShortlinkerError::validation("URL must start with http:// or https://"));
+            return Err(ShortlinkerError::validation(
+                "URL must start with http:// or https://",
+            ));
         }
 
         let config = crate::system::app_config::get_config();
@@ -234,8 +235,10 @@ impl App {
         }
 
         let expires_at = if !self.expire_time_input.is_empty() {
-            Some(TimeParser::parse_expire_time(&self.expire_time_input)
-                .map_err(|e| ShortlinkerError::date_parse(e))?)
+            Some(
+                TimeParser::parse_expire_time(&self.expire_time_input)
+                    .map_err(ShortlinkerError::date_parse)?,
+            )
         } else {
             None
         };
@@ -271,14 +274,18 @@ impl App {
             if !self.target_url_input.starts_with("http://")
                 && !self.target_url_input.starts_with("https://")
             {
-                return Err(ShortlinkerError::validation("URL must start with http:// or https://"));
+                return Err(ShortlinkerError::validation(
+                    "URL must start with http:// or https://",
+                ));
             }
             self.target_url_input.clone()
         };
 
         let expires_at = if !self.expire_time_input.is_empty() {
-            Some(TimeParser::parse_expire_time(&self.expire_time_input)
-                .map_err(|e| ShortlinkerError::date_parse(e))?)
+            Some(
+                TimeParser::parse_expire_time(&self.expire_time_input)
+                    .map_err(ShortlinkerError::date_parse)?,
+            )
         } else {
             link.expires_at
         };
@@ -358,7 +365,11 @@ impl App {
                 );
             }
             // Check for invalid characters
-            if !self.short_code_input.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            if !self
+                .short_code_input
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
                 self.validation_errors.insert(
                     "short_code".to_string(),
                     "Only alphanumeric, dash and underscore allowed".to_string(),
@@ -369,27 +380,27 @@ impl App {
         // Validate URL
         if !self.target_url_input.is_empty() {
             if !self.target_url_input.starts_with("http://")
-                && !self.target_url_input.starts_with("https://") {
+                && !self.target_url_input.starts_with("https://")
+            {
                 self.validation_errors.insert(
                     "target_url".to_string(),
                     "URL must start with http:// or https://".to_string(),
                 );
             }
-        } else if matches!(self.current_screen, CurrentScreen::AddLink | CurrentScreen::EditLink) {
-            self.validation_errors.insert(
-                "target_url".to_string(),
-                "URL is required".to_string(),
-            );
+        } else if matches!(
+            self.current_screen,
+            CurrentScreen::AddLink | CurrentScreen::EditLink
+        ) {
+            self.validation_errors
+                .insert("target_url".to_string(), "URL is required".to_string());
         }
 
         // Validate expire time format
-        if !self.expire_time_input.is_empty() {
-            if let Err(e) = TimeParser::parse_expire_time(&self.expire_time_input) {
-                self.validation_errors.insert(
-                    "expire_time".to_string(),
-                    format!("Invalid format: {}", e),
-                );
-            }
+        if !self.expire_time_input.is_empty()
+            && let Err(e) = TimeParser::parse_expire_time(&self.expire_time_input)
+        {
+            self.validation_errors
+                .insert("expire_time".to_string(), format!("Invalid format: {}", e));
         }
     }
 
@@ -409,10 +420,11 @@ impl App {
         self.is_searching = true;
         let query = self.search_input.to_lowercase();
 
-        self.filtered_links = self.links.iter()
+        self.filtered_links = self
+            .links
+            .iter()
             .filter(|(code, link)| {
-                code.to_lowercase().contains(&query) ||
-                link.target.to_lowercase().contains(&query)
+                code.to_lowercase().contains(&query) || link.target.to_lowercase().contains(&query)
             })
             .map(|(code, _)| code.clone())
             .collect();
@@ -424,10 +436,9 @@ impl App {
     /// Get links to display (filtered or all)
     pub fn get_display_links(&self) -> Vec<(&String, &ShortLink)> {
         if self.is_searching && !self.filtered_links.is_empty() {
-            self.filtered_links.iter()
-                .filter_map(|code| {
-                    self.links.get(code).map(|link| (code, link))
-                })
+            self.filtered_links
+                .iter()
+                .filter_map(|code| self.links.get(code).map(|link| (code, link)))
                 .collect()
         } else if self.is_searching {
             // Searching but no results
@@ -453,10 +464,9 @@ impl App {
         }
 
         // Read directory entries
-        let entries = fs::read_dir(&self.current_dir)
-            .map_err(|e| ShortlinkerError::file_operation(format!(
-                "Failed to read directory: {}", e
-            )))?;
+        let entries = fs::read_dir(&self.current_dir).map_err(|e| {
+            ShortlinkerError::file_operation(format!("Failed to read directory: {}", e))
+        })?;
 
         // Sort entries: directories first, then files
         let mut dirs = Vec::new();
@@ -491,7 +501,8 @@ impl App {
 
         if selected.is_dir() {
             // Navigate into directory
-            self.current_dir = selected.canonicalize()
+            self.current_dir = selected
+                .canonicalize()
                 .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
             self.load_directory()?;
             Ok(None)
@@ -510,7 +521,8 @@ impl App {
 
     /// Move selection down in file browser
     pub fn browser_move_down(&mut self) {
-        if !self.dir_entries.is_empty() && self.browser_selected_index < self.dir_entries.len() - 1 {
+        if !self.dir_entries.is_empty() && self.browser_selected_index < self.dir_entries.len() - 1
+        {
             self.browser_selected_index += 1;
         }
     }

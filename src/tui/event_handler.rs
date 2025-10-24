@@ -5,7 +5,9 @@
 use ratatui::crossterm::event::KeyCode;
 
 use super::app::{App, CurrentScreen, CurrentlyEditing};
-use super::input_handler::{handle_backspace, handle_space_toggle, handle_tab_navigation, handle_text_input};
+use super::input_handler::{
+    handle_backspace, handle_space_toggle, handle_tab_navigation, handle_text_input,
+};
 
 /// Handle keyboard input based on current screen
 pub async fn handle_key_event(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
@@ -236,7 +238,12 @@ fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<boo
 /// Handle help screen input
 fn handle_help_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Char('H') => {
+        KeyCode::Esc
+        | KeyCode::Char('q')
+        | KeyCode::Char('Q')
+        | KeyCode::Char('?')
+        | KeyCode::Char('h')
+        | KeyCode::Char('H') => {
             app.current_screen = CurrentScreen::Main;
         }
         _ => {}

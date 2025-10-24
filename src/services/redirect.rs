@@ -9,7 +9,7 @@ use tracing::{debug, trace};
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
 use crate::repository::click::global::get_click_manager;
-use crate::repository::{ShortLink, Repository};
+use crate::repository::{Repository, ShortLink};
 
 static DEFAULT_REDIRECT_URL: Lazy<String> = Lazy::new(|| {
     crate::system::app_config::get_config()

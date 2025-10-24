@@ -18,11 +18,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(ShortLink::TargetUrl)
-                            .text()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(ShortLink::TargetUrl).text().not_null())
                     .col(
                         ColumnDef::new(ShortLink::CreatedAt)
                             .timestamp_with_time_zone()
@@ -33,11 +29,7 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .null(),
                     )
-                    .col(
-                        ColumnDef::new(ShortLink::Password)
-                            .string()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(ShortLink::Password).string().null())
                     .col(
                         ColumnDef::new(ShortLink::ClickCount)
                             .big_integer()

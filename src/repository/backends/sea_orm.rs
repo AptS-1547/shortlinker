@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectOptions, Database, DatabaseConnection,
-    EntityTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, ConnectOptions, Database, DatabaseConnection, EntityTrait,
+    QueryFilter,
 };
 use tracing::{error, info, trace, warn};
 
@@ -13,7 +13,7 @@ use crate::repository::click::ClickSink;
 use crate::repository::models::StorageConfig;
 use crate::repository::{Repository, ShortLink};
 
-use migration::{entities::short_link, Migrator, MigratorTrait};
+use migration::{Migrator, MigratorTrait, entities::short_link};
 
 #[derive(Clone)]
 pub struct SeaOrmRepository {
@@ -53,9 +53,9 @@ impl SeaOrmRepository {
 
     /// 连接 SQLite 数据库（带自动创建和性能优化）
     async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
-        use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-        use sea_orm::sqlx::SqlitePool;
         use sea_orm::SqlxSqliteConnector;
+        use sea_orm::sqlx::SqlitePool;
+        use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
         use std::str::FromStr;
 
         let opt = SqliteConnectOptions::from_str(database_url)
@@ -70,11 +70,9 @@ impl SeaOrmRepository {
             .pragma("wal_autocheckpoint", "1000");
 
         // 使用 sqlx 的连接池
-        let pool = SqlitePool::connect_with(opt)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
-            })?;
+        let pool = SqlitePool::connect_with(opt).await.map_err(|e| {
+            ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
+        })?;
 
         // 转换为 Sea-ORM 的 DatabaseConnection
         Ok(SqlxSqliteConnector::from_sqlx_sqlite_pool(pool))
@@ -128,11 +126,7 @@ impl SeaOrmRepository {
         short_link::ActiveModel {
             short_code: Set(link.code.clone()),
             target_url: Set(link.target.clone()),
-            created_at: if is_new {
-                Set(link.created_at)
-            } else {
-                NotSet
-            },
+            created_at: if is_new { Set(link.created_at) } else { NotSet },
             expires_at: Set(link.expires_at),
             password: Set(link.password.clone()),
             click_count: if is_new { Set(0) } else { NotSet },
@@ -141,8 +135,8 @@ impl SeaOrmRepository {
 
     /// 使用 ON CONFLICT 的原子 upsert
     async fn upsert_with_on_conflict(&self, link: &ShortLink) -> Result<()> {
-        use sea_orm::sea_query::OnConflict;
         use sea_orm::InsertResult;
+        use sea_orm::sea_query::OnConflict;
 
         let active_model = Self::shortlink_to_active_model(link, true);
 
@@ -234,9 +228,7 @@ impl SeaOrmRepository {
 #[async_trait]
 impl Repository for SeaOrmRepository {
     async fn get(&self, code: &str) -> Option<ShortLink> {
-        let result = short_link::Entity::find_by_id(code)
-            .one(&self.db)
-            .await;
+        let result = short_link::Entity::find_by_id(code).one(&self.db).await;
 
         match result {
             Ok(Some(model)) => Some(Self::model_to_shortlink(model)),
@@ -286,9 +278,7 @@ impl Repository for SeaOrmRepository {
         let result = short_link::Entity::delete_by_id(code)
             .exec(&self.db)
             .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("删除短链接失败: {}", e))
-            })?;
+            .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
 
         if result.rows_affected == 0 {
             return Err(ShortlinkerError::not_found(format!(
@@ -302,7 +292,10 @@ impl Repository for SeaOrmRepository {
     }
 
     async fn reload(&self) -> Result<()> {
-        info!("Reloading links from {} storage", self.backend_name.to_uppercase());
+        info!(
+            "Reloading links from {} storage",
+            self.backend_name.to_uppercase()
+        );
         Ok(())
     }
 
@@ -324,7 +317,7 @@ impl Repository for SeaOrmRepository {
 #[async_trait]
 impl ClickSink for SeaOrmRepository {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
-        use sea_orm::{sea_query::Expr, ExprTrait, TransactionTrait};
+        use sea_orm::{ExprTrait, TransactionTrait, sea_query::Expr};
 
         let txn = self
             .db
@@ -352,7 +345,10 @@ impl ClickSink for SeaOrmRepository {
             .await
             .map_err(|e| anyhow::anyhow!("提交事务失败: {}", e))?;
 
-        trace!("点击计数已刷新到 {} 数据库", self.backend_name.to_uppercase());
+        trace!(
+            "点击计数已刷新到 {} 数据库",
+            self.backend_name.to_uppercase()
+        );
         Ok(())
     }
 }

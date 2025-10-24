@@ -14,8 +14,8 @@ mod cache;
 mod errors;
 mod event;
 mod middleware;
-mod services;
 mod repository;
+mod services;
 mod system;
 mod utils;
 
@@ -95,7 +95,6 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(feature = "server")]
         crate::system::modes::Mode::Server => {
             if let Err(e) = crate::system::modes::run_server(config).await {
-                use crate::errors::ShortlinkerError;
                 // 尝试转换为 ShortlinkerError 以获得更好的显示
                 eprintln!("Server error: {:#}", e);
                 std::process::exit(1);

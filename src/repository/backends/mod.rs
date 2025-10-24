@@ -10,10 +10,8 @@ pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
         || database_url == ":memory:"
     {
         Ok("sqlite".to_string())
-    } else if database_url.starts_with("mysql://") {
+    } else if database_url.starts_with("mysql://") || database_url.starts_with("mariadb://") {
         Ok("mysql".to_string())
-    } else if database_url.starts_with("mariadb://") {
-        Ok("mysql".to_string()) // MariaDB 使用 MySQL 协议
     } else if database_url.starts_with("postgres://") || database_url.starts_with("postgresql://") {
         Ok("postgres".to_string())
     } else {

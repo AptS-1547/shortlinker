@@ -25,9 +25,7 @@ use tracing_subscriber;
 /// # Panics
 /// * If creating the log appender fails
 /// * If setting the global subscriber fails (e.g., already initialized)
-pub fn init_logging(
-    config: &AppConfig,
-) -> tracing_appender::non_blocking::WorkerGuard {
+pub fn init_logging(config: &AppConfig) -> tracing_appender::non_blocking::WorkerGuard {
     // Create writer based on config
     let writer: Box<dyn std::io::Write + Send + Sync> =
         if let Some(ref log_file) = config.logging.file {
@@ -82,4 +80,3 @@ pub fn init_logging(
 
     guard
 }
-

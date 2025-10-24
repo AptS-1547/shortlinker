@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use tracing::{error, info, trace};
 
 use crate::cache::traits::CompositeCacheTrait;
-use crate::repository::{ShortLink, Repository};
+use crate::repository::{Repository, ShortLink};
 use crate::system::reload::reload_all;
 use crate::utils::{TimeParser, generate_random_code};
 

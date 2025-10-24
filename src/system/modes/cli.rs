@@ -3,8 +3,8 @@
 //! This module contains the CLI mode startup logic.
 //! It delegates to the actual CLI implementation.
 
-use crate::system::lifetime;
 use crate::cli::CliError;
+use crate::system::lifetime;
 
 /// Run CLI mode
 ///

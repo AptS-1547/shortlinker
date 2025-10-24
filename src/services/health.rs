@@ -27,7 +27,10 @@ impl HealthService {
         let storage_status =
             match tokio::time::timeout(Duration::from_secs(5), repository.load_all()).await {
                 Ok(links) => {
-                    trace!("Repository health check passed, {} links found", links.len());
+                    trace!(
+                        "Repository health check passed, {} links found",
+                        links.len()
+                    );
                     json!({
                         "status": "healthy",
                         "links_count": links.len(),

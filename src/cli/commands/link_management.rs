@@ -1,5 +1,5 @@
 use super::super::CliError;
-use crate::repository::{ShortLink, Repository};
+use crate::repository::{Repository, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
 use colored::Colorize;
@@ -167,7 +167,10 @@ pub async fn add_link(
     Ok(())
 }
 
-pub async fn remove_link(repository: Arc<dyn Repository>, short_code: String) -> Result<(), CliError> {
+pub async fn remove_link(
+    repository: Arc<dyn Repository>,
+    short_code: String,
+) -> Result<(), CliError> {
     let links = repository.load_all().await;
 
     if !links.contains_key(&short_code) {

@@ -4,10 +4,10 @@
 //! - Server mode: Display detailed stack trace, log to crash.log
 //! - CLI/TUI mode: Display simple message, log to crash.log
 
-use std::panic;
+use chrono::Utc;
 use std::fs::OpenOptions;
 use std::io::Write;
-use chrono::Utc;
+use std::panic;
 
 /// Running mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,7 +31,8 @@ pub fn install_panic_hook(mode: RunMode) {
             "Unknown panic".to_string()
         };
 
-        let location = panic_info.location()
+        let location = panic_info
+            .location()
             .map(|loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()))
             .unwrap_or_else(|| "Unknown location".to_string());
 
@@ -69,9 +70,19 @@ fn display_server_panic(message: &str, location: &str, backtrace: &std::backtrac
     use colored::Colorize;
 
     eprintln!();
-    eprintln!("{}", "═══════════════════════════════════════════════════".red().bold());
+    eprintln!(
+        "{}",
+        "═══════════════════════════════════════════════════"
+            .red()
+            .bold()
+    );
     eprintln!("{}", "PANIC".red().bold());
-    eprintln!("{}", "═══════════════════════════════════════════════════".red().bold());
+    eprintln!(
+        "{}",
+        "═══════════════════════════════════════════════════"
+            .red()
+            .bold()
+    );
     eprintln!();
     eprintln!("{} {}", "Reason:".yellow().bold(), message.white());
     eprintln!("{} {}", "Location:".yellow().bold(), location.white());
@@ -80,7 +91,12 @@ fn display_server_panic(message: &str, location: &str, backtrace: &std::backtrac
     eprintln!("{}", format!("{:?}", backtrace).dimmed());
     eprintln!();
     eprintln!("{}", "Details saved to crash.log".cyan());
-    eprintln!("{}", "═══════════════════════════════════════════════════".red().bold());
+    eprintln!(
+        "{}",
+        "═══════════════════════════════════════════════════"
+            .red()
+            .bold()
+    );
     eprintln!();
 }
 
