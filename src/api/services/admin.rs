@@ -1,3 +1,4 @@
+use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
@@ -421,9 +422,24 @@ impl AdminService {
 
         if login_body.password == *admin_token {
             info!("Admin API: login successful");
-            Ok(Self::success_response(serde_json::json!({
-                "message": "Login successful"
-            })))
+
+            // TODO: Make SameSite policy configurable for different deployment scenarios
+            // Currently using Strict, but this can be moved to config for flexibility
+            let cookie = Cookie::build("sl_admin", admin_token.clone())
+                .path(&config.routes.admin_prefix)
+                .http_only(true)
+                .same_site(SameSite::Strict)
+                .finish();
+
+            Ok(HttpResponse::Ok()
+                .cookie(cookie)
+                .append_header(("Content-Type", "application/json; charset=utf-8"))
+                .json(ApiResponse {
+                    code: 0,
+                    data: serde_json::json!({
+                        "message": "Login successful"
+                    }),
+                }))
         } else {
             error!("Admin API: login failed - invalid token");
             Ok(Self::error_response(
@@ -431,5 +447,28 @@ impl AdminService {
                 "Invalid admin token",
             ))
         }
+    }
+
+    pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
+        info!("Admin API: logout request");
+
+        let config = crate::system::app_config::get_config();
+
+        // Create a cookie with Max-Age=0 to delete it
+        let cookie = Cookie::build("sl_admin", "")
+            .path(&config.routes.admin_prefix)
+            .http_only(true)
+            .max_age(actix_web::cookie::time::Duration::ZERO)
+            .finish();
+
+        Ok(HttpResponse::Ok()
+            .cookie(cookie)
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .json(ApiResponse {
+                code: 0,
+                data: serde_json::json!({
+                    "message": "Logout successful"
+                }),
+            }))
     }
 }

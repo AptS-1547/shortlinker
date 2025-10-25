@@ -80,7 +80,21 @@ where
         )
     }
 
-    /// Extract and validate the bearer token
+    /// Extract and validate the authentication token
+    /// Priority: 1. Cookie (sl_admin), 2. Bearer token header
+    fn validate_token(req: &ServiceRequest, expected_token: &str) -> bool {
+        // First, try to get token from cookie
+        if let Some(cookie_value) = req.cookie("sl_admin") {
+            trace!("Validating token from cookie");
+            return cookie_value.value() == expected_token;
+        }
+
+        // Fallback to Bearer token for backward compatibility
+        trace!("Cookie not found, trying Bearer token");
+        Self::validate_bearer_token(req, expected_token)
+    }
+
+    /// Extract and validate the bearer token (kept for backward compatibility)
     fn validate_bearer_token(req: &ServiceRequest, expected_token: &str) -> bool {
         req.headers()
             .get("Authorization")
@@ -90,11 +104,12 @@ where
             .unwrap_or(false)
     }
 
-    /// Check if the request path is the login endpoint
-    fn is_login_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
+    /// Check if the request path is an auth endpoint (login/logout)
+    fn is_auth_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
         let path = req.path();
         let login_path = format!("{}/auth/login", admin_prefix);
-        path == login_path
+        let logout_path = format!("{}/auth/logout", admin_prefix);
+        path == login_path || path == logout_path
     }
 }
 
@@ -130,15 +145,15 @@ where
                 return Ok(Self::handle_options_request(req));
             }
 
-            // Allow login endpoint to pass through without authentication
-            if Self::is_login_endpoint(&req, &admin_prefix) {
-                trace!("Login endpoint accessed - bypassing authentication");
+            // Allow login and logout endpoints to pass through without authentication
+            if Self::is_auth_endpoint(&req, &admin_prefix) {
+                trace!("Auth endpoint accessed - bypassing authentication");
                 let response = srv.call(req).await?.map_into_left_body();
                 return Ok(response);
             }
 
-            // Validate the bearer token for all other endpoints
-            if !Self::validate_bearer_token(&req, &admin_token) {
+            // Validate the token (from cookie or bearer header) for all other endpoints
+            if !Self::validate_token(&req, &admin_token) {
                 return Ok(Self::handle_unauthorized(req));
             }
 

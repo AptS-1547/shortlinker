@@ -97,7 +97,8 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                     .route(
                         "/auth/login",
                         web::post().to(AdminService::check_admin_token),
-                    ),
+                    )
+                    .route("/auth/logout", web::post().to(AdminService::logout)),
             )
             .service(
                 web::scope(&health_prefix)
