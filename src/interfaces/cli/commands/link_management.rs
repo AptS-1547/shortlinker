@@ -88,22 +88,20 @@ pub async fn add_link(
         }
     };
 
-    let links = storage.load_all().await;
-
     // Check if short code already exists
-    if links.contains_key(&final_short_code) {
+    if let Some(existing_link) = storage.get(&final_short_code).await {
         if force_overwrite {
             println!(
                 "{} Force overwriting code '{}': {} -> {}",
                 "⚠".bold().yellow(),
                 final_short_code.cyan(),
-                links[&final_short_code].target.dimmed().underline(),
+                existing_link.target.dimmed().underline(),
                 target_url.blue()
             );
         } else {
             return Err(CliError::CommandError(format!(
                 "Code '{}' already exists and points to {}. Use --force to overwrite",
-                final_short_code, links[&final_short_code].target
+                final_short_code, existing_link.target
             )));
         }
     }
@@ -168,9 +166,8 @@ pub async fn add_link(
 }
 
 pub async fn remove_link(storage: Arc<SeaOrmStorage>, short_code: String) -> Result<(), CliError> {
-    let links = storage.load_all().await;
-
-    if !links.contains_key(&short_code) {
+    // Check if the link exists before attempting to remove
+    if storage.get(&short_code).await.is_none() {
         return Err(CliError::CommandError(format!(
             "Short link does not exist: {}",
             short_code
