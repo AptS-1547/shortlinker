@@ -78,14 +78,15 @@ pub async fn prepare_server_startup() -> StartupContext {
         .expect("Failed to create cache");
 
     let links = storage.load_all().await;
+    let links_count = links.len();
     cache
         .reconfigure(cache::traits::BloomConfig {
-            capacity: links.len(),
+            capacity: links_count,
             fp_rate: 0.001,
         })
         .await;
-    cache.load_cache(links.clone()).await;
-    debug!("L1/L2 cache initialized with {} links", links.len());
+    cache.load_cache(links).await;
+    debug!("L1/L2 cache initialized with {} links", links_count);
 
     #[cfg(any(feature = "cli", feature = "tui"))]
     crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;

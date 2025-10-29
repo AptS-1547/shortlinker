@@ -170,20 +170,31 @@ impl AdminService {
         query: &GetLinksQuery,
         now: chrono::DateTime<chrono::Utc>,
     ) -> Vec<(String, ShortLink)> {
+        // Parse time filters once outside the iteration
+        let after_time = query
+            .created_after
+            .as_ref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc));
+
+        let before_time = query
+            .created_before
+            .as_ref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc));
+
         links
             .into_iter()
             .filter(|(_, link)| {
                 // Time filters
-                if let Some(created_after) = &query.created_after
-                    && let Ok(after_time) = chrono::DateTime::parse_from_rfc3339(created_after)
-                    && link.created_at < after_time.with_timezone(&chrono::Utc)
+                if let Some(after) = after_time
+                    && link.created_at < after
                 {
                     return false;
                 }
 
-                if let Some(created_before) = &query.created_before
-                    && let Ok(before_time) = chrono::DateTime::parse_from_rfc3339(created_before)
-                    && link.created_at > before_time.with_timezone(&chrono::Utc)
+                if let Some(before) = before_time
+                    && link.created_at > before
                 {
                     return false;
                 }
