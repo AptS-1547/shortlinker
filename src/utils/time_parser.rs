@@ -25,42 +25,36 @@ impl TimeParser {
         let mut remaining = input;
 
         while !remaining.is_empty() {
-            // 提取数字
-            let mut num_str = String::new();
-            let chars = remaining.chars();
+            // Find the position where digits end
+            let digit_end = remaining
+                .char_indices()
+                .find(|(_, c)| !c.is_ascii_digit())
+                .map(|(i, _)| i)
+                .unwrap_or(remaining.len());
 
-            for c in chars {
-                if c.is_ascii_digit() {
-                    num_str.push(c);
-                } else {
-                    remaining = &remaining[num_str.len()..];
-                    break;
-                }
-            }
-
-            if num_str.is_empty() {
+            if digit_end == 0 {
                 return Err(format!("无效的时间格式: '{}'", input));
             }
 
+            let num_str = &remaining[..digit_end];
             let num: i64 = num_str
                 .parse()
                 .map_err(|_| format!("无效的数字: '{}'", num_str))?;
 
-            // 提取单位
-            let mut unit_str = String::new();
-            let chars = remaining.chars();
+            remaining = &remaining[digit_end..];
 
-            for c in chars {
-                if c.is_alphabetic() {
-                    unit_str.push(c);
-                } else {
-                    break;
-                }
-            }
+            // Find the position where letters end
+            let unit_end = remaining
+                .char_indices()
+                .find(|(_, c)| !c.is_alphabetic())
+                .map(|(i, _)| i)
+                .unwrap_or(remaining.len());
 
-            if unit_str.is_empty() {
+            if unit_end == 0 {
                 return Err(format!("缺少时间单位，数字 '{}' 后应跟时间单位", num));
             }
+
+            let unit_str = &remaining[..unit_end];
 
             // 解析单位并计算持续时间
             let duration = match unit_str.to_lowercase().as_str() {
@@ -75,7 +69,7 @@ impl TimeParser {
             };
 
             total_duration += duration;
-            remaining = &remaining[unit_str.len()..];
+            remaining = &remaining[unit_end..];
         }
 
         if total_duration == Duration::zero() {

@@ -46,7 +46,7 @@ pub async fn upsert_with_fallback(db: &DatabaseConnection, link: &ShortLink) -> 
 
     // 先尝试插入
     let active_model = shortlink_to_active_model(link, true);
-    let insert_result = active_model.clone().insert(db).await;
+    let insert_result = active_model.insert(db).await;
 
     match insert_result {
         Ok(_) => {
