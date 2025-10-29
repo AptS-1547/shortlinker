@@ -54,21 +54,23 @@ impl RedirectService {
                     }
                     None => {
                         debug!("Redirect link not found: {}", &capture_path);
-                        HttpResponse::build(StatusCode::NOT_FOUND)
-                            .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                            .insert_header(("Cache-Control", "public, max-age=60")) // 缓存404
-                            .body("Not Found")
+                        Self::not_found_response()
                     }
                 }
             }
             CacheResult::NotFound => {
                 debug!("Cache not found for path: {}", &capture_path);
-                HttpResponse::build(StatusCode::NOT_FOUND)
-                    .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                    .insert_header(("Cache-Control", "public, max-age=60"))
-                    .body("Not Found")
+                Self::not_found_response()
             }
         }
+    }
+
+    #[inline]
+    fn not_found_response() -> HttpResponse {
+        HttpResponse::build(StatusCode::NOT_FOUND)
+            .insert_header(("Content-Type", "text/html; charset=utf-8"))
+            .insert_header(("Cache-Control", "public, max-age=60"))
+            .body("Not Found")
     }
 
     fn update_click(code: &str) {
@@ -92,10 +94,7 @@ impl RedirectService {
         if let Some(expires_at) = link.expires_at
             && expires_at < chrono::Utc::now()
         {
-            return HttpResponse::build(StatusCode::NOT_FOUND)
-                .insert_header(("Content-Type", "text/html; charset=utf-8"))
-                .insert_header(("Cache-Control", "public, max-age=60"))
-                .body("Not Found");
+            return Self::not_found_response();
         }
 
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
