@@ -59,17 +59,17 @@ impl TimeParser {
 
             // 解析单位并计算持续时间
             // 注意：大写 M 表示月份，小写 m 表示分钟
-            let duration = if unit_str == "M" {
+            let lower_unit_str = unit_str.to_lowercase();
+            let duration = if unit_str == "M" || lower_unit_str == "month" || lower_unit_str == "months" {
                 Duration::days(num * 30) // 近似30天
             } else {
-                match unit_str.to_lowercase().as_str() {
+                match lower_unit_str.as_str() {
                     "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
                     "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
                     "h" | "hour" | "hours" => Duration::hours(num),
                     "d" | "day" | "days" => Duration::days(num),
                     "w" | "week" | "weeks" => Duration::weeks(num),
-                    "month" | "months" => Duration::days(num * 30), // 近似30天
-                    "y" | "year" | "years" => Duration::days(num * 365),  // 近似365天
+                    "y" | "year" | "years" => Duration::days(num * 365), // 近似365天
                     _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
                 }
             };
