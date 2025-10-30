@@ -6,8 +6,9 @@ pub struct TimeParser;
 impl TimeParser {
     /// 解析时间字符串，支持多种格式：
     /// - RFC3339 格式：2023-10-01T12:00:00Z
-    /// - 相对时间：1d, 2w, 3m, 1y, 1h30m, 2d12h
+    /// - 相对时间：1d, 2w, 3M (大写M表示月), 1y, 1h30m, 2d12h
     /// - 组合格式：1d2h30m
+    /// 注意：m 表示分钟，M 表示月份
     pub fn parse_expire_time(input: &str) -> Result<DateTime<Utc>, String> {
         let input = input.trim();
 
@@ -57,15 +58,20 @@ impl TimeParser {
             let unit_str = &remaining[..unit_end];
 
             // 解析单位并计算持续时间
-            let duration = match unit_str.to_lowercase().as_str() {
-                "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
-                "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
-                "h" | "hour" | "hours" => Duration::hours(num),
-                "d" | "day" | "days" => Duration::days(num),
-                "w" | "week" | "weeks" => Duration::weeks(num),
-                "M" | "month" | "months" => Duration::days(num * 30), // 近似30天
-                "y" | "year" | "years" => Duration::days(num * 365),  // 近似365天
-                _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
+            // 注意：大写 M 表示月份，小写 m 表示分钟
+            let duration = if unit_str == "M" {
+                Duration::days(num * 30) // 近似30天
+            } else {
+                match unit_str.to_lowercase().as_str() {
+                    "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
+                    "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
+                    "h" | "hour" | "hours" => Duration::hours(num),
+                    "d" | "day" | "days" => Duration::days(num),
+                    "w" | "week" | "weeks" => Duration::weeks(num),
+                    "month" | "months" => Duration::days(num * 30), // 近似30天
+                    "y" | "year" | "years" => Duration::days(num * 365),  // 近似365天
+                    _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
+                }
             };
 
             total_duration += duration;
@@ -144,6 +150,37 @@ mod tests {
     fn test_parse_rfc3339() {
         let result = TimeParser::parse_expire_time("2023-10-01T12:00:00Z");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_month_vs_minute() {
+        let now = Utc::now();
+
+        // 测试大写 M (月份)
+        let result = TimeParser::parse_expire_time("1M").unwrap();
+        let days_diff = (result - now).num_days();
+        assert!(days_diff >= 29 && days_diff <= 31, "1M should be approximately 30 days, got {}", days_diff);
+
+        // 测试小写 m (分钟)
+        let result = TimeParser::parse_expire_time("1m").unwrap();
+        let seconds_diff = (result - now).num_seconds();
+        assert!(seconds_diff >= 59 && seconds_diff <= 61, "1m should be approximately 60 seconds, got {}", seconds_diff);
+
+        // 测试完整单词 month
+        let result = TimeParser::parse_expire_time("2months").unwrap();
+        let days_diff = (result - now).num_days();
+        assert!(days_diff >= 59 && days_diff <= 61, "2months should be approximately 60 days, got {}", days_diff);
+
+        // 测试完整单词 minute
+        let result = TimeParser::parse_expire_time("30minutes").unwrap();
+        let seconds_diff = (result - now).num_seconds();
+        assert!(seconds_diff >= 1799 && seconds_diff <= 1801, "30minutes should be approximately 1800 seconds, got {}", seconds_diff);
+
+        // 测试组合：3个月和30分钟
+        let result = TimeParser::parse_expire_time("3M30m").unwrap();
+        let expected_seconds = 3 * 30 * 24 * 3600 + 30 * 60; // 3 months + 30 minutes
+        let actual_seconds = (result - now).num_seconds();
+        assert!((actual_seconds - expected_seconds).abs() < 5, "3M30m should be approximately {} seconds, got {}", expected_seconds, actual_seconds);
     }
 
     #[test]
