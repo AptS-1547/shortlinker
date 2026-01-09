@@ -14,13 +14,14 @@ port = 8080
 # CPU 核心数量（默认为系统核心数）
 cpu_count = 4
 
-[storage]
+[database]
 # 数据库连接 URL 或文件路径
-# sqlite:///:memory: 表示使用内存数据库
-# sqlite:///path/to/dbfile.db 表示使用文件数据库
-# mysql://user:password@host:port/dbname 表示使用 MySQL 数据库
-# postgres://user:password@host:port/dbname 表示使用 PostgreSQL 数据库
-database_url = "sqlite://shortlinks.db"
+# 数据库类型会从 URL scheme 自动检测：
+# - sqlite:// 或 .db/.sqlite 文件 → SQLite
+# - postgres:// 或 postgresql:// → PostgreSQL
+# - mysql:// → MySQL
+# - mariadb:// → MariaDB（使用 MySQL 协议）
+database_url = "shortlinks.db"
 
 # 数据库连接池大小
 pool_size = 10
@@ -55,6 +56,32 @@ admin_token = ""
 
 # 健康检查 API Token（留空则使用 admin_token）
 health_token = ""
+
+# JWT 配置（用于 Web 管理面板认证）
+# JWT 密钥（生产环境务必修改！）
+jwt_secret = "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND"
+
+# Access Token 有效期（分钟）
+access_token_minutes = 15
+
+# Refresh Token 有效期（天）
+refresh_token_days = 7
+
+# Cookie 配置
+# Access Token Cookie 名称
+access_cookie_name = "shortlinker_access"
+
+# Refresh Token Cookie 名称
+refresh_cookie_name = "shortlinker_refresh"
+
+# Cookie 是否仅通过 HTTPS 传输（生产环境建议启用）
+cookie_secure = false
+
+# Cookie SameSite 策略：Strict, Lax, None
+cookie_same_site = "Lax"
+
+# Cookie 域名（留空则使用当前域名）
+# cookie_domain = ".example.com"
 
 [routes]
 # 管理 API 路由前缀
@@ -93,8 +120,8 @@ level = "info"
 # 日志输出格式：text, json
 format = "text"
 
-# 日志文件路径（留空则输出到控制台）
-file = "shortlinker.log"
+# 日志文件路径（不设置则输出到控制台）
+# file = "shortlinker.log"
 
 # 日志文件最大大小（MB）
 max_size = 100

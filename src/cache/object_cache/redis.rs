@@ -68,7 +68,7 @@ impl RedisObjectCache {
 
     async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
         let client = &self.client;
-        let conn = client.get_multiplexed_tokio_connection().await?;
+        let conn = client.get_multiplexed_async_connection().await?;
         Ok(conn)
     }
 

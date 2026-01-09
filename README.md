@@ -219,11 +219,7 @@ port = 8080
 # CPU core count (defaults to system cores)
 cpu_count = 4
 
-[storage]
-# Storage backend type: sqlite, postgres, mysql, mariadb
-# 💡 This field is now OPTIONAL - the database type can be automatically inferred from DATABASE_URL
-# If specified, it will override auto-detection
-type = "sqlite"
+[database]
 # Database connection URL or file path
 # The database type is automatically detected from the URL scheme:
 # - sqlite:// or .db/.sqlite files → SQLite
@@ -259,6 +255,24 @@ max_capacity = 10000
 admin_token = ""
 # Health check API Token (leave empty to use admin_token)
 health_token = ""
+
+# JWT Configuration (for Web admin panel authentication)
+# JWT secret key (MUST change in production!)
+jwt_secret = "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND"
+# Access Token expiration (minutes)
+access_token_minutes = 15
+# Refresh Token expiration (days)
+refresh_token_days = 7
+
+# Cookie Configuration
+access_cookie_name = "shortlinker_access"
+refresh_cookie_name = "shortlinker_refresh"
+# Set to true for HTTPS-only cookies (recommended for production)
+cookie_secure = false
+# Cookie SameSite policy: Strict, Lax, None
+cookie_same_site = "Lax"
+# Cookie domain (leave empty for current domain)
+# cookie_domain = ".example.com"
 
 [routes]
 # Admin API route prefix
@@ -313,6 +327,14 @@ Still supports the original environment variable configuration method. **Environ
 | `MEMORY_MAX_CAPACITY`| `10000`                | Memory cache max capacity (entries)         |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
+| `JWT_SECRET`         | *(auto-generated)*     | JWT secret key (change in production!)      |
+| `ACCESS_TOKEN_MINUTES` | `15`                 | Access token expiration in minutes          |
+| `REFRESH_TOKEN_DAYS` | `7`                    | Refresh token expiration in days            |
+| `ACCESS_COOKIE_NAME` | `shortlinker_access`   | Access token cookie name                    |
+| `REFRESH_COOKIE_NAME`| `shortlinker_refresh`  | Refresh token cookie name                   |
+| `COOKIE_SECURE`      | `false`                | HTTPS-only cookies (enable in production)   |
+| `COOKIE_SAME_SITE`   | `Lax`                  | Cookie SameSite policy                      |
+| `COOKIE_DOMAIN`      | *(empty)*              | Cookie domain                               |
 | `ADMIN_ROUTE_PREFIX` | `/admin`               | Admin API route prefix                      |
 | `HEALTH_ROUTE_PREFIX`| `/health`              | Health API route prefix                     |
 | `FRONTEND_ROUTE_PREFIX` | `/panel`            | Web admin panel route prefix                |
@@ -351,6 +373,13 @@ DATABASE_URL=data/links.db
 # APIs
 ADMIN_TOKEN=your_admin_token
 HEALTH_TOKEN=your_health_token
+
+# JWT (for Web admin panel)
+JWT_SECRET=your_jwt_secret_change_in_production
+ACCESS_TOKEN_MINUTES=15
+REFRESH_TOKEN_DAYS=7
+COOKIE_SECURE=false
+COOKIE_SAME_SITE=Lax
 
 # Features
 DEFAULT_URL=https://example.com

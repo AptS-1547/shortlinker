@@ -209,11 +209,7 @@ port = 8080
 # CPU 核心数量（默认为系统核心数）
 cpu_count = 4
 
-[storage]
-# 存储后端类型：sqlite, postgres, mysql, mariadb
-# 💡 此字段现在是可选的 - 数据库类型可以从 DATABASE_URL 自动推断
-# 如果指定，将覆盖自动检测
-type = "sqlite"
+[database]
 # 数据库连接 URL 或文件路径
 # 数据库类型会从 URL scheme 自动检测：
 # - sqlite:// 或 .db/.sqlite 文件 → SQLite
@@ -249,6 +245,24 @@ max_capacity = 10000
 admin_token = ""
 # 健康检查 API Token（留空则使用 admin_token）
 health_token = ""
+
+# JWT 配置（用于 Web 管理面板认证）
+# JWT 密钥（生产环境务必修改！）
+jwt_secret = "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND"
+# Access Token 有效期（分钟）
+access_token_minutes = 15
+# Refresh Token 有效期（天）
+refresh_token_days = 7
+
+# Cookie 配置
+access_cookie_name = "shortlinker_access"
+refresh_cookie_name = "shortlinker_refresh"
+# 是否仅通过 HTTPS 传输（生产环境建议启用）
+cookie_secure = false
+# Cookie SameSite 策略：Strict, Lax, None
+cookie_same_site = "Lax"
+# Cookie 域名（留空则使用当前域名）
+# cookie_domain = ".example.com"
 
 [routes]
 # 管理 API 路由前缀
@@ -303,6 +317,14 @@ level = "info"
 | `MEMORY_MAX_CAPACITY`   | `10000`                 | 内存缓存最大容量（条目数）                          |
 | `ADMIN_TOKEN`           | *(empty)*               | 管理 API 密钥                                |
 | `HEALTH_TOKEN`          | *(empty)*               | 健康检查密钥                                   |
+| `JWT_SECRET`            | *(auto-generated)*      | JWT 密钥（生产环境务必修改！）                   |
+| `ACCESS_TOKEN_MINUTES`  | `15`                    | Access Token 有效期（分钟）                    |
+| `REFRESH_TOKEN_DAYS`    | `7`                     | Refresh Token 有效期（天）                     |
+| `ACCESS_COOKIE_NAME`    | `shortlinker_access`    | Access Token Cookie 名称                      |
+| `REFRESH_COOKIE_NAME`   | `shortlinker_refresh`   | Refresh Token Cookie 名称                     |
+| `COOKIE_SECURE`         | `false`                 | 是否仅 HTTPS 传输（生产环境建议启用）             |
+| `COOKIE_SAME_SITE`      | `Lax`                   | Cookie SameSite 策略                          |
+| `COOKIE_DOMAIN`         | *(empty)*               | Cookie 域名                                   |
 | `ADMIN_ROUTE_PREFIX`    | `/admin`                | 管理 API 路由前缀                             |
 | `HEALTH_ROUTE_PREFIX`   | `/health`               | 健康检查路由前缀                                |
 | `FRONTEND_ROUTE_PREFIX` | `/panel`                | Web 管理面板路由前缀                            |

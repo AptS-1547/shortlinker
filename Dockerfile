@@ -1,9 +1,8 @@
 # 前端构建阶段
-FROM node:22-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 
 RUN apk add git
-RUN corepack enable && \
-    corepack prepare yarn@4.9.2 --activate
+RUN npm install -g bun@latest
 
 COPY ./.git /app/.git
 
@@ -11,11 +10,11 @@ WORKDIR /app/admin-panel
 
 # 复制前端依赖文件
 COPY ./admin-panel /app/admin-panel
-RUN yarn install --frozen-lockfile
-RUN yarn build:prod
+RUN bun install --frozen-lockfile
+RUN bun run build
 
 # 多阶段构建 - 构建阶段
-FROM rust:1.90-slim AS builder
+FROM rust:1.92-slim AS builder
 
 # 安装构建依赖，包含完整的 OpenSSL 开发库
 RUN apt-get update && apt-get install -y \
