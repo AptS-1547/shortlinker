@@ -60,19 +60,20 @@ impl TimeParser {
             // 解析单位并计算持续时间
             // 注意：大写 M 表示月份，小写 m 表示分钟
             let lower_unit_str = unit_str.to_lowercase();
-            let duration = if unit_str == "M" || lower_unit_str == "month" || lower_unit_str == "months" {
-                Duration::days(num * 30) // 近似30天
-            } else {
-                match lower_unit_str.as_str() {
-                    "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
-                    "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
-                    "h" | "hour" | "hours" => Duration::hours(num),
-                    "d" | "day" | "days" => Duration::days(num),
-                    "w" | "week" | "weeks" => Duration::weeks(num),
-                    "y" | "year" | "years" => Duration::days(num * 365), // 近似365天
-                    _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
-                }
-            };
+            let duration =
+                if unit_str == "M" || lower_unit_str == "month" || lower_unit_str == "months" {
+                    Duration::days(num * 30) // 近似30天
+                } else {
+                    match lower_unit_str.as_str() {
+                        "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
+                        "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
+                        "h" | "hour" | "hours" => Duration::hours(num),
+                        "d" | "day" | "days" => Duration::days(num),
+                        "w" | "week" | "weeks" => Duration::weeks(num),
+                        "y" | "year" | "years" => Duration::days(num * 365), // 近似365天
+                        _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
+                    }
+                };
 
             total_duration += duration;
             remaining = &remaining[unit_end..];
@@ -159,28 +160,49 @@ mod tests {
         // 测试大写 M (月份)
         let result = TimeParser::parse_expire_time("1M").unwrap();
         let days_diff = (result - now).num_days();
-        assert!(days_diff >= 29 && days_diff <= 31, "1M should be approximately 30 days, got {}", days_diff);
+        assert!(
+            days_diff >= 29 && days_diff <= 31,
+            "1M should be approximately 30 days, got {}",
+            days_diff
+        );
 
         // 测试小写 m (分钟)
         let result = TimeParser::parse_expire_time("1m").unwrap();
         let seconds_diff = (result - now).num_seconds();
-        assert!(seconds_diff >= 59 && seconds_diff <= 61, "1m should be approximately 60 seconds, got {}", seconds_diff);
+        assert!(
+            seconds_diff >= 59 && seconds_diff <= 61,
+            "1m should be approximately 60 seconds, got {}",
+            seconds_diff
+        );
 
         // 测试完整单词 month
         let result = TimeParser::parse_expire_time("2months").unwrap();
         let days_diff = (result - now).num_days();
-        assert!(days_diff >= 59 && days_diff <= 61, "2months should be approximately 60 days, got {}", days_diff);
+        assert!(
+            days_diff >= 59 && days_diff <= 61,
+            "2months should be approximately 60 days, got {}",
+            days_diff
+        );
 
         // 测试完整单词 minute
         let result = TimeParser::parse_expire_time("30minutes").unwrap();
         let seconds_diff = (result - now).num_seconds();
-        assert!(seconds_diff >= 1799 && seconds_diff <= 1801, "30minutes should be approximately 1800 seconds, got {}", seconds_diff);
+        assert!(
+            seconds_diff >= 1799 && seconds_diff <= 1801,
+            "30minutes should be approximately 1800 seconds, got {}",
+            seconds_diff
+        );
 
         // 测试组合：3个月和30分钟
         let result = TimeParser::parse_expire_time("3M30m").unwrap();
         let expected_seconds = 3 * 30 * 24 * 3600 + 30 * 60; // 3 months + 30 minutes
         let actual_seconds = (result - now).num_seconds();
-        assert!((actual_seconds - expected_seconds).abs() < 5, "3M30m should be approximately {} seconds, got {}", expected_seconds, actual_seconds);
+        assert!(
+            (actual_seconds - expected_seconds).abs() < 5,
+            "3M30m should be approximately {} seconds, got {}",
+            expected_seconds,
+            actual_seconds
+        );
     }
 
     #[test]

@@ -77,12 +77,30 @@ pub struct MemoryConfig {
     pub max_capacity: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConfig {
     #[serde(default)]
     pub admin_token: String,
     #[serde(default)]
     pub health_token: String,
+    // JWT 配置
+    #[serde(default = "default_jwt_secret")]
+    pub jwt_secret: String,
+    #[serde(default = "default_access_token_minutes")]
+    pub access_token_minutes: u64,
+    #[serde(default = "default_refresh_token_days")]
+    pub refresh_token_days: u64,
+    // Cookie 配置
+    #[serde(default = "default_access_cookie_name")]
+    pub access_cookie_name: String,
+    #[serde(default = "default_refresh_cookie_name")]
+    pub refresh_cookie_name: String,
+    #[serde(default)]
+    pub cookie_secure: bool,
+    #[serde(default = "default_cookie_same_site")]
+    pub cookie_same_site: String,
+    #[serde(default)]
+    pub cookie_domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +258,31 @@ fn default_enable_rotation() -> bool {
     true
 }
 
+// JWT 默认值
+fn default_jwt_secret() -> String {
+    "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND".to_string()
+}
+
+fn default_access_token_minutes() -> u64 {
+    15
+}
+
+fn default_refresh_token_days() -> u64 {
+    7
+}
+
+fn default_access_cookie_name() -> String {
+    "shortlinker_access".to_string()
+}
+
+fn default_refresh_cookie_name() -> String {
+    "shortlinker_refresh".to_string()
+}
+
+fn default_cookie_same_site() -> String {
+    "Lax".to_string()
+}
+
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
@@ -286,6 +329,23 @@ impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
             max_capacity: default_memory_capacity(),
+        }
+    }
+}
+
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self {
+            admin_token: String::new(),
+            health_token: String::new(),
+            jwt_secret: default_jwt_secret(),
+            access_token_minutes: default_access_token_minutes(),
+            refresh_token_days: default_refresh_token_days(),
+            access_cookie_name: default_access_cookie_name(),
+            refresh_cookie_name: default_refresh_cookie_name(),
+            cookie_secure: false,
+            cookie_same_site: default_cookie_same_site(),
+            cookie_domain: None,
         }
     }
 }

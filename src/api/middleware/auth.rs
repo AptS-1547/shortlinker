@@ -9,6 +9,8 @@ use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use tracing::{trace, warn};
 
+use crate::api::jwt::JwtService;
+
 /// Admin authentication middleware
 #[derive(Clone)]
 pub struct AdminAuth;
@@ -30,6 +32,10 @@ where
             service: Rc::new(service),
             admin_prefix: config.routes.admin_prefix.clone(),
             admin_token: config.api.admin_token.clone(),
+            access_cookie_name: config.api.access_cookie_name.clone(),
+            jwt_secret: config.api.jwt_secret.clone(),
+            access_token_minutes: config.api.access_token_minutes,
+            refresh_token_days: config.api.refresh_token_days,
         }))
     }
 }
@@ -38,6 +44,10 @@ pub struct AdminAuthMiddleware<S> {
     service: Rc<S>,
     admin_prefix: String,
     admin_token: String,
+    access_cookie_name: String,
+    jwt_secret: String,
+    access_token_minutes: u64,
+    refresh_token_days: u64,
 }
 
 impl<S, B> AdminAuthMiddleware<S>
@@ -80,14 +90,32 @@ where
         )
     }
 
-    /// Extract and validate the bearer token
-    fn validate_bearer_token(req: &ServiceRequest, expected_token: &str) -> bool {
-        req.headers()
-            .get("Authorization")
-            .and_then(|header_value| header_value.to_str().ok())
-            .and_then(|auth_str| auth_str.strip_prefix("Bearer "))
-            .map(|token| token == expected_token)
-            .unwrap_or(false)
+    /// Validate JWT from Cookie
+    fn validate_jwt_cookie(
+        req: &ServiceRequest,
+        cookie_name: &str,
+        jwt_secret: &str,
+        access_token_minutes: u64,
+        refresh_token_days: u64,
+    ) -> bool {
+        // Try to get the access token from cookie
+        let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
+
+        if let Some(token) = cookie_token {
+            let jwt_service = JwtService::new(jwt_secret, access_token_minutes, refresh_token_days);
+            match jwt_service.validate_access_token(&token) {
+                Ok(_claims) => {
+                    trace!("JWT validation successful");
+                    return true;
+                }
+                Err(e) => {
+                    warn!("JWT validation failed: {}", e);
+                    return false;
+                }
+            }
+        }
+
+        false
     }
 
     /// Check if the request path is the login endpoint
@@ -95,6 +123,20 @@ where
         let path = req.path();
         let login_path = format!("{}/auth/login", admin_prefix);
         path == login_path
+    }
+
+    /// Check if the request path is the refresh endpoint
+    fn is_refresh_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
+        let path = req.path();
+        let refresh_path = format!("{}/auth/refresh", admin_prefix);
+        path == refresh_path
+    }
+
+    /// Check if the request path is the logout endpoint
+    fn is_logout_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
+        let path = req.path();
+        let logout_path = format!("{}/auth/logout", admin_prefix);
+        path == logout_path
     }
 }
 
@@ -118,6 +160,10 @@ where
         let srv = self.service.clone();
         let admin_token = self.admin_token.clone();
         let admin_prefix = self.admin_prefix.clone();
+        let access_cookie_name = self.access_cookie_name.clone();
+        let jwt_secret = self.jwt_secret.clone();
+        let access_token_minutes = self.access_token_minutes;
+        let refresh_token_days = self.refresh_token_days;
 
         Box::pin(async move {
             // Check if admin token is configured
@@ -137,12 +183,32 @@ where
                 return Ok(response);
             }
 
-            // Validate the bearer token for all other endpoints
-            if !Self::validate_bearer_token(&req, &admin_token) {
+            // Allow refresh endpoint to pass through (it validates refresh token internally)
+            if Self::is_refresh_endpoint(&req, &admin_prefix) {
+                trace!("Refresh endpoint accessed - bypassing access token check");
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
+            }
+
+            // Allow logout endpoint to pass through
+            if Self::is_logout_endpoint(&req, &admin_prefix) {
+                trace!("Logout endpoint accessed - bypassing authentication");
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
+            }
+
+            // Validate JWT from cookie
+            if !Self::validate_jwt_cookie(
+                &req,
+                &access_cookie_name,
+                &jwt_secret,
+                access_token_minutes,
+                refresh_token_days,
+            ) {
                 return Ok(Self::handle_unauthorized(req));
             }
 
-            trace!("Admin authentication successful");
+            trace!("Admin authentication successful via JWT Cookie");
 
             // Process the request with the next service
             let response = srv.call(req).await?.map_into_left_body();

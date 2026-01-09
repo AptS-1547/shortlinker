@@ -1,11 +1,13 @@
+use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
+use crate::api::jwt::JwtService;
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::system::reload::reload_all;
@@ -254,6 +256,15 @@ impl AdminService {
             code, link.target
         );
 
+        // Validate target URL
+        if !link.target.starts_with("http://") && !link.target.starts_with("https://") {
+            error!("Admin API: invalid target URL - {}", link.target);
+            return Ok(Self::error_response(
+                StatusCode::BAD_REQUEST,
+                "URL must start with http:// or https://",
+            ));
+        }
+
         // Parse expiration time
         let expires_at = match &link.expires_at {
             Some(expire_str) => match Self::parse_expires_at(expire_str) {
@@ -363,6 +374,15 @@ impl AdminService {
             code, link.target
         );
 
+        // Validate target URL
+        if !link.target.starts_with("http://") && !link.target.starts_with("https://") {
+            error!("Admin API: invalid target URL - {}", link.target);
+            return Ok(Self::error_response(
+                StatusCode::BAD_REQUEST,
+                "URL must start with http:// or https://",
+            ));
+        }
+
         // Get existing link to preserve creation time
         let existing_link = match storage.get(&code).await {
             Some(link) => link,
@@ -430,17 +450,218 @@ impl AdminService {
         let config = crate::config::get_config();
         let admin_token = &config.api.admin_token;
 
-        if login_body.password == *admin_token {
-            info!("Admin API: login successful");
-            Ok(Self::success_response(serde_json::json!({
-                "message": "Login successful"
-            })))
-        } else {
+        if login_body.password != *admin_token {
             error!("Admin API: login failed - invalid token");
-            Ok(Self::error_response(
+            return Ok(Self::error_response(
                 StatusCode::UNAUTHORIZED,
                 "Invalid admin token",
-            ))
+            ));
         }
+
+        info!("Admin API: login successful");
+
+        // Generate JWT tokens
+        let jwt_service = JwtService::from_config();
+        let access_token = match jwt_service.generate_access_token() {
+            Ok(token) => token,
+            Err(e) => {
+                error!("Admin API: failed to generate access token: {}", e);
+                return Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to generate token",
+                ));
+            }
+        };
+
+        let refresh_token = match jwt_service.generate_refresh_token() {
+            Ok(token) => token,
+            Err(e) => {
+                error!("Admin API: failed to generate refresh token: {}", e);
+                return Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to generate token",
+                ));
+            }
+        };
+
+        // Build cookies
+        let same_site = match config.api.cookie_same_site.to_lowercase().as_str() {
+            "strict" => SameSite::Strict,
+            "none" => SameSite::None,
+            _ => SameSite::Lax,
+        };
+
+        let mut access_cookie = Cookie::new(&config.api.access_cookie_name, access_token);
+        access_cookie.set_path("/");
+        access_cookie.set_http_only(true);
+        access_cookie.set_secure(config.api.cookie_secure);
+        access_cookie.set_same_site(same_site);
+        access_cookie.set_max_age(actix_web::cookie::time::Duration::minutes(
+            config.api.access_token_minutes as i64,
+        ));
+        if let Some(ref domain) = config.api.cookie_domain {
+            access_cookie.set_domain(domain.clone());
+        }
+
+        // Refresh cookie path is restricted to auth endpoints
+        let admin_prefix = &config.routes.admin_prefix;
+        let refresh_path = format!("{}/auth", admin_prefix);
+        let mut refresh_cookie = Cookie::new(&config.api.refresh_cookie_name, refresh_token);
+        refresh_cookie.set_path(&refresh_path);
+        refresh_cookie.set_http_only(true);
+        refresh_cookie.set_secure(config.api.cookie_secure);
+        refresh_cookie.set_same_site(same_site);
+        refresh_cookie.set_max_age(actix_web::cookie::time::Duration::days(
+            config.api.refresh_token_days as i64,
+        ));
+        if let Some(ref domain) = config.api.cookie_domain {
+            refresh_cookie.set_domain(domain.clone());
+        }
+
+        Ok(HttpResponse::Ok()
+            .cookie(access_cookie)
+            .cookie(refresh_cookie)
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .json(ApiResponse {
+                code: 0,
+                data: serde_json::json!({
+                    "message": "Login successful",
+                    "expires_in": config.api.access_token_minutes * 60
+                }),
+            }))
+    }
+
+    /// Refresh tokens endpoint
+    pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
+        let config = crate::config::get_config();
+
+        // Get refresh token from cookie
+        let refresh_token = match req.cookie(&config.api.refresh_cookie_name) {
+            Some(cookie) => cookie.value().to_string(),
+            None => {
+                warn!("Admin API: refresh token not found in cookie");
+                return Ok(Self::error_response(
+                    StatusCode::UNAUTHORIZED,
+                    "Refresh token not found",
+                ));
+            }
+        };
+
+        // Validate refresh token
+        let jwt_service = JwtService::from_config();
+        if let Err(e) = jwt_service.validate_refresh_token(&refresh_token) {
+            warn!("Admin API: invalid refresh token: {}", e);
+            return Ok(Self::error_response(
+                StatusCode::UNAUTHORIZED,
+                "Invalid refresh token",
+            ));
+        }
+
+        info!("Admin API: token refresh successful");
+
+        // Generate new tokens (sliding expiration)
+        let new_access_token = match jwt_service.generate_access_token() {
+            Ok(token) => token,
+            Err(e) => {
+                error!("Admin API: failed to generate access token: {}", e);
+                return Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to generate token",
+                ));
+            }
+        };
+
+        let new_refresh_token = match jwt_service.generate_refresh_token() {
+            Ok(token) => token,
+            Err(e) => {
+                error!("Admin API: failed to generate refresh token: {}", e);
+                return Ok(Self::error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to generate token",
+                ));
+            }
+        };
+
+        // Build cookies
+        let same_site = match config.api.cookie_same_site.to_lowercase().as_str() {
+            "strict" => SameSite::Strict,
+            "none" => SameSite::None,
+            _ => SameSite::Lax,
+        };
+
+        let mut access_cookie = Cookie::new(&config.api.access_cookie_name, new_access_token);
+        access_cookie.set_path("/");
+        access_cookie.set_http_only(true);
+        access_cookie.set_secure(config.api.cookie_secure);
+        access_cookie.set_same_site(same_site);
+        access_cookie.set_max_age(actix_web::cookie::time::Duration::minutes(
+            config.api.access_token_minutes as i64,
+        ));
+        if let Some(ref domain) = config.api.cookie_domain {
+            access_cookie.set_domain(domain.clone());
+        }
+
+        let admin_prefix = &config.routes.admin_prefix;
+        let refresh_path = format!("{}/auth", admin_prefix);
+        let mut refresh_cookie = Cookie::new(&config.api.refresh_cookie_name, new_refresh_token);
+        refresh_cookie.set_path(&refresh_path);
+        refresh_cookie.set_http_only(true);
+        refresh_cookie.set_secure(config.api.cookie_secure);
+        refresh_cookie.set_same_site(same_site);
+        refresh_cookie.set_max_age(actix_web::cookie::time::Duration::days(
+            config.api.refresh_token_days as i64,
+        ));
+        if let Some(ref domain) = config.api.cookie_domain {
+            refresh_cookie.set_domain(domain.clone());
+        }
+
+        Ok(HttpResponse::Ok()
+            .cookie(access_cookie)
+            .cookie(refresh_cookie)
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .json(ApiResponse {
+                code: 0,
+                data: serde_json::json!({
+                    "message": "Token refreshed",
+                    "expires_in": config.api.access_token_minutes * 60
+                }),
+            }))
+    }
+
+    /// Logout endpoint - clears cookies
+    pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
+        let config = crate::config::get_config();
+        info!("Admin API: logout");
+
+        // Create expired cookies to clear them
+        let mut access_cookie = Cookie::new(&config.api.access_cookie_name, "");
+        access_cookie.set_path("/");
+        access_cookie.set_http_only(true);
+        access_cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
+
+        let admin_prefix = &config.routes.admin_prefix;
+        let refresh_path = format!("{}/auth", admin_prefix);
+        let mut refresh_cookie = Cookie::new(&config.api.refresh_cookie_name, "");
+        refresh_cookie.set_path(&refresh_path);
+        refresh_cookie.set_http_only(true);
+        refresh_cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
+
+        Ok(HttpResponse::Ok()
+            .cookie(access_cookie)
+            .cookie(refresh_cookie)
+            .append_header(("Content-Type", "application/json; charset=utf-8"))
+            .json(ApiResponse {
+                code: 0,
+                data: serde_json::json!({
+                    "message": "Logout successful"
+                }),
+            }))
+    }
+
+    /// Verify token endpoint - if middleware passes, token is valid
+    pub async fn verify_token(_req: HttpRequest) -> ActixResult<impl Responder> {
+        Ok(Self::success_response(serde_json::json!({
+            "message": "Token is valid"
+        })))
     }
 }
