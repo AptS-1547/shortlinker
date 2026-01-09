@@ -54,7 +54,7 @@ impl HealthService {
 
         let is_healthy = storage_status["status"] == "healthy";
 
-        let health_response = json!({
+        let health_data = json!({
             "status": if is_healthy { "healthy" } else { "unhealthy" },
             "timestamp": now.to_rfc3339(),
             "uptime": uptime_seconds,
@@ -62,6 +62,11 @@ impl HealthService {
                 "storage": storage_status,
             },
             "response_time_ms": start_time.elapsed().as_millis()
+        });
+
+        let health_response = json!({
+            "code": if is_healthy { 0 } else { 1 },
+            "data": health_data
         });
 
         let response_status = if is_healthy {

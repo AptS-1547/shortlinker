@@ -83,7 +83,7 @@ where
             HttpResponse::Unauthorized()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
                 .json(serde_json::json!({
-                    "code": 401,
+                    "code": 1,
                     "data": { "error": "Unauthorized: Invalid or missing token" }
                 }))
                 .map_into_right_body(),
