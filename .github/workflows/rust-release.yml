@@ -30,15 +30,19 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'  # 使用 Node.js 20.x 版本
+        node-version: '24'  # 使用 Node.js 24.x 版本
+
+    - name: Install Bun
+      working-directory: admin-panel
+      run: npm install -g bun@latest
 
     - name: Install frontend dependencies
       working-directory: admin-panel
-      run: npm install
+      run: bun install --frozen-lockfile
 
     - name: Build frontend
       working-directory: admin-panel
-      run: npm run build:prod
+      run: bun run build
 
     - name: Package frontend
       run: |
