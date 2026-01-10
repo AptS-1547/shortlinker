@@ -1,11 +1,13 @@
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
+
+use arc_swap::ArcSwap;
 
 use super::AppConfig;
 
-static CONFIG: OnceLock<AppConfig> = OnceLock::new();
+static CONFIG: OnceLock<ArcSwap<AppConfig>> = OnceLock::new();
 static CONFIG_PATH: OnceLock<String> = OnceLock::new();
 
 impl AppConfig {
@@ -232,10 +234,14 @@ impl AppConfig {
 // Global configuration instance
 
 /// Get the global configuration instance
-pub fn get_config() -> &'static AppConfig {
+///
+/// Returns an Arc pointer to the configuration, which is cheap to clone
+/// and doesn't hold any locks.
+pub fn get_config() -> Arc<AppConfig> {
     CONFIG
         .get()
         .expect("Config not initialized. Call init_config() first.")
+        .load_full()
 }
 
 /// Initialize the global configuration
@@ -261,10 +267,94 @@ pub fn init_config(config_path: Option<String>) {
     }
 
     // Initialize the configuration
-    CONFIG.get_or_init(|| AppConfig::load(config_path.as_deref()));
+    CONFIG.get_or_init(|| ArcSwap::from_pointee(AppConfig::load(config_path.as_deref())));
 }
 
 /// Get the configuration file path that was used
 pub fn get_config_path() -> Option<&'static str> {
     CONFIG_PATH.get().map(|s| s.as_str())
+}
+
+/// Update configuration with a closure (for runtime updates)
+///
+/// This performs a copy-on-write update: clones the current config,
+/// applies the modification, then atomically replaces the old config.
+///
+/// # Arguments
+/// * `updater` - A closure that modifies the AppConfig
+///
+/// # Example
+/// ```no_run
+/// use shortlinker::config::update_config;
+/// update_config(|config| {
+///     config.api.admin_token = "new_token".to_string();
+/// });
+/// ```
+pub fn update_config<F>(updater: F)
+where
+    F: FnOnce(&mut AppConfig),
+{
+    let config = CONFIG
+        .get()
+        .expect("Config not initialized. Call init_config() first.");
+
+    // Clone current config, modify it, then atomically replace
+    let mut new_config = (*config.load_full()).clone();
+    updater(&mut new_config);
+    config.store(Arc::new(new_config));
+}
+
+/// Update a specific config field by key
+///
+/// Returns true if the key was found and updated, false otherwise.
+pub fn update_config_by_key(key: &str, value: &str) -> bool {
+    update_config(|config| {
+        match key {
+            // API 配置
+            "api.admin_token" => config.api.admin_token = value.to_string(),
+            "api.health_token" => config.api.health_token = value.to_string(),
+            "api.jwt_secret" => config.api.jwt_secret = value.to_string(),
+            "api.access_token_minutes" => {
+                if let Ok(v) = value.parse() {
+                    config.api.access_token_minutes = v;
+                }
+            }
+            "api.refresh_token_days" => {
+                if let Ok(v) = value.parse() {
+                    config.api.refresh_token_days = v;
+                }
+            }
+
+            // 功能配置
+            "features.random_code_length" => {
+                if let Ok(v) = value.parse() {
+                    config.features.random_code_length = v;
+                }
+            }
+            "features.default_url" => config.features.default_url = value.to_string(),
+            "features.enable_admin_panel" => {
+                config.features.enable_admin_panel =
+                    value == "true" || value == "1" || value == "yes";
+            }
+
+            // 点击统计配置
+            "click.enable_tracking" => {
+                config.click_manager.enable_click_tracking =
+                    value == "true" || value == "1" || value == "yes";
+            }
+            "click.flush_interval" => {
+                if let Ok(v) = value.parse() {
+                    config.click_manager.flush_interval = v;
+                }
+            }
+
+            // 路由配置 (requires_restart = true，但还是要更新内存)
+            "routes.admin_prefix" => config.routes.admin_prefix = value.to_string(),
+            "routes.health_prefix" => config.routes.health_prefix = value.to_string(),
+            "routes.frontend_prefix" => config.routes.frontend_prefix = value.to_string(),
+
+            _ => (),
+        }
+    });
+    true
 }

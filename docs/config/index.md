@@ -1,40 +1,74 @@
-# 环境变量配置
+# 配置指南
 
-Shortlinker 通过环境变量进行配置，支持 `.env` 文件和系统环境变量。
+Shortlinker 的配置分为两类：
+
+- **启动配置**：存储在 `config.toml` 文件中，修改后需要重启服务
+- **动态配置**：存储在数据库中，可通过管理面板在运行时修改
+
+## 配置架构
+
+```
+config.toml (启动时读取)
+       ↓
+   数据库 (持久化存储)
+       ↓
+  RuntimeConfig (内存缓存)
+       ↓
+   AppConfig (全局配置)
+       ↓
+    业务逻辑
+```
+
+首次启动时，动态配置会从 `config.toml` 或环境变量迁移到数据库。之后，数据库中的配置优先。
 
 ## 配置方式
 
-### TOML 配置文件（推荐）
+### TOML 配置文件（启动配置）
+
 ```toml
 # config.toml
 [server]
 host = "127.0.0.1"
 port = 8080
 
-[storage]
-type = "sqlite"
+[database]
 database_url = "shortlinks.db"
+
+[cache]
+type = "memory"
 
 [logging]
 level = "info"
 ```
 
-### .env 文件
+### 环境变量
+
 ```bash
-# .env
+# .env 或系统环境变量
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
-DEFAULT_URL=https://example.com
+DATABASE_URL=shortlinks.db
 ```
 
-### 系统环境变量
+### 管理面板（动态配置）
+
+通过 Web 管理面板或 API 修改动态配置：
+
 ```bash
-export SERVER_HOST=0.0.0.0
-export SERVER_PORT=8080
-./shortlinker
+# 获取所有配置
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/config
+
+# 更新配置
+curl -X PUT \
+     -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"value": "8"}' \
+     http://localhost:8080/admin/config/features.random_code_length
 ```
 
-## 配置参数
+## 启动配置参数
+
+这些配置存储在 `config.toml` 中，修改后需要重启服务。
 
 ### 服务器配置
 
@@ -43,51 +77,92 @@ export SERVER_PORT=8080
 | `SERVER_HOST` | String | `127.0.0.1` | 监听地址 |
 | `SERVER_PORT` | Integer | `8080` | 监听端口 |
 | `UNIX_SOCKET` | String | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
-| `CPU_COUNT` | Integer | *(自动)* | 工作线程数量（默认为CPU核心数） |
-| `DEFAULT_URL` | String | `https://esap.cc/repo` | 根路径重定向地址 |
-| `RANDOM_CODE_LENGTH` | Integer | `6` | 随机短码长度 |
+| `CPU_COUNT` | Integer | *(自动)* | 工作线程数量（默认为 CPU 核心数） |
 
-### 存储配置
+### 数据库配置
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `STORAGE_BACKEND` | String | `sqlite` | 存储类型：`sqlite`、`postgres`、`mysql`、`mariadb` |
 | `DATABASE_URL` | String | `shortlinks.db` | 数据库连接 URL 或文件路径 |
+| `DATABASE_POOL_SIZE` | Integer | `10` | 数据库连接池大小 |
+| `DATABASE_TIMEOUT` | Integer | `30` | 数据库连接超时（秒） |
 
 > 详细的存储后端配置请参考 [存储后端](/config/storage)
 
-### API 配置
+### 缓存配置
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `ADMIN_TOKEN` | String | *(空)* | Admin API 鉴权令牌，**为空时禁用** |
-| `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API 路由前缀 |
-| `HEALTH_TOKEN` | String | *(空)* | 健康检查 API 鉴权令牌，**为空时禁用** |
-| `HEALTH_ROUTE_PREFIX` | String | `/health` | 健康检查 API 路由前缀 |
-| `ENABLE_ADMIN_PANEL` | Boolean | `false` | 启用 Web 管理界面（需先构建且需同时设置 ADMIN_TOKEN） |
-| `FRONTEND_ROUTE_PREFIX` | String | `/panel` | Web 管理界面路由前缀 |
-
-> **注意**：Web 管理界面是新推出的特性，可能仍在完善中。
-
-### 点击统计配置
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `ENABLE_CLICK_TRACKING` | Boolean | `true` | 启用点击统计功能 |
-| `CLICK_FLUSH_INTERVAL` | Integer | `30` | 点击计数刷新间隔（秒） |
-| `MAX_CLICKS_BEFORE_FLUSH` | Integer | `100` | 点击上限（达到时触发刷新） |
-
-> 详细的 API 配置请参考 [Admin API](/api/admin) 和 [健康检查 API](/api/health)
+| `CACHE_TYPE` | String | `memory` | 缓存类型：memory, redis |
+| `CACHE_DEFAULT_TTL` | Integer | `3600` | 默认缓存过期时间（秒） |
+| `REDIS_URL` | String | `redis://127.0.0.1:6379/` | Redis 连接地址 |
+| `REDIS_KEY_PREFIX` | String | `shortlinker:` | Redis 键前缀 |
+| `MEMORY_MAX_CAPACITY` | Integer | `10000` | 内存缓存最大容量 |
 
 ### 日志配置
 
-| 参数 | 类型 | 默认值 | 可选值 |
-|------|------|--------|-------|
-| `RUST_LOG` | String | `info` | `error`, `warn`, `info`, `debug`, `trace` |
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `RUST_LOG` | String | `info` | 日志等级：error, warn, info, debug, trace |
+| `LOG_FORMAT` | String | `text` | 日志格式：text, json |
+| `LOG_FILE` | String | *(空)* | 日志文件路径（空则输出到控制台） |
+
+## 动态配置参数
+
+这些配置存储在数据库中，可通过管理面板在运行时修改。
+
+### API 配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `api.admin_token` | String | *(空)* | 否 | 管理 API 令牌 |
+| `api.health_token` | String | *(空)* | 否 | 健康检查令牌 |
+| `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
+| `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
+| `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
+| `api.access_cookie_name` | String | `shortlinker_access` | 是 | Access Token Cookie 名称 |
+| `api.refresh_cookie_name` | String | `shortlinker_refresh` | 是 | Refresh Token Cookie 名称 |
+| `api.cookie_secure` | Boolean | `false` | 是 | 是否仅 HTTPS 传输 |
+| `api.cookie_same_site` | String | `Lax` | 是 | Cookie SameSite 策略 |
+| `api.cookie_domain` | String | *(空)* | 是 | Cookie 域名 |
+
+### 路由配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `routes.admin_prefix` | String | `/admin` | 是 | 管理 API 路由前缀 |
+| `routes.health_prefix` | String | `/health` | 是 | 健康检查路由前缀 |
+| `routes.frontend_prefix` | String | `/panel` | 是 | 前端面板路由前缀 |
+
+### 功能配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `features.enable_admin_panel` | Boolean | `false` | 是 | 启用 Web 管理面板 |
+| `features.random_code_length` | Integer | `6` | 否 | 随机短码长度 |
+| `features.default_url` | String | `https://esap.cc/repo` | 否 | 默认跳转 URL |
+
+### 点击统计配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `click.enable_tracking` | Boolean | `true` | 否 | 启用点击统计 |
+| `click.flush_interval` | Integer | `30` | 否 | 刷新间隔（秒） |
+| `click.max_clicks_before_flush` | Integer | `100` | 否 | 刷新前最大点击数 |
+
+## 配置优先级
+
+1. **数据库配置**（动态配置，最高优先级）
+2. **环境变量**
+3. **TOML 配置文件**
+4. **程序默认值**（最低优先级）
+
+> **注意**：动态配置只在首次启动时从环境变量/TOML 迁移到数据库。之后，数据库中的值优先。
 
 ## 配置示例
 
 ### 开发环境
+
 ```bash
 # 基础配置
 SERVER_HOST=127.0.0.1
@@ -95,100 +170,84 @@ SERVER_PORT=8080
 RUST_LOG=debug
 
 # 存储配置 - SQLite 便于调试
-STORAGE_BACKEND=sqlite
 DATABASE_URL=dev-links.db
 
-# API 配置 - 开发环境使用简单token
+# API 配置 - 开发环境使用简单 token
 ADMIN_TOKEN=dev_admin
 HEALTH_TOKEN=dev_health
 ```
 
 ### 生产环境
-```bash
-# 基础配置
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-CPU_COUNT=8
-RUST_LOG=info
-DEFAULT_URL=https://your-domain.com
 
-# 存储配置 - SQLite 生产级性能
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+```toml
+# config.toml
+[server]
+host = "127.0.0.1"
+port = 8080
+cpu_count = 8
 
-# API 配置 - 使用强密码
-ADMIN_TOKEN=very_secure_production_token_456
-HEALTH_TOKEN=very_secure_health_token_789
+[database]
+database_url = "/data/shortlinks.db"
+pool_size = 20
+timeout = 60
+
+[cache]
+type = "memory"
+default_ttl = 7200
+
+[cache.memory]
+max_capacity = 50000
+
+[logging]
+level = "info"
+format = "json"
+file = "/var/log/shortlinker/app.log"
+enable_rotation = true
 ```
 
 ### Docker 环境
+
 ```bash
-# 服务器配置 - TCP
+# 服务器配置
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 CPU_COUNT=4
 
-# 服务器配置 - Unix 套接字
-# UNIX_SOCKET=/tmp/shortlinker.sock
-
 # 存储配置
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+DATABASE_URL=/data/links.db
 
-# API 配置
-ADMIN_TOKEN=docker_admin_token_123
-HEALTH_TOKEN=docker_health_token_456
+# 首次启动时的动态配置
+ADMIN_TOKEN=secure_admin_token_here
+HEALTH_TOKEN=secure_health_token_here
+JWT_SECRET=your_production_jwt_secret
+ENABLE_ADMIN_PANEL=true
 ```
 
-### 最小配置（仅重定向功能）
-```bash
-# 只提供重定向服务，不启用管理功能
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-# 不设置 ADMIN_TOKEN 和 HEALTH_TOKEN
-```
+## 热重载
 
-## API 访问控制
+### 支持热重载的配置
 
-| 场景 | ADMIN_TOKEN | HEALTH_TOKEN | 说明 |
-|------|-------------|--------------|------|
-| **仅运行服务** | 不设置 | 不设置 | 最安全，仅提供重定向功能 |
-| **运行+管理** | 设置 | 不设置 | 启用管理功能 |
-| **运行+监控** | 不设置 | 设置 | 启用监控功能 |
-| **完整功能** | 设置 | 设置 | 启用所有功能 |
+- ✅ 大部分动态配置（标记为"不需要重启"的）
+- ✅ 短链接数据
 
-## 配置优先级
+### 不支持热重载的配置
 
-1. **命令行环境变量**（最高）
-2. **系统环境变量**
-3. **`.env` 文件**
-4. **程序默认值**（最低）
-
-## 配置验证
-
-启动时会显示当前配置状态：
-
-```bash
-[INFO] Starting server at http://127.0.0.1:8080
-[INFO] SQLite storage initialized with 0 links
-[INFO] Admin API available at: /admin
-[INFO] Health API available at: /health
-```
-
-## 配置更新
-
-### 支持热重载
-- ✅ 存储文件内容变更
-- ❌ 服务器地址和端口（需重启）
-- ❌ API 配置（需重启）
+- ❌ 服务器地址和端口
+- ❌ 数据库连接
+- ❌ 缓存类型
+- ❌ 路由前缀
+- ❌ Cookie 配置
 
 ### 重载方法
+
 ```bash
-# Unix 系统
+# Unix 系统 - 发送 SIGUSR1 信号
 kill -USR1 $(cat shortlinker.pid)
 
-# Windows 系统  
-echo "" > shortlinker.reload
+# 通过 API
+curl -X POST \
+     -H "Authorization: Bearer $ADMIN_TOKEN" \
+     http://localhost:8080/admin/config/reload
 ```
 
 ## 下一步

@@ -206,7 +206,7 @@ You can specify a custom configuration file path using the `-c` or `--config` pa
 
 ### TOML Configuration File
 
-Create a `config.toml` file:
+Create a `config.toml` file for **startup-only** settings. Other settings (API, routes, features) are stored in the database and can be modified via the admin panel at runtime.
 
 ```toml
 [server]
@@ -250,50 +250,22 @@ pool_size = 10
 # Memory cache maximum capacity (entries)
 max_capacity = 10000
 
-[api]
-# Admin API Token (leave empty to disable admin API)
-admin_token = ""
-# Health check API Token (leave empty to use admin_token)
-health_token = ""
-
-# JWT Configuration (for Web admin panel authentication)
-# JWT secret key (MUST change in production!)
-jwt_secret = "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND"
-# Access Token expiration (minutes)
-access_token_minutes = 15
-# Refresh Token expiration (days)
-refresh_token_days = 7
-
-# Cookie Configuration
-access_cookie_name = "shortlinker_access"
-refresh_cookie_name = "shortlinker_refresh"
-# Set to true for HTTPS-only cookies (recommended for production)
-cookie_secure = false
-# Cookie SameSite policy: Strict, Lax, None
-cookie_same_site = "Lax"
-# Cookie domain (leave empty for current domain)
-# cookie_domain = ".example.com"
-
-[routes]
-# Admin API route prefix
-admin_prefix = "/admin"
-# Health check route prefix
-health_prefix = "/health"
-# Frontend panel route prefix
-frontend_prefix = "/panel"
-
-[features]
-# Whether to enable Web admin panel
-enable_admin_panel = false
-# Random short code length
-random_code_length = 6
-# Default redirect URL
-default_url = "https://esap.cc/repo"
-
 [logging]
 # Log level: trace, debug, info, warn, error
 level = "info"
+# Log output format: text, json
+format = "text"
+# Log file path (leave empty to output to console)
+# file = "shortlinker.log"
+# Max log file size (MB)
+max_size = 100
+# Number of log files to keep
+max_backups = 5
+# Enable log rotation
+enable_rotation = true
 ```
+
+> 💡 **Note**: API tokens, JWT settings, route prefixes, and feature flags are now stored in the database. On first startup, they will be migrated from `config.toml` (if present) to the database. After that, modify them via the admin panel.
 
 **Configuration file loading:**
 
@@ -309,14 +281,16 @@ When no parameter is specified:
 
 Still supports the original environment variable configuration method. **Environment variables will override TOML configuration:**
 
+#### Startup Configuration (requires restart)
+
 | Variable               | Default                  | Description                                 |
 | ---------------------- | ------------------------ | ------------------------------------------- |
 | `SERVER_HOST`        | `127.0.0.1`            | Listen address                              |
 | `SERVER_PORT`        | `8080`                 | Listen port                                 |
 | `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
 | `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `DATABASE_BACKEND`   | *(auto-detect)*        | Storage type: sqlite, postgres, mysql, mariadb. **OPTIONAL**: Auto-detected from DATABASE_URL if not set |
-| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path. **Supports auto-detection** from URL scheme |
+| `DATABASE_BACKEND`   | *(auto-detect)*        | Storage type: sqlite, postgres, mysql, mariadb |
+| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path                   |
 | `DATABASE_POOL_SIZE` | `10`                   | Database connection pool size               |
 | `DATABASE_TIMEOUT`   | `30`                   | Database connection timeout (seconds)       |
 | `CACHE_TYPE`         | `memory`               | Cache type: memory, redis                   |
@@ -325,6 +299,14 @@ Still supports the original environment variable configuration method. **Environ
 | `REDIS_KEY_PREFIX`   | `shortlinker:`         | Redis key prefix                            |
 | `REDIS_POOL_SIZE`    | `10`                   | Redis connection pool size                  |
 | `MEMORY_MAX_CAPACITY`| `10000`                | Memory cache max capacity (entries)         |
+| `RUST_LOG`           | `info`                 | Log level                                   |
+
+#### Dynamic Configuration (stored in database, modifiable via admin panel)
+
+These settings are migrated to the database on first startup. Use the admin panel or API to modify them at runtime.
+
+| Variable               | Default                  | Description                                 |
+| ---------------------- | ------------------------ | ------------------------------------------- |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
 | `JWT_SECRET`         | *(auto-generated)*     | JWT secret key (change in production!)      |
@@ -341,9 +323,11 @@ Still supports the original environment variable configuration method. **Environ
 | `ENABLE_ADMIN_PANEL` | `false`                | Enable web admin panel                      |
 | `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
 | `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
-| `RUST_LOG`           | `info`                 | Log level                                   |
+| `ENABLE_CLICK_TRACKING` | `true`              | Enable click tracking                       |
+| `CLICK_FLUSH_INTERVAL` | `30`                 | Click flush interval (seconds)              |
+| `MAX_CLICKS_BEFORE_FLUSH` | `100`             | Max clicks before flush                     |
 
-> **Note**: The web admin panel is a new feature and may be unstable.
+> **Note**: Dynamic configuration is only read from environment variables on **first startup** (when the database is empty). After that, modify them via the admin panel.
 
 ### .env Example
 
@@ -359,7 +343,6 @@ CPU_COUNT=4
 # Storage (DATABASE_BACKEND is optional - auto-detected from DATABASE_URL)
 # SQLite (file path or URL)
 DATABASE_URL=data/links.db
-# Or: DATABASE_URL=sqlite://data/links.db
 
 # PostgreSQL
 # DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
@@ -367,24 +350,14 @@ DATABASE_URL=data/links.db
 # MySQL
 # DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
 
-# MariaDB
-# DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
+# Logging
+RUST_LOG=info
 
-# APIs
+# The following settings are only used on FIRST startup (migrated to database)
+# After that, modify them via the admin panel
 ADMIN_TOKEN=your_admin_token
 HEALTH_TOKEN=your_health_token
-
-# JWT (for Web admin panel)
 JWT_SECRET=your_jwt_secret_change_in_production
-ACCESS_TOKEN_MINUTES=15
-REFRESH_TOKEN_DAYS=7
-COOKIE_SECURE=false
-COOKIE_SAME_SITE=Lax
-
-# Features
-DEFAULT_URL=https://example.com
-RANDOM_CODE_LENGTH=8
-RUST_LOG=info
 ```
 
 ## Storage Backends

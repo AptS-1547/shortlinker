@@ -196,7 +196,7 @@ curl http://localhost:8080/health/live
 
 ### TOML 配置文件
 
-创建 `config.toml` 文件：
+创建 `config.toml` 文件，用于**启动时必需的配置**。其他配置（API、路由、功能等）存储在数据库中，可通过管理面板在运行时修改。
 
 ```toml
 [server]
@@ -240,50 +240,22 @@ pool_size = 10
 # 内存缓存最大容量（条目数）
 max_capacity = 10000
 
-[api]
-# 管理 API Token（留空禁用管理 API）
-admin_token = ""
-# 健康检查 API Token（留空则使用 admin_token）
-health_token = ""
-
-# JWT 配置（用于 Web 管理面板认证）
-# JWT 密钥（生产环境务必修改！）
-jwt_secret = "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND"
-# Access Token 有效期（分钟）
-access_token_minutes = 15
-# Refresh Token 有效期（天）
-refresh_token_days = 7
-
-# Cookie 配置
-access_cookie_name = "shortlinker_access"
-refresh_cookie_name = "shortlinker_refresh"
-# 是否仅通过 HTTPS 传输（生产环境建议启用）
-cookie_secure = false
-# Cookie SameSite 策略：Strict, Lax, None
-cookie_same_site = "Lax"
-# Cookie 域名（留空则使用当前域名）
-# cookie_domain = ".example.com"
-
-[routes]
-# 管理 API 路由前缀
-admin_prefix = "/admin"
-# 健康检查路由前缀
-health_prefix = "/health"
-# 前端面板路由前缀
-frontend_prefix = "/panel"
-
-[features]
-# 是否启用 Web 管理面板
-enable_admin_panel = false
-# 随机短码长度
-random_code_length = 6
-# 默认跳转 URL
-default_url = "https://esap.cc/repo"
-
 [logging]
 # 日志等级：trace, debug, info, warn, error
 level = "info"
+# 日志输出格式：text, json
+format = "text"
+# 日志文件路径（不设置则输出到控制台）
+# file = "shortlinker.log"
+# 日志文件最大大小（MB）
+max_size = 100
+# 保留的日志文件数量
+max_backups = 5
+# 是否启用日志轮转
+enable_rotation = true
 ```
+
+> 💡 **注意**：API 令牌、JWT 设置、路由前缀和功能开关现在存储在数据库中。首次启动时，会从 `config.toml`（如果存在）迁移到数据库。之后请通过管理面板修改。
 
 **配置文件加载规则：**
 
@@ -299,14 +271,16 @@ level = "info"
 
 仍然支持原有的环境变量配置方式，**环境变量会覆盖 TOML 配置**：
 
+#### 启动配置（需要重启）
+
 | 变量                      | 默认值                     | 说明                                        |
 | ----------------------- | ------------------------ | ------------------------------------------- |
 | `SERVER_HOST`           | `127.0.0.1`             | 监听地址                                      |
 | `SERVER_PORT`           | `8080`                  | 监听端口                                      |
-| `UNIX_SOCKET`           | *(empty)*               | Unix Socket 路径（会覆盖 HOST/PORT）            |
-| `CPU_COUNT`             | *(auto)*                | 工作线程数（默认为 CPU 核心数）                      |
-| `DATABASE_BACKEND`      | *(auto-detect)*         | 存储类型：sqlite, postgres, mysql, mariadb。**可选**：不设置则从 DATABASE_URL 自动检测 |
-| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径。**支持自动检测** URL scheme    |
+| `UNIX_SOCKET`           | *(空)*                   | Unix Socket 路径（会覆盖 HOST/PORT）            |
+| `CPU_COUNT`             | *(自动)*                  | 工作线程数（默认为 CPU 核心数）                      |
+| `DATABASE_BACKEND`      | *(自动检测)*               | 存储类型：sqlite, postgres, mysql, mariadb      |
+| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径                            |
 | `DATABASE_POOL_SIZE`    | `10`                    | 数据库连接池大小                                 |
 | `DATABASE_TIMEOUT`      | `30`                    | 数据库连接超时（秒）                              |
 | `CACHE_TYPE`            | `memory`                | 缓存类型：memory, redis                       |
@@ -315,23 +289,35 @@ level = "info"
 | `REDIS_KEY_PREFIX`      | `shortlinker:`          | Redis 键前缀                                 |
 | `REDIS_POOL_SIZE`       | `10`                    | Redis 连接池大小                              |
 | `MEMORY_MAX_CAPACITY`   | `10000`                 | 内存缓存最大容量（条目数）                          |
-| `ADMIN_TOKEN`           | *(empty)*               | 管理 API 密钥                                |
-| `HEALTH_TOKEN`          | *(empty)*               | 健康检查密钥                                   |
-| `JWT_SECRET`            | *(auto-generated)*      | JWT 密钥（生产环境务必修改！）                   |
+| `RUST_LOG`              | `info`                  | 日志等级                                     |
+
+#### 动态配置（存储在数据库，可通过管理面板修改）
+
+这些配置在首次启动时迁移到数据库。之后可通过管理面板或 API 在运行时修改。
+
+| 变量                      | 默认值                     | 说明                                        |
+| ----------------------- | ------------------------ | ------------------------------------------- |
+| `ADMIN_TOKEN`           | *(空)*                   | 管理 API 密钥                                |
+| `HEALTH_TOKEN`          | *(空)*                   | 健康检查密钥                                   |
+| `JWT_SECRET`            | *(自动生成)*               | JWT 密钥（生产环境务必修改！）                   |
 | `ACCESS_TOKEN_MINUTES`  | `15`                    | Access Token 有效期（分钟）                    |
 | `REFRESH_TOKEN_DAYS`    | `7`                     | Refresh Token 有效期（天）                     |
 | `ACCESS_COOKIE_NAME`    | `shortlinker_access`    | Access Token Cookie 名称                      |
 | `REFRESH_COOKIE_NAME`   | `shortlinker_refresh`   | Refresh Token Cookie 名称                     |
 | `COOKIE_SECURE`         | `false`                 | 是否仅 HTTPS 传输（生产环境建议启用）             |
 | `COOKIE_SAME_SITE`      | `Lax`                   | Cookie SameSite 策略                          |
-| `COOKIE_DOMAIN`         | *(empty)*               | Cookie 域名                                   |
+| `COOKIE_DOMAIN`         | *(空)*                   | Cookie 域名                                   |
 | `ADMIN_ROUTE_PREFIX`    | `/admin`                | 管理 API 路由前缀                             |
 | `HEALTH_ROUTE_PREFIX`   | `/health`               | 健康检查路由前缀                                |
 | `FRONTEND_ROUTE_PREFIX` | `/panel`                | Web 管理面板路由前缀                            |
 | `ENABLE_ADMIN_PANEL`    | `false`                 | 启用 Web 管理面板                             |
 | `RANDOM_CODE_LENGTH`    | `6`                     | 随机短码长度                                   |
 | `DEFAULT_URL`           | `https://esap.cc/repo`  | 默认跳转 URL                                 |
-| `RUST_LOG`              | `info`                  | 日志等级                                     |
+| `ENABLE_CLICK_TRACKING` | `true`                  | 启用点击统计                                   |
+| `CLICK_FLUSH_INTERVAL`  | `30`                    | 点击刷新间隔（秒）                              |
+| `MAX_CLICKS_BEFORE_FLUSH` | `100`                 | 刷新前最大点击数                               |
+
+> **注意**：动态配置仅在**首次启动**（数据库为空时）从环境变量读取。之后请通过管理面板修改。
 
 ---
 

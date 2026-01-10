@@ -10,6 +10,7 @@ use tracing::{debug, warn};
 use crate::api::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::api::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
+    admin::{get_all_configs, get_config, get_config_history, reload_config, update_config},
 };
 use crate::runtime::lifetime;
 
@@ -116,7 +117,16 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                     )
                     .route("/auth/refresh", web::post().to(AdminService::refresh_token))
                     .route("/auth/logout", web::post().to(AdminService::logout))
-                    .route("/auth/verify", web::get().to(AdminService::verify_token)),
+                    .route("/auth/verify", web::get().to(AdminService::verify_token))
+                    // Config management endpoints
+                    .route("/config", web::get().to(get_all_configs))
+                    .route("/config/reload", web::post().to(reload_config))
+                    .route(
+                        "/config/{key:.*}/history",
+                        web::get().to(get_config_history),
+                    )
+                    .route("/config/{key:.*}", web::get().to(get_config))
+                    .route("/config/{key:.*}", web::put().to(update_config)),
             )
             .service(
                 web::scope(&health_prefix)

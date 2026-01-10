@@ -1,8 +1,8 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
-use crate::config::get_config;
-use crate::storage::{SeaOrmStorage, StorageFactory};
+use crate::config::{get_config, init_runtime_config, migrate_config_to_db};
+use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -44,14 +44,39 @@ pub async fn prepare_server_startup() -> StartupContext {
         storage.get_backend_config().await.storage_type
     );
 
-    // 初始化点击计数器
+    // 初始化运行时配置系统
+    {
+        let db = storage.get_db().clone();
+        let file_config = get_config();
+
+        // 创建配置存储
+        let config_store = ConfigStore::new(db.clone());
+
+        // 从文件配置迁移到数据库（首次启动时）
+        migrate_config_to_db(&file_config, &config_store)
+            .await
+            .expect("Failed to migrate config to database");
+
+        // 初始化运行时配置缓存
+        init_runtime_config(db)
+            .await
+            .expect("Failed to initialize runtime config");
+
+        debug!("Runtime config system initialized");
+    }
+
+    // 初始化点击计数器（配置已从数据库加载到 AppConfig）
     let config = get_config();
-    if config.click_manager.enable_click_tracking {
+    let enable_click_tracking = config.click_manager.enable_click_tracking;
+    let flush_interval = config.click_manager.flush_interval;
+    let max_clicks_before_flush = config.click_manager.max_clicks_before_flush;
+
+    if enable_click_tracking {
         if let Some(sink) = storage.as_click_sink() {
             let mgr = Arc::new(ClickManager::new(
                 sink,
-                Duration::from_secs(config.click_manager.flush_interval),
-                config.click_manager.max_clicks_before_flush as usize,
+                Duration::from_secs(flush_interval),
+                max_clicks_before_flush as usize,
             ));
             set_global_click_manager(mgr.clone());
 
@@ -63,7 +88,7 @@ pub async fn prepare_server_startup() -> StartupContext {
 
             debug!(
                 "ClickManager initialized with {} seconds and {} max clicks before flush",
-                config.click_manager.flush_interval, config.click_manager.max_clicks_before_flush
+                flush_interval, max_clicks_before_flush
             );
         } else {
             warn!("Click sink is not available, ClickManager will not be initialized");
@@ -91,7 +116,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     #[cfg(any(feature = "cli", feature = "tui"))]
     crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;
 
-    // 提取路由配置
+    // 提取路由配置（配置已从数据库加载到 AppConfig）
     let config = get_config();
     let route_config = RouteConfig {
         admin_prefix: config.routes.admin_prefix.clone(),
@@ -111,6 +136,7 @@ pub async fn prepare_server_startup() -> StartupContext {
 
 fn check_compoment_enabled(route_config: &RouteConfig) {
     let config = get_config();
+
     // 检查 Admin API 是否启用
     let admin_token = &config.api.admin_token;
     if admin_token.is_empty() {

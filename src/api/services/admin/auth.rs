@@ -5,6 +5,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use tracing::{error, info, warn};
 
 use crate::api::jwt::JwtService;
+use crate::config::get_config;
 
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, LoginCredentials};
@@ -14,7 +15,7 @@ pub async fn check_admin_token(
     _req: HttpRequest,
     login_body: web::Json<LoginCredentials>,
 ) -> ActixResult<impl Responder> {
-    let config = crate::config::get_config();
+    let config = get_config();
     let admin_token = &config.api.admin_token;
 
     if login_body.password != *admin_token {

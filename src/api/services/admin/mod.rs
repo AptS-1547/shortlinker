@@ -4,9 +4,11 @@
 //! - 认证（登录、登出、token 刷新）
 //! - 链接 CRUD 操作
 //! - 批量操作
+//! - 配置管理
 
 mod auth;
 mod batch_ops;
+mod config_ops;
 mod helpers;
 mod link_crud;
 mod types;
@@ -26,13 +28,15 @@ pub use link_crud::{delete_link, get_all_links, get_link, get_stats, post_link, 
 // 重新导出批量操作端点
 pub use batch_ops::{batch_create_links, batch_delete_links, batch_update_links};
 
-use std::sync::OnceLock;
-
-static RANDOM_CODE_LENGTH: OnceLock<usize> = OnceLock::new();
+// 重新导出配置管理端点
+pub use config_ops::{
+    ConfigHistoryResponse, ConfigItemResponse, ConfigUpdateRequest, ConfigUpdateResponse,
+    get_all_configs, get_config, get_config_history, reload_config, update_config,
+};
 
 /// 获取随机码长度配置
 pub(crate) fn get_random_code_length() -> usize {
-    *RANDOM_CODE_LENGTH.get_or_init(|| crate::config::get_config().features.random_code_length)
+    crate::config::get_config().features.random_code_length
 }
 
 /// AdminService 结构体，保持向后兼容

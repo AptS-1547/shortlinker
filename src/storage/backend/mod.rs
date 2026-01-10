@@ -397,6 +397,11 @@ impl SeaOrmStorage {
     pub fn as_click_sink(&self) -> Option<Arc<dyn ClickSink>> {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
     }
+
+    /// 获取数据库连接（用于配置系统等需要直接访问数据库的场景）
+    pub fn get_db(&self) -> &DatabaseConnection {
+        &self.db
+    }
 }
 
 #[async_trait]

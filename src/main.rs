@@ -79,9 +79,9 @@ async fn main() -> anyhow::Result<()> {
         #[cfg(feature = "server")]
         crate::runtime::modes::Mode::Server => {
             // Initialize logging system based on config
-            let _log_guard = crate::system::logging::init_logging(config);
+            let _log_guard = crate::system::logging::init_logging(&config);
 
-            if let Err(e) = crate::runtime::modes::run_server(config).await {
+            if let Err(e) = crate::runtime::modes::run_server(&config).await {
                 // 尝试转换为 ShortlinkerError 以获得更好的显示
                 eprintln!("Server error: {:#}", e);
                 std::process::exit(1);

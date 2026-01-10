@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::errors::Result;
 
 pub mod backend;
+pub mod config_store;
 pub mod models;
 
 pub use backend::{LinkFilter, SeaOrmStorage};
+pub use config_store::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 pub use models::{LinkStats, ShortLink};
 
 pub struct StorageFactory;

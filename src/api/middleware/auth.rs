@@ -10,6 +10,7 @@ use std::rc::Rc;
 use tracing::{trace, warn};
 
 use crate::api::jwt::JwtService;
+use crate::config::get_config;
 
 /// Admin authentication middleware
 #[derive(Clone)]
@@ -27,15 +28,11 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = crate::config::get_config();
+        let config = get_config();
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
             admin_prefix: config.routes.admin_prefix.clone(),
-            admin_token: config.api.admin_token.clone(),
             access_cookie_name: config.api.access_cookie_name.clone(),
-            jwt_secret: config.api.jwt_secret.clone(),
-            access_token_minutes: config.api.access_token_minutes,
-            refresh_token_days: config.api.refresh_token_days,
         }))
     }
 }
@@ -43,11 +40,7 @@ where
 pub struct AdminAuthMiddleware<S> {
     service: Rc<S>,
     admin_prefix: String,
-    admin_token: String,
     access_cookie_name: String,
-    jwt_secret: String,
-    access_token_minutes: u64,
-    refresh_token_days: u64,
 }
 
 impl<S, B> AdminAuthMiddleware<S>
@@ -91,18 +84,13 @@ where
     }
 
     /// Validate JWT from Cookie
-    fn validate_jwt_cookie(
-        req: &ServiceRequest,
-        cookie_name: &str,
-        jwt_secret: &str,
-        access_token_minutes: u64,
-        refresh_token_days: u64,
-    ) -> bool {
+    fn validate_jwt_cookie(req: &ServiceRequest, cookie_name: &str) -> bool {
         // Try to get the access token from cookie
         let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
 
         if let Some(token) = cookie_token {
-            let jwt_service = JwtService::new(jwt_secret, access_token_minutes, refresh_token_days);
+            // 每次验证都从最新配置读取 jwt_secret
+            let jwt_service = JwtService::from_config();
             match jwt_service.validate_access_token(&token) {
                 Ok(_claims) => {
                     trace!("JWT validation successful");
@@ -158,14 +146,14 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
-        let admin_token = self.admin_token.clone();
         let admin_prefix = self.admin_prefix.clone();
         let access_cookie_name = self.access_cookie_name.clone();
-        let jwt_secret = self.jwt_secret.clone();
-        let access_token_minutes = self.access_token_minutes;
-        let refresh_token_days = self.refresh_token_days;
 
         Box::pin(async move {
+            // 每次请求都读取最新配置
+            let config = get_config();
+            let admin_token = &config.api.admin_token;
+
             // Check if admin token is configured
             if admin_token.is_empty() {
                 return Ok(Self::handle_missing_token(req));
@@ -198,13 +186,7 @@ where
             }
 
             // Validate JWT from cookie
-            if !Self::validate_jwt_cookie(
-                &req,
-                &access_cookie_name,
-                &jwt_secret,
-                access_token_minutes,
-                refresh_token_days,
-            ) {
+            if !Self::validate_jwt_cookie(&req, &access_cookie_name) {
                 return Ok(Self::handle_unauthorized(req));
             }
 

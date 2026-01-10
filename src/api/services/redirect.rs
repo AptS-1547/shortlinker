@@ -2,17 +2,14 @@
 
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, Responder, web};
-use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tracing::{debug, trace};
 
 use crate::analytics::global::get_click_manager;
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
+use crate::config::get_config;
 use crate::storage::{SeaOrmStorage, ShortLink};
-
-static DEFAULT_REDIRECT_URL: Lazy<String> =
-    Lazy::new(|| crate::config::get_config().features.default_url.clone());
 
 pub struct RedirectService {}
 
@@ -25,8 +22,9 @@ impl RedirectService {
         let captured_path = path.into_inner();
 
         if captured_path.is_empty() {
+            let default_url = get_config().features.default_url.clone();
             HttpResponse::TemporaryRedirect()
-                .insert_header(("Location", DEFAULT_REDIRECT_URL.as_str()))
+                .insert_header(("Location", default_url))
                 .finish()
         } else {
             Self::process_redirect(captured_path, cache, storage).await
