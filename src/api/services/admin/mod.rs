@@ -21,7 +21,7 @@ pub use helpers::{error_response, parse_expires_at, success_response};
 pub use auth::{check_admin_token, logout, refresh_token, verify_token};
 
 // 重新导出链接 CRUD 端点
-pub use link_crud::{delete_link, get_all_links, get_link, post_link, update_link};
+pub use link_crud::{delete_link, get_all_links, get_link, get_stats, post_link, update_link};
 
 // 重新导出批量操作端点
 pub use batch_ops::{batch_create_links, batch_delete_links, batch_update_links};
@@ -133,5 +133,12 @@ impl AdminService {
         storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
         batch_ops::batch_delete_links(req, batch, cache, storage).await
+    }
+
+    pub async fn get_stats(
+        req: actix_web::HttpRequest,
+        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+    ) -> actix_web::Result<impl actix_web::Responder> {
+        link_crud::get_stats(req, storage).await
     }
 }

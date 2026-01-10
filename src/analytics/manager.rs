@@ -205,7 +205,11 @@ mod tests {
     #[tokio::test]
     async fn test_increment_and_flush() {
         let sink = Arc::new(MockSink::new());
-        let manager = ClickManager::new(Arc::clone(&sink) as Arc<dyn ClickSink>, Duration::from_secs(60), 100);
+        let manager = ClickManager::new(
+            Arc::clone(&sink) as Arc<dyn ClickSink>,
+            Duration::from_secs(60),
+            100,
+        );
 
         manager.increment("key1");
         manager.increment("key1");

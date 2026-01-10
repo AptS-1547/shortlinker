@@ -106,3 +106,11 @@ impl From<ShortLink> for LinkResponse {
         }
     }
 }
+
+/// 统计信息响应
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StatsResponse {
+    pub total_links: usize,
+    pub total_clicks: usize,
+    pub active_links: usize,
+}

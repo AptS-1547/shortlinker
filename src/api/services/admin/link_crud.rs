@@ -9,11 +9,12 @@ use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
 
+use super::get_random_code_length;
 use super::helpers::{error_response, parse_expires_at, success_response};
 use super::types::{
     ApiResponse, GetLinksQuery, LinkResponse, PaginatedResponse, PaginationInfo, PostNewLink,
+    StatsResponse,
 };
-use super::get_random_code_length;
 
 /// 获取所有链接（支持分页和过滤）
 pub async fn get_all_links(
@@ -47,7 +48,9 @@ pub async fn get_all_links(
     };
 
     // 使用数据库分页
-    let (links, total) = storage.load_paginated_filtered(page, page_size, filter).await;
+    let (links, total) = storage
+        .load_paginated_filtered(page, page_size, filter)
+        .await;
     let total = total as usize;
     let page = page as usize;
     let page_size = page_size as usize;
@@ -180,7 +183,10 @@ pub async fn post_link(
                 "Admin API: failed to create link - {}: {}",
                 new_link.code, e
             );
-            Ok(error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+            Ok(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error_msg,
+            ))
         }
     }
 }
@@ -223,7 +229,10 @@ pub async fn delete_link(
         Err(e) => {
             let error_msg = format!("Error deleting link: {}", e);
             error!("Admin API: failed to delete link - {}: {}", code, e);
-            Ok(error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+            Ok(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error_msg,
+            ))
         }
     }
 }
@@ -301,7 +310,36 @@ pub async fn update_link(
         Err(e) => {
             let error_msg = format!("Error updating link: {}", e);
             error!("Admin API: failed to update link - {}: {}", code, e);
-            Ok(error_response(StatusCode::INTERNAL_SERVER_ERROR, &error_msg))
+            Ok(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &error_msg,
+            ))
         }
     }
+}
+
+/// 获取链接统计信息
+pub async fn get_stats(
+    _req: HttpRequest,
+    storage: web::Data<Arc<SeaOrmStorage>>,
+) -> ActixResult<impl Responder> {
+    trace!("Admin API: request to get link stats");
+
+    let stats = storage.get_stats().await;
+
+    info!(
+        "Admin API: returning stats - total: {}, clicks: {}, active: {}",
+        stats.total_links, stats.total_clicks, stats.active_links
+    );
+
+    Ok(HttpResponse::Ok()
+        .append_header(("Content-Type", "application/json; charset=utf-8"))
+        .json(ApiResponse {
+            code: 0,
+            data: StatsResponse {
+                total_links: stats.total_links,
+                total_clicks: stats.total_clicks,
+                active_links: stats.active_links,
+            },
+        }))
 }

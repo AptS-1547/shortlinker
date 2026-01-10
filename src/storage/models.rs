@@ -17,3 +17,11 @@ pub struct StorageConfig {
     pub storage_type: String,
     pub support_click: bool,
 }
+
+/// 链接统计信息
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct LinkStats {
+    pub total_links: usize,
+    pub total_clicks: usize,
+    pub active_links: usize,
+}

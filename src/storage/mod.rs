@@ -6,7 +6,7 @@ pub mod backend;
 pub mod models;
 
 pub use backend::{LinkFilter, SeaOrmStorage};
-pub use models::ShortLink;
+pub use models::{LinkStats, ShortLink};
 
 pub struct StorageFactory;
 

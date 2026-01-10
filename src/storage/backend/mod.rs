@@ -7,13 +7,16 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
+    QuerySelect,
+};
 use tracing::{error, info, trace, warn};
 
 use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
-use crate::storage::models::StorageConfig;
+use crate::storage::models::{LinkStats, StorageConfig};
 
 use migration::entities::short_link;
 
@@ -47,6 +50,12 @@ pub fn normalize_backend_name(backend: &str) -> String {
         "mariadb" => "mysql".to_string(),
         other => other.to_string(),
     }
+}
+
+/// 用于 SUM 聚合查询的结果结构体
+#[derive(Debug, FromQueryResult)]
+struct ClickSum {
+    sum: Option<i64>,
 }
 
 /// 链接过滤条件
@@ -273,9 +282,10 @@ impl SeaOrmStorage {
             return Ok(());
         }
 
-        let txn = self.db.begin().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
-        })?;
+        let txn =
+            self.db.begin().await.map_err(|e| {
+                ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
+            })?;
 
         // 构建批量 ActiveModel
         let active_models: Vec<short_link::ActiveModel> = links
@@ -296,13 +306,11 @@ impl SeaOrmStorage {
             )
             .exec(&txn)
             .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("批量插入失败: {}", e))
-            })?;
+            .map_err(|e| ShortlinkerError::database_operation(format!("批量插入失败: {}", e)))?;
 
-        txn.commit().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
-        })?;
+        txn.commit()
+            .await
+            .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
 
         info!("批量插入 {} 条链接成功", links.len());
         Ok(())
@@ -341,6 +349,48 @@ impl SeaOrmStorage {
         StorageConfig {
             storage_type: self.backend_name.clone(),
             support_click: true,
+        }
+    }
+
+    /// 获取链接统计信息
+    pub async fn get_stats(&self) -> LinkStats {
+        use sea_orm::PaginatorTrait;
+
+        let now = Utc::now();
+
+        // 获取总链接数
+        let total_links = short_link::Entity::find()
+            .count(&self.db)
+            .await
+            .unwrap_or(0) as usize;
+
+        // 获取总点击数（使用数据库聚合）
+        let all_clicks: i64 = match short_link::Entity::find()
+            .select_only()
+            .column_as(short_link::Column::ClickCount.sum(), "sum")
+            .into_model::<ClickSum>()
+            .one(&self.db)
+            .await
+        {
+            Ok(Some(result)) => result.sum.unwrap_or(0),
+            Ok(None) | Err(_) => 0,
+        };
+
+        // 获取活跃链接数（未过期的）
+        let active_links = short_link::Entity::find()
+            .filter(
+                Condition::any()
+                    .add(short_link::Column::ExpiresAt.is_null())
+                    .add(short_link::Column::ExpiresAt.gt(now)),
+            )
+            .count(&self.db)
+            .await
+            .unwrap_or(0) as usize;
+
+        LinkStats {
+            total_links,
+            total_clicks: all_clicks as usize,
+            active_links,
         }
     }
 

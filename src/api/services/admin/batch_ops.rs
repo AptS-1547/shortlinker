@@ -8,11 +8,11 @@ use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
 
+use super::get_random_code_length;
 use super::helpers::{parse_expires_at, success_response};
 use super::types::{
     BatchCreateRequest, BatchDeleteRequest, BatchFailedItem, BatchResponse, BatchUpdateRequest,
 };
-use super::get_random_code_length;
 
 /// 批量创建链接
 pub async fn batch_create_links(
