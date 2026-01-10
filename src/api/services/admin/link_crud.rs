@@ -2,13 +2,11 @@
 
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
 
 use crate::cache::traits::CompositeCacheTrait;
-use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::system::reload::reload_all;
+use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
 
 use super::helpers::{error_response, parse_expires_at, success_response};
@@ -28,24 +26,34 @@ pub async fn get_all_links(
         query
     );
 
-    let all_links = storage.load_all().await;
-    trace!("Admin API: retrieved {} total links", all_links.len());
+    let page = query.page.unwrap_or(1).max(1) as u64;
+    let page_size = query.page_size.unwrap_or(20).clamp(1, 100) as u64;
 
-    let now = chrono::Utc::now();
-    let mut filtered_links = filter_links(all_links, &query, now);
+    // 构建过滤条件
+    let filter = LinkFilter {
+        search: query.search.clone(),
+        created_after: query
+            .created_after
+            .as_ref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        created_before: query
+            .created_before
+            .as_ref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        only_expired: query.only_expired.unwrap_or(false),
+        only_active: query.only_active.unwrap_or(false),
+    };
 
-    // Sort by creation time (newest first)
-    filtered_links.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
-
-    let total = filtered_links.len();
-    let page = query.page.unwrap_or(1).max(1);
-    let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
+    // 使用数据库分页
+    let (links, total) = storage.load_paginated_filtered(page, page_size, filter).await;
+    let total = total as usize;
+    let page = page as usize;
+    let page_size = page_size as usize;
     let total_pages = total.div_ceil(page_size);
 
-    let paginated_links: Vec<LinkResponse> = paginate_links(filtered_links, page, page_size)
-        .into_iter()
-        .map(|(_, link)| LinkResponse::from(link))
-        .collect();
+    let paginated_links: Vec<LinkResponse> = links.into_iter().map(LinkResponse::from).collect();
 
     info!(
         "Admin API: returning {} links (page {} of {}, total: {})",
@@ -67,83 +75,6 @@ pub async fn get_all_links(
                 total_pages,
             },
         }))
-}
-
-fn filter_links(
-    links: HashMap<String, ShortLink>,
-    query: &GetLinksQuery,
-    now: chrono::DateTime<chrono::Utc>,
-) -> Vec<(String, ShortLink)> {
-    // Parse time filters once outside the iteration
-    let after_time = query
-        .created_after
-        .as_ref()
-        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt| dt.with_timezone(&chrono::Utc));
-
-    let before_time = query
-        .created_before
-        .as_ref()
-        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-        .map(|dt| dt.with_timezone(&chrono::Utc));
-
-    // Prepare search query (case-insensitive)
-    let search_lower = query.search.as_ref().map(|s| s.to_lowercase());
-
-    links
-        .into_iter()
-        .filter(|(_, link)| {
-            // Search filter (matches code or target, case-insensitive)
-            if let Some(ref search) = search_lower {
-                let code_matches = link.code.to_lowercase().contains(search);
-                let target_matches = link.target.to_lowercase().contains(search);
-                if !code_matches && !target_matches {
-                    return false;
-                }
-            }
-
-            // Time filters
-            if let Some(after) = after_time
-                && link.created_at < after
-            {
-                return false;
-            }
-
-            if let Some(before) = before_time
-                && link.created_at > before
-            {
-                return false;
-            }
-
-            // Expiration status filter
-            let is_expired = link.expires_at.is_some_and(|exp| exp < now);
-
-            if query.only_expired == Some(true) && !is_expired {
-                return false;
-            }
-
-            if query.only_active == Some(true) && is_expired {
-                return false;
-            }
-
-            true
-        })
-        .collect()
-}
-
-fn paginate_links(
-    mut links: Vec<(String, ShortLink)>,
-    page: usize,
-    page_size: usize,
-) -> Vec<(String, ShortLink)> {
-    let start = (page - 1) * page_size;
-    let end = (start + page_size).min(links.len());
-
-    if start < links.len() {
-        links.drain(start..end).collect()
-    } else {
-        Vec::new()
-    }
 }
 
 /// 创建新链接
@@ -228,7 +159,8 @@ pub async fn post_link(
                 "created"
             };
             info!("Admin API: link {} - {}", action, new_link.code);
-            let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+            // 增量更新缓存
+            cache.insert(&new_link.code, new_link.clone()).await;
             Ok(HttpResponse::Created()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(ApiResponse {
@@ -282,7 +214,8 @@ pub async fn delete_link(
     match storage.remove(&code).await {
         Ok(_) => {
             info!("Admin API: link deleted - {}", code);
-            let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+            // 增量更新缓存
+            cache.remove(&code).await;
             Ok(success_response(serde_json::json!({
                 "message": "Link deleted successfully"
             })))
@@ -355,7 +288,8 @@ pub async fn update_link(
     match storage.set(updated_link.clone()).await {
         Ok(_) => {
             info!("Admin API: link updated - {}", code);
-            let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+            // 增量更新缓存
+            cache.insert(&updated_link.code, updated_link.clone()).await;
             Ok(success_response(PostNewLink {
                 code: Some(updated_link.code),
                 target: updated_link.target,

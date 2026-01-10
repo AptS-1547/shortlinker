@@ -6,7 +6,6 @@ use tracing::info;
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::system::reload::reload_all;
 use crate::utils::generate_random_code;
 
 use super::helpers::{parse_expires_at, success_response};
@@ -29,6 +28,7 @@ pub async fn batch_create_links(
 
     let mut success: Vec<String> = Vec::new();
     let mut failed: Vec<BatchFailedItem> = Vec::new();
+    let mut created_links: Vec<ShortLink> = Vec::new();
 
     for link_req in &batch.links {
         // Generate code if not provided
@@ -89,8 +89,11 @@ pub async fn batch_create_links(
             click,
         };
 
-        match storage.set(new_link).await {
-            Ok(_) => success.push(code),
+        match storage.set(new_link.clone()).await {
+            Ok(_) => {
+                success.push(code);
+                created_links.push(new_link);
+            }
             Err(e) => {
                 failed.push(BatchFailedItem {
                     code,
@@ -100,9 +103,10 @@ pub async fn batch_create_links(
         }
     }
 
-    // Reload cache once after all operations
-    if !success.is_empty() {
-        let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+    // 增量更新缓存
+    for link in created_links {
+        let code = link.code.clone();
+        cache.insert(&code, link).await;
     }
 
     info!(
@@ -128,6 +132,7 @@ pub async fn batch_update_links(
 
     let mut success: Vec<String> = Vec::new();
     let mut failed: Vec<BatchFailedItem> = Vec::new();
+    let mut updated_links: Vec<ShortLink> = Vec::new();
 
     for update in &batch.updates {
         let code = &update.code;
@@ -182,8 +187,11 @@ pub async fn batch_update_links(
             click: existing.click,
         };
 
-        match storage.set(updated_link).await {
-            Ok(_) => success.push(code.clone()),
+        match storage.set(updated_link.clone()).await {
+            Ok(_) => {
+                success.push(code.clone());
+                updated_links.push(updated_link);
+            }
             Err(e) => {
                 failed.push(BatchFailedItem {
                     code: code.clone(),
@@ -193,9 +201,10 @@ pub async fn batch_update_links(
         }
     }
 
-    // Reload cache once after all operations
-    if !success.is_empty() {
-        let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+    // 增量更新缓存
+    for link in updated_links {
+        let code = link.code.clone();
+        cache.insert(&code, link).await;
     }
 
     info!(
@@ -234,9 +243,9 @@ pub async fn batch_delete_links(
         }
     }
 
-    // Reload cache once after all operations
-    if !success.is_empty() {
-        let _ = reload_all(cache.get_ref().clone(), storage.get_ref().clone()).await;
+    // 增量更新缓存
+    for code in &success {
+        cache.remove(code).await;
     }
 
     info!(

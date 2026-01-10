@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use chrono::{DateTime, Utc};
+use sea_orm::{ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter};
 use tracing::{error, info, trace, warn};
 
 use crate::analytics::ClickSink;
@@ -46,6 +47,21 @@ pub fn normalize_backend_name(backend: &str) -> String {
         "mariadb" => "mysql".to_string(),
         other => other.to_string(),
     }
+}
+
+/// 链接过滤条件
+#[derive(Default, Clone, Debug)]
+pub struct LinkFilter {
+    /// 模糊搜索 code 或 target
+    pub search: Option<String>,
+    /// 创建时间 >= created_after
+    pub created_after: Option<DateTime<Utc>>,
+    /// 创建时间 <= created_before
+    pub created_before: Option<DateTime<Utc>>,
+    /// 只返回已过期的链接
+    pub only_expired: bool,
+    /// 只返回未过期的链接
+    pub only_active: bool,
 }
 
 #[derive(Clone)]
@@ -124,6 +140,81 @@ impl SeaOrmStorage {
         use sea_orm::{PaginatorTrait, QueryOrder};
 
         let paginator = short_link::Entity::find()
+            .order_by_desc(short_link::Column::CreatedAt)
+            .paginate(&self.db, page_size);
+
+        let total = match paginator.num_items().await {
+            Ok(count) => count,
+            Err(e) => {
+                error!("获取总数失败: {}", e);
+                return (Vec::new(), 0);
+            }
+        };
+
+        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
+            Ok(models) => models,
+            Err(e) => {
+                error!("分页查询失败: {}", e);
+                return (Vec::new(), total);
+            }
+        };
+
+        let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
+
+        (links, total)
+    }
+
+    /// 带过滤条件的分页加载链接
+    pub async fn load_paginated_filtered(
+        &self,
+        page: u64,
+        page_size: u64,
+        filter: LinkFilter,
+    ) -> (Vec<ShortLink>, u64) {
+        use sea_orm::{PaginatorTrait, QueryOrder};
+
+        let now = Utc::now();
+
+        // 构建查询条件
+        let mut condition = Condition::all();
+
+        // search: 模糊匹配 code 或 target
+        if let Some(ref search) = filter.search {
+            let pattern = format!("%{}%", search);
+            condition = condition.add(
+                Condition::any()
+                    .add(short_link::Column::ShortCode.contains(&pattern))
+                    .add(short_link::Column::TargetUrl.contains(&pattern)),
+            );
+        }
+
+        // created_after
+        if let Some(ref after) = filter.created_after {
+            condition = condition.add(short_link::Column::CreatedAt.gte(*after));
+        }
+
+        // created_before
+        if let Some(ref before) = filter.created_before {
+            condition = condition.add(short_link::Column::CreatedAt.lte(*before));
+        }
+
+        // only_expired: 只返回已过期的
+        if filter.only_expired {
+            condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
+            condition = condition.add(short_link::Column::ExpiresAt.lt(now));
+        }
+
+        // only_active: 只返回未过期的（expires_at 为 null 或 > now）
+        if filter.only_active {
+            condition = condition.add(
+                Condition::any()
+                    .add(short_link::Column::ExpiresAt.is_null())
+                    .add(short_link::Column::ExpiresAt.gt(now)),
+            );
+        }
+
+        let paginator = short_link::Entity::find()
+            .filter(condition)
             .order_by_desc(short_link::Column::CreatedAt)
             .paginate(&self.db, page_size);
 

@@ -5,7 +5,7 @@ use crate::errors::Result;
 pub mod backend;
 pub mod models;
 
-pub use backend::SeaOrmStorage;
+pub use backend::{LinkFilter, SeaOrmStorage};
 pub use models::ShortLink;
 
 pub struct StorageFactory;
