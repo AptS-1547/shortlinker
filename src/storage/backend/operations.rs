@@ -34,7 +34,13 @@ pub async fn upsert_with_on_conflict(db: &DatabaseConnection, link: &ShortLink) 
             Ok(())
         }
         Err(e) => Err(ShortlinkerError::database_operation(format!(
-            "Upsert 短链接失败: {}",
+            "Upsert 短链接 '{}' 失败 (target: {}): {}",
+            link.code,
+            if link.target.len() > 50 {
+                format!("{}...", &link.target[..50])
+            } else {
+                link.target.clone()
+            },
             e
         ))),
     }
@@ -59,21 +65,24 @@ pub async fn upsert_with_fallback(db: &DatabaseConnection, link: &ShortLink) -> 
                 // 如果是唯一冲突，执行更新
                 let update_model = shortlink_to_active_model(link, false);
                 update_model.update(db).await.map_err(|e| {
-                    ShortlinkerError::database_operation(format!("更新短链接失败: {}", e))
+                    ShortlinkerError::database_operation(format!(
+                        "更新短链接 '{}' 失败: {}",
+                        link.code, e
+                    ))
                 })?;
                 info!("Short link updated: {}", link.code);
                 Ok(())
             } else {
                 // 其他错误直接返回
                 Err(ShortlinkerError::database_operation(format!(
-                    "插入短链接失败: {}",
-                    sqlx_err
+                    "插入短链接 '{}' 失败: {}",
+                    link.code, sqlx_err
                 )))
             }
         }
         Err(e) => Err(ShortlinkerError::database_operation(format!(
-            "插入短链接失败: {}",
-            e
+            "插入短链接 '{}' 失败: {}",
+            link.code, e
         ))),
     }
 }

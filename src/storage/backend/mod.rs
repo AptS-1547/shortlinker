@@ -98,22 +98,123 @@ impl SeaOrmStorage {
     }
 
     pub async fn load_all(&self) -> HashMap<String, ShortLink> {
-        let mut links = HashMap::new();
-
         match short_link::Entity::find().all(&self.db).await {
             Ok(models) => {
-                for model in models {
-                    let code = model.short_code.clone();
-                    links.insert(code, model_to_shortlink(model));
-                }
+                let count = models.len();
+                // 使用 into_iter 避免不必要的克隆
+                let links: HashMap<String, ShortLink> = models
+                    .into_iter()
+                    .map(|model| {
+                        let link = model_to_shortlink(model);
+                        (link.code.clone(), link)
+                    })
+                    .collect();
+                info!("Loaded {} short links", count);
+                links
             }
             Err(e) => {
                 error!("加载所有短链接失败: {}", e);
+                HashMap::new()
             }
         }
+    }
 
-        info!("Loaded {} short links", links.len());
-        links
+    /// 分页加载链接
+    pub async fn load_paginated(&self, page: u64, page_size: u64) -> (Vec<ShortLink>, u64) {
+        use sea_orm::{PaginatorTrait, QueryOrder};
+
+        let paginator = short_link::Entity::find()
+            .order_by_desc(short_link::Column::CreatedAt)
+            .paginate(&self.db, page_size);
+
+        let total = match paginator.num_items().await {
+            Ok(count) => count,
+            Err(e) => {
+                error!("获取总数失败: {}", e);
+                return (Vec::new(), 0);
+            }
+        };
+
+        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
+            Ok(models) => models,
+            Err(e) => {
+                error!("分页查询失败: {}", e);
+                return (Vec::new(), total);
+            }
+        };
+
+        let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
+
+        (links, total)
+    }
+
+    /// 批量获取链接
+    pub async fn batch_get(&self, codes: &[&str]) -> HashMap<String, ShortLink> {
+        if codes.is_empty() {
+            return HashMap::new();
+        }
+
+        let result = short_link::Entity::find()
+            .filter(short_link::Column::ShortCode.is_in(codes.iter().map(|s| s.to_string())))
+            .all(&self.db)
+            .await;
+
+        match result {
+            Ok(models) => models
+                .into_iter()
+                .map(|m| {
+                    let link = model_to_shortlink(m);
+                    (link.code.clone(), link)
+                })
+                .collect(),
+            Err(e) => {
+                error!("批量查询失败: {}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// 批量设置链接（使用事务）
+    pub async fn batch_set(&self, links: Vec<ShortLink>) -> Result<()> {
+        use sea_orm::{EntityTrait, TransactionTrait, sea_query::OnConflict};
+
+        if links.is_empty() {
+            return Ok(());
+        }
+
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
+        })?;
+
+        // 构建批量 ActiveModel
+        let active_models: Vec<short_link::ActiveModel> = links
+            .iter()
+            .map(|link| shortlink_to_active_model(link, true))
+            .collect();
+
+        // 使用 insert_many with on_conflict
+        short_link::Entity::insert_many(active_models)
+            .on_conflict(
+                OnConflict::column(short_link::Column::ShortCode)
+                    .update_columns([
+                        short_link::Column::TargetUrl,
+                        short_link::Column::ExpiresAt,
+                        short_link::Column::Password,
+                    ])
+                    .to_owned(),
+            )
+            .exec(&txn)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("批量插入失败: {}", e))
+            })?;
+
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("提交事务失败: {}", e))
+        })?;
+
+        info!("批量插入 {} 条链接成功", links.len());
+        Ok(())
     }
 
     pub async fn set(&self, link: ShortLink) -> Result<()> {
@@ -162,35 +263,57 @@ impl ClickSink for SeaOrmStorage {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
         use sea_orm::{ExprTrait, TransactionTrait, sea_query::Expr};
 
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let total_count = updates.len();
         let txn = self
             .db
             .begin()
             .await
             .map_err(|e| anyhow::anyhow!("开始事务失败: {}", e))?;
 
-        for (code, count) in updates {
+        let mut failed_updates: Vec<(String, String)> = Vec::new();
+
+        for (code, count) in &updates {
             // 使用原生 SQL 进行原子增量更新
             let update_result = short_link::Entity::update_many()
                 .col_expr(
                     short_link::Column::ClickCount,
-                    Expr::col(short_link::Column::ClickCount).add(count as i64),
+                    Expr::col(short_link::Column::ClickCount).add(*count as i64),
                 )
-                .filter(short_link::Column::ShortCode.eq(&code))
+                .filter(short_link::Column::ShortCode.eq(code))
                 .exec(&txn)
                 .await;
 
             if let Err(e) = update_result {
-                error!("点击计数更新失败 {}: {}", code, e);
+                failed_updates.push((code.clone(), e.to_string()));
             }
         }
 
+        // 即使有部分失败，也提交成功的更新
         txn.commit()
             .await
             .map_err(|e| anyhow::anyhow!("提交事务失败: {}", e))?;
 
+        let success_count = total_count - failed_updates.len();
+
+        // 报告失败情况
+        if !failed_updates.is_empty() {
+            error!(
+                "部分点击计数更新失败 ({}/{}): {:?}",
+                failed_updates.len(),
+                total_count,
+                failed_updates
+            );
+        }
+
         trace!(
-            "点击计数已刷新到 {} 数据库",
-            self.backend_name.to_uppercase()
+            "点击计数已刷新到 {} 数据库 ({} 成功, {} 失败)",
+            self.backend_name.to_uppercase(),
+            success_count,
+            failed_updates.len()
         );
         Ok(())
     }

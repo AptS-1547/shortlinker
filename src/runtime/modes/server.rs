@@ -87,6 +87,10 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                     .route("/link", web::get().to(AdminService::get_all_links))
                     .route("/link", web::head().to(AdminService::get_all_links))
                     .route("/link", web::post().to(AdminService::post_link))
+                    // Batch operations (must be before /link/{code:.*} to avoid matching)
+                    .route("/link/batch", web::post().to(AdminService::batch_create_links))
+                    .route("/link/batch", web::put().to(AdminService::batch_update_links))
+                    .route("/link/batch", web::delete().to(AdminService::batch_delete_links))
                     .route("/link/{code:.*}", web::get().to(AdminService::get_link))
                     .route("/link/{code:.*}", web::head().to(AdminService::get_link))
                     .route(

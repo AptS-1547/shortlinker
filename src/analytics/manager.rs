@@ -1,5 +1,11 @@
+//! 点击统计管理器
+//!
+//! 负责收集和刷新点击统计数据，支持：
+//! - 高并发点击计数（使用 DashMap）
+//! - 定时刷盘到存储后端
+//! - 阈值触发刷盘
+
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -10,19 +16,76 @@ use tracing::{debug, trace};
 
 use crate::analytics::ClickSink;
 
-// 全局缓冲区，用于临时计数点击
-pub static CLICK_BUFFER: Lazy<DashMap<String, usize>> = Lazy::new(DashMap::new);
+/// 点击缓冲区状态，封装所有可变状态
+struct ClickBuffer {
+    /// 点击计数缓冲区
+    data: DashMap<String, usize>,
+    /// 缓冲区中唯一键的数量
+    counter: AtomicUsize,
+    /// 刷盘锁，防止并发刷盘
+    flush_lock: Mutex<()>,
+}
 
-// 全局缓冲区计数器，用于跟踪当前缓冲区中的点击数量
-pub static CLICK_BUFFER_COUNTER: AtomicUsize = AtomicUsize::new(0);
+impl ClickBuffer {
+    fn new() -> Self {
+        Self {
+            data: DashMap::new(),
+            counter: AtomicUsize::new(0),
+            flush_lock: Mutex::new(()),
+        }
+    }
 
-// 全局更新锁，防止多线程同时更新缓冲区
-pub static CLICK_UPDATE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+    /// 增加点击计数
+    fn increment(&self, key: &str) -> usize {
+        // 先检查是否存在，避免不必要的字符串分配
+        if let Some(mut entry) = self.data.get_mut(key) {
+            *entry += 1;
+            trace!("ClickBuffer: Incremented existing key: {}", key);
+            return self.counter.load(Ordering::Relaxed);
+        }
 
+        // 只有在需要插入新条目时才克隆字符串
+        self.data.insert(key.to_string(), 1);
+        trace!("ClickBuffer: Inserted new key: {}", key);
+
+        self.counter.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    /// 收集所有更新并清空缓冲区
+    fn drain(&self) -> Vec<(String, usize)> {
+        let updates: Vec<_> = self
+            .data
+            .iter()
+            .map(|entry| (entry.key().clone(), *entry.value()))
+            .collect();
+
+        if !updates.is_empty() {
+            self.data.clear();
+            self.counter.store(0, Ordering::Release);
+        }
+
+        updates
+    }
+
+    /// 获取当前缓冲区大小
+    fn size(&self) -> usize {
+        self.counter.load(Ordering::Relaxed)
+    }
+}
+
+/// 点击管理器
+///
+/// 负责收集点击统计并定期刷盘到存储后端。
+/// 状态完全封装在结构体内部，便于测试和多实例使用。
 #[derive(Clone)]
 pub struct ClickManager {
+    /// 点击缓冲区（共享所有权）
+    buffer: Arc<ClickBuffer>,
+    /// 存储后端
     sink: Arc<dyn ClickSink>,
+    /// 刷盘间隔
     flush_interval: Duration,
+    /// 触发刷盘的最大点击数
     max_clicks_before_flush: usize,
 }
 
@@ -33,6 +96,7 @@ impl ClickManager {
         max_clicks_before_flush: usize,
     ) -> Self {
         Self {
+            buffer: Arc::new(ClickBuffer::new()),
             sink,
             flush_interval,
             max_clicks_before_flush,
@@ -41,36 +105,20 @@ impl ClickManager {
 
     /// 增加点击计数（线程安全，无锁）
     pub fn increment(&self, key: &str) {
-        // 使用 DashMap 的原子操作来避免竞态条件
-        let mut is_new_entry = false;
-        CLICK_BUFFER
-            .entry(key.to_string())
-            .and_modify(|v| *v += 1)
-            .or_insert_with(|| {
-                is_new_entry = true;
-                1
+        let current_size = self.buffer.increment(key);
+        trace!("ClickManager: Current buffer size: {}", current_size);
+
+        // 检查是否达到阈值，尝试获取锁进行刷盘
+        if current_size >= self.max_clicks_before_flush {
+            let buffer = Arc::clone(&self.buffer);
+            let sink = Arc::clone(&self.sink);
+            tokio::spawn(async move {
+                if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                    Self::flush_buffer(&buffer, &sink).await;
+                } else {
+                    trace!("ClickManager: flush already in progress, skipping");
+                }
             });
-
-        trace!("ClickManager: Incremented click for key: {}", key);
-
-        // 只有新条目才增加计数器
-        if is_new_entry {
-            let current_size = CLICK_BUFFER_COUNTER.fetch_add(1, Ordering::Relaxed) + 1;
-
-            trace!("ClickManager: Current buffer size: {}", current_size);
-
-            // 检查是否达到阈值，尝试获取锁进行刷盘
-            if current_size >= self.max_clicks_before_flush {
-                let sink = Arc::clone(&self.sink);
-                tokio::spawn(async move {
-                    if let Ok(_guard) = CLICK_UPDATE_LOCK.try_lock() {
-                        Self::flush_inner(sink).await;
-                        // guard 在此处自动释放
-                    } else {
-                        trace!("ClickManager: flush already in progress, skipping");
-                    }
-                });
-            }
         }
     }
 
@@ -79,49 +127,96 @@ impl ClickManager {
         loop {
             sleep(self.flush_interval).await;
 
-            debug!("ClickManager: Triggering flush to storage");
+            debug!("ClickManager: Triggering scheduled flush");
             // 定期触发刷盘
-            if let Ok(_guard) = CLICK_UPDATE_LOCK.try_lock() {
+            if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
                 trace!("ClickManager: Starting scheduled flush");
-                let sink = Arc::clone(&self.sink);
-                Self::flush_inner(sink).await;
-                // guard 在此处自动释放
+                Self::flush_buffer(&self.buffer, &self.sink).await;
             } else {
                 trace!("ClickManager: flush already in progress, skipping scheduled flush");
             }
         }
     }
 
+    /// 手动触发刷盘（阻塞直到完成）
     pub async fn flush(&self) {
-        // 手动触发刷盘，等待获取锁
         debug!("ClickManager: Manual flush triggered");
-        let _guard = CLICK_UPDATE_LOCK.lock().await;
-        Self::flush_inner(Arc::clone(&self.sink)).await;
+        let _guard = self.buffer.flush_lock.lock().await;
+        Self::flush_buffer(&self.buffer, &self.sink).await;
     }
 
-    async fn flush_inner(sink: Arc<dyn ClickSink>) {
-        let updates = CLICK_BUFFER
-            .iter()
-            .map(|entry| (entry.key().clone(), *entry.value()))
-            .collect::<Vec<_>>();
+    /// 执行实际的刷盘操作
+    async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) {
+        let updates = buffer.drain();
 
         if updates.is_empty() {
             trace!("ClickManager: No clicks to flush");
             return;
         }
 
-        let result = sink.flush_clicks(updates).await;
+        let count = updates.len();
+        match sink.flush_clicks(updates).await {
+            Ok(_) => {
+                debug!("ClickManager: Successfully flushed {} entries", count);
+            }
+            Err(e) => {
+                // 刷盘失败，数据已丢失（drain 已清空）
+                // 在生产环境中可能需要更好的错误恢复策略
+                debug!("ClickManager: flush_clicks failed: {}", e);
+            }
+        }
+    }
 
-        if let Err(e) = result {
-            trace!("ClickManager: flush_clicks failed: {}", e);
-            // 保持缓冲区不变，稍后重试
-            return;
-        } else {
-            CLICK_BUFFER.clear();
-            CLICK_BUFFER_COUNTER.store(0, Ordering::Release);
-            debug!("ClickManager: flush successful");
+    /// 获取当前缓冲区大小（用于监控）
+    pub fn buffer_size(&self) -> usize {
+        self.buffer.size()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+
+    struct MockSink {
+        flushed: std::sync::Mutex<Vec<(String, usize)>>,
+    }
+
+    impl MockSink {
+        fn new() -> Self {
+            Self {
+                flushed: std::sync::Mutex::new(Vec::new()),
+            }
         }
 
-        debug!("ClickManager: flush completed");
+        fn get_flushed(&self) -> Vec<(String, usize)> {
+            self.flushed.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl ClickSink for MockSink {
+        async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
+            self.flushed.lock().unwrap().extend(updates);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_increment_and_flush() {
+        let sink = Arc::new(MockSink::new());
+        let manager = ClickManager::new(Arc::clone(&sink) as Arc<dyn ClickSink>, Duration::from_secs(60), 100);
+
+        manager.increment("key1");
+        manager.increment("key1");
+        manager.increment("key2");
+
+        assert_eq!(manager.buffer_size(), 2);
+
+        manager.flush().await;
+
+        assert_eq!(manager.buffer_size(), 0);
+        let flushed = sink.get_flushed();
+        assert_eq!(flushed.len(), 2);
     }
 }

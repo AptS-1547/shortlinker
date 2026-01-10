@@ -24,26 +24,40 @@ static OBJECT_CACHE_REGISTRY: Lazy<RwLock<HashMap<String, ObjectCacheConstructor
 
 pub fn register_filter_plugin<S: Into<String>>(name: S, constructor: ExistenceFilterConstructor) {
     let name = name.into();
-    let mut registry = CACHE_FILTER_REGISTRY.write().unwrap();
+    let mut registry = CACHE_FILTER_REGISTRY
+        .write()
+        .expect("Filter registry RwLock poisoned - a thread panicked while holding the lock");
     registry.insert(name, constructor);
 }
 
 pub fn get_filter_plugin(name: &str) -> Option<ExistenceFilterConstructor> {
-    CACHE_FILTER_REGISTRY.read().unwrap().get(name).cloned()
+    CACHE_FILTER_REGISTRY
+        .read()
+        .expect("Filter registry RwLock poisoned - a thread panicked while holding the lock")
+        .get(name)
+        .cloned()
 }
 
 pub fn register_object_cache_plugin<S: Into<String>>(name: S, constructor: ObjectCacheConstructor) {
     let name = name.into();
-    let mut registry = OBJECT_CACHE_REGISTRY.write().unwrap();
+    let mut registry = OBJECT_CACHE_REGISTRY
+        .write()
+        .expect("Object cache registry RwLock poisoned - a thread panicked while holding the lock");
     registry.insert(name, constructor);
 }
 
 pub fn get_object_cache_plugin(name: &str) -> Option<ObjectCacheConstructor> {
-    OBJECT_CACHE_REGISTRY.read().unwrap().get(name).cloned()
+    OBJECT_CACHE_REGISTRY
+        .read()
+        .expect("Object cache registry RwLock poisoned - a thread panicked while holding the lock")
+        .get(name)
+        .cloned()
 }
 
 pub fn debug_cache_registry() {
-    let filter_registry = CACHE_FILTER_REGISTRY.read().unwrap();
+    let filter_registry = CACHE_FILTER_REGISTRY
+        .read()
+        .expect("Filter registry RwLock poisoned");
     if filter_registry.is_empty() {
         tracing::debug!("No Filter plugins registered.");
     } else {
@@ -53,7 +67,9 @@ pub fn debug_cache_registry() {
         }
     }
 
-    let object_cache_registry = OBJECT_CACHE_REGISTRY.read().unwrap();
+    let object_cache_registry = OBJECT_CACHE_REGISTRY
+        .read()
+        .expect("Object cache registry RwLock poisoned");
     if object_cache_registry.is_empty() {
         tracing::debug!("No Object Cache plugins registered.");
     } else {
