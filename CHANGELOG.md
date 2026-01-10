@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.3.0-alpha.3] - 2026-01-11
+
+### Added
+- **动态配置系统** - 实现基于数据库的运行时配置管理，支持配置热重载
+  - 新增 `system_config` 和 `config_history` 数据表存储配置及变更历史
+  - 添加配置管理 API 端点（`GET/PUT /api/admin/config`），支持通过 API 或管理面板动态修改配置
+  - 支持配置热更新，无需重启服务即可应用大部分配置变更（JWT 密钥、API 令牌、路由前缀等）
+  - 实现配置版本控制和变更历史追踪
+  - 首次启动时自动从 `config.toml` 迁移配置到数据库
+- 引入 `arc-swap` 依赖，实现配置的原子更新和线程安全访问
+
+### Changed
+- **配置架构重构** - 明确区分启动配置（需重启）和动态配置（可热更新）
+  - 启动配置：数据库连接、服务器绑定地址、日志级别等
+  - 动态配置：JWT 设置、API 令牌、CORS、路由前缀等功能配置
+- 重构认证中间件和健康检查中间件，从运行时配置读取设置，支持动态更新
+- 更新配置文档（`docs/config/index.md`），添加详细的配置说明和迁移指南
+- 简化 `config.example.toml`，移除已迁移到数据库的动态配置项
+
+### Improved
+- 将错误测试从中文翻译为英文，提升代码国际化水平
+- 修复配置文档中的代码示例，添加缺失的 `use` 语句
+
+### Migration Notes
+**⚠️ 重要：首次启动 v0.3.0-alpha.3 时，系统会自动从 `config.toml` 迁移配置到数据库**
+
+1. 升级后首次启动时，系统会自动执行配置迁移
+2. 迁移完成后，数据库配置将作为配置源，`config.toml` 中的动态配置项不再生效
+3. 后续可通过管理面板或 API 修改配置，变更会实时生效且持久化到数据库
+4. 如需重置为 `config.toml` 配置，请删除数据库后重新启动
+
+查看完整配置文档：`docs/config/index.md`
+
+## [v0.3.0-alpha.2] - 2026-01-07
+
 ### Changed
 - chore(deps): bump preact
 
@@ -495,7 +530,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.1...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...HEAD
+[v0.3.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.2...v0.3.0-alpha.3
+[v0.3.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.1...v0.3.0-alpha.2
 [v0.3.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.2.3-alpha.3...v0.3.0-alpha.1
 [v0.2.3-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.2.3-alpha.2...v0.2.3-alpha.3
 [v0.2.3-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.2.3-alpha.1...v0.2.3-alpha.2
