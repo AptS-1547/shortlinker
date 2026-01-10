@@ -246,7 +246,8 @@ pub fn get_config() -> &'static AppConfig {
 ///   - `None`: Load from default "config.toml" (warn if doesn't exist)
 ///
 /// # Examples
-/// ```
+/// ```no_run
+/// use shortlinker::config::init_config;
 /// // Use default config.toml
 /// init_config(None);
 ///

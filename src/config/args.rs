@@ -18,6 +18,7 @@
 ///
 /// # Examples
 /// ```
+/// use shortlinker::config::args::parse_config_path;
 /// let args = vec!["program".to_string(), "-c".to_string(), "custom.toml".to_string()];
 /// assert_eq!(parse_config_path(&args), Some("custom.toml".to_string()));
 /// ```
@@ -58,9 +59,10 @@ pub fn parse_config_path(args: &[String]) -> Option<String> {
 ///
 /// # Examples
 /// ```
-/// let args = vec!["program", "-c", "custom.toml", "tui"];
+/// use shortlinker::config::args::filter_config_args;
+/// let args = vec!["program".to_string(), "-c".to_string(), "custom.toml".to_string(), "tui".to_string()];
 /// let filtered = filter_config_args(&args);
-/// // Result: ["program", "tui"]
+/// assert_eq!(filtered, vec!["program".to_string(), "tui".to_string()]);
 /// ```
 pub fn filter_config_args(args: &[String]) -> Vec<String> {
     let mut filtered = Vec::new();
