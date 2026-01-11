@@ -5,7 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.3.0-alpha.4] - 2026-01-11
+
+### Added
+- **密码安全增强** - 使用 Argon2id 算法对管理员密码进行哈希处理
+  - 支持从明文密码自动迁移到哈希密码
+  - 新增 `reset-password` CLI 命令用于重置管理员密码
+- **URL 安全验证** - 阻止危险协议（`javascript:`, `data:`, `file:` 等）的短链接创建
+- **CORS 跨域支持** - 支持配置允许的源、方法和请求头
+- **Docker Compose 配置** - 添加 `docker-compose.yml` 简化部署流程
+
+### Changed
+- **缓存 TTL 优化** - 基于链接过期时间动态调整缓存有效期，避免缓存过期链接
+- **JWT 密钥管理** - 移除硬编码的 JWT_SECRET，改为自动生成安全随机密钥
+- **配置迁移增强** - 支持增量迁移和密码自动升级
+
+### Improved
+- **性能优化**
+  - 使用 `parking_lot` 替换 `tokio::sync::RwLock`，减少 Bloom Filter 锁开销
+  - 使用 `Arc<str>` 替换 `String` 减少点击缓冲区中的字符串克隆开销
+  - 优化点击计数批量更新，使用单条 SQL CASE 语句替代多次查询
+- 更新配置迁移和运行时配置的日志信息，提升可读性
+
+### Docs
+- 更新配置文档，移除已废弃的配置项说明
+- 移除 `redis` 缓存类型的过时注释（现已为有效配置项）
 
 ## [v0.3.0-alpha.3] - 2026-01-11
 
@@ -530,7 +554,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...HEAD
+[v0.3.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...v0.3.0-alpha.4
 [v0.3.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.2...v0.3.0-alpha.3
 [v0.3.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.1...v0.3.0-alpha.2
 [v0.3.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.2.3-alpha.3...v0.3.0-alpha.1
