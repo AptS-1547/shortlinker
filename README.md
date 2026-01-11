@@ -44,7 +44,9 @@
 * 🏥 **Health Monitoring**: Built-in health check endpoints
 * 🐳 **Containerized**: Optimized Docker image for easy deployment
 * 🎨 **Beautiful CLI**: Colorized command-line interface
+* 🖥️ **TUI Mode**: Interactive terminal user interface (requires `tui` feature)
 * 🔌 **Unix Socket**: Support for Unix socket binding
+* 🔐 **Password Protection**: Protect links with access passwords
 
 ## Quick Start
 
@@ -81,6 +83,9 @@ Once your domain (e.g. `esap.cc`) is bound:
 # Start the server
 ./shortlinker
 
+# Start TUI mode (requires 'tui' feature)
+./shortlinker tui
+
 # Add short links
 ./shortlinker add github https://github.com           # Custom code
 ./shortlinker add https://github.com                  # Random code
@@ -91,15 +96,21 @@ Once your domain (e.g. `esap.cc`) is bound:
 ./shortlinker add weekly https://example.com --expire 1w     # Expires in 1 week
 ./shortlinker add complex https://example.com --expire 1d2h30m  # Complex format
 
+# Password protected links
+./shortlinker add secret https://example.com --password mypass  # Requires password to access
+
 # Manage links
 ./shortlinker update github https://new-github.com --expire 30d
 ./shortlinker list                    # List all links
 ./shortlinker remove github           # Remove specific link
 
-# Server control
-./shortlinker start                   # Start server
-./shortlinker stop                    # Stop server
-./shortlinker restart                 # Restart server
+# Import/Export
+./shortlinker export links.json       # Export all links to JSON
+./shortlinker import links.json       # Import links from JSON
+./shortlinker import links.json --force  # Overwrite existing links
+
+# Generate config file
+./shortlinker generate-config         # Generate config.toml example
 ```
 
 ## Admin API (v0.0.5+)
@@ -145,6 +156,44 @@ curl -X PUT \
 curl -X DELETE \
      -H "Authorization: Bearer your_secret_token" \
      http://localhost:8080/admin/link/github
+```
+
+### Batch Operations
+
+```bash
+# Batch create links
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+
+# Batch delete links
+curl -X DELETE \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '["link1","link2"]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### Runtime Configuration API
+
+```bash
+# Get all runtime config
+curl -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/config
+
+# Update a config value
+curl -X PUT \
+     -H "Authorization: Bearer your_secret_token" \
+     -H "Content-Type: application/json" \
+     -d '{"value":"new_value"}' \
+     http://localhost:8080/admin/config/random_code_length
+
+# Reload configuration
+curl -X POST \
+     -H "Authorization: Bearer your_secret_token" \
+     http://localhost:8080/admin/config/reload
 ```
 
 ## Health Check API

@@ -46,7 +46,9 @@
 - 💉 **健康检查 API**：服务存活与就绪检查接口
 - 🐳 **Docker 镜像**：适配容器部署，体积小巧
 - 🎨 **美观 CLI**：带有颜色高亮的命令行工具
+- 🖥️ **TUI 模式**：交互式终端用户界面（需要 `tui` feature）
 - 🔌 **Unix Socket 支持**
+- 🔐 **密码保护**：支持链接访问密码
 
 ---
 
@@ -89,6 +91,9 @@ docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
 # 启动服务
 ./shortlinker
 
+# 启动 TUI 模式（需要 'tui' feature）
+./shortlinker tui
+
 # 添加链接
 ./shortlinker add github https://github.com             # 自定义短码
 ./shortlinker add https://github.com                    # 随机短码
@@ -99,15 +104,21 @@ docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
 ./shortlinker add weekly https://example.com --expire 1w
 ./shortlinker add complex https://example.com --expire 1d2h30m
 
+# 密码保护链接
+./shortlinker add secret https://example.com --password mypass  # 需要密码才能访问
+
 # 管理操作
 ./shortlinker update github https://new-github.com --expire 30d
 ./shortlinker list
 ./shortlinker remove github
 
-# 服务控制
-./shortlinker start
-./shortlinker stop
-./shortlinker restart
+# 导入导出
+./shortlinker export links.json       # 导出所有链接到 JSON
+./shortlinker import links.json       # 从 JSON 导入链接
+./shortlinker import links.json --force  # 覆盖已有链接
+
+# 生成配置文件
+./shortlinker generate-config         # 生成 config.toml 示例
 ```
 
 ---
@@ -133,6 +144,44 @@ curl -X POST \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
      http://localhost:8080/admin/link
+```
+
+### 批量操作
+
+```bash
+# 批量创建链接
+curl -X POST \
+     -H "Authorization: Bearer 你的管理密钥" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+
+# 批量删除链接
+curl -X DELETE \
+     -H "Authorization: Bearer 你的管理密钥" \
+     -H "Content-Type: application/json" \
+     -d '["link1","link2"]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### 运行时配置管理 API
+
+```bash
+# 获取所有运行时配置
+curl -H "Authorization: Bearer 你的管理密钥" \
+     http://localhost:8080/admin/config
+
+# 更新配置值
+curl -X PUT \
+     -H "Authorization: Bearer 你的管理密钥" \
+     -H "Content-Type: application/json" \
+     -d '{"value":"new_value"}' \
+     http://localhost:8080/admin/config/random_code_length
+
+# 重载配置
+curl -X POST \
+     -H "Authorization: Bearer 你的管理密钥" \
+     http://localhost:8080/admin/config/reload
 ```
 
 ---

@@ -13,15 +13,7 @@ pub fn show_help() {
         program_name.cyan()
     );
     println!(
-        "  {} start                    # start server",
-        program_name.cyan()
-    );
-    println!(
-        "  {} stop                     # stop server",
-        program_name.cyan()
-    );
-    println!(
-        "  {} restart                  # restart server",
+        "  {} tui                      # start TUI mode (requires 'tui' feature)",
         program_name.cyan()
     );
     println!(
