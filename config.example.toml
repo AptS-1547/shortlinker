@@ -31,7 +31,7 @@ pool_size = 10
 timeout = 30
 
 [cache]
-# 缓存类型：memory, redis（目前仅支持 memory)
+# 缓存类型：memory, redis
 type = "memory"
 
 # 默认缓存过期时间（秒）
