@@ -9,459 +9,108 @@
 [![MIT 协议](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker 拉取数](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
 
-**一款极简主义的 URL 缩短服务，支持 HTTP 307 重定向，使用 Rust 构建，易于部署，极速响应。**
+一个支持 HTTP 307 重定向的极简短链接服务，使用 Rust 构建。
 
-[English](README.md) • [中文](README.zh.md)
+[English](README.md) | [中文](README.zh.md)
 
-![管理面板界面](assets/admin-panel-dashboard.png)
+![管理面板](assets/admin-panel-dashboard.jpeg)
 
 </div>
 
-## 🚀 性能基准（v0.2.0）
+## 功能特性
 
-**测试环境**
+- 基于 Rust + Actix-web 的高性能服务
+- 多种存储后端：SQLite、MySQL、PostgreSQL
+- 运行时动态管理链接，无需重启
+- 支持自定义和随机短码
+- 灵活的过期时间格式
+- 链接密码保护
+- Bearer Token 认证的管理 API
+- Web 管理面板
+- 终端 TUI 模式
+- Docker 和 Unix Socket 支持
 
-- 操作系统：Linux
-- CPU：12代 Intel Core i5-12500，单核
-- 压测工具：[`wrk`](https://github.com/wg/wrk)
+## 快速开始
 
-| 类型       | 场景                  | QPS 峰值         | 缓存命中 | 布隆过滤器 | 数据库访问 |
-|------------|-----------------------|------------------|-----------|--------------|--------------|
-| 命中缓存   | 热门链接（重复访问） | **696,962.45**   | ✅ 是     | ✅ 是         | ❌ 否        |
-| 未命中缓存 | 冷门链接（随机访问） | **600,622.46**   | ❌ 否     | ✅ 是         | ✅ 是        |
-
-> 💡 即使在缓存未命中时，系统仍能维持近 60 万 QPS，展示了 SQLite + actix-web + 异步缓存的卓越性能。
-
----
-
-## ✨ 功能亮点
-
-- 🚀 **高性能**：Rust + actix-web 构建
-- 🔧 **运行时动态管理**：添加/删除链接无需重启服务
-- 🎲 **智能短码生成**：支持自定义和随机短码
-- ⏰ **支持过期时间**：灵活设置链接有效期（v0.1.1+）
-- 💾 **多种存储后端**：SQLite、JSON 文件
-- 🖥️ **跨平台支持**：Linux、Windows、macOS
-- 🛡️ **管理 API**：支持 Bearer Token 的 HTTP API（v0.0.5+）
-- 💉 **健康检查 API**：服务存活与就绪检查接口
-- 🐳 **Docker 镜像**：适配容器部署，体积小巧
-- 🎨 **美观 CLI**：带有颜色高亮的命令行工具
-- 🖥️ **TUI 模式**：交互式终端用户界面（需要 `tui` feature）
-- 🔌 **Unix Socket 支持**
-- 🔐 **密码保护**：支持链接访问密码
-
----
-
-## 🚀 快速开始
-
-### 本地运行
+**Docker:**
 
 ```bash
-git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker
-cargo run
-````
-
-### Docker 部署
-
-```bash
-# TCP 端口模式
 docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
-
-# Unix Socket 模式
-docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
-  -e UNIX_SOCKET=/sock/shortlinker.sock e1saps/shortlinker
 ```
 
----
-
-## 🧪 使用示例
-
-域名绑定后（如 `https://esap.cc`）：
-
-* `https://esap.cc/github` → 自定义短链接
-* `https://esap.cc/aB3dF1` → 随机短链接
-* `https://esap.cc/` → 默认首页跳转
-
----
-
-## 🔧 命令行管理示例
+**本地运行:**
 
 ```bash
-# 启动服务
-./shortlinker
-
-# 启动 TUI 模式（需要 'tui' feature）
-./shortlinker tui
-
-# 添加链接
-./shortlinker add github https://github.com             # 自定义短码
-./shortlinker add https://github.com                    # 随机短码
-./shortlinker add github https://new-url.com --force    # 覆盖已有短码
-
-# 设置相对时间（v0.1.1+）
-./shortlinker add daily https://example.com --expire 1d
-./shortlinker add weekly https://example.com --expire 1w
-./shortlinker add complex https://example.com --expire 1d2h30m
-
-# 密码保护链接
-./shortlinker add secret https://example.com --password mypass  # 需要密码才能访问
-
-# 管理操作
-./shortlinker update github https://new-github.com --expire 30d
-./shortlinker list
-./shortlinker remove github
-
-# 导入导出
-./shortlinker export links.json       # 导出所有链接到 JSON
-./shortlinker import links.json       # 从 JSON 导入链接
-./shortlinker import links.json --force  # 覆盖已有链接
-
-# 生成配置文件
-./shortlinker generate-config         # 生成 config.toml 示例
+git clone https://github.com/AptS-1547/shortlinker && cd shortlinker
+cargo run
 ```
 
----
-
-## 🔐 管理 API（v0.0.5+）
-
-启用管理功能：
+## CLI 用法
 
 ```bash
-export ADMIN_TOKEN=你的管理密钥
-export ADMIN_ROUTE_PREFIX=/admin  # 可选前缀
+./shortlinker                                    # 启动服务器
+./shortlinker tui                                # TUI 模式（需要 'tui' feature）
+./shortlinker add github https://github.com     # 自定义短码
+./shortlinker add https://example.com           # 随机短码
+./shortlinker add secret https://example.com --password mypass  # 密码保护
+./shortlinker add temp https://example.com --expire 7d          # 7 天后过期
+./shortlinker list                              # 列出所有链接
+./shortlinker remove github                     # 删除链接
+./shortlinker export links.json                 # 导出到 JSON
+./shortlinker import links.json                 # 从 JSON 导入
 ```
 
-### API 示例
+## 管理 API
 
 ```bash
+# 设置 token
+export ADMIN_TOKEN=your_secret_token
+
 # 获取所有链接
-curl -H "Authorization: Bearer 你的管理密钥" http://localhost:8080/admin/link
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/link
 
 # 创建链接
-curl -X POST \
-     -H "Authorization: Bearer 你的管理密钥" \
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
      http://localhost:8080/admin/link
+
+# 删除链接
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
+     http://localhost:8080/admin/link/github
 ```
 
-### 批量操作
+批量操作、运行时配置等详见 [管理 API 文档](docs/api/admin.md)。
+
+## 配置
+
+生成配置文件：
 
 ```bash
-# 批量创建链接
-curl -X POST \
-     -H "Authorization: Bearer 你的管理密钥" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
-     http://localhost:8080/admin/link/batch
-
-# 批量删除链接
-curl -X DELETE \
-     -H "Authorization: Bearer 你的管理密钥" \
-     -H "Content-Type: application/json" \
-     -d '["link1","link2"]' \
-     http://localhost:8080/admin/link/batch
+./shortlinker generate-config
 ```
 
-### 运行时配置管理 API
+这会创建 `config.toml`，包含服务器、数据库、缓存和日志设置。
 
-```bash
-# 获取所有运行时配置
-curl -H "Authorization: Bearer 你的管理密钥" \
-     http://localhost:8080/admin/config
+详细配置选项见 [配置文档](docs/config/index.md)。
 
-# 更新配置值
-curl -X PUT \
-     -H "Authorization: Bearer 你的管理密钥" \
-     -H "Content-Type: application/json" \
-     -d '{"value":"new_value"}' \
-     http://localhost:8080/admin/config/random_code_length
+## 文档
 
-# 重载配置
-curl -X POST \
-     -H "Authorization: Bearer 你的管理密钥" \
-     http://localhost:8080/admin/config/reload
-```
+- [快速入门](docs/guide/getting-started.md)
+- [配置说明](docs/config/index.md)
+- [存储后端](docs/config/storage.md)
+- [管理 API](docs/api/admin.md)
+- [健康检查 API](docs/api/health.md)
+- [Docker 部署](docs/deployment/docker.md)
+- [systemd 服务](docs/deployment/systemd.md)
+- [CLI 命令](docs/cli/commands.md)
 
----
+## 相关项目
 
-## ❤️ 健康检查
+- [Web 管理面板](admin-panel/) - 图形化链接管理
+- [Cloudflare Worker](cf-worker/) - Serverless 版本
 
-```bash
-export HEALTH_TOKEN=你的健康密钥
-
-# 总体健康检查
-curl -H "Authorization: Bearer $HEALTH_TOKEN" http://localhost:8080/health
-
-# 就绪检查
-curl http://localhost:8080/health/ready
-
-# 存活检查
-curl http://localhost:8080/health/live
-```
-
----
-
-## 🕒 时间格式支持
-
-### 相对时间（推荐）
-
-```bash
-1s, 5m, 2h, 1d, 1w, 1M, 1y
-1d2h30m  # 组合时间格式
-```
-
-### 绝对时间（RFC3339）
-
-```bash
-2024-12-31T23:59:59Z
-2024-12-31T23:59:59+08:00
-```
-
----
-
-## ⚙️ 配置方式
-
-**shortlinker 现在支持 TOML 配置文件！**
-
-支持 TOML 配置文件和环境变量两种方式，TOML 配置更清晰易读，推荐使用。
-
-### 自定义配置文件路径
-
-可以使用 `-c` 或 `--config` 参数指定自定义配置文件路径：
-
-```bash
-# 使用自定义配置文件
-./shortlinker -c /path/to/your/config.toml
-./shortlinker --config /path/to/your/config.toml
-
-# 如果指定的文件不存在，会自动创建默认配置
-./shortlinker -c /etc/shortlinker/custom.toml
-# [INFO] Configuration file not found: /etc/shortlinker/custom.toml
-# [INFO] Creating default configuration file...
-# [INFO] Default configuration file created at: /etc/shortlinker/custom.toml
-```
-
-### TOML 配置文件
-
-创建 `config.toml` 文件，用于**启动时必需的配置**。其他配置（API、路由、功能等）存储在数据库中，可通过管理面板在运行时修改。
-
-```toml
-[server]
-# 服务器监听地址
-host = "127.0.0.1"
-# 服务器监听端口
-port = 8080
-# Unix Socket 路径（如果设置了，会覆盖 host 和 port）
-# unix_socket = "/tmp/shortlinker.sock"
-# CPU 核心数量（默认为系统核心数）
-cpu_count = 4
-
-[database]
-# 数据库连接 URL 或文件路径
-# 数据库类型会从 URL scheme 自动检测：
-# - sqlite:// 或 .db/.sqlite 文件 → SQLite
-# - postgres:// 或 postgresql:// → PostgreSQL
-# - mysql:// → MySQL
-# - mariadb:// → MariaDB（使用 MySQL 协议）
-database_url = "shortlinks.db"
-# 数据库连接池大小
-pool_size = 10
-# 数据库连接超时（秒）
-timeout = 30
-
-[cache]
-# 缓存类型：memory, redis（目前仅支持 memory)
-type = "memory"
-# 默认缓存过期时间（秒）
-default_ttl = 3600
-
-[cache.redis]
-# Redis 连接 URL
-url = "redis://127.0.0.1:6379/"
-# Redis 键前缀
-key_prefix = "shortlinker:"
-# Redis 连接池大小
-pool_size = 10
-
-[cache.memory]
-# 内存缓存最大容量（条目数）
-max_capacity = 10000
-
-[logging]
-# 日志等级：trace, debug, info, warn, error
-level = "info"
-# 日志输出格式：text, json
-format = "text"
-# 日志文件路径（不设置则输出到控制台）
-# file = "shortlinker.log"
-# 日志文件最大大小（MB）
-max_size = 100
-# 保留的日志文件数量
-max_backups = 5
-# 是否启用日志轮转
-enable_rotation = true
-```
-
-> 💡 **注意**：API 令牌、JWT 设置、路由前缀和功能开关现在存储在数据库中。首次启动时，会从 `config.toml`（如果存在）迁移到数据库。之后请通过管理面板修改。
-
-**配置文件加载规则：**
-
-使用 `-c/--config` 参数时：
-- 使用指定的路径（不存在则自动创建）
-- 示例：`./shortlinker -c /path/to/config.toml`
-
-不使用参数时：
-- 只在当前目录查找 `config.toml`
-- 找不到则使用内存中的默认配置
-
-### 环境变量（向后兼容）
-
-仍然支持原有的环境变量配置方式，**环境变量会覆盖 TOML 配置**：
-
-#### 启动配置（需要重启）
-
-| 变量                      | 默认值                     | 说明                                        |
-| ----------------------- | ------------------------ | ------------------------------------------- |
-| `SERVER_HOST`           | `127.0.0.1`             | 监听地址                                      |
-| `SERVER_PORT`           | `8080`                  | 监听端口                                      |
-| `UNIX_SOCKET`           | *(空)*                   | Unix Socket 路径（会覆盖 HOST/PORT）            |
-| `CPU_COUNT`             | *(自动)*                  | 工作线程数（默认为 CPU 核心数）                      |
-| `DATABASE_BACKEND`      | *(自动检测)*               | 存储类型：sqlite, postgres, mysql, mariadb      |
-| `DATABASE_URL`          | `shortlinks.db`         | 数据库 URL 或文件路径                            |
-| `DATABASE_POOL_SIZE`    | `10`                    | 数据库连接池大小                                 |
-| `DATABASE_TIMEOUT`      | `30`                    | 数据库连接超时（秒）                              |
-| `CACHE_TYPE`            | `memory`                | 缓存类型：memory, redis                       |
-| `CACHE_DEFAULT_TTL`     | `3600`                  | 默认缓存过期时间（秒）                             |
-| `REDIS_URL`             | `redis://127.0.0.1:6379/` | Redis 连接地址                             |
-| `REDIS_KEY_PREFIX`      | `shortlinker:`          | Redis 键前缀                                 |
-| `REDIS_POOL_SIZE`       | `10`                    | Redis 连接池大小                              |
-| `MEMORY_MAX_CAPACITY`   | `10000`                 | 内存缓存最大容量（条目数）                          |
-| `RUST_LOG`              | `info`                  | 日志等级                                     |
-
-#### 动态配置（存储在数据库，可通过管理面板修改）
-
-这些配置在首次启动时迁移到数据库。之后可通过管理面板或 API 在运行时修改。
-
-| 变量                      | 默认值                     | 说明                                        |
-| ----------------------- | ------------------------ | ------------------------------------------- |
-| `ADMIN_TOKEN`           | *(空)*                   | 管理 API 密钥                                |
-| `HEALTH_TOKEN`          | *(空)*                   | 健康检查密钥                                   |
-| `ACCESS_TOKEN_MINUTES`  | `15`                    | Access Token 有效期（分钟）                    |
-| `REFRESH_TOKEN_DAYS`    | `7`                     | Refresh Token 有效期（天）                     |
-| `ACCESS_COOKIE_NAME`    | `shortlinker_access`    | Access Token Cookie 名称                      |
-| `REFRESH_COOKIE_NAME`   | `shortlinker_refresh`   | Refresh Token Cookie 名称                     |
-| `COOKIE_SECURE`         | `false`                 | 是否仅 HTTPS 传输（生产环境建议启用）             |
-| `COOKIE_SAME_SITE`      | `Lax`                   | Cookie SameSite 策略                          |
-| `COOKIE_DOMAIN`         | *(空)*                   | Cookie 域名                                   |
-| `ADMIN_ROUTE_PREFIX`    | `/admin`                | 管理 API 路由前缀                             |
-| `HEALTH_ROUTE_PREFIX`   | `/health`               | 健康检查路由前缀                                |
-| `FRONTEND_ROUTE_PREFIX` | `/panel`                | Web 管理面板路由前缀                            |
-| `ENABLE_ADMIN_PANEL`    | `false`                 | 启用 Web 管理面板                             |
-| `RANDOM_CODE_LENGTH`    | `6`                     | 随机短码长度                                   |
-| `DEFAULT_URL`           | `https://esap.cc/repo`  | 默认跳转 URL                                 |
-| `ENABLE_CLICK_TRACKING` | `true`                  | 启用点击统计                                   |
-| `CLICK_FLUSH_INTERVAL`  | `30`                    | 点击刷新间隔（秒）                              |
-| `MAX_CLICKS_BEFORE_FLUSH` | `100`                 | 刷新前最大点击数                               |
-
-> **注意**：动态配置仅在**首次启动**（数据库为空时）从环境变量读取。之后请通过管理面板修改。
-
----
-
-## 📦 存储后端
-
-Shortlinker 现在使用 **Sea-ORM** 进行数据库操作，提供：
-- ✅ **原子化 upsert 操作**（防止竞态条件）
-- ✅ **从 DATABASE_URL 自动检测数据库类型**（无需指定 DATABASE_BACKEND）
-- ✅ **自动创建 SQLite 数据库文件**（如果不存在）
-- ✅ **自动执行数据库模式迁移**
-
-### 支持的数据库
-
-- **SQLite**（默认）：生产就绪，推荐用于单节点部署
-- **MySQL / MariaDB**：生产就绪，推荐用于多节点部署
-- **PostgreSQL**：生产就绪，推荐用于企业级部署
-
-### 数据库 URL 示例
-
-```bash
-# SQLite - 自动检测
-DATABASE_URL=links.db                    # 相对路径
-DATABASE_URL=/var/lib/shortlinker/links.db  # 绝对路径
-DATABASE_URL=sqlite://data/links.db      # 显式 SQLite URL
-
-# PostgreSQL - 自动检测
-DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
-DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
-
-# MySQL - 自动检测
-DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
-DATABASE_URL=mysql://user:pass@host:3306/db?charset=utf8mb4
-
-# MariaDB - 自动检测（使用 MySQL 协议）
-DATABASE_URL=mariadb://user:pass@localhost:3306/shortlinker
-```
-
-> 💡 **提示**：`DATABASE_BACKEND` 环境变量现在是**可选的**。数据库类型会从 `DATABASE_URL` 自动推断。只有在需要覆盖自动检测时才需要指定。
-
----
-
-## 📡 部署示例
-
-### Nginx 反向代理
-
-```nginx
-server {
-    listen 80;
-    server_name esap.cc;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-    }
-}
-```
-
-### systemd 服务
-
-```ini
-[Unit]
-Description=ShortLinker 服务
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/shortlinker
-ExecStart=/opt/shortlinker/shortlinker
-Restart=always
-Environment=SERVER_HOST=127.0.0.1
-Environment=SERVER_PORT=8080
-
-[Install]
-WantedBy=multi-user.target
-```
-
----
-
-## 🔧 开发者指南
-
-```bash
-cargo run           # 开发运行
-cargo build --release  # 生产构建
-cargo test          # 运行测试
-cargo fmt && cargo clippy  # 格式化与静态检查
-```
-
----
-
-## 🧩 相关模块
-
-* Web 管理面板：`admin-panel/`
-* Cloudflare Worker：无服务器版，位于 `cf-worker/`
-
----
-
-## 📜 协议
+## 许可证
 
 MIT License © AptS:1547
 
@@ -478,6 +127,3 @@ MIT License © AptS:1547
 
    「ready to 307 !」
 </pre>
-
-> [🔗 Visit Project Docs](https://esap.cc/docs)
-> [💬 Powered by AptS:1547](https://github.com/AptS-1547)

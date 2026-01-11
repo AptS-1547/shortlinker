@@ -9,506 +9,106 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/e1saps/shortlinker)](https://hub.docker.com/r/e1saps/shortlinker)
 
-**A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast.**
+A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust.
 
-[English](README.md) • [中文](README.zh.md)
+[English](README.md) | [中文](README.zh.md)
 
-![1749756794700](assets/admin-panel-dashboard.png)
+![admin-panel-dashboard](assets/admin-panel-dashboard.jpeg)
 
 </div>
 
-## 🚀 Benchmark (v0.2.0)
+## Features
 
-**Environment**
-
-- OS: Linux
-- CPU: Single-core @ 12th Gen Intel(R) Core(TM) i5-12500
-- Tool: [`wrk`](https://github.com/wg/wrk)
-
-| Type       | Scenario                        | QPS Peak          | Cache Hit | Bloom Filter | DB Access |
-| ---------- | ------------------------------- | ----------------- | --------- | ------------ | --------- |
-| Cache Hit  | Hot shortlink (repeated access) | **677,963.46** | ✅ Yes    | ✅ Yes       | ❌ No     |
-| Cache Miss | Cold shortlink (random access)  | **600,622.46** | ❌ No     | ✅ Yes       | ✅ Yes    |
-
-> 💡 Even under cache miss, the system sustains nearly 600k QPS — demonstrating excellent performance with SQLite, `actix-web`, and async caching.
-
-## ✨ Features
-
-* 🚀 **High Performance**: Built with Rust + Actix-web
-* 🎯 **Dynamic Management**: Add or remove links at runtime without restarting
-* 🎲 **Smart Short Codes**: Supports both custom and randomly generated codes
-* ⏰ **Expiration Support**: Set expiration times with flexible time formats (v0.1.1+)
-* 💾 **Multiple Storage Backends**: SQLite database, JSON file storage
-* 🔄 **Cross-Platform**: Works on Windows, Linux, and macOS
-* 🛡️ **Admin API**: HTTP API for link management (v0.0.5+)
-* 🏥 **Health Monitoring**: Built-in health check endpoints
-* 🐳 **Containerized**: Optimized Docker image for easy deployment
-* 🎨 **Beautiful CLI**: Colorized command-line interface
-* 🖥️ **TUI Mode**: Interactive terminal user interface (requires `tui` feature)
-* 🔌 **Unix Socket**: Support for Unix socket binding
-* 🔐 **Password Protection**: Protect links with access passwords
+- High performance with Rust + Actix-web
+- Multiple storage backends: SQLite, MySQL, PostgreSQL
+- Dynamic link management without restart
+- Custom and random short codes
+- Expiration support with flexible time formats
+- Password-protected links
+- Admin API with Bearer token authentication
+- Web admin panel
+- TUI mode for terminal users
+- Docker and Unix socket support
 
 ## Quick Start
 
-### Run Locally
+**Docker:**
 
 ```bash
-git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker
+docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
+```
+
+**Local:**
+
+```bash
+git clone https://github.com/AptS-1547/shortlinker && cd shortlinker
 cargo run
 ```
 
-### Deploy with Docker
+## CLI Usage
 
 ```bash
-# TCP port
-docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
-
-# Unix socket
-docker run -d -v $(pwd)/data:/data -v $(pwd)/sock:/sock \
-  -e UNIX_SOCKET=/sock/shortlinker.sock e1saps/shortlinker
+./shortlinker                                    # Start server
+./shortlinker tui                                # TUI mode (requires 'tui' feature)
+./shortlinker add github https://github.com     # Custom code
+./shortlinker add https://example.com           # Random code
+./shortlinker add secret https://example.com --password mypass  # Password protected
+./shortlinker add temp https://example.com --expire 7d          # Expires in 7 days
+./shortlinker list                              # List all links
+./shortlinker remove github                     # Remove link
+./shortlinker export links.json                 # Export to JSON
+./shortlinker import links.json                 # Import from JSON
 ```
 
-## Usage Example
-
-Once your domain (e.g. `esap.cc`) is bound:
-
-* `https://esap.cc/github` → custom short link
-* `https://esap.cc/aB3dF1` → random short link
-* `https://esap.cc/` → default homepage
-
-## Command-Line Management
+## Admin API
 
 ```bash
-# Start the server
-./shortlinker
-
-# Start TUI mode (requires 'tui' feature)
-./shortlinker tui
-
-# Add short links
-./shortlinker add github https://github.com           # Custom code
-./shortlinker add https://github.com                  # Random code
-./shortlinker add github https://new-url.com --force  # Overwrite existing
-
-# Using relative time format (v0.1.1+)
-./shortlinker add daily https://example.com --expire 1d      # Expires in 1 day
-./shortlinker add weekly https://example.com --expire 1w     # Expires in 1 week
-./shortlinker add complex https://example.com --expire 1d2h30m  # Complex format
-
-# Password protected links
-./shortlinker add secret https://example.com --password mypass  # Requires password to access
-
-# Manage links
-./shortlinker update github https://new-github.com --expire 30d
-./shortlinker list                    # List all links
-./shortlinker remove github           # Remove specific link
-
-# Import/Export
-./shortlinker export links.json       # Export all links to JSON
-./shortlinker import links.json       # Import links from JSON
-./shortlinker import links.json --force  # Overwrite existing links
-
-# Generate config file
-./shortlinker generate-config         # Generate config.toml example
-```
-
-## Admin API (v0.0.5+)
-
-HTTP API for link management with Bearer token authentication.
-
-### Setup
-
-```bash
+# Set token
 export ADMIN_TOKEN=your_secret_token
-export ADMIN_ROUTE_PREFIX=/admin  # optional
-```
 
-### Examples
+# List all links
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/link
 
-```bash
-# Get all links
-curl -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/link
-
-# Create link with relative time
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
+# Create link
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
      http://localhost:8080/admin/link
 
-# Auto-generate random code
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com","expires_at":"30d"}' \
-     http://localhost:8080/admin/link
-
-# Update link
-curl -X PUT \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://new-url.com"}' \
-     http://localhost:8080/admin/link/github
-
 # Delete link
-curl -X DELETE \
-     -H "Authorization: Bearer your_secret_token" \
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
      http://localhost:8080/admin/link/github
 ```
 
-### Batch Operations
-
-```bash
-# Batch create links
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
-     http://localhost:8080/admin/link/batch
-
-# Batch delete links
-curl -X DELETE \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '["link1","link2"]' \
-     http://localhost:8080/admin/link/batch
-```
-
-### Runtime Configuration API
-
-```bash
-# Get all runtime config
-curl -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/config
-
-# Update a config value
-curl -X PUT \
-     -H "Authorization: Bearer your_secret_token" \
-     -H "Content-Type: application/json" \
-     -d '{"value":"new_value"}' \
-     http://localhost:8080/admin/config/random_code_length
-
-# Reload configuration
-curl -X POST \
-     -H "Authorization: Bearer your_secret_token" \
-     http://localhost:8080/admin/config/reload
-```
-
-## Health Check API
-
-Monitor service health and storage status.
-
-```bash
-# Setup
-export HEALTH_TOKEN=your_health_token
-
-# Health check
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health
-
-# Readiness check
-curl http://localhost:8080/health/ready
-
-# Liveness check  
-curl http://localhost:8080/health/live
-```
-
-## Time Format Support (v0.1.1+)
-
-### Relative Time (Recommended)
-
-```bash
-1s, 5m, 2h, 1d, 1w, 1M, 1y    # Single units
-1d2h30m                        # Combined format
-```
-
-### RFC3339 Format
-
-```bash
-2024-12-31T23:59:59Z           # UTC time
-2024-12-31T23:59:59+08:00      # With timezone
-```
+See [Admin API docs](docs/en/api/admin.md) for batch operations, runtime config, and more.
 
 ## Configuration
 
-**shortlinker now supports TOML configuration files!**
-
-Supports both TOML configuration files and environment variables. TOML configuration is clearer and more readable, so it's recommended.
-
-### Custom Configuration File Path
-
-You can specify a custom configuration file path using the `-c` or `--config` parameter:
+Generate a config file:
 
 ```bash
-# Use custom config file
-./shortlinker -c /path/to/your/config.toml
-./shortlinker --config /path/to/your/config.toml
-
-# If the specified file doesn't exist, it will be created automatically with default settings
-./shortlinker -c /etc/shortlinker/custom.toml
-# [INFO] Configuration file not found: /etc/shortlinker/custom.toml
-# [INFO] Creating default configuration file...
-# [INFO] Default configuration file created at: /etc/shortlinker/custom.toml
+./shortlinker generate-config
 ```
 
-### TOML Configuration File
+This creates `config.toml` with server, database, cache, and logging settings.
 
-Create a `config.toml` file for **startup-only** settings. Other settings (API, routes, features) are stored in the database and can be modified via the admin panel at runtime.
+See [Configuration docs](docs/en/config/index.md) for all options.
 
-```toml
-[server]
-# Server listening address
-host = "127.0.0.1"
-# Server listening port
-port = 8080
-# Unix Socket path (if set, overrides host and port)
-# unix_socket = "/tmp/shortlinker.sock"
-# CPU core count (defaults to system cores)
-cpu_count = 4
+## Documentation
 
-[database]
-# Database connection URL or file path
-# The database type is automatically detected from the URL scheme:
-# - sqlite:// or .db/.sqlite files → SQLite
-# - postgres:// or postgresql:// → PostgreSQL
-# - mysql:// → MySQL
-# - mariadb:// → MariaDB (uses MySQL protocol)
-database_url = "shortlinks.db"
-# Database connection pool size
-pool_size = 10
-# Database connection timeout (seconds)
-timeout = 30
+- [Getting Started](docs/en/guide/getting-started.md)
+- [Configuration](docs/en/config/index.md)
+- [Storage Backends](docs/en/config/storage.md)
+- [Admin API](docs/en/api/admin.md)
+- [Health API](docs/en/api/health.md)
+- [Docker Deployment](docs/en/deployment/docker.md)
+- [systemd Service](docs/en/deployment/systemd.md)
+- [CLI Commands](docs/en/cli/commands.md)
 
-[cache]
-# Cache type: memory, redis (currently only memory is supported)
-type = "memory"
-# Default cache expiration time (seconds)
-default_ttl = 3600
+## Related
 
-[cache.redis]
-# Redis connection URL
-url = "redis://127.0.0.1:6379/"
-# Redis key prefix
-key_prefix = "shortlinker:"
-# Redis connection pool size
-pool_size = 10
-
-[cache.memory]
-# Memory cache maximum capacity (entries)
-max_capacity = 10000
-
-[logging]
-# Log level: trace, debug, info, warn, error
-level = "info"
-# Log output format: text, json
-format = "text"
-# Log file path (leave empty to output to console)
-# file = "shortlinker.log"
-# Max log file size (MB)
-max_size = 100
-# Number of log files to keep
-max_backups = 5
-# Enable log rotation
-enable_rotation = true
-```
-
-> 💡 **Note**: API tokens, JWT settings, route prefixes, and feature flags are now stored in the database. On first startup, they will be migrated from `config.toml` (if present) to the database. After that, modify them via the admin panel.
-
-**Configuration file loading:**
-
-When using `-c/--config` parameter:
-- Uses the specified path (auto-creates if not exists)
-- Example: `./shortlinker -c /path/to/config.toml`
-
-When no parameter is specified:
-- Only searches for `config.toml` in the current directory
-- If not found, uses in-memory default configuration
-
-### Environment Variables (Backward Compatible)
-
-Still supports the original environment variable configuration method. **Environment variables will override TOML configuration:**
-
-#### Startup Configuration (requires restart)
-
-| Variable               | Default                  | Description                                 |
-| ---------------------- | ------------------------ | ------------------------------------------- |
-| `SERVER_HOST`        | `127.0.0.1`            | Listen address                              |
-| `SERVER_PORT`        | `8080`                 | Listen port                                 |
-| `UNIX_SOCKET`        | *(empty)*              | Unix socket path (overrides HOST/PORT)      |
-| `CPU_COUNT`          | *(auto)*               | Worker thread count (defaults to CPU cores) |
-| `DATABASE_BACKEND`   | *(auto-detect)*        | Storage type: sqlite, postgres, mysql, mariadb |
-| `DATABASE_URL`       | `shortlinks.db`        | Database URL or file path                   |
-| `DATABASE_POOL_SIZE` | `10`                   | Database connection pool size               |
-| `DATABASE_TIMEOUT`   | `30`                   | Database connection timeout (seconds)       |
-| `CACHE_TYPE`         | `memory`               | Cache type: memory, redis                   |
-| `CACHE_DEFAULT_TTL`  | `3600`                 | Default cache TTL in seconds                |
-| `REDIS_URL`          | `redis://127.0.0.1:6379/` | Redis connection URL                    |
-| `REDIS_KEY_PREFIX`   | `shortlinker:`         | Redis key prefix                            |
-| `REDIS_POOL_SIZE`    | `10`                   | Redis connection pool size                  |
-| `MEMORY_MAX_CAPACITY`| `10000`                | Memory cache max capacity (entries)         |
-| `RUST_LOG`           | `info`                 | Log level                                   |
-
-#### Dynamic Configuration (stored in database, modifiable via admin panel)
-
-These settings are migrated to the database on first startup. Use the admin panel or API to modify them at runtime.
-
-| Variable               | Default                  | Description                                 |
-| ---------------------- | ------------------------ | ------------------------------------------- |
-| `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
-| `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
-| `ACCESS_TOKEN_MINUTES` | `15`                 | Access token expiration in minutes          |
-| `REFRESH_TOKEN_DAYS` | `7`                    | Refresh token expiration in days            |
-| `ACCESS_COOKIE_NAME` | `shortlinker_access`   | Access token cookie name                    |
-| `REFRESH_COOKIE_NAME`| `shortlinker_refresh`  | Refresh token cookie name                   |
-| `COOKIE_SECURE`      | `false`                | HTTPS-only cookies (enable in production)   |
-| `COOKIE_SAME_SITE`   | `Lax`                  | Cookie SameSite policy                      |
-| `COOKIE_DOMAIN`      | *(empty)*              | Cookie domain                               |
-| `ADMIN_ROUTE_PREFIX` | `/admin`               | Admin API route prefix                      |
-| `HEALTH_ROUTE_PREFIX`| `/health`              | Health API route prefix                     |
-| `FRONTEND_ROUTE_PREFIX` | `/panel`            | Web admin panel route prefix                |
-| `ENABLE_ADMIN_PANEL` | `false`                | Enable web admin panel                      |
-| `RANDOM_CODE_LENGTH` | `6`                    | Random code length                          |
-| `DEFAULT_URL`        | `https://esap.cc/repo` | Default redirect URL                        |
-| `ENABLE_CLICK_TRACKING` | `true`              | Enable click tracking                       |
-| `CLICK_FLUSH_INTERVAL` | `30`                 | Click flush interval (seconds)              |
-| `MAX_CLICKS_BEFORE_FLUSH` | `100`             | Max clicks before flush                     |
-
-> **Note**: Dynamic configuration is only read from environment variables on **first startup** (when the database is empty). After that, modify them via the admin panel.
-
-### .env Example
-
-```bash
-# Server - TCP
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
-CPU_COUNT=4
-
-# Server - Unix socket
-# UNIX_SOCKET=/tmp/shortlinker.sock
-
-# Storage (DATABASE_BACKEND is optional - auto-detected from DATABASE_URL)
-# SQLite (file path or URL)
-DATABASE_URL=data/links.db
-
-# PostgreSQL
-# DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
-
-# MySQL
-# DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
-
-# Logging
-RUST_LOG=info
-
-# The following settings are only used on FIRST startup (migrated to database)
-# After that, modify them via the admin panel
-ADMIN_TOKEN=your_admin_token
-HEALTH_TOKEN=your_health_token
-```
-
-## Storage Backends
-
-Shortlinker now uses **Sea-ORM** for database operations, providing:
-- ✅ **Atomic upsert operations** (prevents race conditions)
-- ✅ **Auto-detection from DATABASE_URL** (no need to specify DATABASE_BACKEND)
-- ✅ **Auto-create SQLite database** files if they don't exist
-- ✅ **Automatic schema migrations**
-
-### Supported Databases
-
-- **SQLite** (default): Production-ready, recommended for single-node deployments
-- **MySQL / MariaDB**: Production-ready, recommended for multi-node deployments
-- **PostgreSQL**: Production-ready, recommended for enterprise deployments
-
-### Database URL Examples
-
-```bash
-# SQLite - Auto-detected
-DATABASE_URL=links.db                    # Relative path
-DATABASE_URL=/var/lib/shortlinker/links.db  # Absolute path
-DATABASE_URL=sqlite://data/links.db      # Explicit SQLite URL
-
-# PostgreSQL - Auto-detected
-DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
-DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require
-
-# MySQL - Auto-detected
-DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
-DATABASE_URL=mysql://user:pass@host:3306/db?charset=utf8mb4
-
-# MariaDB - Auto-detected (uses MySQL protocol)
-DATABASE_URL=mariadb://user:pass@localhost:3306/shortlinker
-```
-
-> 💡 **Tip**: The `DATABASE_BACKEND` environment variable is now **optional**. The database type is automatically inferred from your `DATABASE_URL`. Only specify it if you need to override auto-detection.
-
-
-## Deployment
-
-### Reverse Proxy (Nginx)
-
-```nginx
-# TCP port
-server {
-    listen 80;
-    server_name esap.cc;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-}
-
-# Unix socket
-server {
-    listen 80;
-    server_name esap.cc;
-    location / {
-        proxy_pass http://unix:/tmp/shortlinker.sock;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-}
-```
-
-### systemd Service
-
-```ini
-[Unit]
-Description=ShortLinker Service
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/shortlinker
-ExecStart=/opt/shortlinker/shortlinker
-Restart=always
-Environment=SERVER_HOST=127.0.0.1
-Environment=SERVER_PORT=8080
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## Development
-
-```bash
-# Development
-cargo run
-
-# Production build
-cargo build --release
-
-# Run tests
-cargo test
-
-# Code quality
-cargo fmt && cargo clippy
-```
-## Related Modules
-
-- **Web Admin Panel**: GUI to manage links in `admin-panel/` ([docs](/admin-panel/))
-- **Cloudflare Worker**: Serverless version in `cf-worker/` ([docs](/cf-worker/))
+- [Web Admin Panel](admin-panel/) - GUI for link management
+- [Cloudflare Worker](cf-worker/) - Serverless version
 
 ## License
 
@@ -527,6 +127,3 @@ MIT License © AptS:1547
 
    「ready to 307 !」
 </pre>
-
-> [🔗 Visit Project Docs](https://esap.cc/docs)
-> [💬 Powered by AptS:1547](https://github.com/AptS-1547)
