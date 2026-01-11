@@ -72,7 +72,7 @@ impl RedirectService {
     }
 
     fn update_click(code: &str) {
-        let code = code.to_string();
+        let code: Arc<str> = Arc::from(code);
         tokio::spawn(async move {
             match get_click_manager() {
                 Some(manager) => {

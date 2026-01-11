@@ -11,7 +11,7 @@ use sea_orm::{
     ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
     QuerySelect,
 };
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
@@ -407,59 +407,55 @@ impl SeaOrmStorage {
 #[async_trait]
 impl ClickSink for SeaOrmStorage {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
-        use sea_orm::{ExprTrait, TransactionTrait, sea_query::Expr};
+        use sea_orm::sea_query::{
+            CaseStatement, Expr, MysqlQueryBuilder, PostgresQueryBuilder, Query, SqliteQueryBuilder,
+        };
+        use sea_orm::{ConnectionTrait, DatabaseBackend, ExprTrait};
 
         if updates.is_empty() {
             return Ok(());
         }
 
         let total_count = updates.len();
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| anyhow::anyhow!("开始事务失败: {}", e))?;
 
-        let mut failed_updates: Vec<(String, String)> = Vec::new();
+        // 构建 CASE WHEN 表达式（跨平台兼容）
+        let mut case_stmt = CaseStatement::new();
+        let mut codes: Vec<String> = Vec::with_capacity(total_count);
 
         for (code, count) in &updates {
-            // 使用原生 SQL 进行原子增量更新
-            let update_result = short_link::Entity::update_many()
-                .col_expr(
-                    short_link::Column::ClickCount,
-                    Expr::col(short_link::Column::ClickCount).add(*count as i64),
-                )
-                .filter(short_link::Column::ShortCode.eq(code))
-                .exec(&txn)
-                .await;
-
-            if let Err(e) = update_result {
-                failed_updates.push((code.clone(), e.to_string()));
-            }
-        }
-
-        // 即使有部分失败，也提交成功的更新
-        txn.commit()
-            .await
-            .map_err(|e| anyhow::anyhow!("提交事务失败: {}", e))?;
-
-        let success_count = total_count - failed_updates.len();
-
-        // 报告失败情况
-        if !failed_updates.is_empty() {
-            error!(
-                "部分点击计数更新失败 ({}/{}): {:?}",
-                failed_updates.len(),
-                total_count,
-                failed_updates
+            case_stmt = case_stmt.case(
+                Expr::col(short_link::Column::ShortCode).eq(Expr::val(code.as_str())),
+                Expr::col(short_link::Column::ClickCount).add(Expr::val(*count as i64)),
             );
+            codes.push(code.clone());
         }
+        // 不匹配的保持原值
+        case_stmt = case_stmt.finally(Expr::col(short_link::Column::ClickCount));
 
-        trace!(
-            "点击计数已刷新到 {} 数据库 ({} 成功, {} 失败)",
+        // 构建 UPDATE 语句
+        let stmt = Query::update()
+            .table(short_link::Entity)
+            .value(short_link::Column::ClickCount, case_stmt)
+            .and_where(Expr::col(short_link::Column::ShortCode).is_in(codes))
+            .to_owned();
+
+        // 使用 to_string 生成内联值的 SQL（根据数据库类型选择对应的 QueryBuilder）
+        let sql = match self.db.get_database_backend() {
+            DatabaseBackend::Sqlite => stmt.to_string(SqliteQueryBuilder),
+            DatabaseBackend::MySql => stmt.to_string(MysqlQueryBuilder),
+            DatabaseBackend::Postgres => stmt.to_string(PostgresQueryBuilder),
+            _ => stmt.to_string(SqliteQueryBuilder), // fallback to SQLite
+        };
+
+        self.db
+            .execute_unprepared(&sql)
+            .await
+            .map_err(|e| anyhow::anyhow!("批量更新点击数失败: {}", e))?;
+
+        debug!(
+            "点击计数已刷新到 {} 数据库 ({} 条记录)",
             self.backend_name.to_uppercase(),
-            success_count,
-            failed_updates.len()
+            total_count
         );
         Ok(())
     }

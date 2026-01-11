@@ -18,8 +18,8 @@ use crate::analytics::ClickSink;
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
-    /// 点击计数缓冲区
-    data: DashMap<String, usize>,
+    /// 点击计数缓冲区（使用 Arc<str> 减少克隆开销）
+    data: DashMap<Arc<str>, usize>,
     /// 缓冲区中唯一键的数量
     counter: AtomicUsize,
     /// 刷盘锁，防止并发刷盘
@@ -44,8 +44,8 @@ impl ClickBuffer {
             return self.counter.load(Ordering::Relaxed);
         }
 
-        // 只有在需要插入新条目时才克隆字符串
-        self.data.insert(key.to_string(), 1);
+        // 只有在需要插入新条目时才创建 Arc<str>
+        self.data.insert(Arc::from(key), 1);
         trace!("ClickBuffer: Inserted new key: {}", key);
 
         self.counter.fetch_add(1, Ordering::Relaxed) + 1
@@ -56,7 +56,7 @@ impl ClickBuffer {
         let updates: Vec<_> = self
             .data
             .iter()
-            .map(|entry| (entry.key().clone(), *entry.value()))
+            .map(|entry| (entry.key().to_string(), *entry.value()))
             .collect();
 
         if !updates.is_empty() {

@@ -1,0 +1,9 @@
+services:
+  shortlinker:
+    container_name: shortlinker
+    image: ghcr.io/apts-1547/shortlinker:latest
+    restart: always
+    volumes:
+      - ./config.toml:/config.toml
+      - /etc/localtime:/etc/localtime:ro
+      - ./data:/data

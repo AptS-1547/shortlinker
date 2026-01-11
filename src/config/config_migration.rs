@@ -1,4 +1,4 @@
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::config::AppConfig;
 use crate::errors::Result;
@@ -12,11 +12,14 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
     // 检查是否已有配置
     let count = store.count().await?;
     if count > 0 {
-        info!("数据库中已有 {} 条配置，跳过迁移", count);
+        debug!(
+            "Database already has {} configuration items, skipping migration",
+            count
+        );
         return Ok(());
     }
 
-    info!("首次启动，从 config.toml 迁移配置到数据库...");
+    info!("Starting configuration migration to database");
 
     // API 认证配置（敏感）
     store
@@ -216,6 +219,6 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         )
         .await?;
 
-    info!("配置迁移完成");
+    info!("Configuration migration completed successfully");
     Ok(())
 }

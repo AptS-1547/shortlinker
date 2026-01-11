@@ -3123,6 +3123,7 @@ dependencies = [
  "nix",
  "num_cpus",
  "once_cell",
+ "parking_lot",
  "rand 0.9.2",
  "ratatui",
  "redis",

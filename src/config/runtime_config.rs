@@ -37,7 +37,9 @@ impl RuntimeConfig {
         // 更新内部缓存
         {
             let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::database_operation("无法获取配置缓存写锁".to_string())
+                ShortlinkerError::database_operation(
+                    "Cannot acquire runtime config cache write lock".to_string(),
+                )
             })?;
             *cache = configs.clone();
         }
@@ -47,7 +49,7 @@ impl RuntimeConfig {
             update_config_by_key(key, &item.value);
         }
 
-        info!("运行时配置已加载，共 {} 项", count);
+        info!("Loaded {} runtime configuration items from database", count);
         Ok(())
     }
 
@@ -138,7 +140,10 @@ impl RuntimeConfig {
                 item.updated_at = chrono::Utc::now();
             }
         } else {
-            warn!("无法获取配置缓存写锁，缓存可能不同步");
+            warn!(
+                "Cannot acquire runtime config cache write lock, skipping cache update for key: {}",
+                key
+            );
         }
 
         // 如果不需要重启，同步更新 AppConfig
@@ -168,7 +173,9 @@ pub async fn init_runtime_config(db: DatabaseConnection) -> Result<()> {
     config.load().await?;
 
     RUNTIME_CONFIG.set(config).map_err(|_| {
-        ShortlinkerError::database_operation("运行时配置已初始化，不能重复初始化".to_string())
+        ShortlinkerError::database_operation(
+            "Runtime configuration already initialized".to_string(),
+        )
     })?;
 
     Ok(())
@@ -181,7 +188,7 @@ pub async fn init_runtime_config(db: DatabaseConnection) -> Result<()> {
 pub fn get_runtime_config() -> &'static RuntimeConfig {
     RUNTIME_CONFIG
         .get()
-        .expect("运行时配置未初始化，请先调用 init_runtime_config")
+        .expect("Runtime configuration not initialized, please call init_runtime_config() first")
 }
 
 /// 尝试获取全局运行时配置
