@@ -33,8 +33,7 @@ Environment=SERVER_PORT=8080
 # 环境变量 - Unix 套接字（二选一）
 # Environment=UNIX_SOCKET=/tmp/shortlinker.sock
 
-Environment=STORAGE_BACKEND=sqlite
-Environment=DB_FILE_NAME=/opt/shortlinker/data/links.db
+Environment=DATABASE_URL=sqlite:///opt/shortlinker/data/links.db
 Environment=DEFAULT_URL=https://example.com
 Environment=RUST_LOG=info
 
@@ -101,8 +100,7 @@ services:
       - ./data:/data
     environment:
       - SERVER_HOST=0.0.0.0
-      - STORAGE_BACKEND=sqlite
-      - DB_FILE_NAME=/data/shortlinker.data
+      - DATABASE_URL=sqlite:///data/shortlinker.db
       - DEFAULT_URL=https://your-domain.com
       - RUST_LOG=info
     healthcheck:

@@ -122,8 +122,7 @@ kill -USR1 $(cat shortlinker.pid)
 # Production .env configuration
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+DATABASE_URL=sqlite:///data/links.db
 DEFAULT_URL=https://your-domain.com
 
 # Enable API features
@@ -156,8 +155,7 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - STORAGE_BACKEND=sqlite
-      - DB_FILE_NAME=/data/links.db
+      - DATABASE_URL=sqlite:///data/links.db
 ```
 
 ## Next Steps

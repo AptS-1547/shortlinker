@@ -113,17 +113,18 @@ Shortlinker supports multiple storage backends. You can choose the most suitable
 **Configuration Examples**:
 
 ```bash
-STORAGE_BACKEND=sqlite
-DATABASE_URL=./data/links.db
-
 # Relative path (recommended)
-DATABASE_URL=./shortlinker.db
+DATABASE_URL=sqlite://./shortlinker.db
+DATABASE_URL=sqlite://./data/links.db
 
 # Absolute path
-DATABASE_URL=/var/lib/shortlinker/links.db
+DATABASE_URL=sqlite:///var/lib/shortlinker/links.db
+
+# Explicit SQLite URL
+DATABASE_URL=sqlite://./data/links.db
 
 # In-memory database (for testing)
-DATABASE_URL=:memory:
+DATABASE_URL=sqlite::memory:
 ```
 
 **Use Cases**:
@@ -146,8 +147,9 @@ DATABASE_URL=:memory:
 **Configuration Examples**:
 
 ```bash
-STORAGE_BACKEND=postgres
+# Standard connection URL
 DATABASE_URL=postgresql://user:password@localhost:5432/shortlinker
+DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
 
 # Production environment example
 DATABASE_URL=postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require
@@ -184,7 +186,7 @@ docker run --name postgres-shortlinker \
 **Configuration Examples**:
 
 ```bash
-STORAGE_BACKEND=mysql
+# Standard connection URL
 DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
 
 # Production environment example
@@ -222,10 +224,10 @@ docker run --name mysql-shortlinker \
 **Configuration Examples**:
 
 ```bash
-STORAGE_BACKEND=mariadb
-DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
+# MariaDB uses mariadb:// scheme (auto-converts to MySQL protocol)
+DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
 
-# Note: MariaDB uses the same mysql:// protocol
+# Also supports mysql:// scheme (backward compatible)
 DATABASE_URL=mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod
 ```
 
@@ -252,28 +254,33 @@ docker run --name mariadb-shortlinker \
 ### Selection by Deployment Scale
 
 ```bash
-# Medium scale (1,000 - 100,000 links)
-STORAGE_BACKEND=sqlite
-DATABASE_URL=./links.db
+# Small scale (< 10,000 links)
+DATABASE_URL=sqlite://./links.db
+
+# Medium scale (10,000 - 100,000 links)
+DATABASE_URL=sqlite://./links.db
+# Or use MySQL/MariaDB
+DATABASE_URL=mysql://user:pass@host:3306/db
 
 # Large scale (> 100,000 links)
-STORAGE_BACKEND=postgres  # or mysql/mariadb
 DATABASE_URL=postgresql://user:pass@host:5432/db
+# Or use MySQL/MariaDB
+DATABASE_URL=mysql://user:pass@host:3306/db
 ```
 
 ### Selection by Use Case
 
 ```bash
+# Development environment
+DATABASE_URL=sqlite://./dev.db
+
 # Testing environment
-STORAGE_BACKEND=sqlite
-DATABASE_URL=:memory:
+DATABASE_URL=sqlite::memory:
 
 # Production environment (single machine)
-STORAGE_BACKEND=sqlite
-DATABASE_URL=/data/links.db
+DATABASE_URL=sqlite:///data/links.db
 
 # Production environment (cluster)
-STORAGE_BACKEND=postgres
 DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 ```
 
@@ -281,13 +288,15 @@ DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 
 ```bash
 # Low concurrency (< 100 QPS)
-STORAGE_BACKEND=sqlite
+DATABASE_URL=sqlite://links.db
 
 # Medium concurrency (100-1000 QPS)
-STORAGE_BACKEND=sqlite  # or mysql/mariadb
+DATABASE_URL=sqlite://links.db
+# Or MySQL/MariaDB
+# DATABASE_URL=mysql://user:pass@host:3306/db
 
 # High concurrency (> 1000 QPS)
-STORAGE_BACKEND=postgres  # recommended
+DATABASE_URL=postgres://user:pass@host:5432/shortlinker  # recommended
 ```
 
 ## Performance Benchmark Data

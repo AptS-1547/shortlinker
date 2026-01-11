@@ -87,8 +87,7 @@ SERVER_PORT=8080
 RUST_LOG=debug
 
 # Storage configuration - SQLite for development
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=dev-links.db
+DATABASE_URL=sqlite://dev-links.db
 
 # API configuration - simple tokens for development
 ADMIN_TOKEN=dev_admin
@@ -105,8 +104,7 @@ RUST_LOG=info
 DEFAULT_URL=https://your-domain.com
 
 # Storage configuration - SQLite for production performance
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+DATABASE_URL=sqlite:///data/links.db
 
 # API configuration - use strong passwords
 ADMIN_TOKEN=very_secure_production_token_456
@@ -124,8 +122,7 @@ CPU_COUNT=4
 # UNIX_SOCKET=/tmp/shortlinker.sock
 
 # Storage configuration
-STORAGE_BACKEND=sqlite
-DB_FILE_NAME=/data/links.db
+DATABASE_URL=sqlite:///data/links.db
 
 # API configuration
 ADMIN_TOKEN=docker_admin_token_123

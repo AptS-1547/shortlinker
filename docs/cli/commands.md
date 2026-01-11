@@ -62,24 +62,6 @@
 ./shortlinker list
 ```
 
-### start - 后台启动服务器
-
-```bash
-./shortlinker start
-```
-
-### stop - 停止服务器
-
-```bash
-./shortlinker stop
-```
-
-### restart - 重启服务器
-
-```bash
-./shortlinker restart
-```
-
 ### help - 查看帮助
 
 ```bash
@@ -112,6 +94,18 @@
 ./shortlinker update <短码> <新目标URL> [选项]
 ```
 
+**选项**:
+- `--expire <时间>`: 设置新的过期时间
+- `--password <密码>`: 设置或更新密码
+
+**示例**:
+```bash
+./shortlinker update github https://new-github.com
+./shortlinker update github https://new-github.com --expire 30d
+./shortlinker update github https://new-github.com --password secret123
+./shortlinker update github https://new-github.com --expire 7d --password newpass
+```
+
 ## 过期时间格式
 
 ```bash
@@ -129,8 +123,8 @@
 ```json
 [
   {
-    "short_code": "github",
-    "target_url": "https://github.com",
+    "code": "github",
+    "target": "https://github.com",
     "created_at": "2024-12-15T14:30:22Z",
     "expires_at": null,
     "click": 0
@@ -141,9 +135,7 @@
 ## 环境变量
 
 ```bash
-RANDOM_CODE_LENGTH=6      # 随机短码长度
-STORAGE_BACKEND=sqlite    # 存储后端类型
-DB_FILE_NAME=links.db     # 数据库文件路径
+DATABASE_URL=sqlite://links.db  # 数据库连接 URL
 ```
 
 > 完整的环境变量配置请参考 [环境变量配置](/config/)

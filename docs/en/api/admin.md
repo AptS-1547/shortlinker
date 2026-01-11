@@ -40,6 +40,7 @@ curl -H "Authorization: Bearer your_token" \
 |-----------|------|-------------|---------|
 | `page` | Integer | Page number (starts from 1) | `?page=1` |
 | `page_size` | Integer | Items per page (1-100) | `?page_size=20` |
+| `search` | String | Fuzzy search on short codes and target URLs | `?search=github` |
 | `created_after` | RFC3339 | Filter by creation time (after) | `?created_after=2024-01-01T00:00:00Z` |
 | `created_before` | RFC3339 | Filter by creation time (before) | `?created_before=2024-12-31T23:59:59Z` |
 | `only_expired` | Boolean | Show only expired links | `?only_expired=true` |
@@ -160,6 +161,105 @@ curl -X DELETE \
      http://localhost:8080/admin/link/github
 ```
 
+### GET /admin/stats - Get Statistics
+
+```bash
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/stats
+```
+
+**Response Format**:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "total_links": 100,
+    "total_clicks": 5000,
+    "active_links": 80
+  }
+}
+```
+
+**Field Description**:
+- `total_links`: Total number of short links
+- `total_clicks`: Total click count
+- `active_links`: Number of active (non-expired) links
+
+## Batch Operations
+
+### POST /admin/link/batch - Batch Create Short Links
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### PUT /admin/link/batch - Batch Update Short Links
+
+```bash
+curl -X PUT \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://new-example1.com"},{"code":"link2","target":"https://new-example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### DELETE /admin/link/batch - Batch Delete Short Links
+
+```bash
+curl -X DELETE \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '["link1","link2","link3"]' \
+     http://localhost:8080/admin/link/batch
+```
+
+## Authentication Endpoints
+
+### POST /admin/auth/login - Login
+
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"password":"your_admin_token"}' \
+     http://localhost:8080/admin/auth/login
+```
+
+**Response**: Returns JWT Access Token and Refresh Token (via Cookie or response body).
+
+### POST /admin/auth/refresh - Refresh Token
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_refresh_token" \
+     http://localhost:8080/admin/auth/refresh
+```
+
+**Response**: Returns new Access Token.
+
+### POST /admin/auth/logout - Logout
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/auth/logout
+```
+
+**Response**: Clears authentication Cookie and invalidates Token.
+
+### GET /admin/auth/verify - Verify Token
+
+```bash
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/auth/verify
+```
+
+**Response**: Verifies whether current Token is valid.
+
 ## Error Codes
 
 | Error Code | Description |
@@ -216,44 +316,43 @@ result = admin.create_link('test', 'https://example.com')
 
 ### Password Protection Feature ⚠️
 
-**Current Status**: Experimental / Not Fully Implemented
+**Current Status**: Experimental / Partially Implemented
 
-Shortlinker supports setting password fields for short links, but **the current version only supports storing passwords, validation is not performed during access**.
+Shortlinker supports setting password fields for short links. **Current version supports storing passwords (using Argon2 hash encryption), but validation is not performed during access**.
 
 **Implemented**:
 - ✅ Create password-protected short links via API
-- ✅ Store and query password fields
+- ✅ Passwords are hashed using Argon2 algorithm (secure storage)
+- ✅ Store and query password fields (API returns hash value)
 - ✅ Update and delete passwords
 
 **Not Implemented**:
 - ❌ Password validation when accessing short links
 - ❌ Password validation page
-- ❌ Encrypted password storage (currently plaintext)
 
 **Usage Example**:
 
 ```bash
-# Create password-protected short link (password stored but not validated)
+# Create password-protected short link (password is hashed but not validated on access)
 curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"secret","target":"https://example.com","password":"mypass123"}' \
      http://localhost:8080/admin/link
 
-# Query returns password field
+# Query returns password hash value
 curl -H "Authorization: Bearer your_token" \
      http://localhost:8080/admin/link/secret
-# Returns: {"code":"secret","target":"...","password":"mypass123",...}
+# Returns: {"code":"secret","target":"...","password":"$argon2id$...",...}
 ```
 
-**Security Warnings**:
-- 🚨 Passwords are stored in plaintext in the database
-- 🚨 No password required when accessing short links
-- 🚨 Not recommended for production use
+**Security Notes**:
+- ✅ Passwords are hashed using Argon2 algorithm, irreversible
+- ⚠️ No password required when accessing short links
+- ⚠️ Feature not fully implemented, not recommended for production use
 
 **Planned Improvements**:
 - Implement password validation page
-- Support password hashing
 - Support multiple validation methods (HTTP Basic Auth, query parameters, etc.)
 
 For complete password protection functionality, it's recommended to implement access control at the reverse proxy layer (e.g., Nginx).

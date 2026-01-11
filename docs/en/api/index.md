@@ -39,7 +39,7 @@ Cache-Control: no-cache, no-store, must-revalidate
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: text/html; charset=utf-8
-Cache-Control: no-cache, no-store, must-revalidate
+Cache-Control: public, max-age=60
 
 Not Found
 ```
@@ -121,10 +121,12 @@ def check_short_link(base_url, short_code):
 
 ## Caching Strategy
 
-All responses include `Cache-Control: no-cache, no-store, must-revalidate` header to ensure:
-- Browsers won't cache redirect responses
-- Short link modifications take effect immediately
-- Expiration checks are performed in real-time
+- **307 Redirect responses**: Include `Cache-Control: no-cache, no-store, must-revalidate` to ensure:
+  - Browsers won't cache redirect responses
+  - Short link modifications take effect immediately
+  - Expiration checks are performed in real-time
+
+- **404 Not Found responses**: Include `Cache-Control: public, max-age=60` to allow short-term caching and reduce invalid requests.
 
 ## Performance Characteristics
 

@@ -40,6 +40,7 @@ curl -H "Authorization: Bearer your_token" \
 |------|------|------|------|
 | `page` | Integer | 页码（从1开始） | `?page=1` |
 | `page_size` | Integer | 每页数量（1-100） | `?page_size=20` |
+| `search` | String | 模糊搜索短码和目标 URL | `?search=github` |
 | `created_after` | RFC3339 | 创建时间过滤（晚于） | `?created_after=2024-01-01T00:00:00Z` |
 | `created_before` | RFC3339 | 创建时间过滤（早于） | `?created_before=2024-12-31T23:59:59Z` |
 | `only_expired` | Boolean | 仅显示已过期 | `?only_expired=true` |
@@ -59,6 +60,10 @@ curl -H "Authorization: Bearer your_token" \
 # 组合查询：第1页，仅活跃，按时间过滤
 curl -H "Authorization: Bearer your_token" \
      "http://localhost:8080/admin/link?page=1&page_size=20&only_active=true&created_after=2024-01-01T00:00:00Z"
+
+# 搜索包含 github 的链接
+curl -H "Authorization: Bearer your_token" \
+     "http://localhost:8080/admin/link?search=github"
 ```
 
 **响应格式**（分页）：
@@ -160,6 +165,105 @@ curl -X DELETE \
      http://localhost:8080/admin/link/github
 ```
 
+### GET /admin/stats - 获取统计信息
+
+```bash
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/stats
+```
+
+**响应格式**：
+
+```json
+{
+  "code": 0,
+  "data": {
+    "total_links": 100,
+    "total_clicks": 5000,
+    "active_links": 80
+  }
+}
+```
+
+**字段说明**：
+- `total_links`：短链接总数
+- `total_clicks`：总点击次数
+- `active_links`：未过期的活跃链接数
+
+## 批量操作
+
+### POST /admin/link/batch - 批量创建短链接
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### PUT /admin/link/batch - 批量更新短链接
+
+```bash
+curl -X PUT \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '[{"code":"link1","target":"https://new-example1.com"},{"code":"link2","target":"https://new-example2.com"}]' \
+     http://localhost:8080/admin/link/batch
+```
+
+### DELETE /admin/link/batch - 批量删除短链接
+
+```bash
+curl -X DELETE \
+     -H "Authorization: Bearer your_token" \
+     -H "Content-Type: application/json" \
+     -d '["link1","link2","link3"]' \
+     http://localhost:8080/admin/link/batch
+```
+
+## 认证接口
+
+### POST /admin/auth/login - 登录
+
+```bash
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"password":"your_admin_token"}' \
+     http://localhost:8080/admin/auth/login
+```
+
+**响应**：返回 JWT Access Token 和 Refresh Token（通过 Cookie 或响应体）。
+
+### POST /admin/auth/refresh - 刷新 Token
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_refresh_token" \
+     http://localhost:8080/admin/auth/refresh
+```
+
+**响应**：返回新的 Access Token。
+
+### POST /admin/auth/logout - 登出
+
+```bash
+curl -X POST \
+     -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/auth/logout
+```
+
+**响应**：清除认证 Cookie 并使 Token 失效。
+
+### GET /admin/auth/verify - 验证 Token
+
+```bash
+curl -H "Authorization: Bearer your_token" \
+     http://localhost:8080/admin/auth/verify
+```
+
+**响应**：验证当前 Token 是否有效。
+
 ## 错误码
 
 | 错误码 | 说明 |
@@ -216,44 +320,43 @@ result = admin.create_link('test', 'https://example.com')
 
 ### 密码保护功能 ⚠️
 
-**当前状态**：实验性 / 未完全实现
+**当前状态**：实验性 / 部分实现
 
-Shortlinker 支持为短链接设置密码字段，但**当前版本仅支持存储密码，不会在访问时验证**。
+Shortlinker 支持为短链接设置密码字段，**当前版本支持存储密码（使用 Argon2 哈希加密），但访问时暂不验证**。
 
 **已实现**：
 - ✅ 通过 API 创建带密码的短链接
-- ✅ 存储和查询密码字段
+- ✅ 密码使用 Argon2 算法哈希存储（安全存储）
+- ✅ 存储和查询密码字段（API 返回时显示为已设置状态）
 - ✅ 更新和删除密码
 
 **未实现**：
 - ❌ 访问短链接时的密码验证
 - ❌ 密码验证页面
-- ❌ 密码加密存储（当前为明文）
 
 **使用示例**：
 
 ```bash
-# 创建带密码的短链接（密码会被存储但不会验证）
+# 创建带密码的短链接（密码会被哈希存储但访问时不验证）
 curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"secret","target":"https://example.com","password":"mypass123"}' \
      http://localhost:8080/admin/link
 
-# 查询时会返回密码字段
+# 查询时返回密码哈希值
 curl -H "Authorization: Bearer your_token" \
      http://localhost:8080/admin/link/secret
-# 返回: {"code":"secret","target":"...","password":"mypass123",...}
+# 返回: {"code":"secret","target":"...","password":"$argon2id$...",...}
 ```
 
-**安全警告**：
-- 🚨 密码以明文存储在数据库中
-- 🚨 访问短链接时不会要求输入密码
-- 🚨 不建议在生产环境中使用此功能
+**安全说明**：
+- ✅ 密码使用 Argon2 算法哈希存储，不可逆
+- ⚠️ 访问短链接时暂不要求输入密码
+- ⚠️ 功能尚未完全实现，不建议在生产环境依赖此功能
 
 **计划改进**：
 - 实现密码验证页面
-- 支持密码哈希存储
 - 支持多种验证方式（HTTP Basic Auth、查询参数等）
 
 如需完整的密码保护功能，建议在反向代理层（如 Nginx）实现访问控制。

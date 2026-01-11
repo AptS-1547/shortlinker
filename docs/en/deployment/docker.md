@@ -30,8 +30,7 @@ docker run -d -p 8080:8080 e1saps/shortlinker
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/data \
-  -e STORAGE_BACKEND=sqlite \
-  -e DB_FILE_NAME=/data/shortlinker.data \
+  -e DATABASE_URL=sqlite:///data/shortlinker.db \
   e1saps/shortlinker
 
 # Unix socket
@@ -39,8 +38,7 @@ docker run -d \
   -v $(pwd)/data:/data \
   -v $(pwd)/sock:/sock \
   -e UNIX_SOCKET=/sock/shortlinker.sock \
-  -e STORAGE_BACKEND=sqlite \
-  -e DB_FILE_NAME=/data/shortlinker.data \
+  -e DATABASE_URL=sqlite:///data/shortlinker.db \
   e1saps/shortlinker
 ```
 
@@ -62,8 +60,7 @@ services:
     environment:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
-      - STORAGE_BACKEND=sqlite
-      - DB_FILE_NAME=/data/shortlinker.data
+      - DATABASE_URL=sqlite:///data/shortlinker.db
       - DEFAULT_URL=https://example.com
       - RUST_LOG=info
     restart: unless-stopped
@@ -91,8 +88,7 @@ services:
       - SERVER_PORT=8080
       # Unix socket configuration (choose one)
       # - UNIX_SOCKET=/sock/shortlinker.sock
-      - STORAGE_BACKEND=sqlite
-      - DB_FILE_NAME=/data/links.db
+      - DATABASE_URL=sqlite:///data/links.db
       - DEFAULT_URL=https://your-domain.com
       - ADMIN_TOKEN=${ADMIN_TOKEN}
     restart: unless-stopped

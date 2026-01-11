@@ -35,20 +35,23 @@ curl -H "Authorization: Bearer your_health_token" \
 **Response Example**:
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-06-01T12:00:00Z",
-  "uptime": 3600,
-  "checks": {
-    "storage": {
-      "status": "healthy",
-      "links_count": 42,
-      "backend": {
-        "storage_type": "sqlite",
-        "support_click": true
+  "code": 0,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2025-06-01T12:00:00Z",
+    "uptime": 3600,
+    "checks": {
+      "storage": {
+        "status": "healthy",
+        "links_count": 42,
+        "backend": {
+          "storage_type": "sqlite",
+          "support_click": true
+        }
       }
-    }
-  },
-  "response_time_ms": 15
+    },
+    "response_time_ms": 15
+  }
 }
 ```
 
@@ -56,13 +59,14 @@ curl -H "Authorization: Bearer your_health_token" \
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | String | Overall health status: `healthy` or `unhealthy` |
-| `timestamp` | RFC3339 | Timestamp of the check |
-| `uptime` | Integer | Service uptime in seconds |
-| `checks.storage.status` | String | Storage backend health status |
-| `checks.storage.links_count` | Integer | Number of short links stored |
-| `checks.storage.backend` | Object | Storage backend configuration |
-| `response_time_ms` | Integer | Health check response time in milliseconds |
+| `code` | Integer | Response code: 0 for healthy, 1 for unhealthy |
+| `data.status` | String | Overall health status: `healthy` or `unhealthy` |
+| `data.timestamp` | RFC3339 | Timestamp of the check |
+| `data.uptime` | Integer | Service uptime in seconds |
+| `data.checks.storage.status` | String | Storage backend health status |
+| `data.checks.storage.links_count` | Integer | Number of short links stored |
+| `data.checks.storage.backend` | Object | Storage backend configuration |
+| `data.response_time_ms` | Integer | Health check response time in milliseconds |
 
 ### GET /health/ready - Readiness Check
 

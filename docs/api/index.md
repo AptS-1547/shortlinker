@@ -39,10 +39,12 @@ Cache-Control: no-cache, no-store, must-revalidate
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: text/html; charset=utf-8
-Cache-Control: no-cache, no-store, must-revalidate
+Cache-Control: public, max-age=60
 
 Not Found
 ```
+
+> **注意**：404 响应使用 `Cache-Control: public, max-age=60` 进行短时缓存，以减少对不存在短码的重复请求。
 
 ## 特殊路径
 
@@ -121,10 +123,12 @@ def check_short_link(base_url, short_code):
 
 ## 缓存策略
 
-所有响应都包含 `Cache-Control: no-cache, no-store, must-revalidate` 头，确保：
+重定向响应（307）包含 `Cache-Control: no-cache, no-store, must-revalidate` 头，确保：
 - 浏览器不会缓存重定向响应
 - 短链接修改能立即生效
 - 过期检查实时进行
+
+404 响应使用 `Cache-Control: public, max-age=60`，允许短时缓存以减少无效请求。
 
 ## 性能特征
 

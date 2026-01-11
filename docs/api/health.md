@@ -35,20 +35,23 @@ curl -H "Authorization: Bearer your_health_token" \
 **响应示例**:
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-06-01T12:00:00Z",
-  "uptime": 3600,
-  "checks": {
-    "storage": {
-      "status": "healthy",
-      "links_count": 42,
-      "backend": {
-        "storage_type": "sqlite",
-        "support_click": true
+  "code": 0,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2025-06-01T12:00:00Z",
+    "uptime": 3600,
+    "checks": {
+      "storage": {
+        "status": "healthy",
+        "links_count": 42,
+        "backend": {
+          "storage_type": "sqlite",
+          "support_click": true
+        }
       }
-    }
-  },
-  "response_time_ms": 15
+    },
+    "response_time_ms": 15
+  }
 }
 ```
 
@@ -56,13 +59,14 @@ curl -H "Authorization: Bearer your_health_token" \
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `status` | String | 总体健康状态：`healthy` 或 `unhealthy` |
-| `timestamp` | RFC3339 | 检查时的时间戳 |
-| `uptime` | Integer | 服务运行时长（秒） |
-| `checks.storage.status` | String | 存储后端健康状态 |
-| `checks.storage.links_count` | Integer | 当前存储的短链接数量 |
-| `checks.storage.backend` | Object | 存储后端配置信息 |
-| `response_time_ms` | Integer | 健康检查响应时间（毫秒） |
+| `code` | Integer | 响应码：0 表示健康，1 表示不健康 |
+| `data.status` | String | 总体健康状态：`healthy` 或 `unhealthy` |
+| `data.timestamp` | RFC3339 | 检查时的时间戳 |
+| `data.uptime` | Integer | 服务运行时长（秒） |
+| `data.checks.storage.status` | String | 存储后端健康状态 |
+| `data.checks.storage.links_count` | Integer | 当前存储的短链接数量 |
+| `data.checks.storage.backend` | Object | 存储后端配置信息 |
+| `data.response_time_ms` | Integer | 健康检查响应时间（毫秒） |
 
 ### GET /health/ready - 就绪检查
 

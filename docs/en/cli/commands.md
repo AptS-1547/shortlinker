@@ -79,24 +79,6 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker list
 ```
 
-### start - Start server in background
-
-```bash
-./shortlinker start
-```
-
-### stop - Stop running server
-
-```bash
-./shortlinker stop
-```
-
-### restart - Restart server
-
-```bash
-./shortlinker restart
-```
-
 ### help - Show command help
 
 ```bash
@@ -223,10 +205,8 @@ CLI operations automatically notify the server to reload configuration:
 Main environment variables read by CLI tool:
 
 ```bash
-RANDOM_CODE_LENGTH=6      # Random short code length
-STORAGE_BACKEND=sqlite    # Storage backend type
-DB_FILE_NAME=links.db     # Database file path
-RUST_LOG=info            # Log level
+DATABASE_URL=sqlite://links.db  # Database connection URL
+RUST_LOG=info                   # Log level
 ```
 
 > For complete environment variable configuration, see [Environment Variables Configuration](/en/config/)

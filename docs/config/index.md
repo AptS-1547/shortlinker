@@ -58,13 +58,43 @@ DATABASE_URL=shortlinks.db
 # 获取所有配置
 curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/config
 
+# 获取单个配置
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/config/features.random_code_length
+
 # 更新配置
 curl -X PUT \
      -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"value": "8"}' \
      http://localhost:8080/admin/config/features.random_code_length
+
+# 重载配置
+curl -X POST \
+     -H "Authorization: Bearer $ADMIN_TOKEN" \
+     http://localhost:8080/admin/config/reload
+
+# 查询配置历史（可选 limit 参数，默认 20）
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+     "http://localhost:8080/admin/config/features.random_code_length/history?limit=10"
 ```
+
+**配置历史响应格式**：
+
+```json
+{
+  "code": 0,
+  "data": [{
+    "id": 1,
+    "config_key": "features.random_code_length",
+    "old_value": "6",
+    "new_value": "8",
+    "changed_at": "2024-12-15T14:30:22Z",
+    "changed_by": null
+  }]
+}
+```
+
+> **注意**：敏感配置（如 `api.admin_token`、`api.jwt_secret`）在 API 响应中会自动掩码为 `********`。
 
 ## 启动配置参数
 
