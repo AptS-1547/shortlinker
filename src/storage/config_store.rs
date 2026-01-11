@@ -241,7 +241,7 @@ impl ConfigStore {
         Ok(count > 0)
     }
 
-    /// 批量插入配置（用于首次迁移）
+    /// 批量插入配置
     pub async fn insert_if_not_exists(
         &self,
         key: &str,

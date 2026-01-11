@@ -220,4 +220,12 @@ pub mod keys {
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
     pub const ROUTES_HEALTH_PREFIX: &str = "routes.health_prefix";
     pub const ROUTES_FRONTEND_PREFIX: &str = "routes.frontend_prefix";
+
+    // CORS 配置
+    pub const CORS_ENABLED: &str = "cors.enabled";
+    pub const CORS_ALLOWED_ORIGINS: &str = "cors.allowed_origins";
+    pub const CORS_ALLOWED_METHODS: &str = "cors.allowed_methods";
+    pub const CORS_ALLOWED_HEADERS: &str = "cors.allowed_headers";
+    pub const CORS_MAX_AGE: &str = "cors.max_age";
+    pub const CORS_ALLOW_CREDENTIALS: &str = "cors.allow_credentials";
 }

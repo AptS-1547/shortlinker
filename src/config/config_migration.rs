@@ -1,25 +1,17 @@
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::config::AppConfig;
+use crate::config::runtime_config::keys;
 use crate::errors::Result;
 use crate::storage::ConfigStore;
+use crate::utils::password::{hash_password, is_argon2_hash};
 
 /// 从文件配置迁移到数据库
 ///
-/// 首次启动时，如果数据库中没有配置，则从 config.toml 中读取并写入数据库。
-/// 如果数据库中已有配置，则跳过（数据库配置优先）。
+/// 对每个配置项检查是否已存在，如果不存在则从 config.toml 中读取并写入数据库。
+/// 这样可以支持新增配置项的增量迁移。
 pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) -> Result<()> {
-    // 检查是否已有配置
-    let count = store.count().await?;
-    if count > 0 {
-        debug!(
-            "Database already has {} configuration items, skipping migration",
-            count
-        );
-        return Ok(());
-    }
-
-    info!("Starting configuration migration to database");
+    debug!("Checking configuration migration to database");
 
     // API 认证配置（敏感）
     store
@@ -219,6 +211,115 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         )
         .await?;
 
+    // CORS 配置（需要重启）
+    store
+        .insert_if_not_exists(
+            "cors.enabled",
+            &file_config.cors.enabled.to_string(),
+            "bool",
+            true,
+            false,
+        )
+        .await?;
+
+    store
+        .insert_if_not_exists(
+            "cors.allowed_origins",
+            &serde_json::to_string(&file_config.cors.allowed_origins).unwrap_or_default(),
+            "json",
+            true,
+            false,
+        )
+        .await?;
+
+    store
+        .insert_if_not_exists(
+            "cors.allowed_methods",
+            &serde_json::to_string(&file_config.cors.allowed_methods).unwrap_or_default(),
+            "json",
+            true,
+            false,
+        )
+        .await?;
+
+    store
+        .insert_if_not_exists(
+            "cors.allowed_headers",
+            &serde_json::to_string(&file_config.cors.allowed_headers).unwrap_or_default(),
+            "json",
+            true,
+            false,
+        )
+        .await?;
+
+    store
+        .insert_if_not_exists(
+            "cors.max_age",
+            &file_config.cors.max_age.to_string(),
+            "int",
+            true,
+            false,
+        )
+        .await?;
+
+    store
+        .insert_if_not_exists(
+            "cors.allow_credentials",
+            &file_config.cors.allow_credentials.to_string(),
+            "bool",
+            true,
+            false,
+        )
+        .await?;
+
     info!("Configuration migration completed successfully");
+    Ok(())
+}
+
+/// 自动迁移明文密码到 argon2 哈希
+///
+/// 检测数据库中的 admin_token，如果是明文则自动哈希并保存。
+/// 变更会自动记录到 config_history 表。
+pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
+    // 读取 admin_token
+    let admin_token = match store.get(keys::API_ADMIN_TOKEN).await? {
+        Some(value) => value,
+        None => {
+            debug!("admin_token not found in database, skipping password migration");
+            return Ok(());
+        }
+    };
+
+    // 如果为空或已是哈希，跳过
+    if admin_token.is_empty() {
+        debug!("admin_token is empty, skipping password migration");
+        return Ok(());
+    }
+
+    if is_argon2_hash(&admin_token) {
+        debug!("admin_token is already hashed, skipping password migration");
+        return Ok(());
+    }
+
+    // 明文密码，进行哈希迁移
+    info!("Migrating plaintext admin_token to argon2 hash...");
+
+    let hashed = hash_password(&admin_token).map_err(|e| {
+        crate::errors::ShortlinkerError::database_operation(format!(
+            "Failed to hash admin_token: {}",
+            e
+        ))
+    })?;
+
+    // 保存到数据库（自动记录变更历史）
+    store.set(keys::API_ADMIN_TOKEN, &hashed).await?;
+
+    // 同步到 AppConfig
+    crate::config::update_config_by_key(keys::API_ADMIN_TOKEN, &hashed);
+
+    warn!(
+        "admin_token migrated to argon2 hash successfully. The plaintext password in config.toml is now obsolete."
+    );
+
     Ok(())
 }

@@ -1,7 +1,9 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
-use crate::config::{get_config, init_runtime_config, migrate_config_to_db};
+use crate::config::{
+    get_config, init_runtime_config, migrate_config_to_db, migrate_plaintext_passwords,
+};
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,6 +63,11 @@ pub async fn prepare_server_startup() -> StartupContext {
         init_runtime_config(db)
             .await
             .expect("Failed to initialize runtime config");
+
+        // 自动迁移明文密码到 argon2 哈希
+        migrate_plaintext_passwords(&config_store)
+            .await
+            .expect("Failed to migrate plaintext passwords");
 
         debug!("Runtime config system initialized");
     }
@@ -137,6 +144,9 @@ pub async fn prepare_server_startup() -> StartupContext {
 fn check_compoment_enabled(route_config: &RouteConfig) {
     let config = get_config();
 
+    // 检查 JWT Secret 安全性
+    check_jwt_secret_security(&config);
+
     // 检查 Admin API 是否启用
     let admin_token = &config.api.admin_token;
     if admin_token.is_empty() {
@@ -162,5 +172,22 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
             "Frontend routes available at: {}",
             route_config.frontend_prefix
         );
+    }
+}
+
+/// 检查 JWT Secret 安全性
+fn check_jwt_secret_security(config: &crate::config::AppConfig) {
+    // 检查 JWT Secret 长度
+    if config.api.jwt_secret.len() < 32 {
+        warn!(
+            "WARNING: JWT Secret is too short ({} bytes). \
+            Recommended minimum is 32 bytes for security.",
+            config.api.jwt_secret.len()
+        );
+    }
+
+    // 检查 Admin Token 长度
+    if !config.api.admin_token.is_empty() && config.api.admin_token.len() < 8 {
+        warn!("WARNING: Admin Token is very short. Consider using a stronger token.");
     }
 }

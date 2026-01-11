@@ -44,12 +44,17 @@ impl RedirectService {
             CacheResult::ExistsButNoValue => {
                 trace!("L2 cache miss for path: {}", &capture_path);
                 match storage.get(&capture_path).await {
-                    Some(link) => {
-                        Self::update_click(&capture_path);
-                        cache.insert(&capture_path, link.clone()).await;
-
-                        Self::finish_redirect(link)
-                    }
+                    Some(link) => match link.cache_ttl(get_config().cache.default_ttl) {
+                        None => {
+                            debug!("Expired link from storage: {}", &capture_path);
+                            Self::not_found_response()
+                        }
+                        Some(ttl) => {
+                            Self::update_click(&capture_path);
+                            cache.insert(&capture_path, link.clone(), Some(ttl)).await;
+                            Self::finish_redirect(link)
+                        }
+                    },
                     None => {
                         debug!("Redirect link not found: {}", &capture_path);
                         Self::not_found_response()
@@ -89,12 +94,6 @@ impl RedirectService {
     }
 
     fn finish_redirect(link: ShortLink) -> HttpResponse {
-        if let Some(expires_at) = link.expires_at
-            && expires_at < chrono::Utc::now()
-        {
-            return Self::not_found_response();
-        }
-
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
             .insert_header(("Location", link.target))
             .finish()

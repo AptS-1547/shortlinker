@@ -29,7 +29,7 @@ impl ObjectCache for NullObjectCache {
         CacheResult::NotFound
     }
 
-    async fn insert(&self, key: &str, _: ShortLink) {
+    async fn insert(&self, key: &str, _: ShortLink, _ttl_secs: Option<u64>) {
         trace!("NullObjectCache.insert called for key: {}", key);
     }
 

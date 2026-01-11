@@ -19,6 +19,8 @@ pub struct AppConfig {
     pub click_manager: ClickManagerConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub cors: CorsConfig,
 }
 
 /// 服务器配置
@@ -149,6 +151,23 @@ pub struct LoggingConfig {
     pub enable_rotation: bool,
 }
 
+/// CORS 跨域配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsConfig {
+    #[serde(default = "default_cors_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
+    #[serde(default = "default_cors_methods")]
+    pub allowed_methods: Vec<String>,
+    #[serde(default = "default_cors_headers")]
+    pub allowed_headers: Vec<String>,
+    #[serde(default = "default_cors_max_age")]
+    pub max_age: u64,
+    #[serde(default = "default_cors_credentials")]
+    pub allow_credentials: bool,
+}
+
 // Default value functions
 fn default_server_host() -> String {
     "127.0.0.1".to_string()
@@ -260,7 +279,7 @@ fn default_enable_rotation() -> bool {
 
 // JWT 默认值
 fn default_jwt_secret() -> String {
-    "CHANGE_ME_IN_PRODUCTION_USE_OPENSSL_RAND".to_string()
+    crate::utils::generate_secure_token(32) // 64 字符 hex 字符串
 }
 
 fn default_access_token_minutes() -> u64 {
@@ -281,6 +300,38 @@ fn default_refresh_cookie_name() -> String {
 
 fn default_cookie_same_site() -> String {
     "Lax".to_string()
+}
+
+// CORS 默认值
+fn default_cors_enabled() -> bool {
+    true
+}
+
+fn default_cors_methods() -> Vec<String> {
+    vec![
+        "GET".to_string(),
+        "POST".to_string(),
+        "PUT".to_string(),
+        "DELETE".to_string(),
+        "OPTIONS".to_string(),
+        "HEAD".to_string(),
+    ]
+}
+
+fn default_cors_headers() -> Vec<String> {
+    vec![
+        "Content-Type".to_string(),
+        "Authorization".to_string(),
+        "Accept".to_string(),
+    ]
+}
+
+fn default_cors_max_age() -> u64 {
+    3600
+}
+
+fn default_cors_credentials() -> bool {
+    true
 }
 
 impl Default for ServerConfig {
@@ -389,6 +440,19 @@ impl Default for LoggingConfig {
             max_size: default_max_size(),
             max_backups: default_max_backups(),
             enable_rotation: default_enable_rotation(),
+        }
+    }
+}
+
+impl Default for CorsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_cors_enabled(),
+            allowed_origins: vec![],
+            allowed_methods: default_cors_methods(),
+            allowed_headers: default_cors_headers(),
+            max_age: default_cors_max_age(),
+            allow_credentials: default_cors_credentials(),
         }
     }
 }

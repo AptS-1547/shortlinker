@@ -2,6 +2,7 @@
 
 use super::state::{App, CurrentScreen};
 use crate::utils::TimeParser;
+use crate::utils::url_validator::validate_url;
 
 impl App {
     /// Validate current input and update validation_errors
@@ -31,13 +32,9 @@ impl App {
 
         // Validate URL
         if !self.target_url_input.is_empty() {
-            if !self.target_url_input.starts_with("http://")
-                && !self.target_url_input.starts_with("https://")
-            {
-                self.validation_errors.insert(
-                    "target_url".to_string(),
-                    "URL must start with http:// or https://".to_string(),
-                );
+            if let Err(e) = validate_url(&self.target_url_input) {
+                self.validation_errors
+                    .insert("target_url".to_string(), e.to_string());
             }
         } else if matches!(
             self.current_screen,

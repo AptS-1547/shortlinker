@@ -2,6 +2,7 @@ use super::super::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
+use crate::utils::url_validator::validate_url;
 use colored::Colorize;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
@@ -66,10 +67,8 @@ pub async fn add_link(
     password: Option<String>,
 ) -> Result<(), CliError> {
     // Validate URL format
-    if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
-        return Err(CliError::CommandError(
-            "URL must start with http:// or https://".to_string(),
-        ));
+    if let Err(e) = validate_url(&target_url) {
+        return Err(CliError::CommandError(e.to_string()));
     }
 
     let config = crate::config::get_config();
@@ -201,10 +200,8 @@ pub async fn update_link(
     password: Option<String>,
 ) -> Result<(), CliError> {
     // Validate URL format
-    if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
-        return Err(CliError::CommandError(
-            "URL must start with http:// or https://".to_string(),
-        ));
+    if let Err(e) = validate_url(&target_url) {
+        return Err(CliError::CommandError(e.to_string()));
     }
 
     // Check if short code exists

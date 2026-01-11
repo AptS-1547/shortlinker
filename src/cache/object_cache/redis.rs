@@ -155,7 +155,7 @@ impl ObjectCache for RedisObjectCache {
         }
     }
 
-    async fn insert(&self, key: &str, value: ShortLink) {
+    async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>) {
         let redis_key = self.make_key(key);
 
         let mut conn = match self.get_connection().await {
@@ -167,14 +167,19 @@ impl ObjectCache for RedisObjectCache {
             }
         };
 
+        let ttl = ttl_secs.unwrap_or(self.ttl);
+
         match Self::serialize_link(&value) {
             Ok(serialized_value) => {
                 match conn
-                    .set_ex::<String, String, ()>(redis_key, serialized_value, self.ttl)
+                    .set_ex::<String, String, ()>(redis_key, serialized_value, ttl)
                     .await
                 {
                     Ok(_) => {
-                        trace!("Successfully inserted key into cache: {}", key);
+                        trace!(
+                            "Successfully inserted key into cache: {} (TTL: {}s)",
+                            key, ttl
+                        );
                     }
                     Err(e) => {
                         error!("Failed to insert key '{}' into cache: {}", key, e);

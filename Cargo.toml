@@ -1,6 +1,6 @@
 [package]
 name = "shortlinker"
-version = "0.3.0-alpha.3"
+version = "0.3.0-alpha.4"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 edition = "2024"
@@ -85,6 +85,9 @@ sea-orm = { version = "2.0.0-rc", default-features = false, features = ["sqlx-my
 jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
 arc-swap = "1"
 parking_lot = "0.12"
+argon2 = "0.5"
+url = "2"
+actix-cors = "0.7"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.4", default-features = false, features = ["iterator"] }

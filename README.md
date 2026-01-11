@@ -309,7 +309,6 @@ These settings are migrated to the database on first startup. Use the admin pane
 | ---------------------- | ------------------------ | ------------------------------------------- |
 | `ADMIN_TOKEN`        | *(empty)*              | Admin API token                             |
 | `HEALTH_TOKEN`       | *(empty)*              | Health API token                            |
-| `JWT_SECRET`         | *(auto-generated)*     | JWT secret key (change in production!)      |
 | `ACCESS_TOKEN_MINUTES` | `15`                 | Access token expiration in minutes          |
 | `REFRESH_TOKEN_DAYS` | `7`                    | Refresh token expiration in days            |
 | `ACCESS_COOKIE_NAME` | `shortlinker_access`   | Access token cookie name                    |
@@ -357,7 +356,6 @@ RUST_LOG=info
 # After that, modify them via the admin panel
 ADMIN_TOKEN=your_admin_token
 HEALTH_TOKEN=your_health_token
-JWT_SECRET=your_jwt_secret_change_in_production
 ```
 
 ## Storage Backends

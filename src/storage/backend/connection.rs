@@ -38,8 +38,8 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
         .min_connections(5)
         .connect_timeout(std::time::Duration::from_secs(8))
         .acquire_timeout(std::time::Duration::from_secs(8))
-        .idle_timeout(std::time::Duration::from_secs(8))
-        .max_lifetime(std::time::Duration::from_secs(8))
+        .idle_timeout(std::time::Duration::from_secs(300)) // 5分钟空闲超时
+        .max_lifetime(std::time::Duration::from_secs(3600)) // 1小时最大生命周期
         .sqlx_logging(false);
 
     Database::connect(opt).await.map_err(|e| {

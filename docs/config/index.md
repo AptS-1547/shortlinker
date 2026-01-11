@@ -219,7 +219,6 @@ DATABASE_URL=/data/links.db
 # 首次启动时的动态配置
 ADMIN_TOKEN=secure_admin_token_here
 HEALTH_TOKEN=secure_health_token_here
-JWT_SECRET=your_production_jwt_secret
 ENABLE_ADMIN_PANEL=true
 ```
 

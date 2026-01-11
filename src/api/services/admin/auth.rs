@@ -6,6 +6,7 @@ use tracing::{error, info, warn};
 
 use crate::api::jwt::JwtService;
 use crate::config::get_config;
+use crate::utils::password::verify_password;
 
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, LoginCredentials};
@@ -18,7 +19,19 @@ pub async fn check_admin_token(
     let config = get_config();
     let admin_token = &config.api.admin_token;
 
-    if login_body.password != *admin_token {
+    // 验证密码（启动时已自动迁移明文为哈希）
+    let password_valid = match verify_password(&login_body.password, admin_token) {
+        Ok(valid) => valid,
+        Err(e) => {
+            error!("Admin API: password verification error: {}", e);
+            return Ok(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Authentication error",
+            ));
+        }
+    };
+
+    if !password_valid {
         error!("Admin API: login failed - invalid token");
         return Ok(error_response(
             StatusCode::UNAUTHORIZED,

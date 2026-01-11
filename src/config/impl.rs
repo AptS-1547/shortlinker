@@ -353,6 +353,34 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
             "routes.health_prefix" => config.routes.health_prefix = value.to_string(),
             "routes.frontend_prefix" => config.routes.frontend_prefix = value.to_string(),
 
+            // CORS 配置 (requires_restart = true，但还是要更新内存)
+            "cors.enabled" => {
+                config.cors.enabled = value == "true" || value == "1" || value == "yes";
+            }
+            "cors.allowed_origins" => {
+                if let Ok(v) = serde_json::from_str(value) {
+                    config.cors.allowed_origins = v;
+                }
+            }
+            "cors.allowed_methods" => {
+                if let Ok(v) = serde_json::from_str(value) {
+                    config.cors.allowed_methods = v;
+                }
+            }
+            "cors.allowed_headers" => {
+                if let Ok(v) = serde_json::from_str(value) {
+                    config.cors.allowed_headers = v;
+                }
+            }
+            "cors.max_age" => {
+                if let Ok(v) = value.parse() {
+                    config.cors.max_age = v;
+                }
+            }
+            "cors.allow_credentials" => {
+                config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
+            }
+
             _ => (),
         }
     });

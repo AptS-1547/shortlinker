@@ -299,7 +299,6 @@ enable_rotation = true
 | ----------------------- | ------------------------ | ------------------------------------------- |
 | `ADMIN_TOKEN`           | *(空)*                   | 管理 API 密钥                                |
 | `HEALTH_TOKEN`          | *(空)*                   | 健康检查密钥                                   |
-| `JWT_SECRET`            | *(自动生成)*               | JWT 密钥（生产环境务必修改！）                   |
 | `ACCESS_TOKEN_MINUTES`  | `15`                    | Access Token 有效期（分钟）                    |
 | `REFRESH_TOKEN_DAYS`    | `7`                     | Refresh Token 有效期（天）                     |
 | `ACCESS_COOKIE_NAME`    | `shortlinker_access`    | Access Token Cookie 名称                      |

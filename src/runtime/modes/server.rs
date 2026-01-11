@@ -3,6 +3,7 @@
 //! This module contains the HTTP server startup logic.
 //! It configures and starts the HTTP server with all necessary routes.
 
+use actix_cors::Cors;
 use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
 use anyhow::Result;
 use tracing::{debug, warn};
@@ -12,6 +13,7 @@ use crate::api::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
     admin::{get_all_configs, get_config, get_config_history, reload_config, update_config},
 };
+use crate::config::CorsConfig;
 use crate::runtime::lifetime;
 
 /// Server configuration
@@ -21,6 +23,46 @@ pub struct ServerConfig {
     pub server_port: u16,
     #[cfg(unix)]
     pub unix_socket_path: Option<String>,
+}
+
+/// Build CORS middleware from configuration
+fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
+    if !cors_config.enabled {
+        return Cors::permissive();
+    }
+
+    let mut cors = Cors::default();
+
+    // Configure allowed origins
+    if cors_config.allowed_origins.is_empty() {
+        cors = cors.allow_any_origin();
+    } else {
+        for origin in &cors_config.allowed_origins {
+            cors = cors.allowed_origin(origin);
+        }
+    }
+
+    // Configure allowed methods
+    for method in &cors_config.allowed_methods {
+        if let Ok(m) = method.parse::<actix_web::http::Method>() {
+            cors = cors.allowed_methods(vec![m]);
+        }
+    }
+
+    // Configure allowed headers
+    for header in &cors_config.allowed_headers {
+        cors = cors.allowed_header(header);
+    }
+
+    // Configure max age
+    cors = cors.max_age(cors_config.max_age as usize);
+
+    // Configure credentials
+    if cors_config.allow_credentials {
+        cors = cors.supports_credentials();
+    }
+
+    cors
 }
 
 /// Run the HTTP server
@@ -69,9 +111,16 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
     let cpu_count = config.server.cpu_count.min(32);
     warn!("Using {} CPU cores for the server", cpu_count);
 
+    // Load CORS configuration
+    let cors_config = config.cors.clone();
+
     // Configure HTTP server
     let server = HttpServer::new(move || {
+        // Build CORS middleware
+        let cors = build_cors_middleware(&cors_config);
+
         App::new()
+            .wrap(cors)
             .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))

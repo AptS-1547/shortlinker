@@ -8,6 +8,8 @@ use tracing::{error, info, trace, warn};
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
+use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::url_validator::validate_url;
 
 use super::get_random_code_length;
 use super::helpers::{error_response, parse_expires_at, success_response};
@@ -106,12 +108,9 @@ pub async fn post_link(
     );
 
     // Validate target URL
-    if !link.target.starts_with("http://") && !link.target.starts_with("https://") {
-        error!("Admin API: invalid target URL - {}", link.target);
-        return Ok(error_response(
-            StatusCode::BAD_REQUEST,
-            "URL must start with http:// or https://",
-        ));
+    if let Err(e) = validate_url(&link.target) {
+        error!("Admin API: invalid target URL - {}: {}", link.target, e);
+        return Ok(error_response(StatusCode::BAD_REQUEST, &e.to_string()));
     }
 
     // Check if link already exists
@@ -145,12 +144,35 @@ pub async fn post_link(
         (chrono::Utc::now(), 0)
     };
 
+    // Hash password if provided and not already hashed
+    let hashed_password = match &link.password {
+        Some(pwd) if !pwd.is_empty() => {
+            if is_argon2_hash(pwd) {
+                // Already hashed, use as-is
+                Some(pwd.clone())
+            } else {
+                // Hash the plaintext password
+                match hash_password(pwd) {
+                    Ok(hash) => Some(hash),
+                    Err(e) => {
+                        error!("Admin API: failed to hash password: {}", e);
+                        return Ok(error_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to process password",
+                        ));
+                    }
+                }
+            }
+        }
+        _ => None,
+    };
+
     let new_link = ShortLink {
         code: code.clone(),
         target: link.target.clone(),
         created_at,
         expires_at,
-        password: link.password.clone(),
+        password: hashed_password.clone(),
         click,
     };
 
@@ -163,7 +185,8 @@ pub async fn post_link(
             };
             info!("Admin API: link {} - {}", action, new_link.code);
             // 增量更新缓存
-            cache.insert(&new_link.code, new_link.clone()).await;
+            let ttl = new_link.cache_ttl(crate::config::get_config().cache.default_ttl);
+            cache.insert(&new_link.code, new_link.clone(), ttl).await;
             Ok(HttpResponse::Created()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(ApiResponse {
@@ -251,12 +274,9 @@ pub async fn update_link(
     );
 
     // Validate target URL
-    if !link.target.starts_with("http://") && !link.target.starts_with("https://") {
-        error!("Admin API: invalid target URL - {}", link.target);
-        return Ok(error_response(
-            StatusCode::BAD_REQUEST,
-            "URL must start with http:// or https://",
-        ));
+    if let Err(e) = validate_url(&link.target) {
+        error!("Admin API: invalid target URL - {}: {}", link.target, e);
+        return Ok(error_response(StatusCode::BAD_REQUEST, &e.to_string()));
     }
 
     // Get existing link to preserve creation time
@@ -280,17 +300,36 @@ pub async fn update_link(
         None => existing_link.expires_at,
     };
 
+    // Hash password if provided and not already hashed
+    let updated_password = match &link.password {
+        Some(pwd) if !pwd.is_empty() => {
+            if is_argon2_hash(pwd) {
+                // Already hashed, use as-is
+                Some(pwd.clone())
+            } else {
+                // Hash the plaintext password
+                match hash_password(pwd) {
+                    Ok(hash) => Some(hash),
+                    Err(e) => {
+                        error!("Admin API: failed to hash password: {}", e);
+                        return Ok(error_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to process password",
+                        ));
+                    }
+                }
+            }
+        }
+        Some(_) => None,                        // Empty string means remove password
+        None => existing_link.password.clone(), // Not provided, keep existing
+    };
+
     let updated_link = ShortLink {
         code: code.clone(),
         target: link.target.clone(),
         created_at: existing_link.created_at,
         expires_at,
-        // 如果请求中提供了密码字段，则使用新密码；否则保持原密码
-        password: if link.password.is_some() {
-            link.password.clone()
-        } else {
-            existing_link.password
-        },
+        password: updated_password.clone(),
         click: existing_link.click, // 保持原有的点击计数
     };
 
@@ -298,7 +337,10 @@ pub async fn update_link(
         Ok(_) => {
             info!("Admin API: link updated - {}", code);
             // 增量更新缓存
-            cache.insert(&updated_link.code, updated_link.clone()).await;
+            let ttl = updated_link.cache_ttl(crate::config::get_config().cache.default_ttl);
+            cache
+                .insert(&updated_link.code, updated_link.clone(), ttl)
+                .await;
             Ok(success_response(PostNewLink {
                 code: Some(updated_link.code),
                 target: updated_link.target,

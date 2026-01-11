@@ -2,6 +2,7 @@ pub mod commands;
 pub mod parser;
 
 use crate::storage::StorageFactory;
+use commands::{run_reset_password, show_reset_password_help};
 use parser::CliParser;
 use std::fmt;
 
@@ -59,10 +60,41 @@ impl From<crate::errors::ShortlinkerError> for CliError {
     }
 }
 
+/// 检查并处理不需要数据库的命令
+/// 返回 true 表示命令已处理，false 表示需要继续正常流程
+fn handle_standalone_commands() -> bool {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        return false;
+    }
+
+    // reset-password 需要显示帮助时不需要数据库
+    if args[1] == "reset-password" && args.len() < 3 {
+        show_reset_password_help();
+        std::process::exit(1);
+    }
+
+    false
+}
+
 pub async fn run_cli() -> Result<(), CliError> {
+    // 先处理不需要数据库的命令
+    if handle_standalone_commands() {
+        return Ok(());
+    }
+
     let storage = StorageFactory::create()
         .await
         .map_err(|e| CliError::StorageError(e.to_string()))?;
+
+    // 处理需要数据库的特殊命令
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 3 && args[1] == "reset-password" {
+        run_reset_password(storage.get_db().clone(), &args[2]).await;
+        return Ok(());
+    }
+
     let parser = CliParser::new();
     let command = parser.parse()?;
     command.execute(storage).await

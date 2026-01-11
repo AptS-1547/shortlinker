@@ -7,6 +7,8 @@ use tracing::info;
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
+use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::url_validator::validate_url;
 
 use super::get_random_code_length;
 use super::helpers::{parse_expires_at, success_response};
@@ -38,10 +40,10 @@ pub async fn batch_create_links(
         };
 
         // Validate target URL
-        if !link_req.target.starts_with("http://") && !link_req.target.starts_with("https://") {
+        if let Err(e) = validate_url(&link_req.target) {
             failed.push(BatchFailedItem {
                 code: code.clone(),
-                error: "URL must start with http:// or https://".to_string(),
+                error: e.to_string(),
             });
             continue;
         }
@@ -80,12 +82,33 @@ pub async fn batch_create_links(
             (chrono::Utc::now(), 0)
         };
 
+        // Hash password if provided
+        let hashed_password = match &link_req.password {
+            Some(pwd) if !pwd.is_empty() => {
+                if is_argon2_hash(pwd) {
+                    Some(pwd.clone())
+                } else {
+                    match hash_password(pwd) {
+                        Ok(hash) => Some(hash),
+                        Err(e) => {
+                            failed.push(BatchFailedItem {
+                                code: code.clone(),
+                                error: format!("Failed to hash password: {}", e),
+                            });
+                            continue;
+                        }
+                    }
+                }
+            }
+            _ => None,
+        };
+
         let new_link = ShortLink {
             code: code.clone(),
             target: link_req.target.clone(),
             created_at,
             expires_at,
-            password: link_req.password.clone(),
+            password: hashed_password,
             click,
         };
 
@@ -106,7 +129,8 @@ pub async fn batch_create_links(
     // 增量更新缓存
     for link in created_links {
         let code = link.code.clone();
-        cache.insert(&code, link).await;
+        let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
+        cache.insert(&code, link, ttl).await;
     }
 
     info!(
@@ -139,10 +163,10 @@ pub async fn batch_update_links(
         let payload = &update.payload;
 
         // Validate target URL
-        if !payload.target.starts_with("http://") && !payload.target.starts_with("https://") {
+        if let Err(e) = validate_url(&payload.target) {
             failed.push(BatchFailedItem {
                 code: code.clone(),
-                error: "URL must start with http:// or https://".to_string(),
+                error: e.to_string(),
             });
             continue;
         }
@@ -174,16 +198,34 @@ pub async fn batch_update_links(
             None => existing.expires_at,
         };
 
+        // Hash password if provided
+        let updated_password = match &payload.password {
+            Some(pwd) if !pwd.is_empty() => {
+                if is_argon2_hash(pwd) {
+                    Some(pwd.clone())
+                } else {
+                    match hash_password(pwd) {
+                        Ok(hash) => Some(hash),
+                        Err(e) => {
+                            failed.push(BatchFailedItem {
+                                code: code.clone(),
+                                error: format!("Failed to hash password: {}", e),
+                            });
+                            continue;
+                        }
+                    }
+                }
+            }
+            Some(_) => None,                   // Empty string means remove password
+            None => existing.password.clone(), // Not provided, keep existing
+        };
+
         let updated_link = ShortLink {
             code: code.clone(),
             target: payload.target.clone(),
             created_at: existing.created_at,
             expires_at,
-            password: if payload.password.is_some() {
-                payload.password.clone()
-            } else {
-                existing.password
-            },
+            password: updated_password,
             click: existing.click,
         };
 
@@ -204,7 +246,8 @@ pub async fn batch_update_links(
     // 增量更新缓存
     for link in updated_links {
         let code = link.code.clone();
-        cache.insert(&code, link).await;
+        let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
+        cache.insert(&code, link, ttl).await;
     }
 
     info!(
