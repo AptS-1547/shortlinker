@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };

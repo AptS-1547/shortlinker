@@ -55,7 +55,9 @@ pub async fn run_tui() -> Result<(), Box<dyn std::error::Error>> {
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     loop {
         // Render UI
-        terminal.draw(|f| ui(f, app))?;
+        terminal
+            .draw(|f| ui(f, app))
+            .map_err(|e| io::Error::other(e.to_string()))?;
 
         // Handle events
         if let Event::Key(key) = event::read()? {
