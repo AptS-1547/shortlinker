@@ -132,50 +132,51 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                     .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
             )
             .service(
-                web::scope(&admin_prefix)
-                    .wrap(AdminAuth)
-                    .route("/link", web::get().to(AdminService::get_all_links))
-                    .route("/link", web::head().to(AdminService::get_all_links))
-                    .route("/link", web::post().to(AdminService::post_link))
-                    // Batch operations (must be before /link/{code:.*} to avoid matching)
-                    .route(
-                        "/link/batch",
-                        web::post().to(AdminService::batch_create_links),
-                    )
-                    .route(
-                        "/link/batch",
-                        web::put().to(AdminService::batch_update_links),
-                    )
-                    .route(
-                        "/link/batch",
-                        web::delete().to(AdminService::batch_delete_links),
-                    )
-                    // Stats endpoint (must be before /link/{code:.*} to avoid matching)
-                    .route("/stats", web::get().to(AdminService::get_stats))
-                    .route("/stats", web::head().to(AdminService::get_stats))
-                    .route("/link/{code:.*}", web::get().to(AdminService::get_link))
-                    .route("/link/{code:.*}", web::head().to(AdminService::get_link))
-                    .route(
-                        "/link/{code:.*}",
-                        web::delete().to(AdminService::delete_link),
-                    )
-                    .route("/link/{code:.*}", web::put().to(AdminService::update_link))
-                    .route(
-                        "/auth/login",
-                        web::post().to(AdminService::check_admin_token),
-                    )
-                    .route("/auth/refresh", web::post().to(AdminService::refresh_token))
-                    .route("/auth/logout", web::post().to(AdminService::logout))
-                    .route("/auth/verify", web::get().to(AdminService::verify_token))
-                    // Config management endpoints
-                    .route("/config", web::get().to(get_all_configs))
-                    .route("/config/reload", web::post().to(reload_config))
-                    .route(
-                        "/config/{key:.*}/history",
-                        web::get().to(get_config_history),
-                    )
-                    .route("/config/{key:.*}", web::get().to(get_config))
-                    .route("/config/{key:.*}", web::put().to(update_config)),
+                web::scope(&admin_prefix).wrap(AdminAuth).service(
+                    web::scope("/v1")
+                        .route("/links", web::get().to(AdminService::get_all_links))
+                        .route("/links", web::head().to(AdminService::get_all_links))
+                        .route("/links", web::post().to(AdminService::post_link))
+                        // Batch operations (must be before /links/{code:.*} to avoid matching)
+                        .route(
+                            "/links/batch",
+                            web::post().to(AdminService::batch_create_links),
+                        )
+                        .route(
+                            "/links/batch",
+                            web::put().to(AdminService::batch_update_links),
+                        )
+                        .route(
+                            "/links/batch",
+                            web::delete().to(AdminService::batch_delete_links),
+                        )
+                        // Stats endpoint (must be before /links/{code:.*} to avoid matching)
+                        .route("/stats", web::get().to(AdminService::get_stats))
+                        .route("/stats", web::head().to(AdminService::get_stats))
+                        .route("/links/{code:.*}", web::get().to(AdminService::get_link))
+                        .route("/links/{code:.*}", web::head().to(AdminService::get_link))
+                        .route(
+                            "/links/{code:.*}",
+                            web::delete().to(AdminService::delete_link),
+                        )
+                        .route("/links/{code:.*}", web::put().to(AdminService::update_link))
+                        .route(
+                            "/auth/login",
+                            web::post().to(AdminService::check_admin_token),
+                        )
+                        .route("/auth/refresh", web::post().to(AdminService::refresh_token))
+                        .route("/auth/logout", web::post().to(AdminService::logout))
+                        .route("/auth/verify", web::get().to(AdminService::verify_token))
+                        // Config management endpoints
+                        .route("/config", web::get().to(get_all_configs))
+                        .route("/config/reload", web::post().to(reload_config))
+                        .route(
+                            "/config/{key:.*}/history",
+                            web::get().to(get_config_history),
+                        )
+                        .route("/config/{key:.*}", web::get().to(get_config))
+                        .route("/config/{key:.*}", web::put().to(update_config)),
+                ),
             )
             .service(
                 web::scope(&health_prefix)

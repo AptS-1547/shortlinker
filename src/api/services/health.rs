@@ -1,9 +1,11 @@
 use actix_web::{HttpResponse, Responder, web};
-use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{error, info, trace};
 
+use crate::api::services::admin::{
+    ApiResponse, HealthChecks, HealthResponse, HealthStorageBackend, HealthStorageCheck,
+};
 use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
 
@@ -23,24 +25,33 @@ impl HealthService {
         let start_time = Instant::now();
         trace!("Received health check request");
 
+        // 获取后端配置
+        let backend_config = storage.get_backend_config().await;
+        let backend = HealthStorageBackend {
+            storage_type: backend_config.storage_type,
+            support_click: backend_config.support_click,
+        };
+
         // 检查存储健康状况
         let storage_status =
             match tokio::time::timeout(Duration::from_secs(5), storage.load_all()).await {
                 Ok(links) => {
                     trace!("Storage health check passed, {} links found", links.len());
-                    json!({
-                        "status": "healthy",
-                        "links_count": links.len(),
-                        "backend": storage.get_backend_config().await
-                    })
+                    HealthStorageCheck {
+                        status: "healthy".to_string(),
+                        links_count: Some(links.len()),
+                        backend,
+                        error: None,
+                    }
                 }
                 Err(_) => {
                     error!("Storage health check timeout");
-                    json!({
-                        "status": "unhealthy",
-                        "error": "timeout",
-                        "backend": storage.get_backend_config().await
-                    })
+                    HealthStorageCheck {
+                        status: "unhealthy".to_string(),
+                        links_count: None,
+                        backend,
+                        error: Some("timeout".to_string()),
+                    }
                 }
             };
 
@@ -50,24 +61,28 @@ impl HealthService {
         let uptime_human = TimeParser::format_duration_human(app_start_time.start_datetime, now);
 
         // 计算运行秒数
-        let uptime_seconds = (now - app_start_time.start_datetime).num_seconds().max(0) as u64;
+        let uptime_seconds = (now - app_start_time.start_datetime).num_seconds().max(0) as u32;
 
-        let is_healthy = storage_status["status"] == "healthy";
+        let is_healthy = storage_status.status == "healthy";
 
-        let health_data = json!({
-            "status": if is_healthy { "healthy" } else { "unhealthy" },
-            "timestamp": now.to_rfc3339(),
-            "uptime": uptime_seconds,
-            "checks": {
-                "storage": storage_status,
+        let health_data = HealthResponse {
+            status: if is_healthy {
+                "healthy".to_string()
+            } else {
+                "unhealthy".to_string()
             },
-            "response_time_ms": start_time.elapsed().as_millis()
-        });
+            timestamp: now.to_rfc3339(),
+            uptime: uptime_seconds,
+            checks: HealthChecks {
+                storage: storage_status,
+            },
+            response_time_ms: start_time.elapsed().as_millis() as u32,
+        };
 
-        let health_response = json!({
-            "code": if is_healthy { 0 } else { 1 },
-            "data": health_data
-        });
+        let health_response = ApiResponse {
+            code: if is_healthy { 0 } else { 1 },
+            data: health_data,
+        };
 
         let response_status = if is_healthy {
             actix_web::http::StatusCode::OK

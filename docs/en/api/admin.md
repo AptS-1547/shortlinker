@@ -220,42 +220,42 @@ curl -X DELETE \
 
 ## Authentication Endpoints
 
-### POST /admin/auth/login - Login
+### POST /admin/v1/auth/login - Login
 
 ```bash
 curl -X POST \
      -H "Content-Type: application/json" \
      -d '{"password":"your_admin_token"}' \
-     http://localhost:8080/admin/auth/login
+     http://localhost:8080/admin/v1/auth/login
 ```
 
 **Response**: Returns JWT Access Token and Refresh Token (via Cookie or response body).
 
-### POST /admin/auth/refresh - Refresh Token
+### POST /admin/v1/auth/refresh - Refresh Token
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_refresh_token" \
-     http://localhost:8080/admin/auth/refresh
+     http://localhost:8080/admin/v1/auth/refresh
 ```
 
 **Response**: Returns new Access Token.
 
-### POST /admin/auth/logout - Logout
+### POST /admin/v1/auth/logout - Logout
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/auth/logout
+     http://localhost:8080/admin/v1/auth/logout
 ```
 
 **Response**: Clears authentication Cookie and invalidates Token.
 
-### GET /admin/auth/verify - Verify Token
+### GET /admin/v1/auth/verify - Verify Token
 
 ```bash
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/auth/verify
+     http://localhost:8080/admin/v1/auth/verify
 ```
 
 **Response**: Verifies whether current Token is valid.

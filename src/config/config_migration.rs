@@ -1,5 +1,6 @@
 use tracing::{debug, info, warn};
 
+use crate::api::services::admin::ValueType;
 use crate::config::AppConfig;
 use crate::config::runtime_config::keys;
 use crate::errors::Result;
@@ -18,7 +19,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.admin_token",
             &file_config.api.admin_token,
-            "string",
+            ValueType::String,
             false,
             true, // is_sensitive
         )
@@ -28,7 +29,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.health_token",
             &file_config.api.health_token,
-            "string",
+            ValueType::String,
             false,
             true, // is_sensitive
         )
@@ -38,7 +39,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.jwt_secret",
             &file_config.api.jwt_secret,
-            "string",
+            ValueType::String,
             false,
             true, // is_sensitive
         )
@@ -48,7 +49,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.access_token_minutes",
             &file_config.api.access_token_minutes.to_string(),
-            "int",
+            ValueType::Int,
             false,
             false,
         )
@@ -58,7 +59,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.refresh_token_days",
             &file_config.api.refresh_token_days.to_string(),
-            "int",
+            ValueType::Int,
             false,
             false,
         )
@@ -69,7 +70,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.access_cookie_name",
             &file_config.api.access_cookie_name,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -79,7 +80,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.refresh_cookie_name",
             &file_config.api.refresh_cookie_name,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -89,7 +90,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.cookie_secure",
             &file_config.api.cookie_secure.to_string(),
-            "bool",
+            ValueType::Bool,
             true,
             false,
         )
@@ -99,7 +100,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.cookie_same_site",
             &file_config.api.cookie_same_site,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -109,7 +110,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "api.cookie_domain",
             file_config.api.cookie_domain.as_deref().unwrap_or(""),
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -120,7 +121,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "features.random_code_length",
             &file_config.features.random_code_length.to_string(),
-            "int",
+            ValueType::Int,
             false,
             false,
         )
@@ -130,7 +131,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "features.default_url",
             &file_config.features.default_url,
-            "string",
+            ValueType::String,
             false,
             false,
         )
@@ -140,7 +141,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "features.enable_admin_panel",
             &file_config.features.enable_admin_panel.to_string(),
-            "bool",
+            ValueType::Bool,
             true,
             false,
         )
@@ -151,7 +152,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "click.enable_tracking",
             &file_config.click_manager.enable_click_tracking.to_string(),
-            "bool",
+            ValueType::Bool,
             true,
             false,
         )
@@ -161,7 +162,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "click.flush_interval",
             &file_config.click_manager.flush_interval.to_string(),
-            "int",
+            ValueType::Int,
             true,
             false,
         )
@@ -174,7 +175,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
                 .click_manager
                 .max_clicks_before_flush
                 .to_string(),
-            "int",
+            ValueType::Int,
             true,
             false,
         )
@@ -185,7 +186,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "routes.admin_prefix",
             &file_config.routes.admin_prefix,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -195,7 +196,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "routes.health_prefix",
             &file_config.routes.health_prefix,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -205,7 +206,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "routes.frontend_prefix",
             &file_config.routes.frontend_prefix,
-            "string",
+            ValueType::String,
             true,
             false,
         )
@@ -216,7 +217,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.enabled",
             &file_config.cors.enabled.to_string(),
-            "bool",
+            ValueType::Bool,
             true,
             false,
         )
@@ -226,7 +227,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.allowed_origins",
             &serde_json::to_string(&file_config.cors.allowed_origins).unwrap_or_default(),
-            "json",
+            ValueType::Json,
             true,
             false,
         )
@@ -236,7 +237,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.allowed_methods",
             &serde_json::to_string(&file_config.cors.allowed_methods).unwrap_or_default(),
-            "json",
+            ValueType::Json,
             true,
             false,
         )
@@ -246,7 +247,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.allowed_headers",
             &serde_json::to_string(&file_config.cors.allowed_headers).unwrap_or_default(),
-            "json",
+            ValueType::Json,
             true,
             false,
         )
@@ -256,7 +257,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.max_age",
             &file_config.cors.max_age.to_string(),
-            "int",
+            ValueType::Int,
             true,
             false,
         )
@@ -266,7 +267,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         .insert_if_not_exists(
             "cors.allow_credentials",
             &file_config.cors.allow_credentials.to_string(),
-            "bool",
+            ValueType::Bool,
             true,
             false,
         )

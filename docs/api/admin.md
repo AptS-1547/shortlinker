@@ -224,42 +224,42 @@ curl -X DELETE \
 
 ## 认证接口
 
-### POST /admin/auth/login - 登录
+### POST /admin/v1/auth/login - 登录
 
 ```bash
 curl -X POST \
      -H "Content-Type: application/json" \
      -d '{"password":"your_admin_token"}' \
-     http://localhost:8080/admin/auth/login
+     http://localhost:8080/admin/v1/auth/login
 ```
 
 **响应**：返回 JWT Access Token 和 Refresh Token（通过 Cookie 或响应体）。
 
-### POST /admin/auth/refresh - 刷新 Token
+### POST /admin/v1/auth/refresh - 刷新 Token
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_refresh_token" \
-     http://localhost:8080/admin/auth/refresh
+     http://localhost:8080/admin/v1/auth/refresh
 ```
 
 **响应**：返回新的 Access Token。
 
-### POST /admin/auth/logout - 登出
+### POST /admin/v1/auth/logout - 登出
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/auth/logout
+     http://localhost:8080/admin/v1/auth/logout
 ```
 
 **响应**：清除认证 Cookie 并使 Token 失效。
 
-### GET /admin/auth/verify - 验证 Token
+### GET /admin/v1/auth/verify - 验证 Token
 
 ```bash
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/auth/verify
+     http://localhost:8080/admin/v1/auth/verify
 ```
 
 **响应**：验证当前 Token 是否有效。

@@ -5,9 +5,9 @@
 use sea_orm::{EntityTrait, TransactionTrait, sea_query::OnConflict};
 use tracing::info;
 
+use super::SeaOrmStorage;
 use super::converters::shortlink_to_active_model;
 use super::operations::upsert;
-use super::SeaOrmStorage;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
 

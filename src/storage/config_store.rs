@@ -5,6 +5,7 @@ use sea_orm::{
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::api::services::admin::ValueType;
 use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
 
@@ -13,7 +14,7 @@ use migration::entities::{config_history, system_config};
 pub struct ConfigItem {
     pub key: String,
     pub value: Arc<String>,
-    pub value_type: String,
+    pub value_type: ValueType,
     pub requires_restart: bool,
     pub is_sensitive: bool,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -74,7 +75,7 @@ impl ConfigStore {
         Ok(result.map(|m| ConfigItem {
             key: m.key,
             value: Arc::new(m.value),
-            value_type: m.value_type,
+            value_type: m.value_type.parse().unwrap_or(ValueType::String),
             requires_restart: m.requires_restart,
             is_sensitive: m.is_sensitive,
             updated_at: m.updated_at,
@@ -194,7 +195,7 @@ impl ConfigStore {
                 ConfigItem {
                     key: r.key,
                     value: Arc::new(r.value),
-                    value_type: r.value_type,
+                    value_type: r.value_type.parse().unwrap_or(ValueType::String),
                     requires_restart: r.requires_restart,
                     is_sensitive: r.is_sensitive,
                     updated_at: r.updated_at,
@@ -247,7 +248,7 @@ impl ConfigStore {
         &self,
         key: &str,
         value: &str,
-        value_type: &str,
+        value_type: ValueType,
         requires_restart: bool,
         is_sensitive: bool,
     ) -> Result<bool> {

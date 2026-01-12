@@ -109,21 +109,21 @@ where
     /// Check if the request path is the login endpoint
     fn is_login_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
         let path = req.path();
-        let login_path = format!("{}/auth/login", admin_prefix);
+        let login_path = format!("{}/v1/auth/login", admin_prefix);
         path == login_path
     }
 
     /// Check if the request path is the refresh endpoint
     fn is_refresh_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
         let path = req.path();
-        let refresh_path = format!("{}/auth/refresh", admin_prefix);
+        let refresh_path = format!("{}/v1/auth/refresh", admin_prefix);
         path == refresh_path
     }
 
     /// Check if the request path is the logout endpoint
     fn is_logout_endpoint(req: &ServiceRequest, admin_prefix: &str) -> bool {
         let path = req.path();
-        let logout_path = format!("{}/auth/logout", admin_prefix);
+        let logout_path = format!("{}/v1/auth/logout", admin_prefix);
         path == logout_path
     }
 }

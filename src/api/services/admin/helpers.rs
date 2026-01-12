@@ -90,7 +90,7 @@ impl CookieBuilder {
     }
 
     pub fn build_refresh_cookie(&self, token: String) -> Cookie<'static> {
-        let refresh_path = format!("{}/auth", self.admin_prefix);
+        let refresh_path = format!("{}/v1/auth", self.admin_prefix);
         let mut cookie = Cookie::new(self.refresh_cookie_name.clone(), token);
         cookie.set_path(refresh_path);
         cookie.set_http_only(true);
@@ -114,7 +114,7 @@ impl CookieBuilder {
     }
 
     pub fn build_expired_refresh_cookie(&self) -> Cookie<'static> {
-        let refresh_path = format!("{}/auth", self.admin_prefix);
+        let refresh_path = format!("{}/v1/auth", self.admin_prefix);
         let mut cookie = Cookie::new(self.refresh_cookie_name.clone(), "");
         cookie.set_path(refresh_path);
         cookie.set_http_only(true);

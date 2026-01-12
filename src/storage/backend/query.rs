@@ -12,8 +12,8 @@ use sea_orm::{
 use tracing::{error, info};
 
 use super::{LinkFilter, SeaOrmStorage};
-use crate::storage::models::LinkStats;
 use crate::storage::ShortLink;
+use crate::storage::models::LinkStats;
 
 use migration::entities::short_link;
 

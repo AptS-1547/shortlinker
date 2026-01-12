@@ -4,30 +4,45 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
+use ts_rs::TS;
 
 use crate::config::try_get_runtime_config;
 
 use super::helpers::{error_response, success_response};
+use super::types::{TS_EXPORT_PATH, ValueType};
 
 /// 配置项响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(
+    export,
+    export_to = TS_EXPORT_PATH
+)]
 pub struct ConfigItemResponse {
     pub key: String,
     pub value: String,
-    pub value_type: String,
+    /// 值类型
+    pub value_type: ValueType,
     pub requires_restart: bool,
     pub is_sensitive: bool,
     pub updated_at: String,
 }
 
 /// 配置更新请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, TS)]
+#[ts(
+    export,
+    export_to = TS_EXPORT_PATH
+)]
 pub struct ConfigUpdateRequest {
     pub value: String,
 }
 
 /// 配置更新响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(
+    export,
+    export_to = TS_EXPORT_PATH
+)]
 pub struct ConfigUpdateResponse {
     pub key: String,
     pub value: String,
@@ -37,7 +52,11 @@ pub struct ConfigUpdateResponse {
 }
 
 /// 配置历史记录响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, TS)]
+#[ts(
+    export,
+    export_to = TS_EXPORT_PATH
+)]
 pub struct ConfigHistoryResponse {
     pub id: i32,
     pub config_key: String,
@@ -269,4 +288,20 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
 #[derive(Debug, Deserialize)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_config_types() {
+        ValueType::export_all().expect("Failed to export ValueType");
+        ConfigItemResponse::export_all().expect("Failed to export ConfigItemResponse");
+        ConfigUpdateRequest::export_all().expect("Failed to export ConfigUpdateRequest");
+        ConfigUpdateResponse::export_all().expect("Failed to export ConfigUpdateResponse");
+        ConfigHistoryResponse::export_all().expect("Failed to export ConfigHistoryResponse");
+        println!("Config TypeScript types exported");
+    }
 }
