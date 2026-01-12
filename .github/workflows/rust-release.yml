@@ -1,11 +1,10 @@
-name: Generate Rust Binaries and Create Release
+name: Release
 
 on:
   push:
     tags:
       - 'v*'
 
-# 添加权限配置
 permissions:
   contents: write
   packages: write
@@ -15,116 +14,77 @@ env:
 
 jobs:
   build-frontend:
-    name: Build Frontend
     runs-on: ubuntu-latest
     steps:
-    - name: Get tag name
-      id: tag
-      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
-        submodules: true  # 初始化和更新子模块
+        submodules: true
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - uses: actions/setup-node@v4
       with:
-        node-version: '24'  # 使用 Node.js 24.x 版本
-
-    - name: Install Bun
-      working-directory: admin-panel
-      run: npm install -g bun@latest
-
-    - name: Install frontend dependencies
-      working-directory: admin-panel
-      run: bun install --frozen-lockfile
+        node-version: '24'
 
     - name: Build frontend
       working-directory: admin-panel
-      run: bun run build
+      run: |
+        npm install -g bun@latest
+        bun install --frozen-lockfile
+        bun run build
 
     - name: Package frontend
       run: |
-        cd admin-panel/dist
-        tar -czf ../shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz .
-        cd ..
-        mv shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz ../
+        VERSION="${GITHUB_REF#refs/tags/}"
+        tar -czf "shortlinker-admin-panel_${VERSION}.tar.gz" -C admin-panel/dist .
 
-    - name: Upload frontend build artifacts
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: frontend-dist
         path: admin-panel/dist
-        # 仅保留最近一次构建的前端文件
         retention-days: 1
 
-    - name: Upload frontend package
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: frontend-package
-        path: shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz
+        path: shortlinker-admin-panel_*.tar.gz
         retention-days: 1
 
   build-linux-windows:
-    name: Build Linux x86/i686 & Windows
     needs: build-frontend
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          # Linux musl 静态编译 (排除 ARM64)
           - target: x86_64-unknown-linux-musl
             name: linux_x86_64
             packages: musl-tools
-          # Windows
           - target: x86_64-pc-windows-gnu
             name: windows_x86_64.exe
             packages: gcc-mingw-w64-x86-64
 
     steps:
-    - name: Get tag name
-      id: tag
-      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
     - uses: actions/checkout@v4
 
-    - name: Download frontend build artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         name: frontend-dist
         path: admin-panel/dist
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
       with:
         targets: ${{ matrix.target }}
-    
+
     - uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.target }}
-        shared-key: "shortlinker"
-        save-if: ${{ github.ref == 'refs/heads/main' }}
 
-    - name: Cache and install APT packages
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: ${{ matrix.packages }}
-        version: 1.0
-        execute_install_scripts: true
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
 
-    - name: Install cross-compilation tools
-      if: matrix.packages
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ${{ matrix.packages }}
-
-    - name: Configure cross-compilation
+    - name: Configure linker
       run: |
         case "${{ matrix.target }}" in
           x86_64-unknown-linux-musl)
             echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> $GITHUB_ENV
-            echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
             ;;
           x86_64-pc-windows-gnu)
             echo "CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc" >> $GITHUB_ENV
@@ -132,418 +92,150 @@ jobs:
         esac
 
     - name: Build
-      env:
-        RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
-      run: cargo build --release --target ${{ matrix.target }} --all-features
+      run: |
+        RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-s" \
+        cargo build --release --target ${{ matrix.target }} --all-features
 
     - name: Rename binary
       run: |
-        if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
-          mv target/${{ matrix.target }}/release/shortlinker.exe shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
-        else
-          mv target/${{ matrix.target }}/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
-        fi
+        VERSION="${GITHUB_REF#refs/tags/}"
+        SRC="target/${{ matrix.target }}/release/shortlinker"
+        [[ "${{ matrix.target }}" == *windows* ]] && SRC="${SRC}.exe"
+        mv "$SRC" "shortlinker_${VERSION}_${{ matrix.name }}"
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
-        name: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
-        path: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
+        name: binary-${{ matrix.name }}
+        path: shortlinker_*
 
   build-arm64:
-    name: Build ARM64 Linux
     needs: build-frontend
     runs-on: ubuntu-latest
     steps:
-    - name: Get tag name
-      id: tag
-      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
     - uses: actions/checkout@v4
 
-    - name: Download frontend build artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         name: frontend-dist
         path: admin-panel/dist
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
       with:
         targets: aarch64-unknown-linux-gnu
 
     - uses: Swatinem/rust-cache@v2
       with:
-        key: aarch64-unknown-linux-musl
-        shared-key: "shortlinker"
-        save-if: ${{ github.ref == 'refs/heads/main' }}
+        key: aarch64-unknown-linux-gnu
 
-    - name: Install ARM64 toolchain (glibc)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu
+    - name: Install ARM64 toolchain
+      run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
 
-    - name: Configure cross-compilation
-      run: |
-        echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-    
-    - name: Build ARM64
+    - name: Build
       env:
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-s"
       run: cargo build --release --target aarch64-unknown-linux-gnu --all-features
 
     - name: Rename binary
-      run: mv target/aarch64-unknown-linux-gnu/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        mv target/aarch64-unknown-linux-gnu/release/shortlinker "shortlinker_${VERSION}_linux_aarch64"
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
-        name: shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
-        path: shortlinker_${{ steps.tag.outputs.tag }}_linux-aarch64
+        name: binary-linux_aarch64
+        path: shortlinker_*
 
   build-macos:
-    name: Build macOS
     needs: build-frontend
     runs-on: macos-latest
-    strategy:
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            name: macos_aarch64
-
     steps:
-    - name: Get tag name
-      id: tag
-      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
     - uses: actions/checkout@v4
 
-    - name: Download frontend build artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         name: frontend-dist
         path: admin-panel/dist
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        targets: ${{ matrix.target }}
+        targets: aarch64-apple-darwin
 
     - uses: Swatinem/rust-cache@v2
       with:
-        key: ${{ matrix.target }}
-        shared-key: "shortlinker"
-        save-if: ${{ github.ref == 'refs/heads/main' }}
+        key: aarch64-apple-darwin
 
-    - name: Build native
+    - name: Build
       env:
         RUSTFLAGS: "-C link-arg=-s"
-      run: cargo build --release --target ${{ matrix.target }} --all-features
+      run: cargo build --release --target aarch64-apple-darwin --all-features
 
     - name: Rename binary
-      run: mv target/${{ matrix.target }}/release/shortlinker shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        mv target/aarch64-apple-darwin/release/shortlinker "shortlinker_${VERSION}_macos_aarch64"
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
-        name: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
-        path: shortlinker_${{ steps.tag.outputs.tag }}_${{ matrix.name }}
+        name: binary-macos_aarch64
+        path: shortlinker_*
 
   release:
-    name: Create Release
     needs: [build-linux-windows, build-arm64, build-macos]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 获取完整的 Git 历史
-        fetch-tags: true  # 确保获取所有标签
+        fetch-depth: 0
+        fetch-tags: true
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         path: artifacts
 
-    - name: Create release directory
+    - name: Prepare release files
       run: |
         mkdir -p release
-        # 复制所有二进制文件（排除前端原始文件目录）
-        find artifacts -name "shortlinker_*" -type f -exec cp {} release/ \;
-        # 复制前端打包文件
-        find artifacts -name "*.tar.gz" -type f -exec cp {} release/ \;
+        find artifacts -type f \( -name "shortlinker_*" -o -name "*.tar.gz" \) -exec cp {} release/ \;
+        cd release && sha256sum * > checksums.txt
 
-    - name: Generate checksums
-      run: |
-        cd release
-        sha256sum * > checksums.txt
-
-    - name: Get tag name
-      id: tag
-      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Get changelog
+    - name: Extract changelog
       id: changelog
       run: |
-        # 获取当前标签
-        CURRENT_TAG="${GITHUB_REF#refs/tags/}"
-        echo "Current tag: $CURRENT_TAG"
-        
-        # 获取上一个标签（排除当前标签）
-        PREV_TAG=$(git tag --sort=-version:refname | grep -v "^$CURRENT_TAG$" | head -n 1)
-        
-        if [ -n "$PREV_TAG" ]; then
-          echo "Found previous tag: $PREV_TAG"
-          
-          # 获取两个标签之间的提交信息
-          COMMITS=$(git log --pretty=format:"%s|%h|%an" $PREV_TAG..$CURRENT_TAG --no-merges)
-          
-          # 如果没有新提交，获取当前标签的提交
-          if [ -z "$COMMITS" ]; then
-            echo "No commits between tags, getting current tag commit"
-            COMMITS=$(git log --pretty=format:"%s|%h|%an" -n 1 $CURRENT_TAG)
-          fi
-          
-          # 初始化各类别
-          FEATURES=""
-          FIXES=""
-          DOCS=""
-          CHORES=""
-          OTHERS=""
-          
-          # 处理每个提交
-          while IFS='|' read -r message hash author; do
-            # 跳过空行
-            [ -z "$message" ] && continue
-            
-            # 根据 conventional commits 分类
-            case "$message" in
-              feat*|feature*)
-                FEATURES="$FEATURES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
-                ;;
-              fix*|bugfix*)
-                FIXES="$FIXES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
-                ;;
-              docs*)
-                DOCS="$DOCS\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
-                ;;
-              chore*|build*|ci*|style*|refactor*|perf*|test*)
-                CHORES="$CHORES\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
-                ;;
-              *)
-                OTHERS="$OTHERS\n- $message ([$hash](https://github.com/${{ github.repository }}/commit/$hash))"
-                ;;
-            esac
-          done <<< "$COMMITS"
-          
-          # 构建 changelog
-          CHANGELOG=""
-          
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="$CHANGELOG### 🚀 新功能\n$FEATURES\n\n"
-          fi
-          
-          if [ -n "$FIXES" ]; then
-            CHANGELOG="$CHANGELOG### 🐛 Bug 修复\n$FIXES\n\n"
-          fi
-          
-          if [ -n "$DOCS" ]; then
-            CHANGELOG="$CHANGELOG### 📚 文档更新\n$DOCS\n\n"
-          fi
-          
-          if [ -n "$OTHERS" ]; then
-            CHANGELOG="$CHANGELOG### 🔄 其他改进\n$OTHERS\n\n"
-          fi
-          
-          if [ -n "$CHORES" ]; then
-            CHANGELOG="$CHANGELOG### 🛠️ 开发相关\n$CHORES\n\n"
-          fi
-          
-          # 如果没有分类的提交，显示默认信息
-          if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="### 🔄 更新内容\n\n本次更新包含多项改进和优化。"
-          fi
-          
-          # 添加比较链接
-          CHANGELOG="$CHANGELOG---\n\n**完整更改**: [$PREV_TAG...$CURRENT_TAG](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$CURRENT_TAG)"
-          
-        else
-          echo "No previous tag found, this is the initial release"
-          CHANGELOG="### 🎉 首次发布\n\n这是 Shortlinker 的首个正式版本，包含以下核心功能：\n\n- ⚡ 高性能的短链接重定向服务\n- 🛠️ 完整的命令行管理工具\n- 🐳 Docker 容器化支持\n- 📱 跨平台兼容（Linux、macOS、Windows）\n- 🔧 简单易用的配置管理\n- 📊 JSON 文件存储，支持热重载"
+        VERSION="${GITHUB_REF#refs/tags/}"
+        # 从 CHANGELOG.md 提取当前版本的内容
+        CONTENT=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[v/{if(flag) exit} flag" CHANGELOG.md)
+        if [ -z "$CONTENT" ]; then
+          CONTENT="Release ${VERSION}"
         fi
-        
-        # 输出到 GitHub Actions
-        echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        
-        # 调试输出
-        echo "Generated changelog:"
-        echo -e "$CHANGELOG"
+        {
+          echo 'body<<EOF'
+          echo "$CONTENT"
+          echo 'EOF'
+        } >> "$GITHUB_OUTPUT"
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ steps.tag.outputs.tag }}
-        name: Release ${{ steps.tag.outputs.tag }}
+        name: ShortLinker ${{ github.ref_name }}
         body: |
-          <div align="center">
-          
-          # 🚀 ShortLinker ${{ steps.tag.outputs.tag }}
+          ${{ steps.changelog.outputs.body }}
 
-          <p>
-            <a href="https://github.com/AptS-1547/shortlinker/releases/tag/${{ steps.tag.outputs.tag }}">
-              <img src="https://img.shields.io/github/downloads/AptS-1547/shortlinker/${{ steps.tag.outputs.tag }}/total?style=for-the-badge&amp;color=blue" alt="Downloads">
-            </a>
-            <a href="LICENSE">
-              <img src="https://img.shields.io/github/license/AptS-1547/shortlinker?style=for-the-badge" alt="License">
-            </a>
-            <a href="https://github.com/AptS-1547/shortlinker/actions">
-              <img src="https://img.shields.io/github/actions/workflow/status/AptS-1547/shortlinker/rust-release.yml?style=for-the-badge" alt="Build Status">
-            </a>
-          </p>
+          ---
 
-          **高性能的链接缩短服务，使用 Rust 构建** ⚡
-          
-          </div>
-          
-          ---
-          
-          ## ✨ 新特性 & 改进
-          
-          ${{ steps.changelog.outputs.changelog }}
-          
-          ---
-          
-          ## 📦 快速下载
-          
-          > 💡 **提示**：选择与您系统匹配的版本，下载后可直接运行！
-          
-          ### 🌐 前端管理面板
-          
-          📥 [shortlinker-admin-panel.tar.gz](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker-admin-panel_${{ steps.tag.outputs.tag }}.tar.gz) - 独立前端文件包
-          
-          <table>
-          <tr>
-          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/linux/linux-original.svg" width="32" height="32"><br><b>Linux</b></td>
-          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/windows8/windows8-original.svg" width="32" height="32"><br><b>Windows</b></td>
-          <td align="center"><img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/apple/apple-original.svg" width="32" height="32"><br><b>macOS</b></td>
-          </tr>
-          <tr>
-          <td>
-          
-          **x86_64** (Intel/AMD 64位)  
-          📥 [shortlinker-linux-x86_64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_x86_64)
-          
-          **ARM64** (树莓派4/服务器)  
-          📥 [shortlinker-linux-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_linux_aarch64)
-          
-          </td>
-          <td>
-          
-          **x86_64** (64位 Windows)  
-          📥 [shortlinker-windows-x86_64.exe](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_windows_x86_64.exe)
-          
-          <br><br><br><br>
-          
-          </td>
-          <td>
-          
-          **Apple Silicon** (M1/M2/M3)  
-          📥 [shortlinker-macos-aarch64](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/shortlinker_${{ steps.tag.outputs.tag }}_macos_aarch64)
-          
-          <br><br>
-          
-          </td>
-          </tr>
-          </table>
-          
-          ---
-          
-          ## 🚀 快速开始
-          
-          ### Linux / macOS
-          ```bash
-          # 下载并赋予执行权限
-          chmod +x shortlinker-*
-          
-          # 直接运行
-          ./shortlinker-*
-          ```
-          
-          ### Windows
-          ```powershell
-          # 直接双击运行或在命令行中执行
-          .\shortlinker-windows-x86_64.exe
-          ```
-          
-          ---
-          
-          ## 🔐 安全验证
-          
-          为确保下载文件的完整性和安全性，请验证 SHA256 校验和：
-          
-          ```bash
-          # 下载校验文件
-          curl -LO https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt
-          
-          # 验证文件完整性
-          sha256sum -c checksums.txt
-          
-          # 或单独验证某个文件
-          sha256sum shortlinker-linux-x86_64
-          ```
-          
-          📋 **校验文件下载**：[checksums.txt](https://github.com/AptS-1547/shortlinker/releases/download/${{ steps.tag.outputs.tag }}/checksums.txt)
-          
-          ---
-          
-          ## 📖 文档 & 帮助
-          
-          | 资源 | 链接 | 描述 |
-          |------|------|------|
-          | 📚 **完整文档** | [esap.cc/docs](https://esap.cc/docs) | 详细使用指南和API文档 |
-          | 🐛 **问题反馈** | [Issues](https://github.com/AptS-1547/shortlinker/issues) | 报告bug或提出功能请求 |
-          | 💬 **讨论区** | [Discussions](https://github.com/AptS-1547/shortlinker/discussions) | 社区交流和问答 |
-          | 🔧 **贡献指南** | [CONTRIBUTING.md](CONTRIBUTING.md) | 参与项目开发 |
-          
-          ---
-          
-          ## 🎯 主要特性
-          
-          - ⚡ **高性能**：基于 Rust，内存安全且极速响应
-          - 🛡️ **安全可靠**：内置防护机制，数据加密存储
-          - 🌐 **跨平台**：支持 Linux、Windows、macOS 多平台
-          - 📊 **实时统计**：点击统计、访问分析等功能
-          - 🔧 **易于部署**：单文件部署，配置简单
-          - 📱 **现代化UI**：响应式设计，移动端友好
-          
-          ---
-          
-          ## 💝 支持项目
-          
-          如果这个项目对您有帮助，请考虑：
-          
-          - ⭐ **给项目点星**
-          - 🐛 **报告问题**
-          - 🔧 **提交PR**
-          - 📢 **分享给朋友**
-          
-          ---
-          
-          <div align="center">
-          
-          **感谢所有贡献者和用户的支持！** ❤️
-          <p>
-            <img src="https://img.shields.io/github/contributors/AptS-1547/shortlinker?style=for-the-badge" alt="Contributors">
-            <img src="https://img.shields.io/github/stars/AptS-1547/shortlinker?style=for-the-badge" alt="Stars">
-            <img src="https://img.shields.io/github/forks/AptS-1547/shortlinker?style=for-the-badge" alt="Forks">
-          </p>
-          </div>
+          ## Downloads
 
-        files: |
-          release/*
+          | Platform | Architecture | Download |
+          |----------|--------------|----------|
+          | Linux | x86_64 | [shortlinker_${{ github.ref_name }}_linux_x86_64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_linux_x86_64) |
+          | Linux | ARM64 | [shortlinker_${{ github.ref_name }}_linux_aarch64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_linux_aarch64) |
+          | Windows | x86_64 | [shortlinker_${{ github.ref_name }}_windows_x86_64.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_windows_x86_64.exe) |
+          | macOS | ARM64 | [shortlinker_${{ github.ref_name }}_macos_aarch64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_macos_aarch64) |
+          | Admin Panel | - | [shortlinker-admin-panel_${{ github.ref_name }}.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker-admin-panel_${{ github.ref_name }}.tar.gz) |
+
+          **Checksums**: [checksums.txt](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/checksums.txt)
+        files: release/*
         draft: false
-        prerelease: ${{ contains(steps.tag.outputs.tag, 'alpha') || contains(steps.tag.outputs.tag, 'beta') || contains(steps.tag.outputs.tag, 'rc') || contains(steps.tag.outputs.tag, 'pre') }}
-        generate_release_notes: true
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

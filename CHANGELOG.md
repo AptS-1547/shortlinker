@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-alpha.5] - 2026-01-13
+
+### Added
+- **搜索索引迁移** - 新增 `m020260112_000001_search_index` 迁移，为 `short_links` 表添加数据库特定的搜索索引
+  - PostgreSQL：使用 pg_trgm 扩展和 GIN 索引支持高效的模糊搜索
+  - MySQL：添加 FULLTEXT 索引支持全文搜索
+  - 所有数据库：添加复合索引 `(expires_at, created_at DESC)` 优化未过期链接的排序查询
+- **TypeScript 类型生成** - 集成 ts-rs 自动生成 TypeScript 类型定义
+
+### Changed
+- **Admin API 路径重构** - 统一添加 `/v1` 前缀
+- **依赖升级**
+  - SeaORM 升级至 2.0.0-rc.28
+  - actix-web 升级至 4.12
+  - ratatui 升级至 0.30.0
+- 配置迁移模块使用强类型的 ValueType 枚举
+- 健康检查服务响应结构优化，增强类型安全性
+- 更新 admin-panel 子模块到最新提交
+
+### Improved
+- **性能优化**
+  - 为 actix-web 启用 brotli/gzip 压缩中间件，减少网络传输
+  - 使用 moka 缓存分页 COUNT 查询结果（TTL 30秒），提升分页性能
+  - 重构统计查询为单次 DSL 聚合查询，减少数据库往返
+  - 简化 upsert 实现，移除冗余的后备策略
+  - 数据变更时自动清除 COUNT 缓存，保证一致性
+
+### Fixed
+- 修复 ratatui 0.30.0 的 API 变更：移除 Stylize trait 导入，更新 terminal.draw 错误处理
+- 修复全局点击管理器重复初始化时的 panic，改为警告日志
+
+### Refactored
+- **CLI 模块拆分** - 将链接管理命令拆分为独立模块（add, list, update, remove, import_export, config_gen）
+- **缓存错误处理重构** - Bloom 和 Null 过滤器构造函数返回 Result，移除 panic
+- **统一缓存接口** - `ExistenceFilter::clear` 和 `CompositeCacheTrait::reconfigure` 返回 Result
+- **SeaOrmStorage 重构** - 分离查询、变更和点击刷新逻辑到独立模块
+- 配置项值类型使用 `Arc<String>` 避免重复克隆
+
+### Docs
+- 精简 README 内容，将 PNG 图片替换为 JPEG 格式以减小文件大小
+- 更新 API 文档：添加搜索参数、统计接口、批量操作和认证端点
+- 新增 TUI 模式、密码保护、批量操作和运行时配置 API 文档
+- 更新健康检查 API 响应格式，统一为 code/data 结构
+- 统一数据库配置：使用 DATABASE_URL 替代 STORAGE_BACKEND 和 DB_FILE_NAME
+
 ## [v0.3.0-alpha.4] - 2026-01-11
 
 ### Added
@@ -554,7 +599,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...HEAD
+[v0.3.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...v0.3.0-alpha.5
 [v0.3.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...v0.3.0-alpha.4
 [v0.3.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.2...v0.3.0-alpha.3
 [v0.3.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.1...v0.3.0-alpha.2
