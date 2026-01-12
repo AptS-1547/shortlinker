@@ -4,7 +4,11 @@
 //! It configures and starts the HTTP server with all necessary routes.
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, middleware::DefaultHeaders, web};
+use actix_web::{
+    App, HttpServer,
+    middleware::{Compress, DefaultHeaders},
+    web,
+};
 use anyhow::Result;
 use tracing::{debug, warn};
 
@@ -121,6 +125,7 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
 
         App::new()
             .wrap(cors)
+            .wrap(Compress::default())
             .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(app_start_time.clone()))

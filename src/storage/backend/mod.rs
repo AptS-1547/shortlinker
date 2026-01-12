@@ -11,8 +11,10 @@ mod operations;
 mod query;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use moka::sync::Cache;
 use sea_orm::DatabaseConnection;
 use tracing::warn;
 
@@ -72,6 +74,8 @@ pub struct LinkFilter {
 pub struct SeaOrmStorage {
     db: DatabaseConnection,
     backend_name: String,
+    /// 分页 COUNT 缓存（TTL 30秒）
+    count_cache: Cache<String, u64>,
 }
 
 impl SeaOrmStorage {
@@ -92,6 +96,10 @@ impl SeaOrmStorage {
         let storage = SeaOrmStorage {
             db,
             backend_name: backend_name.to_string(),
+            count_cache: Cache::builder()
+                .time_to_live(Duration::from_secs(30))
+                .max_capacity(100)
+                .build(),
         };
 
         // 运行迁移
@@ -126,5 +134,10 @@ impl SeaOrmStorage {
     /// 获取数据库连接（用于配置系统等需要直接访问数据库的场景）
     pub fn get_db(&self) -> &DatabaseConnection {
         &self.db
+    }
+
+    /// 清除分页 COUNT 缓存（数据变更时调用）
+    pub fn invalidate_count_cache(&self) {
+        self.count_cache.invalidate_all();
     }
 }

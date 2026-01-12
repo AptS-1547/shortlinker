@@ -15,7 +15,9 @@ use migration::entities::short_link;
 
 impl SeaOrmStorage {
     pub async fn set(&self, link: ShortLink) -> Result<()> {
-        upsert(&self.db, &self.backend_name, &link).await
+        upsert(&self.db, &link).await?;
+        self.invalidate_count_cache();
+        Ok(())
     }
 
     pub async fn remove(&self, code: &str) -> Result<()> {
@@ -31,6 +33,7 @@ impl SeaOrmStorage {
             )));
         }
 
+        self.invalidate_count_cache();
         info!("Short link deleted: {}", code);
         Ok(())
     }
@@ -71,6 +74,7 @@ impl SeaOrmStorage {
             .await
             .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
 
+        self.invalidate_count_cache();
         info!("批量插入 {} 条链接成功", links.len());
         Ok(())
     }

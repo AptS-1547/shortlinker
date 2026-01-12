@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect,
+    ColumnTrait, Condition, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, sea_query::Expr,
 };
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use super::{LinkFilter, SeaOrmStorage};
 use crate::storage::ShortLink;
@@ -19,10 +19,12 @@ use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
 
-/// 用于 SUM 聚合查询的结果结构体
+/// 用于统计查询的结果结构体（DSL 聚合查询）
 #[derive(Debug, FromQueryResult)]
-pub(super) struct ClickSum {
-    pub sum: Option<i64>,
+struct StatsResult {
+    total_links: i64,
+    total_clicks: Option<i64>,
+    active_links: Option<i64>,
 }
 
 impl SeaOrmStorage {
@@ -60,34 +62,7 @@ impl SeaOrmStorage {
         }
     }
 
-    /// 分页加载链接
-    pub async fn load_paginated(&self, page: u64, page_size: u64) -> (Vec<ShortLink>, u64) {
-        let paginator = short_link::Entity::find()
-            .order_by_desc(short_link::Column::CreatedAt)
-            .paginate(&self.db, page_size);
-
-        let total = match paginator.num_items().await {
-            Ok(count) => count,
-            Err(e) => {
-                error!("获取总数失败: {}", e);
-                return (Vec::new(), 0);
-            }
-        };
-
-        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
-            Ok(models) => models,
-            Err(e) => {
-                error!("分页查询失败: {}", e);
-                return (Vec::new(), total);
-            }
-        };
-
-        let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-
-        (links, total)
-    }
-
-    /// 带过滤条件的分页加载链接
+    /// 带过滤条件的分页加载链接（带 COUNT 缓存）
     pub async fn load_paginated_filtered(
         &self,
         page: u64,
@@ -95,6 +70,16 @@ impl SeaOrmStorage {
         filter: LinkFilter,
     ) -> (Vec<ShortLink>, u64) {
         let now = Utc::now();
+
+        // 生成缓存 key（基于过滤条件）
+        let cache_key = format!(
+            "count:s={:?}:a={:?}:b={:?}:e={}:v={}",
+            filter.search,
+            filter.created_after.map(|d| d.timestamp()),
+            filter.created_before.map(|d| d.timestamp()),
+            filter.only_expired,
+            filter.only_active
+        );
 
         // 构建查询条件
         let mut condition = Condition::all();
@@ -134,20 +119,29 @@ impl SeaOrmStorage {
             );
         }
 
-        let paginator = short_link::Entity::find()
-            .filter(condition)
-            .order_by_desc(short_link::Column::CreatedAt)
-            .paginate(&self.db, page_size);
-
-        let total = match paginator.num_items().await {
-            Ok(count) => count,
-            Err(e) => {
-                error!("获取总数失败: {}", e);
-                return (Vec::new(), 0);
-            }
+        // 尝试从缓存获取总数
+        let total = if let Some(cached) = self.count_cache.get(&cache_key) {
+            debug!("count cache hit: key={}, value={}", cache_key, cached);
+            cached
+        } else {
+            // 缓存未命中，执行 COUNT 查询
+            let count = short_link::Entity::find()
+                .filter(condition.clone())
+                .count(&self.db)
+                .await
+                .unwrap_or(0);
+            self.count_cache.insert(cache_key, count);
+            count
         };
 
-        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
+        // 执行分页数据查询
+        let models = match short_link::Entity::find()
+            .filter(condition)
+            .order_by_desc(short_link::Column::CreatedAt)
+            .paginate(&self.db, page_size)
+            .fetch_page(page.saturating_sub(1))
+            .await
+        {
             Ok(models) => models,
             Err(e) => {
                 error!("分页查询失败: {}", e);
@@ -156,7 +150,6 @@ impl SeaOrmStorage {
         };
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-
         (links, total)
     }
 
@@ -186,43 +179,46 @@ impl SeaOrmStorage {
         }
     }
 
-    /// 获取链接统计信息
+    /// 获取链接统计信息（SeaORM DSL 聚合查询）
     pub async fn get_stats(&self) -> LinkStats {
         let now = Utc::now();
 
-        // 获取总链接数
-        let total_links = short_link::Entity::find()
-            .count(&self.db)
-            .await
-            .unwrap_or(0) as usize;
-
-        // 获取总点击数（使用数据库聚合）
-        let all_clicks: i64 = match short_link::Entity::find()
+        let result = short_link::Entity::find()
             .select_only()
-            .column_as(short_link::Column::ClickCount.sum(), "sum")
-            .into_model::<ClickSum>()
-            .one(&self.db)
-            .await
-        {
-            Ok(Some(result)) => result.sum.unwrap_or(0),
-            Ok(None) | Err(_) => 0,
-        };
-
-        // 获取活跃链接数（未过期的）
-        let active_links = short_link::Entity::find()
-            .filter(
-                Condition::any()
-                    .add(short_link::Column::ExpiresAt.is_null())
-                    .add(short_link::Column::ExpiresAt.gt(now)),
+            // COUNT(*) - 总链接数
+            .column_as(short_link::Column::ShortCode.count(), "total_links")
+            // SUM(click_count) - 总点击数
+            .column_as(short_link::Column::ClickCount.sum(), "total_clicks")
+            // SUM(CASE WHEN expires_at IS NULL OR expires_at > now THEN 1 ELSE 0 END) - 活跃链接数
+            .column_as(
+                Expr::case(
+                    Condition::any()
+                        .add(short_link::Column::ExpiresAt.is_null())
+                        .add(short_link::Column::ExpiresAt.gt(now)),
+                    1,
+                )
+                .finally(0)
+                .sum(),
+                "active_links",
             )
-            .count(&self.db)
-            .await
-            .unwrap_or(0) as usize;
+            .into_model::<StatsResult>()
+            .one(&self.db)
+            .await;
 
-        LinkStats {
-            total_links,
-            total_clicks: all_clicks as usize,
-            active_links,
+        match result {
+            Ok(Some(stats)) => LinkStats {
+                total_links: stats.total_links as usize,
+                total_clicks: stats.total_clicks.unwrap_or(0) as usize,
+                active_links: stats.active_links.unwrap_or(0) as usize,
+            },
+            Ok(None) => {
+                error!("统计查询返回空结果");
+                LinkStats::default()
+            }
+            Err(e) => {
+                error!("统计查询失败: {}", e);
+                LinkStats::default()
+            }
         }
     }
 }

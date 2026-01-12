@@ -88,11 +88,9 @@ impl MigrationTrait for Migration {
             DatabaseBackend::MySql => {
                 let conn = manager.get_connection();
 
-                conn.execute_unprepared(
-                    "ALTER TABLE short_links DROP INDEX idx_search_fulltext",
-                )
-                .await
-                .ok(); // 忽略错误（索引可能不存在）
+                conn.execute_unprepared("ALTER TABLE short_links DROP INDEX idx_search_fulltext")
+                    .await
+                    .ok(); // 忽略错误（索引可能不存在）
             }
             DatabaseBackend::Sqlite => {
                 // 无操作
