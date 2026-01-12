@@ -3,6 +3,7 @@ use sea_orm::{
     QueryOrder, Set,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
@@ -11,7 +12,7 @@ use migration::entities::{config_history, system_config};
 #[derive(Debug, Clone)]
 pub struct ConfigItem {
     pub key: String,
-    pub value: String,
+    pub value: Arc<String>,
     pub value_type: String,
     pub requires_restart: bool,
     pub is_sensitive: bool,
@@ -72,7 +73,7 @@ impl ConfigStore {
 
         Ok(result.map(|m| ConfigItem {
             key: m.key,
-            value: m.value,
+            value: Arc::new(m.value),
             value_type: m.value_type,
             requires_restart: m.requires_restart,
             is_sensitive: m.is_sensitive,
@@ -192,7 +193,7 @@ impl ConfigStore {
                 r.key.clone(),
                 ConfigItem {
                     key: r.key,
-                    value: r.value,
+                    value: Arc::new(r.value),
                     value_type: r.value_type,
                     requires_restart: r.requires_restart,
                     is_sensitive: r.is_sensitive,

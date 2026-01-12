@@ -6,6 +6,7 @@ use tracing::debug;
 
 use crate::cache::ExistenceFilter;
 use crate::declare_existence_filter_plugin;
+use crate::errors::{Result, ShortlinkerError};
 
 declare_existence_filter_plugin!("bloom", BloomExistenceFilterPlugin);
 
@@ -15,17 +16,18 @@ pub struct BloomExistenceFilterPlugin {
 
 impl Default for BloomExistenceFilterPlugin {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default BloomExistenceFilterPlugin")
     }
 }
 
 impl BloomExistenceFilterPlugin {
-    pub fn new() -> Self {
-        let bloom = Bloom::new_for_fp_rate(10_000, 0.001)
-            .unwrap_or_else(|_| panic!("Failed to create bloom filter"));
-        Self {
+    pub fn new() -> Result<Self> {
+        let bloom = Bloom::new_for_fp_rate(10_000, 0.001).map_err(|e| {
+            ShortlinkerError::cache_connection(format!("Failed to create bloom filter: {e}"))
+        })?;
+        Ok(Self {
             inner: Arc::new(RwLock::new(bloom)),
-        }
+        })
     }
 }
 
@@ -49,14 +51,16 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
         debug!("Bulk inserted {} keys into bloom filter", keys.len());
     }
 
-    async fn clear(&self, count: usize, fp_rate: f64) {
+    async fn clear(&self, count: usize, fp_rate: f64) -> Result<()> {
         let mut bloom = self.inner.write();
-        let capacity = count.max(9_000) + 1000; // Ensure a minimum capacity
-        *bloom = Bloom::new_for_fp_rate(capacity, fp_rate)
-            .unwrap_or_else(|_| panic!("Failed to clear bloom filter"));
+        let capacity = count.max(9_000) + 1000;
+        *bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
+            ShortlinkerError::cache_connection(format!("Failed to clear bloom filter: {e}"))
+        })?;
         debug!(
             "Bloom filter cleared with count: {}, fp_rate: {}",
             capacity, fp_rate
         );
+        Ok(())
     }
 }

@@ -1,24 +1,24 @@
+//! SeaORM storage backend
+//!
+//! This module provides database storage using SeaORM,
+//! supporting SQLite, MySQL/MariaDB, and PostgreSQL.
+
+mod click_sink;
 mod connection;
 mod converters;
+mod mutations;
 mod operations;
+mod query;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sea_orm::{
-    ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
-    QuerySelect,
-};
-use tracing::{debug, error, info, warn};
+use sea_orm::DatabaseConnection;
+use tracing::warn;
 
 use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
-use crate::storage::ShortLink;
-use crate::storage::models::{LinkStats, StorageConfig};
-
-use migration::entities::short_link;
+use crate::storage::models::StorageConfig;
 
 pub use connection::{connect_generic, connect_sqlite, run_migrations};
 pub use converters::{model_to_shortlink, shortlink_to_active_model};
@@ -52,12 +52,6 @@ pub fn normalize_backend_name(backend: &str) -> String {
     }
 }
 
-/// 用于 SUM 聚合查询的结果结构体
-#[derive(Debug, FromQueryResult)]
-struct ClickSum {
-    sum: Option<i64>,
-}
-
 /// 链接过滤条件
 #[derive(Default, Clone, Debug)]
 pub struct LinkFilter {
@@ -73,6 +67,7 @@ pub struct LinkFilter {
     pub only_active: bool,
 }
 
+/// SeaORM-based storage backend
 #[derive(Clone)]
 pub struct SeaOrmStorage {
     db: DatabaseConnection,
@@ -109,236 +104,8 @@ impl SeaOrmStorage {
         Ok(storage)
     }
 
-    pub async fn get(&self, code: &str) -> Option<ShortLink> {
-        let result = short_link::Entity::find_by_id(code).one(&self.db).await;
-
-        match result {
-            Ok(Some(model)) => Some(model_to_shortlink(model)),
-            Ok(None) => None,
-            Err(e) => {
-                error!("查询短链接失败: {}", e);
-                None
-            }
-        }
-    }
-
-    pub async fn load_all(&self) -> HashMap<String, ShortLink> {
-        match short_link::Entity::find().all(&self.db).await {
-            Ok(models) => {
-                let count = models.len();
-                // 使用 into_iter 避免不必要的克隆
-                let links: HashMap<String, ShortLink> = models
-                    .into_iter()
-                    .map(|model| {
-                        let link = model_to_shortlink(model);
-                        (link.code.clone(), link)
-                    })
-                    .collect();
-                info!("Loaded {} short links", count);
-                links
-            }
-            Err(e) => {
-                error!("加载所有短链接失败: {}", e);
-                HashMap::new()
-            }
-        }
-    }
-
-    /// 分页加载链接
-    pub async fn load_paginated(&self, page: u64, page_size: u64) -> (Vec<ShortLink>, u64) {
-        use sea_orm::{PaginatorTrait, QueryOrder};
-
-        let paginator = short_link::Entity::find()
-            .order_by_desc(short_link::Column::CreatedAt)
-            .paginate(&self.db, page_size);
-
-        let total = match paginator.num_items().await {
-            Ok(count) => count,
-            Err(e) => {
-                error!("获取总数失败: {}", e);
-                return (Vec::new(), 0);
-            }
-        };
-
-        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
-            Ok(models) => models,
-            Err(e) => {
-                error!("分页查询失败: {}", e);
-                return (Vec::new(), total);
-            }
-        };
-
-        let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-
-        (links, total)
-    }
-
-    /// 带过滤条件的分页加载链接
-    pub async fn load_paginated_filtered(
-        &self,
-        page: u64,
-        page_size: u64,
-        filter: LinkFilter,
-    ) -> (Vec<ShortLink>, u64) {
-        use sea_orm::{PaginatorTrait, QueryOrder};
-
-        let now = Utc::now();
-
-        // 构建查询条件
-        let mut condition = Condition::all();
-
-        // search: 模糊匹配 code 或 target
-        if let Some(ref search) = filter.search {
-            let pattern = format!("%{}%", search);
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ShortCode.contains(&pattern))
-                    .add(short_link::Column::TargetUrl.contains(&pattern)),
-            );
-        }
-
-        // created_after
-        if let Some(ref after) = filter.created_after {
-            condition = condition.add(short_link::Column::CreatedAt.gte(*after));
-        }
-
-        // created_before
-        if let Some(ref before) = filter.created_before {
-            condition = condition.add(short_link::Column::CreatedAt.lte(*before));
-        }
-
-        // only_expired: 只返回已过期的
-        if filter.only_expired {
-            condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
-            condition = condition.add(short_link::Column::ExpiresAt.lt(now));
-        }
-
-        // only_active: 只返回未过期的（expires_at 为 null 或 > now）
-        if filter.only_active {
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ExpiresAt.is_null())
-                    .add(short_link::Column::ExpiresAt.gt(now)),
-            );
-        }
-
-        let paginator = short_link::Entity::find()
-            .filter(condition)
-            .order_by_desc(short_link::Column::CreatedAt)
-            .paginate(&self.db, page_size);
-
-        let total = match paginator.num_items().await {
-            Ok(count) => count,
-            Err(e) => {
-                error!("获取总数失败: {}", e);
-                return (Vec::new(), 0);
-            }
-        };
-
-        let models = match paginator.fetch_page(page.saturating_sub(1)).await {
-            Ok(models) => models,
-            Err(e) => {
-                error!("分页查询失败: {}", e);
-                return (Vec::new(), total);
-            }
-        };
-
-        let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-
-        (links, total)
-    }
-
-    /// 批量获取链接
-    pub async fn batch_get(&self, codes: &[&str]) -> HashMap<String, ShortLink> {
-        if codes.is_empty() {
-            return HashMap::new();
-        }
-
-        let result = short_link::Entity::find()
-            .filter(short_link::Column::ShortCode.is_in(codes.iter().map(|s| s.to_string())))
-            .all(&self.db)
-            .await;
-
-        match result {
-            Ok(models) => models
-                .into_iter()
-                .map(|m| {
-                    let link = model_to_shortlink(m);
-                    (link.code.clone(), link)
-                })
-                .collect(),
-            Err(e) => {
-                error!("批量查询失败: {}", e);
-                HashMap::new()
-            }
-        }
-    }
-
-    /// 批量设置链接（使用事务）
-    pub async fn batch_set(&self, links: Vec<ShortLink>) -> Result<()> {
-        use sea_orm::{EntityTrait, TransactionTrait, sea_query::OnConflict};
-
-        if links.is_empty() {
-            return Ok(());
-        }
-
-        let txn =
-            self.db.begin().await.map_err(|e| {
-                ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
-            })?;
-
-        // 构建批量 ActiveModel
-        let active_models: Vec<short_link::ActiveModel> = links
-            .iter()
-            .map(|link| shortlink_to_active_model(link, true))
-            .collect();
-
-        // 使用 insert_many with on_conflict
-        short_link::Entity::insert_many(active_models)
-            .on_conflict(
-                OnConflict::column(short_link::Column::ShortCode)
-                    .update_columns([
-                        short_link::Column::TargetUrl,
-                        short_link::Column::ExpiresAt,
-                        short_link::Column::Password,
-                    ])
-                    .to_owned(),
-            )
-            .exec(&txn)
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("批量插入失败: {}", e)))?;
-
-        txn.commit()
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
-
-        info!("批量插入 {} 条链接成功", links.len());
-        Ok(())
-    }
-
-    pub async fn set(&self, link: ShortLink) -> Result<()> {
-        upsert(&self.db, &self.backend_name, &link).await
-    }
-
-    pub async fn remove(&self, code: &str) -> Result<()> {
-        let result = short_link::Entity::delete_by_id(code)
-            .exec(&self.db)
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
-
-        if result.rows_affected == 0 {
-            return Err(ShortlinkerError::not_found(format!(
-                "短链接不存在: {}",
-                code
-            )));
-        }
-
-        info!("Short link deleted: {}", code);
-        Ok(())
-    }
-
     pub async fn reload(&self) -> Result<()> {
-        info!(
+        tracing::info!(
             "Reloading links from {} storage",
             self.backend_name.to_uppercase()
         );
@@ -352,48 +119,6 @@ impl SeaOrmStorage {
         }
     }
 
-    /// 获取链接统计信息
-    pub async fn get_stats(&self) -> LinkStats {
-        use sea_orm::PaginatorTrait;
-
-        let now = Utc::now();
-
-        // 获取总链接数
-        let total_links = short_link::Entity::find()
-            .count(&self.db)
-            .await
-            .unwrap_or(0) as usize;
-
-        // 获取总点击数（使用数据库聚合）
-        let all_clicks: i64 = match short_link::Entity::find()
-            .select_only()
-            .column_as(short_link::Column::ClickCount.sum(), "sum")
-            .into_model::<ClickSum>()
-            .one(&self.db)
-            .await
-        {
-            Ok(Some(result)) => result.sum.unwrap_or(0),
-            Ok(None) | Err(_) => 0,
-        };
-
-        // 获取活跃链接数（未过期的）
-        let active_links = short_link::Entity::find()
-            .filter(
-                Condition::any()
-                    .add(short_link::Column::ExpiresAt.is_null())
-                    .add(short_link::Column::ExpiresAt.gt(now)),
-            )
-            .count(&self.db)
-            .await
-            .unwrap_or(0) as usize;
-
-        LinkStats {
-            total_links,
-            total_clicks: all_clicks as usize,
-            active_links,
-        }
-    }
-
     pub fn as_click_sink(&self) -> Option<Arc<dyn ClickSink>> {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
     }
@@ -401,62 +126,5 @@ impl SeaOrmStorage {
     /// 获取数据库连接（用于配置系统等需要直接访问数据库的场景）
     pub fn get_db(&self) -> &DatabaseConnection {
         &self.db
-    }
-}
-
-#[async_trait]
-impl ClickSink for SeaOrmStorage {
-    async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
-        use sea_orm::sea_query::{
-            CaseStatement, Expr, MysqlQueryBuilder, PostgresQueryBuilder, Query, SqliteQueryBuilder,
-        };
-        use sea_orm::{ConnectionTrait, DatabaseBackend, ExprTrait};
-
-        if updates.is_empty() {
-            return Ok(());
-        }
-
-        let total_count = updates.len();
-
-        // 构建 CASE WHEN 表达式（跨平台兼容）
-        let mut case_stmt = CaseStatement::new();
-        let mut codes: Vec<String> = Vec::with_capacity(total_count);
-
-        for (code, count) in &updates {
-            case_stmt = case_stmt.case(
-                Expr::col(short_link::Column::ShortCode).eq(Expr::val(code.as_str())),
-                Expr::col(short_link::Column::ClickCount).add(Expr::val(*count as i64)),
-            );
-            codes.push(code.clone());
-        }
-        // 不匹配的保持原值
-        case_stmt = case_stmt.finally(Expr::col(short_link::Column::ClickCount));
-
-        // 构建 UPDATE 语句
-        let stmt = Query::update()
-            .table(short_link::Entity)
-            .value(short_link::Column::ClickCount, case_stmt)
-            .and_where(Expr::col(short_link::Column::ShortCode).is_in(codes))
-            .to_owned();
-
-        // 使用 to_string 生成内联值的 SQL（根据数据库类型选择对应的 QueryBuilder）
-        let sql = match self.db.get_database_backend() {
-            DatabaseBackend::Sqlite => stmt.to_string(SqliteQueryBuilder),
-            DatabaseBackend::MySql => stmt.to_string(MysqlQueryBuilder),
-            DatabaseBackend::Postgres => stmt.to_string(PostgresQueryBuilder),
-            _ => stmt.to_string(SqliteQueryBuilder), // fallback to SQLite
-        };
-
-        self.db
-            .execute_unprepared(&sql)
-            .await
-            .map_err(|e| anyhow::anyhow!("批量更新点击数失败: {}", e))?;
-
-        debug!(
-            "点击计数已刷新到 {} 数据库 ({} 条记录)",
-            self.backend_name.to_uppercase(),
-            total_count
-        );
-        Ok(())
     }
 }

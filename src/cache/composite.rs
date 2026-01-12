@@ -1,6 +1,6 @@
 use crate::cache::register::{get_filter_plugin, get_object_cache_plugin};
 use crate::cache::{BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, ObjectCache};
-use crate::errors::ShortlinkerError;
+use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ pub struct CompositeCache {
 }
 
 impl CompositeCache {
-    pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>, ShortlinkerError> {
+    pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>> {
         let config = crate::config::get_config();
 
         let filter_plugin_name = "bloom";
@@ -73,9 +73,9 @@ impl CompositeCacheTrait for CompositeCache {
         self.object_cache.load_object_cache(links).await;
     }
 
-    async fn reconfigure(&self, config: BloomConfig) {
+    async fn reconfigure(&self, config: BloomConfig) -> Result<()> {
         self.filter_plugin
             .clear(config.capacity, config.fp_rate)
-            .await;
+            .await
     }
 }

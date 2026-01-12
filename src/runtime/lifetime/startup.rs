@@ -116,7 +116,8 @@ pub async fn prepare_server_startup() -> StartupContext {
             capacity: links_count,
             fp_rate: 0.001,
         })
-        .await;
+        .await
+        .expect("Failed to reconfigure cache");
     cache.load_cache(links).await;
     debug!("L1/L2 cache initialized with {} links", links_count);
 

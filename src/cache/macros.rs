@@ -10,8 +10,14 @@ macro_rules! declare_existence_filter_plugin {
                 $name,
                 Arc::new(|| {
                     Box::pin(async {
-                        let l1 = <$ty>::new();
-                        Ok(Box::new(l1) as Box<dyn $crate::cache::ExistenceFilter>)
+                        match <$ty>::new() {
+                            Ok(filter) => {
+                                Ok(Box::new(filter) as Box<dyn $crate::cache::ExistenceFilter>)
+                            }
+                            Err(e) => Err($crate::errors::ShortlinkerError::cache_connection(
+                                format!("Failed to create existence filter: {}", e),
+                            )),
+                        }
                     })
                 }),
             );

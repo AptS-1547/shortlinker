@@ -3,6 +3,7 @@ use tracing::trace;
 
 use crate::cache::ExistenceFilter;
 use crate::declare_existence_filter_plugin;
+use crate::errors::Result;
 
 declare_existence_filter_plugin!("null", NullExistenceFilterPlugin);
 
@@ -10,14 +11,14 @@ pub struct NullExistenceFilterPlugin;
 
 impl Default for NullExistenceFilterPlugin {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default NullExistenceFilterPlugin")
     }
 }
 
 impl NullExistenceFilterPlugin {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         trace!("Using NullExistenceFilterPlugin: no L1 cache will be used");
-        NullExistenceFilterPlugin
+        Ok(NullExistenceFilterPlugin)
     }
 }
 
@@ -36,7 +37,8 @@ impl ExistenceFilter for NullExistenceFilterPlugin {
         trace!("NullExistenceFilterPlugin: skip bulk_set");
     }
 
-    async fn clear(&self, _count: usize, _fp_rate: f64) {
+    async fn clear(&self, _count: usize, _fp_rate: f64) -> Result<()> {
         trace!("NullExistenceFilterPlugin: skip clear");
+        Ok(())
     }
 }

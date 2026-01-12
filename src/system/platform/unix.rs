@@ -144,7 +144,7 @@ async fn reload_all(
             capacity: links.len(),
             fp_rate: 0.001,
         })
-        .await;
+        .await?;
 
     // Load data into cache
     cache.load_cache(links).await;

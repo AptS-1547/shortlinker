@@ -61,7 +61,7 @@ impl RuntimeConfig {
     /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
         let cache = self.cache.read().ok()?;
-        cache.get(key).map(|item| item.value.clone())
+        cache.get(key).map(|item| (*item.value).clone())
     }
 
     /// 获取配置的完整信息
@@ -136,7 +136,7 @@ impl RuntimeConfig {
         // 更新内部缓存
         if let Ok(mut cache) = self.cache.write() {
             if let Some(item) = cache.get_mut(key) {
-                item.value = value.to_string();
+                item.value = std::sync::Arc::new(value.to_string());
                 item.updated_at = chrono::Utc::now();
             }
         } else {

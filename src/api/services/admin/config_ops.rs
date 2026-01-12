@@ -67,7 +67,7 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
             let value = if item.is_sensitive {
                 "********".to_string()
             } else {
-                item.value
+                (*item.value).clone()
             };
             ConfigItemResponse {
                 key: item.key,
@@ -103,7 +103,7 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
             let value = if item.is_sensitive {
                 "********".to_string()
             } else {
-                item.value
+                (*item.value).clone()
             };
             Ok(success_response(ConfigItemResponse {
                 key: item.key,

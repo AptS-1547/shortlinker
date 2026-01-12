@@ -30,7 +30,7 @@ pub async fn reload_all(
             capacity: links.len(),
             fp_rate: 0.001,
         })
-        .await;
+        .await?;
 
     // 加载缓存
     cache.load_cache(links).await;

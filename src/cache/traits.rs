@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::errors::Result;
 use crate::storage::ShortLink;
 use async_trait::async_trait;
 
@@ -30,7 +31,7 @@ pub trait CompositeCacheTrait: Send + Sync {
     async fn load_cache(&self, links: HashMap<String, ShortLink>);
 
     /// 重新初始化 Filter
-    async fn reconfigure(&self, config: BloomConfig);
+    async fn reconfigure(&self, config: BloomConfig) -> Result<()>;
 }
 
 #[async_trait]
@@ -47,13 +48,14 @@ pub trait ExistenceFilter: Send + Sync {
     async fn bulk_set(&self, keys: &[String]);
 
     /// 清空整个 Filter（重载、重建场景）
-    async fn clear(&self, count: usize, fp_rate: f64) {
+    async fn clear(&self, count: usize, fp_rate: f64) -> Result<()> {
         // 默认实现：子类可以选择覆盖
         tracing::trace!(
             "Not clearing Existence Filter, no operation defined. Count: {}, FP Rate: {}",
             count,
             fp_rate
         );
+        Ok(())
     }
 }
 
