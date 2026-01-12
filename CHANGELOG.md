@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-alpha.6] - 2026-01-13
+
+### Fixed (Admin Panel)
+- **API 版本管理重构** - 版本号 (`/v1`) 改由前端自己管理，后端只注入路由前缀 (`/admin`)
+- **Login 页面添加版本号** - 在登录页面底部显示版本信息，与 Sidebar 风格一致
+
 ## [v0.3.0-alpha.5] - 2026-01-13
 
 ### Added
@@ -599,7 +605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...HEAD
+[v0.3.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...v0.3.0-alpha.6
 [v0.3.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...v0.3.0-alpha.5
 [v0.3.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...v0.3.0-alpha.4
 [v0.3.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.2...v0.3.0-alpha.3
