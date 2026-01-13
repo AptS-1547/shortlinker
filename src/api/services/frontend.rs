@@ -160,12 +160,51 @@ impl FrontendService {
         }
     }
 
+    /// 处理 PWA 相关文件（manifest, service worker, 图标）
+    pub async fn handle_pwa_assets(req: HttpRequest) -> Result<HttpResponse> {
+        let path = req.path();
+        // 去掉 frontend_prefix，获取文件名
+        let config = crate::config::get_config();
+        let frontend_prefix =
+            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
+        let file_name = path
+            .strip_prefix(frontend_prefix)
+            .unwrap_or(path)
+            .trim_start_matches('/');
+
+        trace!("Serving PWA asset: {}", file_name);
+
+        let content_type = Self::get_content_type(file_name);
+
+        match FrontendAssets::get(file_name) {
+            Some(content) => {
+                // 对 manifest.webmanifest 做配置注入
+                if file_name == "manifest.webmanifest" {
+                    let manifest_content = String::from_utf8_lossy(&content.data);
+                    let processed = manifest_content.replace("%BASE_PATH%", frontend_prefix);
+                    Ok(HttpResponse::Ok()
+                        .content_type(content_type)
+                        .body(processed))
+                } else {
+                    Ok(HttpResponse::Ok()
+                        .content_type(content_type)
+                        .body(content.data.into_owned()))
+                }
+            }
+            None => {
+                debug!("PWA asset not found: {}", file_name);
+                Ok(HttpResponse::NotFound().body("File not found"))
+            }
+        }
+    }
+
     /// 根据文件扩展名确定 Content-Type
     fn get_content_type(path: &str) -> &'static str {
         match path.split('.').next_back() {
             Some("css") => "text/css",
             Some("js") => "application/javascript",
             Some("json") => "application/json",
+            Some("webmanifest") => "application/manifest+json",
             Some("png") => "image/png",
             Some("jpg") | Some("jpeg") => "image/jpeg",
             Some("gif") => "image/gif",

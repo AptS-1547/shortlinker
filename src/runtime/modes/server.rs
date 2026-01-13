@@ -219,6 +219,58 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                         "/favicon.ico",
                         web::head().to(FrontendService::handle_favicon),
                     )
+                    // PWA 文件（必须在 SPA fallback 之前）
+                    .route("/sw.js", web::get().to(FrontendService::handle_pwa_assets))
+                    .route("/sw.js", web::head().to(FrontendService::handle_pwa_assets))
+                    .route(
+                        "/registerSW.js",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/registerSW.js",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/manifest.webmanifest",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/manifest.webmanifest",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/pwa-192x192.png",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/pwa-192x192.png",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/pwa-512x512.png",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/pwa-512x512.png",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/apple-touch-icon.png",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/apple-touch-icon.png",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/workbox-{hash}.js",
+                        web::get().to(FrontendService::handle_pwa_assets),
+                    )
+                    .route(
+                        "/workbox-{hash}.js",
+                        web::head().to(FrontendService::handle_pwa_assets),
+                    )
+                    // SPA fallback（必须在最后）
                     .route(
                         "/{path:.*}",
                         web::get().to(FrontendService::handle_spa_fallback),
