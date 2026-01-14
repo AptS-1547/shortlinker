@@ -253,6 +253,64 @@ pub struct HealthResponse {
     pub response_time_ms: u32,
 }
 
+// ============ 导出导入相关类型 ============
+
+/// 导出查询参数
+#[derive(Serialize, Deserialize, Clone, Debug, Default, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ExportQuery {
+    pub search: Option<String>,
+    pub created_after: Option<String>,
+    pub created_before: Option<String>,
+    pub only_expired: Option<bool>,
+    pub only_active: Option<bool>,
+}
+
+/// 导入模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+#[serde(rename_all = "lowercase")]
+pub enum ImportMode {
+    #[default]
+    Skip, // 跳过已存在的
+    Overwrite, // 覆盖已存在的
+    Error,     // 遇到已存在的报错
+}
+
+/// 导入失败项
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ImportFailedItem {
+    pub row: usize,
+    pub code: String,
+    pub error: String,
+}
+
+/// 导入响应
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ImportResponse {
+    pub total_rows: usize,
+    pub success_count: usize,
+    pub skipped_count: usize,
+    pub failed_count: usize,
+    pub failed_items: Vec<ImportFailedItem>,
+}
+
+/// CSV 行数据结构（用于序列化/反序列化）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CsvLinkRow {
+    pub code: String,
+    pub target: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub expires_at: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default)]
+    pub click_count: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +342,12 @@ mod tests {
         HealthStorageCheck::export_all().expect("Failed to export HealthStorageCheck");
         HealthChecks::export_all().expect("Failed to export HealthChecks");
         HealthResponse::export_all().expect("Failed to export HealthResponse");
+
+        // Export/Import types
+        ExportQuery::export_all().expect("Failed to export ExportQuery");
+        ImportMode::export_all().expect("Failed to export ImportMode");
+        ImportFailedItem::export_all().expect("Failed to export ImportFailedItem");
+        ImportResponse::export_all().expect("Failed to export ImportResponse");
 
         // Config types
         ValueType::export_all().expect("Failed to export ValueType");

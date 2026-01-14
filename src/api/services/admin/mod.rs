@@ -9,6 +9,7 @@
 mod auth;
 mod batch_ops;
 mod config_ops;
+mod export_import;
 mod helpers;
 mod link_crud;
 mod types;
@@ -27,6 +28,9 @@ pub use link_crud::{delete_link, get_all_links, get_link, get_stats, post_link, 
 
 // 重新导出批量操作端点
 pub use batch_ops::{batch_create_links, batch_delete_links, batch_update_links};
+
+// 重新导出导出导入端点
+pub use export_import::{export_links, import_links};
 
 // 重新导出配置管理端点
 pub use config_ops::{
@@ -144,5 +148,22 @@ impl AdminService {
         storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
         link_crud::get_stats(req, storage).await
+    }
+
+    pub async fn export_links(
+        req: actix_web::HttpRequest,
+        query: actix_web::web::Query<ExportQuery>,
+        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+    ) -> actix_web::Result<impl actix_web::Responder> {
+        export_import::export_links(req, query, storage).await
+    }
+
+    pub async fn import_links(
+        req: actix_web::HttpRequest,
+        payload: actix_multipart::Multipart,
+        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
+        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+    ) -> actix_web::Result<impl actix_web::Responder> {
+        export_import::import_links(req, payload, cache, storage).await
     }
 }

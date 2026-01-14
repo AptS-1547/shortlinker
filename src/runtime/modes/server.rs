@@ -155,6 +155,9 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                             "/links/batch",
                             web::delete().to(AdminService::batch_delete_links),
                         )
+                        // Export/Import operations (must be before /links/{code:.*})
+                        .route("/links/export", web::get().to(AdminService::export_links))
+                        .route("/links/import", web::post().to(AdminService::import_links))
                         // Stats endpoint (must be before /links/{code:.*} to avoid matching)
                         .route("/stats", web::get().to(AdminService::get_stats))
                         .route("/stats", web::head().to(AdminService::get_stats))

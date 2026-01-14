@@ -179,6 +179,57 @@ impl SeaOrmStorage {
         }
     }
 
+    /// 带过滤条件加载所有链接（不分页，用于导出）
+    pub async fn load_all_filtered(&self, filter: LinkFilter) -> Vec<ShortLink> {
+        let now = Utc::now();
+
+        // 构建查询条件（复用 load_paginated_filtered 的逻辑）
+        let mut condition = Condition::all();
+
+        if let Some(ref search) = filter.search {
+            let pattern = format!("%{}%", search);
+            condition = condition.add(
+                Condition::any()
+                    .add(short_link::Column::ShortCode.contains(&pattern))
+                    .add(short_link::Column::TargetUrl.contains(&pattern)),
+            );
+        }
+
+        if let Some(ref after) = filter.created_after {
+            condition = condition.add(short_link::Column::CreatedAt.gte(*after));
+        }
+
+        if let Some(ref before) = filter.created_before {
+            condition = condition.add(short_link::Column::CreatedAt.lte(*before));
+        }
+
+        if filter.only_expired {
+            condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
+            condition = condition.add(short_link::Column::ExpiresAt.lt(now));
+        }
+
+        if filter.only_active {
+            condition = condition.add(
+                Condition::any()
+                    .add(short_link::Column::ExpiresAt.is_null())
+                    .add(short_link::Column::ExpiresAt.gt(now)),
+            );
+        }
+
+        match short_link::Entity::find()
+            .filter(condition)
+            .order_by_desc(short_link::Column::CreatedAt)
+            .all(&self.db)
+            .await
+        {
+            Ok(models) => models.into_iter().map(model_to_shortlink).collect(),
+            Err(e) => {
+                error!("加载过滤链接失败: {}", e);
+                Vec::new()
+            }
+        }
+    }
+
     /// 获取链接统计信息（SeaORM DSL 聚合查询）
     pub async fn get_stats(&self) -> LinkStats {
         let now = Utc::now();
