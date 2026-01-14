@@ -5,6 +5,7 @@ use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
 use serde::Serialize;
 
+use crate::config::SameSitePolicy;
 use crate::utils::TimeParser;
 
 use super::types::ApiResponse;
@@ -56,10 +57,10 @@ impl CookieBuilder {
     pub fn from_config() -> Self {
         let config = crate::config::get_config();
 
-        let same_site = match config.api.cookie_same_site.to_lowercase().as_str() {
-            "strict" => SameSite::Strict,
-            "none" => SameSite::None,
-            _ => SameSite::Lax,
+        let same_site = match config.api.cookie_same_site {
+            SameSitePolicy::Strict => SameSite::Strict,
+            SameSitePolicy::None => SameSite::None,
+            SameSitePolicy::Lax => SameSite::Lax,
         };
 
         Self {

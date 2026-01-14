@@ -2,7 +2,8 @@ use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{
-    get_config, init_runtime_config, migrate_config_to_db, migrate_plaintext_passwords,
+    get_config, init_runtime_config, migrate_config_to_db, migrate_enum_configs,
+    migrate_plaintext_passwords,
 };
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use std::sync::Arc;
@@ -68,6 +69,11 @@ pub async fn prepare_server_startup() -> StartupContext {
         migrate_plaintext_passwords(&config_store)
             .await
             .expect("Failed to migrate plaintext passwords");
+
+        // 自动迁移不合法的 enum 配置值
+        migrate_enum_configs(&config_store)
+            .await
+            .expect("Failed to migrate enum configs");
 
         debug!("Runtime config system initialized");
     }

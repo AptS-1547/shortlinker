@@ -1,4 +1,108 @@
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumIter, EnumMessage, IntoEnumIterator};
+use ts_rs::TS;
+
+/// 输出目录常量
+pub(crate) const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
+
+/// 获取默认的 HTTP 方法 JSON 数组
+///
+/// 使用 EnumIter 自动从 HttpMethod 枚举生成，保证类型安全。
+/// 用于配置迁移和 schema 默认值。
+pub fn default_http_methods_json() -> String {
+    let methods: Vec<String> = HttpMethod::iter().map(|v| v.as_ref().to_string()).collect();
+    serde_json::to_string(&methods).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Cookie SameSite 策略
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS,
+         EnumIter, AsRefStr, EnumMessage)]
+#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[serde(rename_all = "PascalCase")]
+#[strum(serialize_all = "PascalCase")]
+pub enum SameSitePolicy {
+    #[strum(message = "Most secure, only same-site requests carry cookies")]
+    Strict,
+    #[default]
+    #[strum(message = "Default, allows top-level navigation to carry cookies")]
+    Lax,
+    #[strum(message = "No restrictions, requires Secure attribute")]
+    None,
+}
+
+impl std::fmt::Display for SameSitePolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Strict => write!(f, "Strict"),
+            Self::Lax => write!(f, "Lax"),
+            Self::None => write!(f, "None"),
+        }
+    }
+}
+
+impl std::str::FromStr for SameSitePolicy {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "strict" => Ok(Self::Strict),
+            "lax" => Ok(Self::Lax),
+            "none" => Ok(Self::None),
+            _ => Err(format!(
+                "Invalid SameSite policy: '{}'. Valid: Strict, Lax, None",
+                s
+            )),
+        }
+    }
+}
+
+/// HTTP 方法枚举
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS,
+         EnumIter, AsRefStr)]
+#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[serde(rename_all = "UPPERCASE")]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+    Patch,
+    Head,
+    Options,
+}
+
+impl std::fmt::Display for HttpMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Get => write!(f, "GET"),
+            Self::Post => write!(f, "POST"),
+            Self::Put => write!(f, "PUT"),
+            Self::Delete => write!(f, "DELETE"),
+            Self::Patch => write!(f, "PATCH"),
+            Self::Head => write!(f, "HEAD"),
+            Self::Options => write!(f, "OPTIONS"),
+        }
+    }
+}
+
+impl std::str::FromStr for HttpMethod {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "GET" => Ok(Self::Get),
+            "POST" => Ok(Self::Post),
+            "PUT" => Ok(Self::Put),
+            "DELETE" => Ok(Self::Delete),
+            "PATCH" => Ok(Self::Patch),
+            "HEAD" => Ok(Self::Head),
+            "OPTIONS" => Ok(Self::Options),
+            _ => Err(format!(
+                "Invalid HTTP method: '{}'. Valid: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS",
+                s
+            )),
+        }
+    }
+}
 
 /// 应用程序配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -97,8 +201,8 @@ pub struct ApiConfig {
     pub refresh_cookie_name: String,
     #[serde(default)]
     pub cookie_secure: bool,
-    #[serde(default = "default_cookie_same_site")]
-    pub cookie_same_site: String,
+    #[serde(default)]
+    pub cookie_same_site: SameSitePolicy,
     #[serde(default)]
     pub cookie_domain: Option<String>,
 }
@@ -157,7 +261,7 @@ pub struct CorsConfig {
     #[serde(default)]
     pub allowed_origins: Vec<String>,
     #[serde(default = "default_cors_methods")]
-    pub allowed_methods: Vec<String>,
+    pub allowed_methods: Vec<HttpMethod>,
     #[serde(default = "default_cors_headers")]
     pub allowed_headers: Vec<String>,
     #[serde(default = "default_cors_max_age")]
@@ -296,23 +400,19 @@ fn default_refresh_cookie_name() -> String {
     "shortlinker_refresh".to_string()
 }
 
-fn default_cookie_same_site() -> String {
-    "Lax".to_string()
-}
-
 // CORS 默认值
 fn default_cors_enabled() -> bool {
     true
 }
 
-fn default_cors_methods() -> Vec<String> {
+fn default_cors_methods() -> Vec<HttpMethod> {
     vec![
-        "GET".to_string(),
-        "POST".to_string(),
-        "PUT".to_string(),
-        "DELETE".to_string(),
-        "OPTIONS".to_string(),
-        "HEAD".to_string(),
+        HttpMethod::Get,
+        HttpMethod::Post,
+        HttpMethod::Put,
+        HttpMethod::Delete,
+        HttpMethod::Options,
+        HttpMethod::Head,
     ]
 }
 
@@ -392,7 +492,7 @@ impl Default for ApiConfig {
             access_cookie_name: default_access_cookie_name(),
             refresh_cookie_name: default_refresh_cookie_name(),
             cookie_secure: false,
-            cookie_same_site: default_cookie_same_site(),
+            cookie_same_site: SameSitePolicy::default(),
             cookie_domain: None,
         }
     }
@@ -451,5 +551,22 @@ impl Default for CorsConfig {
             max_age: default_cors_max_age(),
             allow_credentials: default_cors_credentials(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_typescript_types() {
+        // 运行此测试会自动生成 TypeScript 类型文件
+        // cargo test export_typescript_types -- --nocapture
+
+        // Export enums
+        SameSitePolicy::export_all().expect("Failed to export LoginCredentials");
+        HttpMethod::export_all().expect("Failed to export HttpMethod");
+
+        println!("TypeScript types exported to {}", TS_EXPORT_PATH);
     }
 }

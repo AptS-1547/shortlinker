@@ -17,6 +17,7 @@ pub enum ValueType {
     Int,
     Bool,
     Json,
+    Enum,
 }
 
 impl std::fmt::Display for ValueType {
@@ -26,6 +27,7 @@ impl std::fmt::Display for ValueType {
             Self::Int => write!(f, "int"),
             Self::Bool => write!(f, "bool"),
             Self::Json => write!(f, "json"),
+            Self::Enum => write!(f, "enum"),
         }
     }
 }
@@ -38,6 +40,7 @@ impl std::str::FromStr for ValueType {
             "int" => Ok(Self::Int),
             "bool" => Ok(Self::Bool),
             "json" => Ok(Self::Json),
+            "enum" => Ok(Self::Enum),
             _ => Err(format!("Unknown value type: {}", s)),
         }
     }

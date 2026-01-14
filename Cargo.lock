@@ -3609,6 +3609,7 @@ dependencies = [
  "serde",
  "serde_json",
  "signal-hook 0.4.1",
+ "strum",
  "tempfile",
  "tokio",
  "tokio-test",

@@ -35,7 +35,8 @@ pub use export_import::{export_links, import_links};
 // 重新导出配置管理端点
 pub use config_ops::{
     ConfigHistoryResponse, ConfigItemResponse, ConfigUpdateRequest, ConfigUpdateResponse,
-    get_all_configs, get_config, get_config_history, reload_config, update_config,
+    get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
+    update_config,
 };
 
 /// 获取随机码长度配置

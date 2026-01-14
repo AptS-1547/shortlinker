@@ -15,7 +15,10 @@ use tracing::{debug, warn};
 use crate::api::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::api::services::{
     AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
-    admin::{get_all_configs, get_config, get_config_history, reload_config, update_config},
+    admin::{
+        get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
+        update_config,
+    },
 };
 use crate::config::CorsConfig;
 use crate::runtime::lifetime;
@@ -48,7 +51,7 @@ fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
 
     // Configure allowed methods
     for method in &cors_config.allowed_methods {
-        if let Ok(m) = method.parse::<actix_web::http::Method>() {
+        if let Ok(m) = method.to_string().parse::<actix_web::http::Method>() {
             cors = cors.allowed_methods(vec![m]);
         }
     }
@@ -178,6 +181,7 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
                         // Config management endpoints
                         .route("/config", web::get().to(get_all_configs))
                         .route("/config/reload", web::post().to(reload_config))
+                        .route("/config/schema", web::get().to(get_config_schema))
                         .route(
                             "/config/{key:.*}/history",
                             web::get().to(get_config_history),

@@ -284,4 +284,31 @@ impl ConfigStore {
 
         Ok(count)
     }
+
+    /// 更新配置项的 value_type
+    ///
+    /// 用于迁移场景，将已有配置的 value_type 从旧类型更新为新类型。
+    pub async fn update_value_type(&self, key: &str, value_type: ValueType) -> Result<()> {
+        let record = system_config::Entity::find_by_id(key)
+            .one(&self.db)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+            })?;
+
+        match record {
+            Some(r) => {
+                let mut active_model: system_config::ActiveModel = r.into();
+                active_model.value_type = Set(value_type.to_string());
+                active_model.update(&self.db).await.map_err(|e| {
+                    ShortlinkerError::database_operation(format!(
+                        "更新配置 '{}' 的 value_type 失败: {}",
+                        key, e
+                    ))
+                })?;
+                Ok(())
+            }
+            None => Ok(()), // 记录不存在，忽略
+        }
+    }
 }

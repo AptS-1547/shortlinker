@@ -7,6 +7,7 @@ use crate::errors::{Result, ShortlinkerError};
 use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 
 use super::update_config_by_key;
+use super::validators;
 
 /// 全局运行时配置实例
 static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
@@ -130,6 +131,14 @@ impl RuntimeConfig {
 
     /// 设置配置值（同时更新数据库、内部缓存和 AppConfig）
     pub async fn set(&self, key: &str, value: &str) -> Result<ConfigUpdateResult> {
+        // 验证 enum 类型配置值
+        if let Err(e) = validators::validate_config_value(key, value) {
+            return Err(ShortlinkerError::validation(format!(
+                "Invalid value for '{}': {}",
+                key, e
+            )));
+        }
+
         // 先更新数据库
         let result = self.store.set(key, value).await?;
 
@@ -206,6 +215,9 @@ pub mod keys {
     pub const API_JWT_SECRET: &str = "api.jwt_secret";
     pub const API_ACCESS_TOKEN_MINUTES: &str = "api.access_token_minutes";
     pub const API_REFRESH_TOKEN_DAYS: &str = "api.refresh_token_days";
+
+    // Cookie 配置
+    pub const API_COOKIE_SAME_SITE: &str = "api.cookie_same_site";
 
     // 功能配置
     pub const FEATURES_RANDOM_CODE_LENGTH: &str = "features.random_code_length";

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ts_rs::TS;
 
-use crate::config::try_get_runtime_config;
+use crate::config::{get_all_schemas, try_get_runtime_config};
 
 use super::helpers::{error_response, success_response};
 use super::types::{TS_EXPORT_PATH, ValueType};
@@ -288,6 +288,15 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
 #[derive(Debug, Deserialize)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
+}
+
+/// 获取所有配置的 schema
+///
+/// 返回配置项的元信息，包括类型、默认值、枚举选项等。
+/// 前端用这个动态渲染配置表单。
+pub async fn get_config_schema(_req: HttpRequest) -> ActixResult<impl Responder> {
+    let schemas = get_all_schemas();
+    Ok(success_response(schemas))
 }
 
 #[cfg(test)]
