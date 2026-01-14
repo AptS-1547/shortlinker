@@ -79,7 +79,7 @@ pub struct MemoryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConfig {
-    #[serde(default)]
+    #[serde(default = "default_admin_token")]
     pub admin_token: String,
     #[serde(default)]
     pub health_token: String,
@@ -276,6 +276,10 @@ fn default_jwt_secret() -> String {
     crate::utils::generate_secure_token(32) // 64 字符 hex 字符串
 }
 
+fn default_admin_token() -> String {
+    crate::utils::generate_random_code(8) // 8 字符随机字符串
+}
+
 fn default_access_token_minutes() -> u64 {
     15
 }
@@ -380,7 +384,7 @@ impl Default for MemoryConfig {
 impl Default for ApiConfig {
     fn default() -> Self {
         Self {
-            admin_token: String::new(),
+            admin_token: default_admin_token(),
             health_token: String::new(),
             jwt_secret: default_jwt_secret(),
             access_token_minutes: default_access_token_minutes(),

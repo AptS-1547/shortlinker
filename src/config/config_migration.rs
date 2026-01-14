@@ -14,6 +14,18 @@ use crate::utils::password::{hash_password, is_argon2_hash};
 pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) -> Result<()> {
     debug!("Checking configuration migration to database");
 
+    // 检测是否需要打印自动生成的 admin_token
+    let admin_token = &file_config.api.admin_token;
+    let is_auto_generated = !admin_token.is_empty() && !is_argon2_hash(admin_token);
+
+    // 如果数据库中还没有这个配置，且是自动生成的，打印一次
+    if is_auto_generated && store.get(keys::API_ADMIN_TOKEN).await?.is_none() {
+        warn!("===========================================");
+        warn!("Auto-generated ADMIN_TOKEN: {}", admin_token);
+        warn!("Please save this token, it will only be shown once!");
+        warn!("===========================================");
+    }
+
     // API 认证配置（敏感）
     store
         .insert_if_not_exists(
