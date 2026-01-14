@@ -2,25 +2,28 @@
 
 :::warning v0.3.x Version Notice
 The current version (v0.3.x) is undergoing significant feature adjustments and refactoring with frequent updates. We recommend:
+
 - 📌 Use stable version tags for production environments
 - 🔄 Follow the latest version in development to experience new features
 - 📖 Documentation may lag behind code implementation; actual functionality prevails
 :::
 
-Shortlinker provides a modern Web administration interface built with Vue 3 + TypeScript, located in the `admin-panel` directory, offering complete graphical management capabilities through the Admin API.
+Shortlinker provides a modern Web administration interface built with React 19 + TypeScript, located in the `admin-panel` directory, offering complete graphical management capabilities through the Admin API.
 
 ## Enabling the Panel
 
 To enable the Web admin panel in Shortlinker:
 
 1. **Build frontend assets**:
+
    ```bash
    cd admin-panel
-   yarn install
-   yarn build
+   bun install
+   bun run build
    ```
 
 2. **Configure environment variables**:
+
    ```bash
    ENABLE_ADMIN_PANEL=true
    ADMIN_TOKEN=your_secure_admin_token
@@ -58,7 +61,8 @@ Shortlinker supports using custom frontend implementations. You can replace the 
 
 4. **Detection**:
    When Shortlinker starts, it will automatically detect the `./frontend-panel` directory and use it if present. You'll see a log message:
-   ```
+
+   ```text
    Custom frontend detected at: ./frontend-panel
    ```
 
@@ -69,201 +73,102 @@ Custom frontend takes priority over the built-in admin panel. If `./frontend-pan
 ## Main Features
 
 ### Core Functions
+
 - 🔑 **Token Authentication**: Secure Bearer Token-based authentication
 - 📋 **Link Management**: Complete CRUD interface
   - Create new short links (custom codes, expiration, password protection)
   - Edit existing links
   - Delete links (with confirmation)
-  - Batch operations (planned)
+  - Batch selection and batch deletion
+  - QR code generation
 - 📊 **Data Visualization**:
   - Dashboard showing key metrics
-  - Click statistics charts
   - Storage backend status monitoring
+  - System uptime display
 - 🔍 **Advanced Features**:
-  - Filter and search links (active/expired/protected)
-  - Pagination
-  - Expiration reminders
+  - Search by code or URL
+  - Filter by status (all/active/expired)
+  - Filter by creation date range
+  - Multi-column sorting (code, target, clicks, created, expires)
+  - Pagination (10/20/50/100 items per page)
   - Copy short links to clipboard
-  - QR code generation (planned)
+  - Column configuration (show/hide table columns)
+- 📥 **Import/Export**:
+  - CSV export (supports filter conditions)
+  - CSV import (supports skip/overwrite/error conflict modes)
+  - Drag and drop upload support
 
 ### Interface Features
-- 🌓 **Theme Switching**: Light and dark theme support
-- 🌍 **Internationalization**: Chinese and English interfaces
+
+- 🌓 **Theme Switching**: Light/dark/system auto three modes
+- 🌍 **Internationalization**: 5 languages (Chinese, English, Japanese, French, Russian)
 - 📱 **Responsive Design**: Desktop and mobile compatible
-- ⚡ **Performance Optimized**: Vue 3 Composition API + Vite build
+- ⚡ **Performance Optimized**: React 19 + Vite build
+- 📲 **PWA Support**: Installable to desktop, offline access
 
-## Development Guide
+### Settings Page
 
-### Local Development
-
-```bash
-cd admin-panel
-
-# Install dependencies
-yarn install
-
-# Start development server
-yarn dev
-```
-
-Development server runs at `http://localhost:5173`.
-
-### Environment Configuration
-
-Create `.env.local` file to configure backend API address:
-
-```bash
-# .env.local
-VITE_API_URL=http://localhost:8080
-```
-
-Available environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API address | `http://localhost:8080` |
-| `VITE_DEFAULT_LOCALE` | Default language | `zh` |
-
-### Build & Deploy
-
-```bash
-# Build for production
-yarn build
-
-# Preview build
-yarn preview
-
-# Type checking
-yarn type-check
-
-# Code linting
-yarn lint
-```
-
-Build output is in `dist/` directory, which can be:
-1. Served through Shortlinker (set `ENABLE_ADMIN_PANEL=true`)
-2. Deployed to standalone static server (Nginx, Caddy, etc.)
-3. Deployed to CDN (requires CORS configuration)
-
-### Docker Integration
-
-If using Docker, include frontend assets in image build:
-
-```dockerfile
-# Multi-stage build example
-FROM node:18 AS frontend-builder
-WORKDIR /app/admin-panel
-COPY admin-panel/package.json admin-panel/yarn.lock ./
-RUN yarn install
-COPY admin-panel/ ./
-RUN yarn build
-
-FROM rust:1.75 AS backend-builder
-# ... Rust build steps ...
-
-FROM debian:bookworm-slim
-COPY --from=frontend-builder /app/admin-panel/dist /app/admin-panel/dist
-# ... other configurations ...
-```
-
-## Tech Stack
-
-- **Framework**: Vue 3 + TypeScript
-- **Build Tool**: Vite 5
-- **Router**: Vue Router 4
-- **State Management**: Pinia
-- **UI Styling**: Native CSS + CSS Variables
-- **HTTP Client**: Axios
-- **Charts**: Chart.js (planned)
-- **i18n**: Vue I18n
+- ⚙️ **Preferences**: Theme selection, language switching
+- 🔧 **System Configuration**:
+  - Runtime configuration management (grouped display)
+  - Configuration editing (supports string/number/boolean/json types)
+  - Configuration history
+  - Reload configuration
+- ℹ️ **About**: Version info, tech stack, open source license, project links
 
 ## Interface Preview
 
 ### Dashboard
+
 - Total link count statistics
 - Active/expired link counts
 - Click count aggregation
 - Storage backend information
-- Service uptime
+- System uptime
+- Recently created links list
 
 ### Links Management Page
+
 - Table view of all links
 - Status badges (active/expired/protected)
 - Real-time click count display
-- Quick action buttons (edit/delete/copy)
+- Quick action buttons (edit/delete/copy/QR code)
+- Batch selection and operations
+- Advanced filter bar
 - Pagination navigation
+- Column configuration dropdown
 
-### Analytics Page (Planned)
+### Settings Page
+
+- Preferences tab (theme/language)
+- System configuration tab (runtime config management)
+- About tab (version/tech stack/links)
+
+### Analytics Page (In Development)
+
 - Click trend charts
 - Top links ranking
 - Traffic source statistics
-
-## Security Recommendations
-
-1. **Strong Password**: Use sufficiently complex `ADMIN_TOKEN`
-2. **HTTPS**: Production must enable HTTPS
-3. **Path Isolation**: Consider using non-default `FRONTEND_ROUTE_PREFIX`
-4. **Network Isolation**: Only expose admin panel in trusted networks
-5. **Regular Updates**: Keep dependencies updated for security fixes
-
-## Troubleshooting
-
-### Login Failed
-
-```bash
-# Check if ADMIN_TOKEN is correctly configured
-echo $ADMIN_TOKEN
-
-# Check API address configuration
-cat admin-panel/.env.local
-
-# View browser console errors
-```
-
-### Build Failed
-
-```bash
-# Clean dependencies and reinstall
-rm -rf node_modules yarn.lock
-yarn install
-
-# Check Node.js version (requires >= 18)
-node --version
-```
-
-### Style Issues
-
-```bash
-# Clear Vite cache
-rm -rf admin-panel/.vite
-yarn dev
-```
 
 ## Roadmap
 
 - ✅ Basic CRUD functionality
 - ✅ Authentication and authorization
 - ✅ Theme switching
-- ✅ Internationalization support
-- 🚧 Batch operations
-- 🚧 QR code generation
+- ✅ Internationalization support (5 languages)
+- ✅ Batch operations
+- ✅ QR code generation
+- ✅ Import/export functionality
+- ✅ PWA support
+- ✅ System configuration management
 - 🚧 Click statistics charts
-- 📋 Export/import functionality
 - 📋 Link group management
 - 📋 Custom domain support
-
-## Contributing
-
-PRs welcome to improve the Web admin panel! Before developing:
-
-1. Fork the project and create feature branch
-2. Follow existing code style (use ESLint + Prettier)
-3. Add necessary type definitions
-4. Ensure build passes: `yarn type-check && yarn build`
-5. Submit PR with description of changes
 
 ## Related Links
 
 - 📖 [Admin API Documentation](/en/api/admin)
 - 🔧 [Environment Configuration](/en/config/)
 - 🚀 [Deployment Guide](/en/deployment/)
+- 🛠️ [Development Guide](./development)
+- ❓ [Troubleshooting](./troubleshooting)

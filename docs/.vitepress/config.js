@@ -149,7 +149,9 @@ export default {
         {
           text: 'Web 管理界面',
           items: [
-            { text: '概述', link: '/admin-panel/' }
+            { text: '概述', link: '/admin-panel/' },
+            { text: '开发指南', link: '/admin-panel/development' },
+            { text: '故障排除', link: '/admin-panel/troubleshooting' }
           ]
         }
       ],
@@ -225,7 +227,9 @@ export default {
         {
           text: 'Web Admin Panel',
           items: [
-            { text: 'Overview', link: '/en/admin-panel/' }
+            { text: 'Overview', link: '/en/admin-panel/' },
+            { text: 'Development Guide', link: '/en/admin-panel/development' },
+            { text: 'Troubleshooting', link: '/en/admin-panel/troubleshooting' }
           ]
         }
       ],
