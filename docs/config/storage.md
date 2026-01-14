@@ -455,21 +455,33 @@ chmod 644 links.*
 使用健康检查 API 监控存储状态：
 
 ```bash
+# Health API 复用 Admin 的 JWT Cookie 鉴权，需要先登录获取 cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
 # 检查存储健康状态
-curl -H "Authorization: Bearer $HEALTH_TOKEN" \
-     http://localhost:8080/health
+curl -sS -b cookies.txt http://localhost:8080/health
 ```
 
 响应示例：
 
 ```json
 {
-  "status": "healthy",
-  "checks": {
-    "storage": {
-      "status": "healthy",
-      "links_count": 1234,
-      "backend": "sqlite"
+  "code": 0,
+  "data": {
+    "status": "healthy",
+    "checks": {
+      "storage": {
+        "status": "healthy",
+        "links_count": 1234,
+        "backend": {
+          "storage_type": "sqlite",
+          "support_click": true
+        }
+      }
     }
   }
 }

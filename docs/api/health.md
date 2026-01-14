@@ -5,39 +5,52 @@ Shortlinker 提供健康检查 API，用于监控服务状态和存储健康状�
 ## 功能概述
 
 - 服务健康状态检查
-- 存储后端状态监控  
+- 存储后端状态监控
 - 就绪和活跃性检查
 - 服务运行时间统计
 
 ## 配置方式
 
-健康检查 API 需要以下环境变量，详细配置请参考 [环境变量配置](/config/)：
+健康检查 API 的路由前缀可通过环境变量配置，详细配置见 [配置指南](/config/)：
 
-- `HEALTH_TOKEN` - 健康检查专用令牌（可选）
 - `HEALTH_ROUTE_PREFIX` - 路由前缀（可选，默认 `/health`）
 
-**认证方式**：
+> 备注：配置项 `api.health_token` / 环境变量 `HEALTH_TOKEN` 在当前实现中不会用于 Health API 的鉴权（仅作为配置项保留）；Health API 目前复用 Admin 的鉴权机制。
 
-| HEALTH_TOKEN | ADMIN_TOKEN | 结果 |
-|--------------|-------------|------|
-| 已设置 | 任意 | 使用 HEALTH_TOKEN 认证 |
-| 未设置 | 已设置 | 使用 ADMIN_TOKEN 认证 |
-| 未设置 | 未设置 | Health API 禁用 |
+## 鉴权方式（重要）
 
-所有请求需要携带 Authorization 头：
-```http
-Authorization: Bearer your_secure_health_token
+Health API 当前复用 Admin API 的 **JWT Cookie** 鉴权：
+
+1. 先调用 `POST /admin/v1/auth/login` 登录获取 Cookie
+2. 再携带 Cookie 调用 `/health`、`/health/ready`、`/health/live`
+
+示例（curl 保存并复用 cookie）：
+```bash
+# 1) 登录获取 cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
+# 2) 调用健康检查接口
+curl -sS -b cookies.txt \
+  http://localhost:8080/health
 ```
+
+> 若 `api.admin_token` 为空，Health 端点会返回 `404 Not Found`（视为禁用）。默认情况下若你未显式设置 `ADMIN_TOKEN`，程序会在首次启动时自动生成并在日志中提示一次。
 
 ## API 端点
 
 **Base URL**: `http://your-domain:port/health`
 
+> 所有端点同时支持 `GET` 与 `HEAD`。
+
 ### GET /health - 完整健康检查
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health
+curl -sS -b cookies.txt \
+  http://localhost:8080/health
 ```
 
 **响应示例**:
@@ -79,17 +92,17 @@ curl -H "Authorization: Bearer your_health_token" \
 ### GET /health/ready - 就绪检查
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health/ready
+curl -sS -b cookies.txt \
+  http://localhost:8080/health/ready
 ```
 
-返回 200 状态码表示服务就绪。
+返回 200 状态码表示服务就绪（响应体为 `OK`）。
 
 ### GET /health/live - 活跃性检查
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health/live
+curl -sS -b cookies.txt -I \
+  http://localhost:8080/health/live
 ```
 
 返回 204 状态码表示服务正常运行。
@@ -100,12 +113,21 @@ curl -H "Authorization: Bearer your_health_token" \
 |--------|------|
 | 200 | 健康/就绪 |
 | 204 | 活跃（无内容） |
-| 401 | 鉴权失败 |
+| 401 | 鉴权失败（缺少/无效 Cookie） |
 | 503 | 服务不健康 |
 
-## 监控集成
+> 鉴权失败时，响应体示例：`{"code":401,"data":{"error":"Unauthorized: Invalid or missing token"}}`
 
-### Kubernetes 探针配置
+## 监控集成（注意事项）
+
+由于当前 Health API 采用 Cookie 鉴权，Kubernetes 的 `httpGet` 探针不方便直接携带有效 JWT（Access Token 有有效期）。
+
+建议策略：
+
+1. **简单存活探针**：直接探测根路径 `/`（会返回 `307`，Kubernetes 视为成功），用于确认进程存活
+2. **深度健康检查**：使用外部监控系统/脚本先登录获取 Cookie，再调用 `/health`
+
+### Kubernetes 探针示例（简单存活）
 
 ```yaml
 apiVersion: v1
@@ -116,84 +138,47 @@ spec:
     image: e1saps/shortlinker
     livenessProbe:
       httpGet:
-        path: /health/live
+        path: /
         port: 8080
-        httpHeaders:
-        - name: Authorization
-          value: "Bearer your_health_token"
-      initialDelaySeconds: 30
+      initialDelaySeconds: 10
       periodSeconds: 10
-    readinessProbe:
-      httpGet:
-        path: /health/ready
-        port: 8080
-        httpHeaders:
-        - name: Authorization
-          value: "Bearer your_health_token"
-      initialDelaySeconds: 5
-      periodSeconds: 5
 ```
 
-### Docker Compose 健康检查
-
-```yaml
-version: '3.8'
-services:
-  shortlinker:
-    image: e1saps/shortlinker
-    healthcheck:
-      test: ["CMD", "curl", "-f", "-H", "Authorization: Bearer your_health_token", "http://localhost:8080/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-```
-
-## 监控脚本示例
+## 监控脚本示例（登录 + 健康检查）
 
 ```bash
 #!/bin/bash
-# simple_monitor.sh
+set -euo pipefail
 
-HEALTH_TOKEN="your_health_token"
-HEALTH_URL="http://localhost:8080/health"
+ADMIN_TOKEN="your_admin_token"
+BASE_URL="http://localhost:8080"
+COOKIE_JAR="$(mktemp)"
 
-check_health() {
-    response=$(curl -s -w "%{http_code}" -H "Authorization: Bearer $HEALTH_TOKEN" "$HEALTH_URL")
-    http_code="${response: -3}"
-  
-    if [ "$http_code" -eq 200 ]; then
-        echo "$(date): Service is healthy"
-        return 0
-    else
-        echo "$(date): Service is unhealthy (HTTP $http_code)"
-        return 1
-    fi
-}
+# 登录获取 cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c "$COOKIE_JAR" \
+  -d "{\"password\":\"${ADMIN_TOKEN}\"}" \
+  "${BASE_URL}/admin/v1/auth/login" >/dev/null
 
-# 每60秒检查一次
-while true; do
-    check_health || echo "$(date): Sending alert..."
-    sleep 60
-done
+# 检查健康状态（HTTP 200 表示健康，503 表示不健康）
+curl -sS -b "$COOKIE_JAR" "${BASE_URL}/health"
 ```
 
 ## 故障排除
 
 ```bash
-# 检查服务状态
-curl -H "Authorization: Bearer your_token" http://localhost:8080/health | jq .
+# 先登录再检查
+curl -sS -X POST -H "Content-Type: application/json" -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
 
-# 验证 API 是否启用
-if [ -n "$HEALTH_TOKEN" ]; then
-    echo "Health API enabled"
-else
-    echo "Health API disabled"
-fi
+curl -sS -b cookies.txt http://localhost:8080/health | jq .
 ```
 
 ## 安全建议
 
-1. **强密码**: 使用足够复杂的 HEALTH_TOKEN
-2. **网络隔离**: 仅在监控网络中暴露健康检查端点
-3. **定期轮换**: 定期更换 Health Token
+1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`
+2. **网络隔离**：仅在受信任网络中访问 Health 端点
+3. **HTTPS**：生产环境建议启用 HTTPS，并正确配置 Cookie 安全参数
+

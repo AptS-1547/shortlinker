@@ -20,10 +20,9 @@ port = 8080
 [features]
 default_url = "https://example.com"
 
-# 可选：启用管理和监控功能
+# 可选：启用管理功能（Health API 当前复用 Admin 鉴权）
 # [api]
 # admin_token = "your_admin_token"
-# health_token = "your_health_token"
 ```
 
 或者使用自定义路径：
@@ -48,9 +47,8 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# 可选：启用管理和监控功能
+# 可选：启用管理功能（Health API 当前复用 Admin 鉴权）
 # ADMIN_TOKEN=your_admin_token
-# HEALTH_TOKEN=your_health_token
 ```
 
 ## 第二步：启动服务
@@ -127,7 +125,6 @@ DEFAULT_URL=https://your-domain.com
 
 # 启用 API 功能
 ADMIN_TOKEN=your_secure_admin_token
-HEALTH_TOKEN=your_secure_health_token
 ```
 
 ### 反向代理示例

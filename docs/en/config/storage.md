@@ -364,21 +364,33 @@ chmod 644 links.*
 Use health check API to monitor storage status:
 
 ```bash
+# Health API reuses Admin JWT-cookie auth, login first to obtain cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
 # Check storage health status
-curl -H "Authorization: Bearer $HEALTH_TOKEN" \
-     http://localhost:8080/health
+curl -sS -b cookies.txt http://localhost:8080/health
 ```
 
 Response example:
 
 ```json
 {
-  "status": "healthy",
-  "checks": {
-    "storage": {
-      "status": "healthy",
-      "links_count": 1234,
-      "backend": "sqlite"
+  "code": 0,
+  "data": {
+    "status": "healthy",
+    "checks": {
+      "storage": {
+        "status": "healthy",
+        "links_count": 1234,
+        "backend": {
+          "storage_type": "sqlite",
+          "support_click": true
+        }
+      }
     }
   }
 }

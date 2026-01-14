@@ -74,7 +74,7 @@ Custom frontend takes priority over the built-in admin panel. If `./frontend-pan
 
 ### Core Functions
 
-- 🔑 **Token Authentication**: Secure Bearer Token-based authentication
+- 🔑 **Login & Session Auth**: Login with `ADMIN_TOKEN`; backend issues JWT cookies via `Set-Cookie` (access/refresh), and the UI uses cookie-based sessions for API calls
 - 📋 **Link Management**: Complete CRUD interface
   - Create new short links (custom codes, expiration, password protection)
   - Edit existing links

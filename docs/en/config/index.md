@@ -1,220 +1,282 @@
-# Environment Variables Configuration
+# Configuration Guide
 
-Shortlinker is configured through environment variables, supporting both `.env` files and system environment variables.
+Shortlinker configuration is split into two layers:
+
+- **Startup config**: stored in `config.toml`, changes require a restart
+- **Runtime config**: stored in the database, can be updated at runtime via the admin panel / Admin API
+
+## Configuration Architecture
+
+```
+config.toml (read at startup)
+       ↓
+Database (persistent storage)
+       ↓
+RuntimeConfig (in-memory cache)
+       ↓
+AppConfig (global config)
+       ↓
+Business logic
+```
+
+On first startup, runtime config is migrated from `config.toml` and/or environment variables into the database. After that, **database values take precedence**.
 
 ## Configuration Methods
 
-### TOML Configuration File
+### TOML config file (startup config)
 
-```bash
+```toml
 # config.toml
 [server]
 host = "127.0.0.1"
 port = 8080
-default_url = "https://example.com"
 
-[storage]
-backend = "sqlite"
-database_url = "./data/links.db"
+[database]
+database_url = "shortlinks.db"
+
+[cache]
+type = "memory"
 
 [logging]
 level = "info"
-file = "./logs/shortlinker.log"
-max_size = "10MB"
-max_files = 5
 ```
 
-### System Environment Variables
+### Environment variables
 
 ```bash
-export SERVER_HOST=0.0.0.0
-export SERVER_PORT=8080
-./shortlinker
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+DATABASE_URL=shortlinks.db
+RUST_LOG=debug
 ```
 
-## Configuration Parameters
+### Admin panel / API (runtime config)
 
-### Server Configuration
+Runtime config can be updated via the Admin API `/{ADMIN_ROUTE_PREFIX}/v1/config`.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `SERVER_HOST` | String | `127.0.0.1` | Listening address |
-| `SERVER_PORT` | Integer | `8080` | Listening port |
-| `UNIX_SOCKET` | String | *(empty)* | Unix socket path (overrides HOST/PORT) |
-| `CPU_COUNT` | Integer | *(auto)* | Worker thread count (defaults to CPU cores) |
-| `DEFAULT_URL` | String | `https://esap.cc/repo` | Root path redirect URL |
-| `RANDOM_CODE_LENGTH` | Integer | `6` | Random short code length |
+Because Admin API uses **JWT cookies**, you need to login first:
 
-### Storage Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `DATABASE_URL` | String | `shortlinks.db` | Database connection URL or file path. Supports auto-detection from URL scheme |
-| `DATABASE_POOL_SIZE` | Number | `10` | Database connection pool size |
-| `DATABASE_TIMEOUT` | Number | `30` | Database connection timeout (seconds) |
-
-> **Note**: Database type is auto-detected from `DATABASE_URL`. Supported: SQLite, MySQL, PostgreSQL, MariaDB.
->
-> For detailed storage backend configuration, see [Storage Backends](/en/config/storage)
-
-### API Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `ADMIN_TOKEN` | String | *(empty)* | Admin API auth token, **disabled when empty** |
-| `ADMIN_ROUTE_PREFIX` | String | `/admin` | Admin API route prefix |
-| `HEALTH_TOKEN` | String | *(empty)* | Health check API auth token, **disabled when empty** |
-| `HEALTH_ROUTE_PREFIX` | String | `/health` | Health check API route prefix |
-| `ENABLE_ADMIN_PANEL` | Boolean | `false` | Enable the web admin panel (requires build and ADMIN_TOKEN) |
-| `FRONTEND_ROUTE_PREFIX` | String | `/panel` | Route prefix for the web admin panel |
-> **Note**: The web admin panel is a new feature and may still be unstable.
-
-> For detailed API configuration, see [Admin API](/en/api/admin) and [Health Check API](/en/api/health)
-
-### JWT & Cookie Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `JWT_SECRET` | String | *(random)* | JWT signing secret key (at least 32 characters recommended) |
-| `ACCESS_TOKEN_MINUTES` | Integer | `15` | Access token expiration time (minutes) |
-| `REFRESH_TOKEN_DAYS` | Integer | `7` | Refresh token expiration time (days) |
-| `ACCESS_COOKIE_NAME` | String | `access_token` | Access token cookie name |
-| `REFRESH_COOKIE_NAME` | String | `refresh_token` | Refresh token cookie name |
-| `COOKIE_SECURE` | Boolean | `false` | Use HTTPS-only cookies |
-| `COOKIE_SAME_SITE` | String | `Lax` | Cookie SameSite policy (`Strict`, `Lax`, `None`) |
-| `COOKIE_DOMAIN` | String | *(empty)* | Cookie domain |
-
-### Click Tracking Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `ENABLE_CLICK_TRACKING` | Boolean | `true` | Enable click tracking |
-| `FLUSH_INTERVAL` | Integer | `60` | Click data flush interval (seconds) |
-| `MAX_CLICKS_BEFORE_FLUSH` | Integer | `100` | Maximum clicks before forced flush |
-
-### CORS Configuration
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `CORS_ENABLED` | Boolean | `true` | Enable CORS |
-| `CORS_ALLOWED_ORIGINS` | String | *(empty)* | Allowed origins (comma-separated, empty = all) |
-| `CORS_ALLOWED_METHODS` | String | `GET,POST,PUT,DELETE,OPTIONS` | Allowed HTTP methods |
-| `CORS_ALLOWED_HEADERS` | String | `Content-Type,Authorization` | Allowed headers |
-| `CORS_MAX_AGE` | Integer | `3600` | Preflight cache time (seconds) |
-| `CORS_ALLOW_CREDENTIALS` | Boolean | `false` | Allow credentials |
-
-### Logging Configuration
-
-| Parameter | Type | Default | Options |
-|-----------|------|---------|---------|
-| `RUST_LOG` | String | `info` | `error`, `warn`, `info`, `debug`, `trace` |
-
-## Configuration Examples
-
-### Development Environment
 ```bash
-# Basic configuration
+# 1) Login to obtain cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
+# 2) List all configs
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config
+
+# 3) Get a single config
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config/features.random_code_length
+
+# 4) Update a config
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"value":"8"}' \
+  http://localhost:8080/admin/v1/config/features.random_code_length
+
+# 5) Reload config
+curl -sS -X POST -b cookies.txt \
+  http://localhost:8080/admin/v1/config/reload
+
+# 6) Config history (optional limit, default 20)
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
+```
+
+> Sensitive values (e.g. `api.admin_token`, `api.jwt_secret`) are masked as `********` in API responses.
+
+## Startup Config Parameters
+
+These settings live in `config.toml` and can be overridden by environment variables.
+
+### Server
+
+| Env | Type | Default | Description |
+|-----|------|---------|-------------|
+| `SERVER_HOST` | String | `127.0.0.1` | Bind address |
+| `SERVER_PORT` | Integer | `8080` | Bind port |
+| `UNIX_SOCKET` | String | *(empty)* | Unix socket path (overrides host/port) |
+| `CPU_COUNT` | Integer | *(auto)* | Worker threads (defaults to CPU cores) |
+
+### Database
+
+| Env | Type | Default | Description |
+|-----|------|---------|-------------|
+| `DATABASE_URL` | String | `shortlinks.db` | Database URL or file path |
+| `DATABASE_POOL_SIZE` | Integer | `10` | Connection pool size |
+| `DATABASE_TIMEOUT` | Integer | `30` | Connection timeout (seconds) |
+
+See [Storage Backends](/en/config/storage) for details.
+
+### Cache
+
+| Env | Type | Default | Description |
+|-----|------|---------|-------------|
+| `CACHE_TYPE` | String | `memory` | Cache type: `memory`, `redis` |
+| `CACHE_DEFAULT_TTL` | Integer | `3600` | Default TTL (seconds) |
+| `REDIS_URL` | String | `redis://127.0.0.1:6379/` | Redis URL |
+| `REDIS_KEY_PREFIX` | String | `shortlinker:` | Redis key prefix |
+| `MEMORY_MAX_CAPACITY` | Integer | `10000` | In-memory cache max entries |
+
+### Logging
+
+| Env | Type | Default | Description |
+|-----|------|---------|-------------|
+| `RUST_LOG` | String | `info` | Log level: `error`, `warn`, `info`, `debug`, `trace` |
+
+> Log format and file output are configured via `config.toml` `[logging]` (e.g. `logging.format`, `logging.file`). The current version does not provide env overrides for them.
+
+## Runtime Config Keys
+
+These settings are stored in the database and can be changed at runtime via the admin panel / Admin API.
+
+### API
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `api.admin_token` | String | *(auto-generated)* | No | Admin login password for `POST /admin/v1/auth/login` |
+| `api.health_token` | String | *(empty)* | No | Reserved (not used for Health API auth in current version) |
+| `api.jwt_secret` | String | *(auto-generated)* | No | JWT signing secret |
+| `api.access_token_minutes` | Integer | `15` | No | Access token TTL (minutes) |
+| `api.refresh_token_days` | Integer | `7` | No | Refresh token TTL (days) |
+| `api.access_cookie_name` | String | `shortlinker_access` | Yes | Access cookie name |
+| `api.refresh_cookie_name` | String | `shortlinker_refresh` | Yes | Refresh cookie name |
+| `api.cookie_secure` | Boolean | `false` | Yes | HTTPS-only cookies |
+| `api.cookie_same_site` | String | `Lax` | Yes | SameSite policy |
+| `api.cookie_domain` | String | *(empty)* | Yes | Cookie domain |
+
+### Routes
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `routes.admin_prefix` | String | `/admin` | Yes | Admin API prefix |
+| `routes.health_prefix` | String | `/health` | Yes | Health API prefix |
+| `routes.frontend_prefix` | String | `/panel` | Yes | Admin panel (frontend) prefix |
+
+### Features
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `features.enable_admin_panel` | Boolean | `false` | Yes | Enable web admin panel |
+| `features.random_code_length` | Integer | `6` | No | Random short code length |
+| `features.default_url` | String | `https://esap.cc/repo` | No | Default redirect URL for `/` |
+
+### Click tracking
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `click.enable_tracking` | Boolean | `true` | Yes | Enable click tracking |
+| `click.flush_interval` | Integer | `30` | Yes | Flush interval (seconds) |
+| `click.max_clicks_before_flush` | Integer | `100` | Yes | Max clicks before flush |
+
+### CORS
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `cors.enabled` | Boolean | `true` | Yes | Enable CORS |
+| `cors.allowed_origins` | Json | `[]` | Yes | Allowed origins (empty array = allow all) |
+| `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | Yes | Allowed methods |
+| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | Yes | Allowed headers |
+| `cors.max_age` | Integer | `3600` | Yes | Preflight cache TTL (seconds) |
+| `cors.allow_credentials` | Boolean | `false` | Yes | Allow credentials (needed for cross-origin cookies) |
+
+## Priority
+
+1. **Database config** (runtime config, highest priority)
+2. **Environment variables**
+3. **TOML config file**
+4. **Program defaults** (lowest)
+
+## Examples
+
+### Development
+
+```bash
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 RUST_LOG=debug
-
-# Storage configuration - SQLite for development
-DATABASE_URL=sqlite://dev-links.db
-
-# API configuration - simple tokens for development
+DATABASE_URL=dev-links.db
 ADMIN_TOKEN=dev_admin
-HEALTH_TOKEN=dev_health
 ```
 
-### Production Environment
-```bash
-# Basic configuration
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-CPU_COUNT=8
-RUST_LOG=info
-DEFAULT_URL=https://your-domain.com
+### Production
 
-# Storage configuration - SQLite for production performance
-DATABASE_URL=sqlite:///data/links.db
+```toml
+[server]
+host = "127.0.0.1"
+port = 8080
+cpu_count = 8
 
-# API configuration - use strong passwords
-ADMIN_TOKEN=very_secure_production_token_456
-HEALTH_TOKEN=very_secure_health_token_789
+[database]
+database_url = "/data/shortlinks.db"
+pool_size = 20
+timeout = 60
+
+[cache]
+type = "memory"
+default_ttl = 7200
+
+[cache.memory]
+max_capacity = 50000
+
+[logging]
+level = "info"
+format = "json"
+file = "/var/log/shortlinker/app.log"
+enable_rotation = true
 ```
 
-### Docker Environment
+### Docker (first startup seeding)
+
 ```bash
-# Server configuration - TCP
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 CPU_COUNT=4
-
-# Server configuration - Unix socket
-# UNIX_SOCKET=/tmp/shortlinker.sock
-
-# Storage configuration
-DATABASE_URL=sqlite:///data/links.db
-
-# API configuration
-ADMIN_TOKEN=docker_admin_token_123
-HEALTH_TOKEN=docker_health_token_456
+DATABASE_URL=/data/links.db
+ADMIN_TOKEN=secure_admin_token_here
+ENABLE_ADMIN_PANEL=true
 ```
 
-### Minimal Configuration (Redirect Only)
-```bash
-# Only provide redirect service, no management features
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-# Don't set ADMIN_TOKEN and HEALTH_TOKEN
-```
+## Hot Reload
 
-## API Access Control
+### Supported
 
-| Scenario | ADMIN_TOKEN | HEALTH_TOKEN | Description |
-|----------|-------------|--------------|-------------|
-| **Service Only** | Not set | Not set | Most secure, redirect functionality only |
-| **Service + Management** | Set | Not set | Enable management features |
-| **Service + Monitoring** | Not set | Set | Enable monitoring features |
-| **Full Features** | Set | Set | Enable all features |
+- ✅ Most runtime configs marked as “no restart”
+- ✅ Short link data
 
-## Configuration Priority
+### Not supported
 
-1. **Command line environment variables** (highest)
-2. **System environment variables**
-3. **`.env` file**
-4. **Program defaults** (lowest)
+- ❌ Server host/port
+- ❌ Database connection
+- ❌ Cache type
+- ❌ Route prefixes
+- ❌ Cookie settings
 
-## Configuration Validation
-
-Configuration status will be displayed at startup:
+### Reload methods
 
 ```bash
-[INFO] Starting server at http://127.0.0.1:8080
-[INFO] SQLite storage initialized with 0 links
-[INFO] Admin API available at: /admin
-[INFO] Health API available at: /health
-```
-
-## Configuration Updates
-
-### Hot Reload Support
-- ✅ Storage file content changes
-- ❌ Server address and port (requires restart)
-- ❌ API configuration (requires restart)
-
-### Reload Methods
-```bash
-# Unix systems
+# Unix: send SIGUSR1
 kill -USR1 $(cat shortlinker.pid)
 
-# Windows systems
-echo "" > shortlinker.reload
+# Admin API reload (requires cookies)
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
+curl -sS -X POST -b cookies.txt \
+  http://localhost:8080/admin/v1/config/reload
 ```
 
-## Next Steps
+## Next steps
 
-- 📋 Check [Storage Backend Configuration](/en/config/storage) for detailed storage options
-- 🚀 Learn [Deployment Configuration](/en/deployment/) for production environment setup
-- 🛡️ Learn [Admin API](/en/api/admin) for management interface usage
-- 🏥 Learn [Health Check API](/en/api/health) for monitoring interface usage
+- 📋 [Storage Backends](/en/config/storage)
+- 🛡️ [Admin API](/en/api/admin)
+- 🏥 [Health Check API](/en/api/health)
+

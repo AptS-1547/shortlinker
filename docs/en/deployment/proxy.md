@@ -230,8 +230,12 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### Health Check
 
+> Note: In the current version, `/health/*` endpoints require JWT cookies issued after Admin login, so they are not suitable as a simple reverse-proxy health probe.
+>
+> If you only need a liveness probe, check `/` (default returns `307`), or expose a dedicated proxy health path that forwards to `/`.
+
 ```nginx
-location /health {
+location = /_healthz {
     access_log off;
     proxy_pass http://127.0.0.1:8080/;
     proxy_connect_timeout 1s;

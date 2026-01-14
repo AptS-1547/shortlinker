@@ -74,7 +74,7 @@ Shortlinker 支持使用自定义前端实现。你可以通过将自定义前�
 
 ### 核心功能
 
-- 🔑 **Token 认证登录**：基于 Bearer Token 的安全认证
+- 🔑 **登录与会话认证**：使用 `ADMIN_TOKEN` 登录，后端通过 `Set-Cookie` 下发 JWT Cookie（Access/Refresh），前端基于 Cookie 会话访问接口
 - 📋 **链接管理**：完整的 CRUD 操作界面
   - 创建新短链接（支持自定义短码、过期时间、密码保护）
   - 编辑现有链接

@@ -1,46 +1,59 @@
 # Health Check API
 
-Shortlinker provides health check API for monitoring service status and storage health.
+Shortlinker provides a health check API for monitoring service status and storage health.
 
-## Function Overview
+## Overview
 
-- Service health status check
-- Storage backend status monitoring  
-- Readiness and liveness checks
-- Service uptime statistics
+- Service health status
+- Storage backend health checks
+- Readiness and liveness endpoints
+- Uptime and response time metrics
 
 ## Configuration
 
-Health check API requires the following environment variables. For detailed configuration, see [Environment Variables Configuration](/en/config/):
+Route prefix can be configured via environment variables (see [Configuration](/en/config/)):
 
-- `HEALTH_TOKEN` - Health check dedicated token (optional)
-- `HEALTH_ROUTE_PREFIX` - Route prefix (optional, default `/health`)
+- `HEALTH_ROUTE_PREFIX` - route prefix (optional, default: `/health`)
 
-**Authentication**:
+> Note: `api.health_token` / `HEALTH_TOKEN` is currently not used for Health API authentication (kept as a config field). Health endpoints currently reuse Admin authentication.
 
-| HEALTH_TOKEN | ADMIN_TOKEN | Result |
-|--------------|-------------|--------|
-| Set | Any | Authenticate with HEALTH_TOKEN |
-| Not set | Set | Authenticate with ADMIN_TOKEN |
-| Not set | Not set | Health API disabled |
+## Authentication (Important)
 
-All requests must include Authorization header:
-```http
-Authorization: Bearer your_secure_health_token
+Health endpoints reuse Admin **JWT Cookie** authentication:
+
+1. Login via `POST /admin/v1/auth/login` to obtain cookies
+2. Call `/health`, `/health/ready`, `/health/live` with those cookies
+
+Example:
+```bash
+# 1) Login and save cookies
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+
+# 2) Call health check
+curl -sS -b cookies.txt \
+  http://localhost:8080/health
 ```
 
-## API Endpoints
+> If `api.admin_token` is empty, health endpoints return `404 Not Found` (treated as disabled). If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and print it once in logs.
+
+## Endpoints
 
 **Base URL**: `http://your-domain:port/health`
 
-### GET /health - Complete Health Check
+> All endpoints support both `GET` and `HEAD`.
+
+### GET /health - Full health check
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health
+curl -sS -b cookies.txt \
+  http://localhost:8080/health
 ```
 
-**Response Example**:
+**Example response**:
 ```json
 {
   "code": 0,
@@ -63,49 +76,45 @@ curl -H "Authorization: Bearer your_health_token" \
 }
 ```
 
-**Response Field Description**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `code` | Integer | Response code: 0 for healthy, 1 for unhealthy |
-| `data.status` | String | Overall health status: `healthy` or `unhealthy` |
-| `data.timestamp` | RFC3339 | Timestamp of the check |
-| `data.uptime` | Integer | Service uptime in seconds |
-| `data.checks.storage.status` | String | Storage backend health status |
-| `data.checks.storage.links_count` | Integer | Number of short links stored |
-| `data.checks.storage.backend` | Object | Storage backend configuration |
-| `data.response_time_ms` | Integer | Health check response time in milliseconds |
-
-### GET /health/ready - Readiness Check
+### GET /health/ready - Readiness
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health/ready
+curl -sS -b cookies.txt \
+  http://localhost:8080/health/ready
 ```
 
-Returns 200 status code indicating service is ready.
+Returns HTTP 200 when ready (body: `OK`).
 
-### GET /health/live - Liveness Check
+### GET /health/live - Liveness
 
 ```bash
-curl -H "Authorization: Bearer your_health_token" \
-     http://localhost:8080/health/live
+curl -sS -b cookies.txt -I \
+  http://localhost:8080/health/live
 ```
 
-Returns 204 status code indicating service is running normally.
+Returns HTTP 204 when alive.
 
-## Status Codes
+## Status codes
 
-| Status Code | Description |
-|-------------|-------------|
+| Status | Meaning |
+|--------|---------|
 | 200 | Healthy/Ready |
-| 204 | Live (no content) |
-| 401 | Authentication failed |
-| 503 | Service unhealthy |
+| 204 | Alive (no content) |
+| 401 | Unauthorized (missing/invalid cookie) |
+| 503 | Unhealthy |
 
-## Monitoring Integration
+> Unauthorized body example: `{"code":401,"data":{"error":"Unauthorized: Invalid or missing token"}}`
 
-### Kubernetes Probe Configuration
+## Monitoring integration notes
+
+Because Health API uses cookie-based auth (access token expires), Kubernetes `httpGet` probes are not convenient to use directly for `/health/*`.
+
+Recommended options:
+
+1. **Simple liveness**: probe `/` (returns `307`, treated as success in Kubernetes) to ensure the process is up
+2. **Deep checks**: external monitor/script that logs in and calls `/health`
+
+### Kubernetes probe example (simple liveness)
 
 ```yaml
 apiVersion: v1
@@ -116,84 +125,34 @@ spec:
     image: e1saps/shortlinker
     livenessProbe:
       httpGet:
-        path: /health/live
+        path: /
         port: 8080
-        httpHeaders:
-        - name: Authorization
-          value: "Bearer your_health_token"
-      initialDelaySeconds: 30
+      initialDelaySeconds: 10
       periodSeconds: 10
-    readinessProbe:
-      httpGet:
-        path: /health/ready
-        port: 8080
-        httpHeaders:
-        - name: Authorization
-          value: "Bearer your_health_token"
-      initialDelaySeconds: 5
-      periodSeconds: 5
 ```
 
-### Docker Compose Health Check
-
-```yaml
-version: '3.8'
-services:
-  shortlinker:
-    image: e1saps/shortlinker
-    healthcheck:
-      test: ["CMD", "curl", "-f", "-H", "Authorization: Bearer your_health_token", "http://localhost:8080/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-```
-
-## Monitoring Script Example
+## Script example (login + health check)
 
 ```bash
 #!/bin/bash
-# simple_monitor.sh
+set -euo pipefail
 
-HEALTH_TOKEN="your_health_token"
-HEALTH_URL="http://localhost:8080/health"
+ADMIN_TOKEN="your_admin_token"
+BASE_URL="http://localhost:8080"
+COOKIE_JAR="$(mktemp)"
 
-check_health() {
-    response=$(curl -s -w "%{http_code}" -H "Authorization: Bearer $HEALTH_TOKEN" "$HEALTH_URL")
-    http_code="${response: -3}"
-  
-    if [ "$http_code" -eq 200 ]; then
-        echo "$(date): Service is healthy"
-        return 0
-    else
-        echo "$(date): Service is unhealthy (HTTP $http_code)"
-        return 1
-    fi
-}
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c "$COOKIE_JAR" \
+  -d "{\"password\":\"${ADMIN_TOKEN}\"}" \
+  "${BASE_URL}/admin/v1/auth/login" >/dev/null
 
-# Check every 60 seconds
-while true; do
-    check_health || echo "$(date): Sending alert..."
-    sleep 60
-done
+curl -sS -b "$COOKIE_JAR" "${BASE_URL}/health"
 ```
 
-## Troubleshooting
+## Security notes
 
-```bash
-# Check service status
-curl -H "Authorization: Bearer your_token" http://localhost:8080/health | jq .
+1. Use a strong `ADMIN_TOKEN`
+2. Restrict access to health endpoints to trusted networks
+3. Use HTTPS in production and configure cookie security correctly
 
-# Verify if API is enabled
-if [ -n "$HEALTH_TOKEN" ]; then
-    echo "Health API enabled"
-else
-    echo "Health API disabled"
-fi
-```
-
-## Security Recommendations
-
-1. **Strong Password**: Use sufficiently complex HEALTH_TOKEN
-2. **Network Isolation**: Only expose health check endpoints in monitoring networks
-3. **Regular Rotation**: Regularly change Health Token

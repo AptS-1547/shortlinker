@@ -55,27 +55,34 @@ DATABASE_URL=shortlinks.db
 通过 Web 管理面板或 API 修改动态配置：
 
 ```bash
+# 配置管理接口属于 Admin API，需要先登录获取 Cookie
+curl -sS -X POST \
+     -H "Content-Type: application/json" \
+     -c cookies.txt \
+     -d '{"password":"your_admin_token"}' \
+     http://localhost:8080/admin/v1/auth/login
+
 # 获取所有配置
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/config
+curl -sS -b cookies.txt http://localhost:8080/admin/v1/config
 
 # 获取单个配置
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/config/features.random_code_length
+curl -sS -b cookies.txt http://localhost:8080/admin/v1/config/features.random_code_length
 
 # 更新配置
 curl -X PUT \
-     -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -b cookies.txt \
      -H "Content-Type: application/json" \
      -d '{"value": "8"}' \
-     http://localhost:8080/admin/config/features.random_code_length
+     http://localhost:8080/admin/v1/config/features.random_code_length
 
 # 重载配置
 curl -X POST \
-     -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8080/admin/config/reload
+     -b cookies.txt \
+     http://localhost:8080/admin/v1/config/reload
 
 # 查询配置历史（可选 limit 参数，默认 20）
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-     "http://localhost:8080/admin/config/features.random_code_length/history?limit=10"
+curl -sS -b cookies.txt \
+     "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
 ```
 
 **配置历史响应格式**：
@@ -134,8 +141,8 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `RUST_LOG` | String | `info` | 日志等级：error, warn, info, debug, trace |
-| `LOG_FORMAT` | String | `text` | 日志格式：text, json |
-| `LOG_FILE` | String | *(空)* | 日志文件路径（空则输出到控制台） |
+
+> 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置（如 `logging.format`、`logging.file`）设置，当前版本未提供对应的环境变量覆盖。
 
 ## 动态配置参数
 
@@ -145,8 +152,8 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
-| `api.admin_token` | String | *(空)* | 否 | 管理 API 令牌 |
-| `api.health_token` | String | *(空)* | 否 | 健康检查令牌 |
+| `api.admin_token` | String | *(自动生成)* | 否 | 管理员登录密码（用于 `POST /admin/v1/auth/login`） |
+| `api.health_token` | String | *(空)* | 否 | 保留字段（当前版本不用于 Health API 鉴权） |
 | `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
 | `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
 | `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
@@ -176,20 +183,20 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
-| `click.enable_tracking` | Boolean | `true` | 否 | 启用点击统计 |
-| `click.flush_interval` | Integer | `30` | 否 | 刷新间隔（秒） |
-| `click.max_clicks_before_flush` | Integer | `100` | 否 | 刷新前最大点击数 |
+| `click.enable_tracking` | Boolean | `true` | 是 | 启用点击统计 |
+| `click.flush_interval` | Integer | `30` | 是 | 刷新间隔（秒） |
+| `click.max_clicks_before_flush` | Integer | `100` | 是 | 刷新前最大点击数 |
 
 ### CORS 跨域配置
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `CORS_ENABLED` | Boolean | `true` | 启用 CORS |
-| `CORS_ALLOWED_ORIGINS` | String | *(空)* | 允许的来源（逗号分隔，空 = 允许全部） |
-| `CORS_ALLOWED_METHODS` | String | `GET,POST,PUT,DELETE,OPTIONS` | 允许的 HTTP 方法 |
-| `CORS_ALLOWED_HEADERS` | String | `Content-Type,Authorization` | 允许的请求头 |
-| `CORS_MAX_AGE` | Integer | `3600` | 预检请求缓存时间（秒） |
-| `CORS_ALLOW_CREDENTIALS` | Boolean | `false` | 允许携带凭证 |
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `cors.enabled` | Boolean | `true` | 是 | 启用 CORS |
+| `cors.allowed_origins` | Json | `[]` | 是 | 允许的来源（空数组 = 允许全部） |
+| `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | 是 | 允许的 HTTP 方法 |
+| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | 是 | 允许的请求头 |
+| `cors.max_age` | Integer | `3600` | 是 | 预检请求缓存时间（秒） |
+| `cors.allow_credentials` | Boolean | `false` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启） |
 
 ## 配置优先级
 
@@ -215,7 +222,6 @@ DATABASE_URL=dev-links.db
 
 # API 配置 - 开发环境使用简单 token
 ADMIN_TOKEN=dev_admin
-HEALTH_TOKEN=dev_health
 ```
 
 ### 生产环境
@@ -259,7 +265,6 @@ DATABASE_URL=/data/links.db
 
 # 首次启动时的动态配置
 ADMIN_TOKEN=secure_admin_token_here
-HEALTH_TOKEN=secure_health_token_here
 ENABLE_ADMIN_PANEL=true
 ```
 
@@ -285,9 +290,16 @@ ENABLE_ADMIN_PANEL=true
 kill -USR1 $(cat shortlinker.pid)
 
 # 通过 API
+# 先登录获取 cookies（如已存在 cookies.txt 可跳过）
+curl -sS -X POST \
+     -H "Content-Type: application/json" \
+     -c cookies.txt \
+     -d '{"password":"your_admin_token"}' \
+     http://localhost:8080/admin/v1/auth/login
+
 curl -X POST \
-     -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8080/admin/config/reload
+     -b cookies.txt \
+     http://localhost:8080/admin/v1/config/reload
 ```
 
 ## 下一步

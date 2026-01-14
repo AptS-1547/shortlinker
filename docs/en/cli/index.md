@@ -13,24 +13,26 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 ## Basic Syntax
 
 ```bash
-./shortlinker <command> [arguments] [options]
+./shortlinker                         # start HTTP server (default)
+./shortlinker <command> [args] [opts] # run CLI command
 ```
 
 ## Command Overview
 
+> Note: `start/stop/restart` are not built-in subcommands. To start the service, run `./shortlinker` without a subcommand. Stopping/restarting is typically handled by systemd/Docker or OS signals (see deployment/ops docs).
+
 | Command | Function | Example |
 |---------|----------|---------|
 | `help` | Show help | `./shortlinker help` |
-| `start` | Start server | `./shortlinker start` |
-| `stop` | Stop server | `./shortlinker stop` |
-| `restart` | Restart server | `./shortlinker restart` |
 | `add` | Add short link | `./shortlinker add github https://github.com` |
 | `remove` | Delete short link | `./shortlinker remove github` |
 | `update` | Update short link | `./shortlinker update github https://new-url.com` |
 | `list` | List all links | `./shortlinker list` |
 | `export` | Export data | `./shortlinker export backup.json` |
 | `import` | Import data | `./shortlinker import backup.json --force` |
-| `tui` | Launch TUI interface | `./shortlinker tui` |
+| `generate-config` | Generate config template | `./shortlinker generate-config` |
+| `reset-password` | Reset admin password | `./shortlinker reset-password "new_password"` |
+| `tui` | Launch TUI interface (requires build feature) | `./shortlinker tui` |
 
 ## Quick Examples
 

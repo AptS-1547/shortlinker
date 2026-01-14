@@ -1,69 +1,115 @@
-# Admin API Documentation
+# Admin API
 
-Shortlinker provides complete HTTP API for managing short links, supporting CRUD operations.
+Shortlinker provides a full-featured HTTP Admin API for managing short links, including CRUD, batch operations, CSV import/export, and runtime config management.
 
 ## Configuration
 
-Admin API requires the following environment variables. For detailed configuration, see [Environment Variables Configuration](/en/config/):
+Admin API settings can come from `config.toml`, environment variables, or runtime config (database). See [Configuration](/en/config/).
 
-- `ADMIN_TOKEN` - Admin token (required)
-- `ADMIN_ROUTE_PREFIX` - Route prefix (optional, default `/admin`)
+- `ADMIN_TOKEN`: admin login password (recommended to set explicitly in production; if not set, the server will auto-generate one and print it once in logs on first startup)
+- `ADMIN_ROUTE_PREFIX`: route prefix (optional, default: `/admin`)
 
-All requests must include Authorization header:
-```http
-Authorization: Bearer your_secure_admin_token
+> All API paths include `/v1`, e.g. the default login endpoint is `http://localhost:8080/admin/v1/auth/login`.
+
+## Authentication (Important)
+
+The current implementation **does not** use `Authorization: Bearer ...` headers.
+
+Admin API uses **JWT Cookies**:
+
+- Access Token Cookie: default name `shortlinker_access`, `Path=/`
+- Refresh Token Cookie: default name `shortlinker_refresh`, `Path={ADMIN_ROUTE_PREFIX}/v1/auth`
+
+Cookie names, TTL, SameSite/Secure/Domain are configurable via `api.*` (see [Configuration](/en/config/)).
+
+### 1) Login to get cookies
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/login`
+
+Body:
+```json
+{ "password": "your_admin_token" }
 ```
 
-## API Endpoints
+Example (save cookies to `cookies.txt`):
+```bash
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+```
 
-**Base URL**: `http://your-domain:port/admin/v1`
+> Tokens are returned via `Set-Cookie`. The response body does not include raw token strings.
 
-### Common Response Format
+### 2) Call other endpoints with cookies
 
+```bash
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/links
+```
+
+### 3) Refresh tokens
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/refresh`
+
+```bash
+curl -sS -X POST \
+  -b cookies.txt -c cookies.txt \
+  http://localhost:8080/admin/v1/auth/refresh
+```
+
+### 4) Logout (clear cookies)
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/logout`
+
+```bash
+curl -sS -X POST -b cookies.txt -c cookies.txt \
+  http://localhost:8080/admin/v1/auth/logout
+```
+
+## Base URL
+
+Default: `http://your-domain:port/admin/v1`
+
+> If you changed `ADMIN_ROUTE_PREFIX`, replace `/admin` with your prefix.
+
+## Common JSON format
+
+Most endpoints return:
 ```json
 {
   "code": 0,
-  "data": { /* response data */ }
+  "data": { /* payload */ }
 }
 ```
 
-### GET /admin/v1/links - Get All Short Links
+- `code = 0`: success
+- `code = 1`: error (details in `data.error`)
+- HTTP status code indicates error category (`401/404/409/500`, etc.)
+
+## Link management
+
+### GET /links - List short links (pagination + filters)
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links?page=1&page_size=20"
 ```
 
-**Query Parameters**:
+**Query params**:
 
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `page` | Integer | Page number (starts from 1) | `?page=1` |
-| `page_size` | Integer | Items per page (1-100) | `?page_size=20` |
-| `search` | String | Fuzzy search on short codes and target URLs | `?search=github` |
-| `created_after` | RFC3339 | Filter by creation time (after) | `?created_after=2024-01-01T00:00:00Z` |
-| `created_before` | RFC3339 | Filter by creation time (before) | `?created_before=2024-12-31T23:59:59Z` |
-| `only_expired` | Boolean | Show only expired links | `?only_expired=true` |
-| `only_active` | Boolean | Show only active links | `?only_active=true` |
+| Param | Type | Description | Example |
+|------|------|-------------|---------|
+| `page` | Integer | page index (starts from 1) | `?page=1` |
+| `page_size` | Integer | page size (1-100) | `?page_size=20` |
+| `search` | String | fuzzy search on code + target | `?search=github` |
+| `created_after` | RFC3339 | created_at >= | `?created_after=2024-01-01T00:00:00Z` |
+| `created_before` | RFC3339 | created_at <= | `?created_before=2024-12-31T23:59:59Z` |
+| `only_expired` | Boolean | only expired links | `?only_expired=true` |
+| `only_active` | Boolean | only active (not expired) | `?only_active=true` |
 
-**Pagination Examples**:
-
-```bash
-# Get page 2 with 10 items per page
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?page=2&page_size=10"
-
-# Show only active links
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?only_active=true"
-
-# Combined query: page 1, active only, filtered by time
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?page=1&page_size=20&only_active=true&created_after=2024-01-01T00:00:00Z"
-```
-
-**Response Format** (Paginated):
-
+**Response**:
 ```json
 {
   "code": 0,
@@ -86,273 +132,228 @@ curl -H "Authorization: Bearer your_token" \
 }
 ```
 
-### POST /admin/v1/links - Create Short Link
+### POST /links - Create a short link
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"github","target":"https://github.com"}' \
-     http://localhost:8080/admin/v1/links
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"code":"github","target":"https://github.com"}' \
+  http://localhost:8080/admin/v1/links
 ```
 
-**Request Body**:
+**Body**:
 ```json
 {
   "code": "github",
   "target": "https://github.com",
-  "expires_at": "2024-12-31T23:59:59Z",  // optional, supports relative time (e.g., "7d")
-  "password": "secret123"  // optional, password protection (experimental, storage only)
+  "expires_at": "2024-12-31T23:59:59Z",
+  "password": "secret123",
+  "force": false
 }
 ```
 
-**Field Description**:
-- `code`: Short code (optional), auto-generates random code if not provided
-- `target`: Target URL (required)
-- `expires_at`: Expiration time (optional), supports relative time (e.g., `"1d"`, `"7d"`, `"1w"`) or RFC3339 format
-- `password`: Password protection (optional) ⚠️ **Note**: Current version only stores password, does not validate on redirect. This is an experimental feature.
+Notes:
+- `code` optional (auto-generated if omitted)
+- `target` required
+- `expires_at` optional (relative like `"7d"` or RFC3339)
+- `force` optional (default `false`); when `code` exists and `force=false`, returns `409 Conflict`
+- `password` experimental
+  - Admin API hashes plaintext passwords using Argon2 (if input already starts with `$argon2...`, it will be stored as-is)
+  - Redirect does not validate password in current version (stored only)
 
-**Create password-protected short link**:
-
-```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"secret","target":"https://example.com","password":"mypassword"}' \
-     http://localhost:8080/admin/v1/links
-```
-
-### GET /admin/v1/links/{code} - Get Specific Short Link
+### GET /links/{code} - Get a link
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/github
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/links/github
 ```
 
-### PUT /admin/v1/links/{code} - Update Short Link
+### PUT /links/{code} - Update a link
 
 ```bash
-curl -X PUT \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
-     http://localhost:8080/admin/v1/links/github
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
+  http://localhost:8080/admin/v1/links/github
 ```
 
-**Request Body Description**:
+**Body**:
 ```json
 {
-  "target": "https://new-url.com",  // required
-  "expires_at": "7d",  // optional, keeps original if not provided
-  "password": "newpass"  // optional, keeps original if not provided, pass null to clear
+  "target": "https://new-url.com",
+  "expires_at": "7d",
+  "password": ""
 }
 ```
 
-**Notes**:
-- Update preserves original creation time and click count
-- `expires_at` keeps original expiration time if not provided
-- `password` keeps original password if not provided, updates if new value provided
+Notes:
+- `target` is required
+- `expires_at` omitted => keep existing value
+- `password`
+  - omitted => keep existing
+  - empty string `""` => remove password
+  - plaintext => hash with Argon2
+  - `$argon2...` => store as-is
 
-### DELETE /admin/v1/links/{code} - Delete Short Link
-
-```bash
-curl -X DELETE \
-     -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/github
-```
-
-### GET /admin/v1/stats - Get Statistics
+### DELETE /links/{code} - Delete a link
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/stats
+curl -sS -X DELETE -b cookies.txt \
+  http://localhost:8080/admin/v1/links/github
 ```
 
-**Response Format**:
-
-```json
-{
-  "code": 0,
-  "data": {
-    "total_links": 100,
-    "total_clicks": 5000,
-    "active_links": 80
-  }
-}
-```
-
-**Field Description**:
-- `total_links`: Total number of short links
-- `total_clicks`: Total click count
-- `active_links`: Number of active (non-expired) links
-
-## Batch Operations
-
-### POST /admin/v1/links/batch - Batch Create Short Links
+### GET /stats - Stats
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/stats
 ```
 
-### PUT /admin/v1/links/batch - Batch Update Short Links
+## Batch operations
+
+### POST /links/batch - Batch create
+
+> The request body is an object with `links`, not a raw array.
 
 ```bash
-curl -X PUT \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://new-example1.com"},{"code":"link2","target":"https://new-example2.com"}]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"links":[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-### DELETE /admin/v1/links/batch - Batch Delete Short Links
+### PUT /links/batch - Batch update
+
+> The request body uses `updates`, each item includes `code` and `payload`.
 
 ```bash
-curl -X DELETE \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '["link1","link2","link3"]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"updates":[{"code":"link1","payload":{"target":"https://new-example1.com"}},{"code":"link2","payload":{"target":"https://new-example2.com"}}]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-## Authentication Endpoints
+### DELETE /links/batch - Batch delete
 
-### POST /admin/v1/auth/login - Login
+> The request body uses `codes`.
 
 ```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"password":"your_admin_token"}' \
-     http://localhost:8080/admin/v1/auth/login
+curl -sS -X DELETE \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"codes":["link1","link2","link3"]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-**Response**: Returns JWT Access Token and Refresh Token (via Cookie or response body).
+## CSV export/import
 
-### POST /admin/v1/auth/refresh - Refresh Token
+### GET /links/export - Export CSV
+
+The exported CSV contains a header and these columns:
+`code,target,created_at,expires_at,password,click_count`
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_refresh_token" \
-     http://localhost:8080/admin/v1/auth/refresh
+curl -sS -b cookies.txt \
+  -o shortlinks_export.csv \
+  "http://localhost:8080/admin/v1/links/export?only_active=true"
 ```
 
-**Response**: Returns new Access Token.
+### POST /links/import - Import CSV
 
-### POST /admin/v1/auth/logout - Logout
+Multipart form fields:
+- `file`: CSV file
+- `mode` (optional): `skip` (default) / `overwrite` / `error`
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/auth/logout
+curl -sS -X POST \
+  -b cookies.txt -c cookies.txt \
+  -F "mode=overwrite" \
+  -F "file=@./shortlinks_export.csv" \
+  http://localhost:8080/admin/v1/links/import
 ```
 
-**Response**: Clears authentication Cookie and invalidates Token.
+## Runtime config management
 
-### GET /admin/v1/auth/verify - Verify Token
+Config endpoints are under `/{ADMIN_ROUTE_PREFIX}/v1/config`. Sensitive values are masked as `********`.
 
+### GET /config
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/auth/verify
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config
 ```
 
-**Response**: Verifies whether current Token is valid.
+### GET /config/{key}
+```bash
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config/features.random_code_length
+```
 
-## Error Codes
+### PUT /config/{key}
+```bash
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"value":"8"}' \
+  http://localhost:8080/admin/v1/config/features.random_code_length
+```
 
-| Error Code | Description |
-|------------|-------------|
-| 0 | Success |
-| 1 | General error |
-| 401 | Authentication failed |
+### GET /config/{key}/history
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
+```
 
-## Python Client Example
+### POST /config/reload
+```bash
+curl -sS -X POST -b cookies.txt \
+  http://localhost:8080/admin/v1/config/reload
+```
+
+## Auth endpoints notes
+
+- `POST /auth/login`: no cookies required; validates `ADMIN_TOKEN` and sets cookies
+- `POST /auth/refresh`: no access cookie required, but refresh cookie is required
+- `POST /auth/logout`: no cookies required; clears cookies
+- `GET /auth/verify`: requires access cookie
+
+## Python example (requests)
 
 ```python
 import requests
 
 class ShortlinkerAdmin:
-    def __init__(self, base_url, token):
-        self.base_url = base_url.rstrip('/')
-        self.headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-    
-    def create_link(self, code, target, expires_at=None):
-        data = {'code': code, 'target': target}
-        if expires_at:
-            data['expires_at'] = expires_at
-        
-        response = requests.post(
-            f'{self.base_url}/admin/v1/links',
-            headers=self.headers,
-            json=data
-        )
-        return response.json()
-    
-    def get_all_links(self):
-        response = requests.get(
-            f'{self.base_url}/admin/v1/links',
-            headers=self.headers
-        )
-        return response.json()
+    def __init__(self, base_url: str, admin_token: str):
+        self.base_url = base_url.rstrip("/")
+        self.session = requests.Session()
 
-# Usage example
-admin = ShortlinkerAdmin('http://localhost:8080', 'your_token')
-result = admin.create_link('test', 'https://example.com')
+        resp = self.session.post(
+            f"{self.base_url}/admin/v1/auth/login",
+            json={"password": admin_token},
+            timeout=10,
+        )
+        resp.raise_for_status()
+
+    def list_links(self, page=1, page_size=20):
+        resp = self.session.get(
+            f"{self.base_url}/admin/v1/links",
+            params={"page": page, "page_size": page_size},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+admin = ShortlinkerAdmin("http://localhost:8080", "your_admin_token")
+print(admin.list_links())
 ```
 
-## Security Recommendations
+## Security notes
 
-1. **Strong Password**: Use sufficiently complex ADMIN_TOKEN
-2. **HTTPS**: Production environment must use HTTPS
-3. **Network Isolation**: Only expose Admin API in trusted network environments
-4. **Regular Rotation**: Regularly change Admin Token
+1. Use a strong `ADMIN_TOKEN` (do not rely on the auto-generated one in production)
+2. Use HTTPS in production and set `api.cookie_secure=true`
+3. Expose Admin API only to trusted networks
+4. Rotate `ADMIN_TOKEN` regularly and re-login to get new cookies
 
-## Experimental Features
-
-### Password Protection Feature ⚠️
-
-**Current Status**: Experimental / Partially Implemented
-
-Shortlinker supports setting password fields for short links. **Current version supports storing passwords (using Argon2 hash encryption), but validation is not performed during access**.
-
-**Implemented**:
-- ✅ Create password-protected short links via API
-- ✅ Passwords are hashed using Argon2 algorithm (secure storage)
-- ✅ Store and query password fields (API returns hash value)
-- ✅ Update and delete passwords
-
-**Not Implemented**:
-- ❌ Password validation when accessing short links
-- ❌ Password validation page
-
-**Usage Example**:
-
-```bash
-# Create password-protected short link (password is hashed but not validated on access)
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"secret","target":"https://example.com","password":"mypass123"}' \
-     http://localhost:8080/admin/v1/links
-
-# Query returns password hash value
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/secret
-# Returns: {"code":"secret","target":"...","password":"$argon2id$...",...}
-```
-
-**Security Notes**:
-- ✅ Passwords are hashed using Argon2 algorithm, irreversible
-- ⚠️ No password required when accessing short links
-- ⚠️ Feature not fully implemented, not recommended for production use
-
-**Planned Improvements**:
-- Implement password validation page
-- Support multiple validation methods (HTTP Basic Auth, query parameters, etc.)
-
-For complete password protection functionality, it's recommended to implement access control at the reverse proxy layer (e.g., Nginx).

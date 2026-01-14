@@ -1,25 +1,85 @@
 # Admin API 文档
 
-Shortlinker 提供完整的 HTTP API 用于管理短链接，支持 CRUD 操作。
+Shortlinker 提供完整的 HTTP Admin API 用于管理短链接，支持 CRUD、批量操作、CSV 导入/导出，以及运行时配置管理。
 
 ## 配置方式
 
-Admin API 需要以下环境变量，详细配置请参考 [环境变量配置](/config/)：
+Admin API 相关配置可来自 `config.toml`、环境变量或运行时配置（数据库）。详细配置见 [配置指南](/config/)。
 
-- `ADMIN_TOKEN` - 管理员令牌（必需）
-- `ADMIN_ROUTE_PREFIX` - 路由前缀（可选，默认 `/admin`）
+- `ADMIN_TOKEN`：管理员登录密码（建议生产环境显式设置；未设置时程序会在首次启动时自动生成并在日志中提示一次）
+- `ADMIN_ROUTE_PREFIX`：路由前缀（可选，默认 `/admin`）
 
-所有请求需要携带 Authorization 头：
-```http
-Authorization: Bearer your_secure_admin_token
+> 实际接口路径固定包含 `/v1`，例如默认登录地址为 `http://localhost:8080/admin/v1/auth/login`。
+
+## 鉴权方式（重要）
+
+当前实现 **不使用** `Authorization: Bearer ...` 头。
+
+Admin API 使用 **JWT Cookie** 进行鉴权：
+
+- Access Token Cookie：默认名 `shortlinker_access`，`Path=/`（用于访问大部分 Admin/Health 接口）
+- Refresh Token Cookie：默认名 `shortlinker_refresh`，`Path={ADMIN_ROUTE_PREFIX}/v1/auth`（仅用于刷新 Token）
+
+Cookie 名称、有效期、SameSite、Secure、Domain 等可通过配置项 `api.*` 调整，见 [配置指南](/config/)。
+
+### 1) 登录获取 Cookie
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/login`
+
+请求体：
+```json
+{ "password": "your_admin_token" }
 ```
 
-## API 端点
+示例（把 cookie 保存到 `cookies.txt`）：
+```bash
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"password":"your_admin_token"}' \
+  http://localhost:8080/admin/v1/auth/login
+```
 
-**Base URL**: `http://your-domain:port/admin/v1`
+> 该接口会通过 `Set-Cookie` 返回 access/refresh cookie；响应体不返回 token 字符串，只返回提示信息与过期时间。
 
-### 通用响应格式
+### 2) 携带 Cookie 调用其它接口
 
+示例：
+```bash
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/links
+```
+
+### 3) 刷新 Token
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/refresh`
+
+示例（读取并更新 cookie）：
+```bash
+curl -sS -X POST \
+  -b cookies.txt -c cookies.txt \
+  http://localhost:8080/admin/v1/auth/refresh
+```
+
+### 4) 登出（清理 Cookie）
+
+**POST** `/{ADMIN_ROUTE_PREFIX}/v1/auth/logout`
+
+示例：
+```bash
+curl -sS -X POST -b cookies.txt -c cookies.txt \
+  http://localhost:8080/admin/v1/auth/logout
+```
+
+## Base URL
+
+默认：`http://your-domain:port/admin/v1`
+
+> 若你修改了 `ADMIN_ROUTE_PREFIX`，只需把 `/admin` 替换为自定义前缀。
+
+## 通用响应格式
+
+大部分接口返回 JSON：
 ```json
 {
   "code": 0,
@@ -27,18 +87,24 @@ Authorization: Bearer your_secure_admin_token
 }
 ```
 
-### GET /admin/v1/links - 获取所有短链接
+- `code = 0`：成功
+- `code = 1`：业务错误（具体原因在 `data.error`）
+- HTTP 状态码用于表达错误类型（如 `401/404/409/500`）
+
+## 链接管理
+
+### GET /links - 获取短链接列表（分页 + 过滤）
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links?page=1&page_size=20"
 ```
 
 **查询参数**：
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `page` | Integer | 页码（从1开始） | `?page=1` |
+| `page` | Integer | 页码（从 1 开始） | `?page=1` |
 | `page_size` | Integer | 每页数量（1-100） | `?page_size=20` |
 | `search` | String | 模糊搜索短码和目标 URL | `?search=github` |
 | `created_after` | RFC3339 | 创建时间过滤（晚于） | `?created_after=2024-01-01T00:00:00Z` |
@@ -46,28 +112,7 @@ curl -H "Authorization: Bearer your_token" \
 | `only_expired` | Boolean | 仅显示已过期 | `?only_expired=true` |
 | `only_active` | Boolean | 仅显示未过期 | `?only_active=true` |
 
-**分页查询示例**：
-
-```bash
-# 获取第2页，每页10条
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?page=2&page_size=10"
-
-# 仅显示活跃链接
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?only_active=true"
-
-# 组合查询：第1页，仅活跃，按时间过滤
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?page=1&page_size=20&only_active=true&created_after=2024-01-01T00:00:00Z"
-
-# 搜索包含 github 的链接
-curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/v1/links?search=github"
-```
-
 **响应格式**（分页）：
-
 ```json
 {
   "code": 0,
@@ -90,90 +135,86 @@ curl -H "Authorization: Bearer your_token" \
 }
 ```
 
-### POST /admin/v1/links - 创建短链接
+### POST /links - 创建短链接
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"github","target":"https://github.com"}' \
-     http://localhost:8080/admin/v1/links
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"code":"github","target":"https://github.com"}' \
+  http://localhost:8080/admin/v1/links
 ```
 
-**请求体**:
+**请求体**：
 ```json
 {
   "code": "github",
   "target": "https://github.com",
-  "expires_at": "2024-12-31T23:59:59Z",  // 可选，支持相对时间格式（如 "7d"）
-  "password": "secret123"  // 可选，密码保护（实验性功能，仅存储）
+  "expires_at": "2024-12-31T23:59:59Z",
+  "password": "secret123",
+  "force": false
 }
 ```
 
 **说明**：
 - `code`：短码（可选），不提供则自动生成随机短码
 - `target`：目标 URL（必需）
-- `expires_at`：过期时间（可选），支持相对时间（如 `"1d"`, `"7d"`, `"1w"`）或 RFC3339 格式
-- `password`：密码保护（可选）⚠️ **注意**：当前版本仅存储密码，重定向时暂不验证，此为实验性功能
+- `expires_at`：过期时间（可选），支持相对时间（如 `"1d"`, `"7d"`, `"1w"`）或 RFC3339
+- `force`：当 `code` 已存在时，是否覆盖（可选，默认 `false`；未开启时会返回 `409 Conflict`）
+- `password`：密码保护字段（实验性）
+  - 通过 Admin API 写入时会自动使用 Argon2 哈希（若传入的字符串已是 `$argon2...` 格式则会原样保存）
+  - 当前版本重定向时不验证密码，仅存储
 
-**创建带密码的短链接**：
+### GET /links/{code} - 获取指定短链接
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"secret","target":"https://example.com","password":"mypassword"}' \
-     http://localhost:8080/admin/v1/links
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/links/github
 ```
 
-### GET /admin/v1/links/{code} - 获取指定短链接
+### PUT /links/{code} - 更新短链接
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/github
-```
-
-### PUT /admin/v1/links/{code} - 更新短链接
-
-```bash
-curl -X PUT \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
-     http://localhost:8080/admin/v1/links/github
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
+  http://localhost:8080/admin/v1/links/github
 ```
 
 **请求体说明**：
 ```json
 {
-  "target": "https://new-url.com",  // 必需
-  "expires_at": "7d",  // 可选，不提供则保持原值
-  "password": "newpass"  // 可选，不提供则保持原值，传 null 可清除密码
+  "target": "https://new-url.com",
+  "expires_at": "7d",
+  "password": ""
 }
 ```
 
 **说明**：
-- 更新时会保留原有的创建时间和点击计数
-- `expires_at` 不提供则保持原过期时间
-- `password` 不提供则保持原密码，提供新值则更新密码
+- `target` 必填
+- `expires_at` 不提供则保持原值
+- `password`
+  - 不提供：保持原值
+  - 传空字符串 `""`：清除密码
+  - 传明文：自动 Argon2 哈希后保存
+  - 传 `$argon2...`：视为已哈希，原样保存
 
-### DELETE /admin/v1/links/{code} - 删除短链接
+### DELETE /links/{code} - 删除短链接
 
 ```bash
-curl -X DELETE \
-     -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/github
+curl -sS -X DELETE -b cookies.txt \
+  http://localhost:8080/admin/v1/links/github
 ```
 
-### GET /admin/v1/stats - 获取统计信息
+### GET /stats - 获取统计信息
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/stats
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/stats
 ```
 
 **响应格式**：
-
 ```json
 {
   "code": 0,
@@ -185,178 +226,182 @@ curl -H "Authorization: Bearer your_token" \
 }
 ```
 
-**字段说明**：
-- `total_links`：短链接总数
-- `total_clicks`：总点击次数
-- `active_links`：未过期的活跃链接数
-
 ## 批量操作
 
-### POST /admin/v1/links/batch - 批量创建短链接
+### POST /links/batch - 批量创建短链接
+
+> 注意：请求体是对象，字段名为 `links`，不是纯数组。
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"links":[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-### PUT /admin/v1/links/batch - 批量更新短链接
+### PUT /links/batch - 批量更新短链接
+
+> 注意：请求体字段名为 `updates`，每一项包含 `code` 与 `payload`。
 
 ```bash
-curl -X PUT \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '[{"code":"link1","target":"https://new-example1.com"},{"code":"link2","target":"https://new-example2.com"}]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"updates":[{"code":"link1","payload":{"target":"https://new-example1.com"}},{"code":"link2","payload":{"target":"https://new-example2.com"}}]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-### DELETE /admin/v1/links/batch - 批量删除短链接
+### DELETE /links/batch - 批量删除短链接
+
+> 注意：请求体字段名为 `codes`。
 
 ```bash
-curl -X DELETE \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '["link1","link2","link3"]' \
-     http://localhost:8080/admin/v1/links/batch
+curl -sS -X DELETE \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"codes":["link1","link2","link3"]}' \
+  http://localhost:8080/admin/v1/links/batch
 ```
 
-## 认证接口
+## CSV 导出/导入
 
-### POST /admin/v1/auth/login - 登录
+### GET /links/export - 导出为 CSV
+
+导出会生成可直接用于导入的 CSV（包含 header），字段：
+`code,target,created_at,expires_at,password,click_count`
 
 ```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"password":"your_admin_token"}' \
-     http://localhost:8080/admin/v1/auth/login
+curl -sS -b cookies.txt \
+  -o shortlinks_export.csv \
+  "http://localhost:8080/admin/v1/links/export?only_active=true"
 ```
 
-**响应**：返回 JWT Access Token 和 Refresh Token（通过 Cookie 或响应体）。
+### POST /links/import - 从 CSV 导入
 
-### POST /admin/v1/auth/refresh - 刷新 Token
+上传 `multipart/form-data`：
+- `file`：CSV 文件
+- `mode`（可选）：冲突处理模式，`skip`（默认）/`overwrite`/`error`
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_refresh_token" \
-     http://localhost:8080/admin/v1/auth/refresh
+curl -sS -X POST \
+  -b cookies.txt -c cookies.txt \
+  -F "mode=overwrite" \
+  -F "file=@./shortlinks_export.csv" \
+  http://localhost:8080/admin/v1/links/import
 ```
 
-**响应**：返回新的 Access Token。
+**响应**：
+```json
+{
+  "code": 0,
+  "data": {
+    "total_rows": 10,
+    "success_count": 9,
+    "skipped_count": 1,
+    "failed_count": 0,
+    "failed_items": []
+  }
+}
+```
 
-### POST /admin/v1/auth/logout - 登出
+## 运行时配置管理
+
+配置管理接口位于 `/{ADMIN_ROUTE_PREFIX}/v1/config` 下，返回值统一为 `{code,data}` 结构；敏感配置会自动掩码为 `********`。
+
+### GET /config - 获取所有配置
 
 ```bash
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/auth/logout
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config
 ```
 
-**响应**：清除认证 Cookie 并使 Token 失效。
-
-### GET /admin/v1/auth/verify - 验证 Token
+### GET /config/{key} - 获取单个配置
 
 ```bash
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/auth/verify
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config/features.random_code_length
 ```
 
-**响应**：验证当前 Token 是否有效。
+### PUT /config/{key} - 更新配置
 
-## 错误码
+```bash
+curl -sS -X PUT \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"value":"8"}' \
+  http://localhost:8080/admin/v1/config/features.random_code_length
+```
 
-| 错误码 | 说明 |
-|--------|------|
-| 0 | 成功 |
-| 1 | 一般错误 |
-| 401 | 鉴权失败 |
+### GET /config/{key}/history - 获取变更历史
 
-## Python 客户端示例
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
+```
+
+### POST /config/reload - 重新加载配置
+
+```bash
+curl -sS -X POST -b cookies.txt \
+  http://localhost:8080/admin/v1/config/reload
+```
+
+## 认证接口补充说明
+
+- `POST /auth/login`：无需 Cookie；验证 `ADMIN_TOKEN` 成功后下发 Cookie
+- `POST /auth/refresh`：无需 Access Cookie，但需要 Refresh Cookie
+- `POST /auth/logout`：无需 Cookie；用于清理 Cookie
+- `GET /auth/verify`：需要 Access Cookie（中间件校验通过即有效）
+
+## Python 客户端示例（requests）
 
 ```python
 import requests
 
 class ShortlinkerAdmin:
-    def __init__(self, base_url, token):
-        self.base_url = base_url.rstrip('/')
-        self.headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-    
-    def create_link(self, code, target, expires_at=None):
-        data = {'code': code, 'target': target}
+    def __init__(self, base_url: str, admin_token: str):
+        self.base_url = base_url.rstrip("/")
+        self.session = requests.Session()
+
+        # 登录：Set-Cookie 会被 requests.Session 自动保存
+        resp = self.session.post(
+            f"{self.base_url}/admin/v1/auth/login",
+            json={"password": admin_token},
+            timeout=10,
+        )
+        resp.raise_for_status()
+
+    def get_all_links(self, page=1, page_size=20):
+        resp = self.session.get(
+            f"{self.base_url}/admin/v1/links",
+            params={"page": page, "page_size": page_size},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def create_link(self, code, target, expires_at=None, force=False):
+        payload = {"code": code, "target": target, "force": force}
         if expires_at:
-            data['expires_at'] = expires_at
-        
-        response = requests.post(
-            f'{self.base_url}/admin/v1/links',
-            headers=self.headers,
-            json=data
+            payload["expires_at"] = expires_at
+        resp = self.session.post(
+            f"{self.base_url}/admin/v1/links",
+            json=payload,
+            timeout=10,
         )
-        return response.json()
-    
-    def get_all_links(self):
-        response = requests.get(
-            f'{self.base_url}/admin/v1/links',
-            headers=self.headers
-        )
-        return response.json()
+        resp.raise_for_status()
+        return resp.json()
 
 # 使用示例
-admin = ShortlinkerAdmin('http://localhost:8080', 'your_token')
-result = admin.create_link('test', 'https://example.com')
+admin = ShortlinkerAdmin("http://localhost:8080", "your_admin_token")
+print(admin.get_all_links())
 ```
 
 ## 安全建议
 
-1. **强密码**: 使用足够复杂的 ADMIN_TOKEN
-2. **HTTPS**: 生产环境必须使用 HTTPS
-3. **网络隔离**: 仅在受信任的网络环境中暴露 Admin API
-4. **定期轮换**: 定期更换 Admin Token
+1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`（不要使用默认的自动生成值直接上生产）
+2. **HTTPS**：生产环境建议启用 HTTPS，并将 `api.cookie_secure=true`
+3. **网络隔离**：仅在受信任网络环境中暴露 Admin API
+4. **定期轮换**：定期更换 `ADMIN_TOKEN`（并重新登录获取新 Cookie）
 
-## 实验性功能
-
-### 密码保护功能 ⚠️
-
-**当前状态**：实验性 / 部分实现
-
-Shortlinker 支持为短链接设置密码字段，**当前版本支持存储密码（使用 Argon2 哈希加密），但访问时暂不验证**。
-
-**已实现**：
-- ✅ 通过 API 创建带密码的短链接
-- ✅ 密码使用 Argon2 算法哈希存储（安全存储）
-- ✅ 存储和查询密码字段（API 返回时显示为已设置状态）
-- ✅ 更新和删除密码
-
-**未实现**：
-- ❌ 访问短链接时的密码验证
-- ❌ 密码验证页面
-
-**使用示例**：
-
-```bash
-# 创建带密码的短链接（密码会被哈希存储但访问时不验证）
-curl -X POST \
-     -H "Authorization: Bearer your_token" \
-     -H "Content-Type: application/json" \
-     -d '{"code":"secret","target":"https://example.com","password":"mypass123"}' \
-     http://localhost:8080/admin/v1/links
-
-# 查询时返回密码哈希值
-curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/v1/links/secret
-# 返回: {"code":"secret","target":"...","password":"$argon2id$...",...}
-```
-
-**安全说明**：
-- ✅ 密码使用 Argon2 算法哈希存储，不可逆
-- ⚠️ 访问短链接时暂不要求输入密码
-- ⚠️ 功能尚未完全实现，不建议在生产环境依赖此功能
-
-**计划改进**：
-- 实现密码验证页面
-- 支持多种验证方式（HTTP Basic Auth、查询参数等）
-
-如需完整的密码保护功能，建议在反向代理层（如 Nginx）实现访问控制。

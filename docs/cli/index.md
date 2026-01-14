@@ -13,24 +13,26 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 ## 基本语法
 
 ```bash
-./shortlinker <command> [arguments] [options]
+./shortlinker                          # 启动 HTTP 服务器（默认）
+./shortlinker <command> [args] [opts]  # 运行 CLI 命令
 ```
 
 ## 命令概览
 
+> 注意：`start/stop/restart` 不是内置子命令；服务启动直接运行 `./shortlinker`，停止/重启通常由 systemd/Docker 或发送信号完成（见部署/运维文档）。
+
 | 命令 | 功能 | 示例 |
 |------|------|------|
 | `help` | 查看帮助 | `./shortlinker help` |
-| `start` | 启动服务器 | `./shortlinker start` |
-| `stop` | 停止服务器 | `./shortlinker stop` |
-| `restart` | 重启服务器 | `./shortlinker restart` |
 | `add` | 添加短链接 | `./shortlinker add github https://github.com` |
 | `remove` | 删除短链接 | `./shortlinker remove github` |
 | `update` | 更新短链接 | `./shortlinker update github https://new-url.com` |
 | `list` | 列出所有链接 | `./shortlinker list` |
 | `export` | 导出数据 | `./shortlinker export backup.json` |
 | `import` | 导入数据 | `./shortlinker import backup.json --force` |
-| `tui` | 启动 TUI 界面 | `./shortlinker tui` |
+| `generate-config` | 生成配置模板 | `./shortlinker generate-config` |
+| `reset-password` | 重置管理员密码 | `./shortlinker reset-password "new_password"` |
+| `tui` | 启动 TUI 界面（需编译启用） | `./shortlinker tui` |
 
 ## 快速示例
 

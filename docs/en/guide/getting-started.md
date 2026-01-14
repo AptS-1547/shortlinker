@@ -20,10 +20,9 @@ port = 8080
 [features]
 default_url = "https://example.com"
 
-# Optional: Enable admin and monitoring features
+# Optional: Enable admin features (Health API currently reuses Admin auth)
 # [api]
 # admin_token = "your_admin_token"
-# health_token = "your_health_token"
 ```
 
 Or use a custom path:
@@ -48,9 +47,8 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# Optional: Enable admin and monitoring features
+# Optional: Enable admin features (Health API currently reuses Admin auth)
 # ADMIN_TOKEN=your_admin_token
-# HEALTH_TOKEN=your_health_token
 ```
 
 ## Step 2: Start Service
@@ -127,7 +125,6 @@ DEFAULT_URL=https://your-domain.com
 
 # Enable API features
 ADMIN_TOKEN=your_secure_admin_token
-HEALTH_TOKEN=your_secure_health_token
 ```
 
 ### Reverse Proxy Example
