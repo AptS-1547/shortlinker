@@ -10,7 +10,9 @@
 use clap::Parser;
 use dotenv::dotenv;
 
-use shortlinker::cli::{Cli, Commands};
+use shortlinker::cli::Cli;
+#[cfg(feature = "tui")]
+use shortlinker::cli::Commands;
 use shortlinker::system::panic_handler::RunMode;
 
 /// Application entry point
