@@ -67,17 +67,17 @@ cargo run
 export ADMIN_TOKEN=your_secret_token
 
 # List all links
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/link
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/v1/links
 
 # Create link
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 
 # Delete link
 curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8080/admin/link/github
+     http://localhost:8080/admin/v1/links/github
 ```
 
 See [Admin API docs](docs/en/api/admin.md) for batch operations, runtime config, and more.

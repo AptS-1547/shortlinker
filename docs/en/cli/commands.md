@@ -17,6 +17,7 @@ Detailed command line tool usage instructions and parameter options.
 **Options**:
 - `--force`: Force overwrite existing short code
 - `--expire <time>`: Set expiration time
+- `--password <password>`: Set password protection (experimental)
 
 **Examples**:
 ```bash
@@ -32,6 +33,9 @@ Detailed command line tool usage instructions and parameter options.
 
 # Force overwrite
 ./shortlinker add google https://www.google.com --force
+
+# Password protected link
+./shortlinker add secret https://example.com --password mypass
 ```
 
 ### export - Export Short Links
@@ -83,6 +87,35 @@ Detailed command line tool usage instructions and parameter options.
 
 ```bash
 ./shortlinker help
+```
+
+### generate-config - Generate Configuration File
+
+```bash
+./shortlinker generate-config [output_path]
+```
+
+Generate a default configuration file template with all configurable options.
+
+**Examples**:
+```bash
+./shortlinker generate-config           # Generate config.toml
+./shortlinker generate-config myconfig.toml  # Specify filename
+```
+
+### reset-password - Reset Admin Password
+
+```bash
+./shortlinker reset-password <new_password>
+```
+
+Reset the admin API password. The new password will be hashed with Argon2id and stored in the database.
+
+**Requirement**: Password must be at least 8 characters long.
+
+**Examples**:
+```bash
+./shortlinker reset-password "my_new_secure_password"
 ```
 
 ### tui - Launch Terminal User Interface

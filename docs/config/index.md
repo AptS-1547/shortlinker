@@ -180,6 +180,17 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 | `click.flush_interval` | Integer | `30` | 否 | 刷新间隔（秒） |
 | `click.max_clicks_before_flush` | Integer | `100` | 否 | 刷新前最大点击数 |
 
+### CORS 跨域配置
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `CORS_ENABLED` | Boolean | `true` | 启用 CORS |
+| `CORS_ALLOWED_ORIGINS` | String | *(空)* | 允许的来源（逗号分隔，空 = 允许全部） |
+| `CORS_ALLOWED_METHODS` | String | `GET,POST,PUT,DELETE,OPTIONS` | 允许的 HTTP 方法 |
+| `CORS_ALLOWED_HEADERS` | String | `Content-Type,Authorization` | 允许的请求头 |
+| `CORS_MAX_AGE` | Integer | `3600` | 预检请求缓存时间（秒） |
+| `CORS_ALLOW_CREDENTIALS` | Boolean | `false` | 允许携带凭证 |
+
 ## 配置优先级
 
 1. **数据库配置**（动态配置，最高优先级）

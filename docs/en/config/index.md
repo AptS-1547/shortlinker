@@ -71,6 +71,38 @@ export SERVER_PORT=8080
 
 > For detailed API configuration, see [Admin API](/en/api/admin) and [Health Check API](/en/api/health)
 
+### JWT & Cookie Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `JWT_SECRET` | String | *(random)* | JWT signing secret key (at least 32 characters recommended) |
+| `ACCESS_TOKEN_MINUTES` | Integer | `15` | Access token expiration time (minutes) |
+| `REFRESH_TOKEN_DAYS` | Integer | `7` | Refresh token expiration time (days) |
+| `ACCESS_COOKIE_NAME` | String | `access_token` | Access token cookie name |
+| `REFRESH_COOKIE_NAME` | String | `refresh_token` | Refresh token cookie name |
+| `COOKIE_SECURE` | Boolean | `false` | Use HTTPS-only cookies |
+| `COOKIE_SAME_SITE` | String | `Lax` | Cookie SameSite policy (`Strict`, `Lax`, `None`) |
+| `COOKIE_DOMAIN` | String | *(empty)* | Cookie domain |
+
+### Click Tracking Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ENABLE_CLICK_TRACKING` | Boolean | `true` | Enable click tracking |
+| `FLUSH_INTERVAL` | Integer | `60` | Click data flush interval (seconds) |
+| `MAX_CLICKS_BEFORE_FLUSH` | Integer | `100` | Maximum clicks before forced flush |
+
+### CORS Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `CORS_ENABLED` | Boolean | `true` | Enable CORS |
+| `CORS_ALLOWED_ORIGINS` | String | *(empty)* | Allowed origins (comma-separated, empty = all) |
+| `CORS_ALLOWED_METHODS` | String | `GET,POST,PUT,DELETE,OPTIONS` | Allowed HTTP methods |
+| `CORS_ALLOWED_HEADERS` | String | `Content-Type,Authorization` | Allowed headers |
+| `CORS_MAX_AGE` | Integer | `3600` | Preflight cache time (seconds) |
+| `CORS_ALLOW_CREDENTIALS` | Boolean | `false` | Allow credentials |
+
 ### Logging Configuration
 
 | Parameter | Type | Default | Options |

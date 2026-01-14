@@ -67,17 +67,17 @@ cargo run
 export ADMIN_TOKEN=your_secret_token
 
 # 获取所有链接
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/link
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/v1/links
 
 # 创建链接
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com","expires_at":"7d"}' \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 
 # 删除链接
 curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
-     http://localhost:8080/admin/link/github
+     http://localhost:8080/admin/v1/links/github
 ```
 
 批量操作、运行时配置等详见 [管理 API 文档](docs/api/admin.md)。

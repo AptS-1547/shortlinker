@@ -13,8 +13,16 @@ Shortlinker 提供健康检查 API，用于监控服务状态和存储健康状�
 
 健康检查 API 需要以下环境变量，详细配置请参考 [环境变量配置](/config/)：
 
-- `HEALTH_TOKEN` - 健康检查令牌（必需）
+- `HEALTH_TOKEN` - 健康检查专用令牌（可选）
 - `HEALTH_ROUTE_PREFIX` - 路由前缀（可选，默认 `/health`）
+
+**认证方式**：
+
+| HEALTH_TOKEN | ADMIN_TOKEN | 结果 |
+|--------------|-------------|------|
+| 已设置 | 任意 | 使用 HEALTH_TOKEN 认证 |
+| 未设置 | 已设置 | 使用 ADMIN_TOKEN 认证 |
+| 未设置 | 未设置 | Health API 禁用 |
 
 所有请求需要携带 Authorization 头：
 ```http

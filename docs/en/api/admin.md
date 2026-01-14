@@ -16,7 +16,7 @@ Authorization: Bearer your_secure_admin_token
 
 ## API Endpoints
 
-**Base URL**: `http://your-domain:port/admin`
+**Base URL**: `http://your-domain:port/admin/v1`
 
 ### Common Response Format
 
@@ -27,11 +27,11 @@ Authorization: Bearer your_secure_admin_token
 }
 ```
 
-### GET /admin/link - Get All Short Links
+### GET /admin/v1/links - Get All Short Links
 
 ```bash
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 ```
 
 **Query Parameters**:
@@ -51,15 +51,15 @@ curl -H "Authorization: Bearer your_token" \
 ```bash
 # Get page 2 with 10 items per page
 curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/link?page=2&page_size=10"
+     "http://localhost:8080/admin/v1/links?page=2&page_size=10"
 
 # Show only active links
 curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/link?only_active=true"
+     "http://localhost:8080/admin/v1/links?only_active=true"
 
 # Combined query: page 1, active only, filtered by time
 curl -H "Authorization: Bearer your_token" \
-     "http://localhost:8080/admin/link?page=1&page_size=20&only_active=true&created_after=2024-01-01T00:00:00Z"
+     "http://localhost:8080/admin/v1/links?page=1&page_size=20&only_active=true&created_after=2024-01-01T00:00:00Z"
 ```
 
 **Response Format** (Paginated):
@@ -86,14 +86,14 @@ curl -H "Authorization: Bearer your_token" \
 }
 ```
 
-### POST /admin/link - Create Short Link
+### POST /admin/v1/links - Create Short Link
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"github","target":"https://github.com"}' \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 ```
 
 **Request Body**:
@@ -119,24 +119,24 @@ curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"secret","target":"https://example.com","password":"mypassword"}' \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 ```
 
-### GET /admin/link/{code} - Get Specific Short Link
+### GET /admin/v1/links/{code} - Get Specific Short Link
 
 ```bash
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/link/github
+     http://localhost:8080/admin/v1/links/github
 ```
 
-### PUT /admin/link/{code} - Update Short Link
+### PUT /admin/v1/links/{code} - Update Short Link
 
 ```bash
 curl -X PUT \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
-     http://localhost:8080/admin/link/github
+     http://localhost:8080/admin/v1/links/github
 ```
 
 **Request Body Description**:
@@ -153,19 +153,19 @@ curl -X PUT \
 - `expires_at` keeps original expiration time if not provided
 - `password` keeps original password if not provided, updates if new value provided
 
-### DELETE /admin/link/{code} - Delete Short Link
+### DELETE /admin/v1/links/{code} - Delete Short Link
 
 ```bash
 curl -X DELETE \
      -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/link/github
+     http://localhost:8080/admin/v1/links/github
 ```
 
-### GET /admin/stats - Get Statistics
+### GET /admin/v1/stats - Get Statistics
 
 ```bash
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/stats
+     http://localhost:8080/admin/v1/stats
 ```
 
 **Response Format**:
@@ -188,34 +188,34 @@ curl -H "Authorization: Bearer your_token" \
 
 ## Batch Operations
 
-### POST /admin/link/batch - Batch Create Short Links
+### POST /admin/v1/links/batch - Batch Create Short Links
 
 ```bash
 curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]' \
-     http://localhost:8080/admin/link/batch
+     http://localhost:8080/admin/v1/links/batch
 ```
 
-### PUT /admin/link/batch - Batch Update Short Links
+### PUT /admin/v1/links/batch - Batch Update Short Links
 
 ```bash
 curl -X PUT \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '[{"code":"link1","target":"https://new-example1.com"},{"code":"link2","target":"https://new-example2.com"}]' \
-     http://localhost:8080/admin/link/batch
+     http://localhost:8080/admin/v1/links/batch
 ```
 
-### DELETE /admin/link/batch - Batch Delete Short Links
+### DELETE /admin/v1/links/batch - Batch Delete Short Links
 
 ```bash
 curl -X DELETE \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '["link1","link2","link3"]' \
-     http://localhost:8080/admin/link/batch
+     http://localhost:8080/admin/v1/links/batch
 ```
 
 ## Authentication Endpoints
@@ -287,7 +287,7 @@ class ShortlinkerAdmin:
             data['expires_at'] = expires_at
         
         response = requests.post(
-            f'{self.base_url}/admin/link',
+            f'{self.base_url}/admin/v1/links',
             headers=self.headers,
             json=data
         )
@@ -295,7 +295,7 @@ class ShortlinkerAdmin:
     
     def get_all_links(self):
         response = requests.get(
-            f'{self.base_url}/admin/link',
+            f'{self.base_url}/admin/v1/links',
             headers=self.headers
         )
         return response.json()
@@ -338,11 +338,11 @@ curl -X POST \
      -H "Authorization: Bearer your_token" \
      -H "Content-Type: application/json" \
      -d '{"code":"secret","target":"https://example.com","password":"mypass123"}' \
-     http://localhost:8080/admin/link
+     http://localhost:8080/admin/v1/links
 
 # Query returns password hash value
 curl -H "Authorization: Bearer your_token" \
-     http://localhost:8080/admin/link/secret
+     http://localhost:8080/admin/v1/links/secret
 # Returns: {"code":"secret","target":"...","password":"$argon2id$...",...}
 ```
 

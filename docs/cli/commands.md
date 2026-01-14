@@ -14,6 +14,7 @@
 **选项**:
 - `--force`: 强制覆盖已存在的短码
 - `--expire <时间>`: 设置过期时间
+- `--password <密码>`: 设置密码保护（实验性功能）
 
 **示例**:
 ```bash
@@ -21,6 +22,7 @@
 ./shortlinker add https://www.example.com  # 随机短码
 ./shortlinker add daily https://example.com --expire 1d
 ./shortlinker add google https://www.google.com --force
+./shortlinker add secret https://example.com --password mypass  # 密码保护
 ```
 
 ### export - 导出短链接
@@ -66,6 +68,35 @@
 
 ```bash
 ./shortlinker help
+```
+
+### generate-config - 生成配置文件
+
+```bash
+./shortlinker generate-config [输出路径]
+```
+
+生成默认配置文件模板，包含所有可配置选项。
+
+**示例**:
+```bash
+./shortlinker generate-config           # 生成 config.toml
+./shortlinker generate-config myconfig.toml  # 指定文件名
+```
+
+### reset-password - 重置管理员密码
+
+```bash
+./shortlinker reset-password <新密码>
+```
+
+重置管理员 API 密码。新密码会使用 Argon2id 算法哈希后存储到数据库。
+
+**要求**：密码长度至少 8 个字符。
+
+**示例**:
+```bash
+./shortlinker reset-password "my_new_secure_password"
 ```
 
 ### tui - 启动终端用户界面

@@ -13,8 +13,16 @@ Shortlinker provides health check API for monitoring service status and storage 
 
 Health check API requires the following environment variables. For detailed configuration, see [Environment Variables Configuration](/en/config/):
 
-- `HEALTH_TOKEN` - Health check token (required)
+- `HEALTH_TOKEN` - Health check dedicated token (optional)
 - `HEALTH_ROUTE_PREFIX` - Route prefix (optional, default `/health`)
+
+**Authentication**:
+
+| HEALTH_TOKEN | ADMIN_TOKEN | Result |
+|--------------|-------------|--------|
+| Set | Any | Authenticate with HEALTH_TOKEN |
+| Not set | Set | Authenticate with ADMIN_TOKEN |
+| Not set | Not set | Health API disabled |
 
 All requests must include Authorization header:
 ```http

@@ -33,9 +33,12 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
 
 /// 连接通用数据库（MySQL/PostgreSQL）
 pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<DatabaseConnection> {
+    let config = crate::config::get_config();
+    let pool_size = config.database.pool_size;
+
     let mut opt = ConnectOptions::new(database_url.to_owned());
-    opt.max_connections(100)
-        .min_connections(5)
+    opt.max_connections(pool_size)
+        .min_connections(pool_size.min(5))
         .connect_timeout(std::time::Duration::from_secs(8))
         .acquire_timeout(std::time::Duration::from_secs(8))
         .idle_timeout(std::time::Duration::from_secs(300)) // 5分钟空闲超时
