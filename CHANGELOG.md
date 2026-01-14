@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-alpha.7] - 2026-01-14
+
+### Added
+- **链接导出导入功能** - 新增 CSV 格式的批量导出导入接口
+  - 导出支持按时间、状态等条件筛选
+  - 导入支持跳过 (skip)、覆盖 (overwrite)、报错 (error) 三种冲突处理模式
+  - 新增 `/links/export` 和 `/links/import` API 端点
+- **Admin Panel PWA 支持** - 管理面板可作为渐进式 Web 应用安装
+
+### Improved
+- **Redis 缓存批量失效** - 实现 `invalidate_all` 方法，通过 SCAN 命令批量删除指定前缀的缓存键
+- **缓存容错性增强** - 反序列化失败时自动删除损坏的 Redis 缓存数据，防止持续读取错误
+- **批量删除原子操作** - 批量删除短链接改为数据库事务原子操作，保证数据一致性
+
+### Refactored
+- **Redis 连接管理** - 使用 ConnectionManager 简化连接处理，移除手动连接池管理
+
+### Dependencies
+- 添加 `actix-multipart` 和 `csv` 依赖以支持文件上传和 CSV 处理
+- 更新 `rust-embed` 和 `rust_decimal` 依赖版本
+
 ## [v0.3.0-alpha.6] - 2026-01-13
 
 ### Fixed (Admin Panel)
@@ -605,7 +626,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...HEAD
+[v0.3.0-alpha.7]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...v0.3.0-alpha.7
 [v0.3.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...v0.3.0-alpha.6
 [v0.3.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...v0.3.0-alpha.5
 [v0.3.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.3...v0.3.0-alpha.4
