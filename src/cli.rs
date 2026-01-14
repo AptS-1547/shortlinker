@@ -1,0 +1,115 @@
+//! Command-line interface definitions using clap
+//!
+//! This module defines the CLI structure for shortlinker using clap's derive macros.
+
+use clap::{Parser, Subcommand};
+
+/// Shortlinker - A high-performance URL shortener service
+#[derive(Parser)]
+#[command(name = "shortlinker")]
+#[command(version)]
+#[command(about = "A high-performance URL shortener service", long_about = None)]
+pub struct Cli {
+    /// Configuration file path
+    #[arg(short, long, global = true)]
+    pub config: Option<String>,
+
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+/// Available commands
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Start TUI mode
+    #[cfg(feature = "tui")]
+    Tui,
+
+    /// Add a short link
+    ///
+    /// Usage: add [SHORT_CODE] <TARGET_URL>
+    /// - If only URL provided, generates random short code
+    /// - If both provided, uses specified short code
+    Add {
+        /// Positional args: [short_code] <target_url>
+        #[arg(required = true, num_args = 1..=2)]
+        args: Vec<String>,
+
+        /// Force overwrite existing code
+        #[arg(long)]
+        force: bool,
+
+        /// Expiration time (RFC3339 or relative like "1d", "2h")
+        #[arg(long)]
+        expire: Option<String>,
+
+        /// Password protection
+        #[arg(long)]
+        password: Option<String>,
+    },
+
+    /// Remove a short link
+    Remove {
+        /// Short code to remove
+        short_code: String,
+    },
+
+    /// Update a short link
+    Update {
+        /// Short code to update
+        short_code: String,
+
+        /// New target URL
+        target_url: String,
+
+        /// New expiration time
+        #[arg(long)]
+        expire: Option<String>,
+
+        /// New password
+        #[arg(long)]
+        password: Option<String>,
+    },
+
+    /// List all short links
+    List,
+
+    /// Export links to JSON file
+    Export {
+        /// Output file path (default: stdout)
+        file_path: Option<String>,
+    },
+
+    /// Import links from JSON file
+    Import {
+        /// Input file path
+        file_path: String,
+
+        /// Force overwrite existing links
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Generate example configuration file
+    GenerateConfig {
+        /// Output path (default: config.example.toml)
+        output_path: Option<String>,
+    },
+
+    /// Reset admin password
+    ResetPassword {
+        /// New password
+        new_password: String,
+    },
+}
+
+impl Commands {
+    /// Parse add command args into (short_code, target_url)
+    pub fn parse_add_args(args: &[String]) -> (Option<String>, String) {
+        match args.len() {
+            1 => (None, args[0].clone()),
+            2 => (Some(args[0].clone()), args[1].clone()),
+            _ => unreachable!("clap ensures 1-2 args"),
+        }
+    }
+}

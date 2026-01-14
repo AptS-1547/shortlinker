@@ -3583,6 +3583,7 @@ dependencies = [
  "async-trait",
  "bloomfilter",
  "chrono",
+ "clap",
  "color-eyre",
  "colored",
  "crossterm",

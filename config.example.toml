@@ -13,7 +13,7 @@ port = 8080
 # unix_socket = "/tmp/shortlinker.sock"
 
 # CPU 核心数量（默认为系统核心数）
-cpu_count = 4
+# cpu_count = 4
 
 [database]
 # 数据库连接 URL 或文件路径

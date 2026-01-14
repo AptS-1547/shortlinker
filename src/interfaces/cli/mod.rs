@@ -1,9 +1,15 @@
-pub mod commands;
-pub mod parser;
+//! CLI interface module
+//!
+//! This module provides command-line interface functionality for shortlinker.
 
+pub mod commands;
+
+use crate::cli::Commands;
 use crate::storage::StorageFactory;
-use commands::{run_reset_password, show_reset_password_help};
-use parser::CliParser;
+use commands::{
+    add_link, export_links, generate_config, import_links, list_links, remove_link,
+    run_reset_password, update_link,
+};
 use std::fmt;
 
 #[derive(Debug)]
@@ -14,7 +20,7 @@ pub enum CliError {
 }
 
 impl CliError {
-    /// 格式化为简洁输出（CLI 默认不用彩色，保持简洁）
+    /// Format as simple output
     pub fn format_simple(&self) -> String {
         match self {
             CliError::StorageError(msg) => format!("Storage error: {}", msg),
@@ -23,7 +29,7 @@ impl CliError {
         }
     }
 
-    /// 格式化为彩色输出（可选）
+    /// Format as colored output
     #[cfg(feature = "cli")]
     pub fn format_colored(&self) -> String {
         #[cfg(feature = "server")]
@@ -60,42 +66,53 @@ impl From<crate::errors::ShortlinkerError> for CliError {
     }
 }
 
-/// 检查并处理不需要数据库的命令
-/// 返回 true 表示命令已处理，false 表示需要继续正常流程
-fn handle_standalone_commands() -> bool {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 2 {
-        return false;
-    }
-
-    // reset-password 需要显示帮助时不需要数据库
-    if args[1] == "reset-password" && args.len() < 3 {
-        show_reset_password_help();
-        std::process::exit(1);
-    }
-
-    false
-}
-
-pub async fn run_cli() -> Result<(), CliError> {
-    // 先处理不需要数据库的命令
-    if handle_standalone_commands() {
+/// Run a CLI command from clap-parsed input
+pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
+    // Handle reset-password command separately (needs DB connection)
+    if let Commands::ResetPassword { new_password } = cmd {
+        let storage = StorageFactory::create()
+            .await
+            .map_err(|e| CliError::StorageError(e.to_string()))?;
+        run_reset_password(storage.get_db().clone(), &new_password).await;
         return Ok(());
     }
 
+    // Create storage for commands that need it
     let storage = StorageFactory::create()
         .await
         .map_err(|e| CliError::StorageError(e.to_string()))?;
 
-    // 处理需要数据库的特殊命令
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() >= 3 && args[1] == "reset-password" {
-        run_reset_password(storage.get_db().clone(), &args[2]).await;
-        return Ok(());
-    }
+    match cmd {
+        Commands::Add {
+            args,
+            force,
+            expire,
+            password,
+        } => {
+            let (short_code, target_url) = Commands::parse_add_args(&args);
+            add_link(storage, short_code, target_url, force, expire, password).await
+        }
 
-    let parser = CliParser::new();
-    let command = parser.parse()?;
-    command.execute(storage).await
+        Commands::Remove { short_code } => remove_link(storage, short_code).await,
+
+        Commands::Update {
+            short_code,
+            target_url,
+            expire,
+            password,
+        } => update_link(storage, short_code, target_url, expire, password).await,
+
+        Commands::List => list_links(storage).await,
+
+        Commands::Export { file_path } => export_links(storage, file_path).await,
+
+        Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
+
+        Commands::GenerateConfig { output_path } => generate_config(output_path).await,
+
+        Commands::ResetPassword { .. } => unreachable!("handled above"),
+
+        #[cfg(feature = "tui")]
+        Commands::Tui => unreachable!("TUI handled in main"),
+    }
 }

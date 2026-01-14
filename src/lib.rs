@@ -22,6 +22,7 @@
 pub mod analytics;
 pub mod api;
 pub mod cache;
+pub mod cli;
 pub mod config;
 pub mod errors;
 mod event;

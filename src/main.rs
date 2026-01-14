@@ -7,16 +7,17 @@
 //!
 //! Mode selection is based on command-line arguments and compile-time features.
 
+use clap::Parser;
 use dotenv::dotenv;
 
-// Load all modules from shortlinker lib
-use shortlinker::*;
+use shortlinker::cli::{Cli, Commands};
+use shortlinker::system::panic_handler::RunMode;
 
 /// Application entry point
 ///
 /// # Mode Selection
 /// - `./shortlinker tui` -> TUI mode (if compiled with tui feature)
-/// - `./shortlinker <args>` -> CLI mode (if compiled with cli feature)
+/// - `./shortlinker <command>` -> CLI mode (if compiled with cli feature)
 /// - `./shortlinker` -> Server mode (default, if compiled with server feature)
 ///
 /// # Configuration
@@ -27,71 +28,68 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables
     dotenv().ok();
 
-    // 1. Parse command-line arguments
-    let args: Vec<String> = std::env::args().collect();
+    // Parse command-line arguments using clap
+    let cli = Cli::parse();
 
-    // 2. Detect mode early for panic handler
-    let filtered_args = crate::config::args::filter_config_args(&args);
-    let mode = crate::runtime::modes::detect_mode(&filtered_args);
-
-    // 3. Install panic hook based on mode
-    let panic_mode = match mode {
-        #[cfg(feature = "server")]
-        crate::runtime::modes::Mode::Server => crate::system::panic_handler::RunMode::Server,
-        #[cfg(feature = "cli")]
-        crate::runtime::modes::Mode::Cli => crate::system::panic_handler::RunMode::Cli,
+    // Determine run mode for panic handler
+    let panic_mode = match &cli.command {
         #[cfg(feature = "tui")]
-        crate::runtime::modes::Mode::Tui => crate::system::panic_handler::RunMode::Tui,
-        crate::runtime::modes::Mode::Unknown => crate::system::panic_handler::RunMode::Cli,
+        Some(Commands::Tui) => RunMode::Tui,
+        Some(_) => RunMode::Cli,
+        None => RunMode::Server,
     };
-    crate::system::panic_handler::install_panic_hook(panic_mode);
+    shortlinker::system::panic_handler::install_panic_hook(panic_mode);
 
-    // 4. Parse configuration file path
-    let config_path = crate::config::args::parse_config_path(&args);
+    // Initialize configuration system
+    shortlinker::config::init_config(cli.config);
+    let config = shortlinker::config::get_config();
 
-    // 5. Initialize configuration system
-    crate::config::init_config(config_path);
-    let config = crate::config::get_config();
-
-    // 6. Run appropriate mode
-    match mode {
+    // Run appropriate mode based on command
+    match cli.command {
         #[cfg(feature = "tui")]
-        crate::runtime::modes::Mode::Tui => {
-            if let Err(e) = crate::runtime::modes::run_tui().await {
+        Some(Commands::Tui) => {
+            if let Err(e) = shortlinker::runtime::modes::run_tui().await {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
             }
         }
 
-        #[cfg(feature = "cli")]
-        crate::runtime::modes::Mode::Cli => {
-            if let Err(e) = crate::runtime::modes::run_cli().await {
-                #[cfg(feature = "server")]
-                eprintln!("{}", e.format_colored());
+        Some(cmd) => {
+            #[cfg(feature = "cli")]
+            {
+                if let Err(e) = shortlinker::interfaces::cli::run_cli_command(cmd).await {
+                    eprintln!("{}", e.format_colored());
+                    std::process::exit(1);
+                }
+            }
 
-                #[cfg(not(feature = "server"))]
-                eprintln!("Error: {}", e);
-
+            #[cfg(not(feature = "cli"))]
+            {
+                let _ = cmd;
+                eprintln!("Error: CLI feature not enabled");
+                eprintln!("Please compile with --features cli");
                 std::process::exit(1);
             }
         }
 
-        #[cfg(feature = "server")]
-        crate::runtime::modes::Mode::Server => {
-            // Initialize logging system based on config
-            let _log_guard = crate::system::logging::init_logging(&config);
+        None => {
+            #[cfg(feature = "server")]
+            {
+                // Initialize logging system based on config
+                let _log_guard = shortlinker::system::logging::init_logging(&config);
 
-            if let Err(e) = crate::runtime::modes::run_server(&config).await {
-                // 尝试转换为 ShortlinkerError 以获得更好的显示
-                eprintln!("Server error: {:#}", e);
+                if let Err(e) = shortlinker::runtime::modes::run_server(&config).await {
+                    eprintln!("Server error: {:#}", e);
+                    std::process::exit(1);
+                }
+            }
+
+            #[cfg(not(feature = "server"))]
+            {
+                eprintln!("Error: No features enabled");
+                eprintln!("Please compile with one of: --features server, cli, tui, or full");
                 std::process::exit(1);
             }
-        }
-
-        crate::runtime::modes::Mode::Unknown => {
-            eprintln!("Error: No features enabled");
-            eprintln!("Please compile with one of: --features server, cli, tui, or full");
-            std::process::exit(1);
         }
     }
 

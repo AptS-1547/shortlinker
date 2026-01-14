@@ -49,6 +49,7 @@ path = "src/main.rs"
 members = [".", "migration"]
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 migration = { path = "migration" }
 actix-web = { version = "4.12", features = ["compress-brotli", "compress-gzip"] }
 dotenv = "0.15"
