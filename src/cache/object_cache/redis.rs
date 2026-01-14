@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
-use tracing::{debug, error, trace, warn};
+use redis::aio::ConnectionManager;
+use tracing::{debug, error, trace};
 
 use crate::cache::{CacheResult, ObjectCache};
 use crate::declare_object_cache_plugin;
@@ -78,6 +78,8 @@ impl ObjectCache for RedisObjectCache {
                 }
                 Err(e) => {
                     error!("Failed to deserialize ShortLink for key '{}': {}", key, e);
+                    // 删除损坏的数据
+                    let _ = conn.del::<&str, ()>(&redis_key).await;
                     CacheResult::ExistsButNoValue
                 }
             },
@@ -107,8 +109,7 @@ impl ObjectCache for RedisObjectCache {
                     Ok(_) => {
                         trace!(
                             "Successfully inserted key into cache: {} (TTL: {}s)",
-                            key,
-                            ttl
+                            key, ttl
                         );
                     }
                     Err(e) => {
@@ -141,6 +142,48 @@ impl ObjectCache for RedisObjectCache {
     }
 
     async fn invalidate_all(&self) {
-        warn!("RedisObjectCache does not implement invalidate_all");
+        let mut conn = self.connection.clone();
+        let pattern = format!("{}*", self.key_prefix);
+        let mut deleted_count = 0u64;
+        let mut cursor: u64 = 0;
+
+        loop {
+            let scan_result: redis::RedisResult<(u64, Vec<String>)> = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(&pattern)
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut conn)
+                .await;
+
+            match scan_result {
+                Ok((new_cursor, keys)) => {
+                    if !keys.is_empty() {
+                        match conn.del::<&[String], u64>(&keys).await {
+                            Ok(actual_deleted) => {
+                                deleted_count += actual_deleted;
+                            }
+                            Err(e) => {
+                                error!("Failed to delete keys during invalidate_all: {}", e);
+                            }
+                        }
+                    }
+                    cursor = new_cursor;
+                    if cursor == 0 {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    error!("SCAN failed during invalidate_all: {}", e);
+                    break;
+                }
+            }
+        }
+
+        debug!(
+            "Invalidated {} keys with prefix: {}",
+            deleted_count, self.key_prefix
+        );
     }
 }
