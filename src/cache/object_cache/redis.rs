@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use redis::{AsyncCommands, aio::MultiplexedConnection};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use redis::aio::ConnectionManager;
+use redis::AsyncCommands;
 use tracing::{debug, error, trace, warn};
 
 use crate::cache::{CacheResult, ObjectCache};
@@ -11,95 +10,41 @@ use crate::storage::ShortLink;
 declare_object_cache_plugin!("redis", RedisObjectCache);
 
 pub struct RedisObjectCache {
-    client: redis::Client,
-    /// 持久化连接，使用 RwLock 保护
-    connection: Arc<RwLock<Option<MultiplexedConnection>>>,
+    /// ConnectionManager 自动处理重连
+    connection: ConnectionManager,
     key_prefix: String,
     ttl: u64,
 }
 
-impl Default for RedisObjectCache {
-    fn default() -> Self {
-        Self::new().expect("RedisObjectCache initialization failed")
-    }
-}
-
 impl RedisObjectCache {
-    pub fn new() -> Result<Self, String> {
+    pub async fn new() -> Result<Self, String> {
         let config = crate::config::get_config();
         let redis_config = &config.cache.redis;
-
         let ttl = config.cache.default_ttl;
 
         debug!(
-            "RedisObjectCache created with prefix: '{}', TTL: {}s",
+            "Initializing RedisObjectCache with prefix: '{}', TTL: {}s",
             redis_config.key_prefix, ttl
         );
 
         let client = redis::Client::open(redis_config.url.clone())
-            .expect("Failed to create Redis client. Check REDIS_URL.");
+            .map_err(|e| format!("Failed to create Redis client: {e}"))?;
 
-        // 测试 Redis 连接 - 使用同步连接进行简单测试
-        match client.get_connection() {
-            Ok(mut conn) => match redis::cmd("PING").query::<String>(&mut conn) {
-                Ok(response) => {
-                    debug!("Redis connection test successful: {}", response);
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to ping Redis server: {}. Check Redis server status and URL: {}",
-                        e, redis_config.url
-                    );
-                    return Err(format!("Redis ping failed: {e}"));
-                }
-            },
-            Err(e) => {
-                error!(
-                    "Failed to ping Redis server: {}. Check Redis server status and URL: {}",
-                    e, redis_config.url
-                );
-                return Err(format!("Redis ping failed: {e}"));
-            }
-        }
+        // 使用 ConnectionManager，支持自动重连
+        let connection = ConnectionManager::new(client)
+            .await
+            .map_err(|e| format!("Failed to create Redis ConnectionManager: {e}"))?;
+
+        debug!(
+            "RedisObjectCache initialized with ConnectionManager, prefix: '{}', TTL: {}s",
+            redis_config.key_prefix, ttl
+        );
 
         Ok(Self {
-            client,
-            connection: Arc::new(RwLock::new(None)),
+            connection,
             key_prefix: redis_config.key_prefix.clone(),
-            ttl: config.cache.default_ttl,
+            ttl,
         })
-    }
-
-    /// 获取或建立持久连接
-    async fn get_connection(&self) -> Result<MultiplexedConnection, redis::RedisError> {
-        // 首先尝试读取现有连接
-        {
-            let conn_guard = self.connection.read().await;
-            if let Some(ref conn) = *conn_guard {
-                return Ok(conn.clone());
-            }
-        }
-
-        // 需要建立新连接
-        let mut conn_guard = self.connection.write().await;
-
-        // 双重检查，避免竞态条件
-        if let Some(ref conn) = *conn_guard {
-            return Ok(conn.clone());
-        }
-
-        let new_conn = self.client.get_multiplexed_async_connection().await?;
-        *conn_guard = Some(new_conn.clone());
-        debug!("Redis connection established and cached");
-
-        Ok(new_conn)
-    }
-
-    /// 重置连接（在连接错误时调用）
-    async fn reset_connection(&self) {
-        let mut conn_guard = self.connection.write().await;
-        *conn_guard = None;
-        debug!("Redis connection reset due to error");
     }
 
     fn make_key(&self, key: &str) -> String {
@@ -120,14 +65,8 @@ impl ObjectCache for RedisObjectCache {
     async fn get(&self, key: &str) -> CacheResult {
         let redis_key = self.make_key(key);
 
-        let mut conn = match self.get_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to get Redis connection: {}", e);
-                self.reset_connection().await;
-                return CacheResult::ExistsButNoValue;
-            }
-        };
+        // ConnectionManager 可以直接 clone 使用，自动处理重连
+        let mut conn = self.connection.clone();
 
         let result: redis::RedisResult<Option<String>> = conn.get(&redis_key).await;
 
@@ -147,9 +86,8 @@ impl ObjectCache for RedisObjectCache {
                 CacheResult::NotFound
             }
             Err(e) => {
-                error!("Failed to get key '{}': {}", key, e);
-                // 连接可能已断开，重置连接
-                self.reset_connection().await;
+                // ConnectionManager 自动处理重连，这里只记录错误
+                error!("Redis get error (will auto-reconnect): {}", e);
                 CacheResult::ExistsButNoValue
             }
         }
@@ -157,16 +95,7 @@ impl ObjectCache for RedisObjectCache {
 
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>) {
         let redis_key = self.make_key(key);
-
-        let mut conn = match self.get_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to get Redis connection: {}", e);
-                self.reset_connection().await;
-                return;
-            }
-        };
-
+        let mut conn = self.connection.clone();
         let ttl = ttl_secs.unwrap_or(self.ttl);
 
         match Self::serialize_link(&value) {
@@ -178,12 +107,12 @@ impl ObjectCache for RedisObjectCache {
                     Ok(_) => {
                         trace!(
                             "Successfully inserted key into cache: {} (TTL: {}s)",
-                            key, ttl
+                            key,
+                            ttl
                         );
                     }
                     Err(e) => {
                         error!("Failed to insert key '{}' into cache: {}", key, e);
-                        self.reset_connection().await;
                     }
                 }
             }
@@ -195,15 +124,7 @@ impl ObjectCache for RedisObjectCache {
 
     async fn remove(&self, key: &str) {
         let redis_key = self.make_key(key);
-
-        let mut conn = match self.get_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to get Redis connection: {}", e);
-                self.reset_connection().await;
-                return;
-            }
-        };
+        let mut conn = self.connection.clone();
 
         match conn.del::<String, i32>(redis_key).await {
             Ok(deleted_count) => {
@@ -215,7 +136,6 @@ impl ObjectCache for RedisObjectCache {
             }
             Err(e) => {
                 error!("Failed to remove key '{}': {}", key, e);
-                self.reset_connection().await;
             }
         }
     }

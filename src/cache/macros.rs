@@ -37,7 +37,7 @@ macro_rules! declare_object_cache_plugin {
                 $name,
                 Arc::new(|| {
                     Box::pin(async {
-                        match <$ty>::new() {
+                        match <$ty>::new().await {
                             Ok(cache) => Ok(Box::new(cache) as Box<dyn $crate::cache::ObjectCache>),
                             Err(e) => Err($crate::errors::ShortlinkerError::cache_connection(e)),
                         }

@@ -75,7 +75,7 @@ tracing-attributes = "0.1.31"
 anyhow = { version = "1.0.100", features = ["backtrace"] }
 rust-embed = "8.10.0"
 uuid = { version = "1.19", features = ["v4"] }
-redis = { version = "1.0.2", features = ["tokio-comp", "tokio-rustls-comp"] }
+redis = { version = "1.0.2", features = ["tokio-comp", "tokio-rustls-comp", "connection-manager"] }
 rustls = "0.23.36"
 toml = "0.9"
 color-eyre = { version = "0.6.5", optional = true }

@@ -150,13 +150,6 @@ impl AppConfig {
         if let Ok(redis_key_prefix) = env::var("REDIS_KEY_PREFIX") {
             self.cache.redis.key_prefix = redis_key_prefix;
         }
-        if let Ok(redis_pool_size) = env::var("REDIS_POOL_SIZE") {
-            if let Ok(size) = redis_pool_size.parse() {
-                self.cache.redis.pool_size = size;
-            } else {
-                eprintln!("[ERROR] Invalid REDIS_POOL_SIZE: {}", redis_pool_size);
-            }
-        }
         if let Ok(memory_max_capacity) = env::var("MEMORY_MAX_CAPACITY") {
             if let Ok(capacity) = memory_max_capacity.parse() {
                 self.cache.memory.max_capacity = capacity;

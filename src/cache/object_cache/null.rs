@@ -9,14 +9,8 @@ declare_object_cache_plugin!("null", NullObjectCache);
 
 pub struct NullObjectCache;
 
-impl Default for NullObjectCache {
-    fn default() -> Self {
-        Self::new().expect("NullObjectCache initialization failed")
-    }
-}
-
 impl NullObjectCache {
-    pub fn new() -> Result<Self, String> {
+    pub async fn new() -> Result<Self, String> {
         trace!("Using NullObjectCache: no L2 cache will be used");
         Ok(NullObjectCache)
     }

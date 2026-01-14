@@ -44,9 +44,6 @@ url = "redis://127.0.0.1:6379/"
 # Redis 键前缀
 key_prefix = "shortlinker:"
 
-# Redis 连接池大小
-pool_size = 10
-
 [cache.memory]
 # 内存缓存最大容量（条目数）
 max_capacity = 10000

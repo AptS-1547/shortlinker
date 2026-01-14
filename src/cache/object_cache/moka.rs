@@ -44,14 +44,8 @@ pub struct MokaCacheWrapper {
     inner: Cache<String, ShortLink>,
 }
 
-impl Default for MokaCacheWrapper {
-    fn default() -> Self {
-        Self::new().expect("MokaCacheWrapper initialization failed")
-    }
-}
-
 impl MokaCacheWrapper {
-    pub fn new() -> Result<Self, String> {
+    pub async fn new() -> Result<Self, String> {
         let config = crate::config::get_config();
         let default_ttl = Duration::from_secs(config.cache.default_ttl);
 

@@ -68,8 +68,6 @@ pub struct RedisConfig {
     pub url: String,
     #[serde(default = "default_redis_key_prefix")]
     pub key_prefix: String,
-    #[serde(default = "default_redis_pool_size")]
-    pub pool_size: u64,
 }
 
 /// 内存缓存配置
@@ -211,10 +209,6 @@ fn default_redis_url() -> String {
 
 fn default_redis_key_prefix() -> String {
     "shortlinker:".to_string()
-}
-
-fn default_redis_pool_size() -> u64 {
-    10
 }
 
 fn default_memory_capacity() -> u64 {
@@ -371,7 +365,6 @@ impl Default for RedisConfig {
         Self {
             url: default_redis_url(),
             key_prefix: default_redis_key_prefix(),
-            pool_size: default_redis_pool_size(),
         }
     }
 }
