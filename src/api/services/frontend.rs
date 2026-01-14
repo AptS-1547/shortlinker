@@ -1,6 +1,7 @@
 use actix_web::{HttpRequest, HttpResponse, Result};
 use rust_embed::Embed;
 use std::env;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use tracing::{debug, trace};
 
@@ -15,7 +16,25 @@ static FRONTEND_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 static ADMIN_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 static HEALTH_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 
+/// 自定义前端目录路径
+const CUSTOM_FRONTEND_DIR: &str = "./frontend-panel";
+
 impl FrontendService {
+    /// 尝试从自定义前端目录加载文件
+    fn try_load_custom_frontend(file_path: &str) -> Option<Vec<u8>> {
+        // 防止路径遍历攻击
+        if file_path.contains("..") {
+            return None;
+        }
+
+        let custom_path = PathBuf::from(CUSTOM_FRONTEND_DIR).join(file_path);
+        if custom_path.exists() && custom_path.is_file() {
+            std::fs::read(&custom_path).ok()
+        } else {
+            None
+        }
+    }
+
     /// 处理前端首页 - 服务构建好的 index.html
     pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
         trace!("Serving frontend index page from dist");
@@ -35,10 +54,14 @@ impl FrontendService {
                 .finish());
         }
 
-        match FrontendAssets::get("index.html") {
-            Some(content) => {
+        // 优先尝试加载自定义前端
+        let content = Self::try_load_custom_frontend("index.html")
+            .or_else(|| FrontendAssets::get("index.html").map(|c| c.data.into_owned()));
+
+        match content {
+            Some(data) => {
                 // 将字节数组转换为字符串并替换占位符
-                let html_content = String::from_utf8_lossy(&content.data);
+                let html_content = String::from_utf8_lossy(&data);
                 let processed_html = html_content
                     .replace("%BASE_PATH%", frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
@@ -77,10 +100,12 @@ impl FrontendService {
 
         let asset_path = format!("assets/{}", path);
 
-        match FrontendAssets::get(&asset_path) {
-            Some(content) => Ok(HttpResponse::Ok()
-                .content_type(content_type)
-                .body(content.data.into_owned())),
+        // 优先尝试加载自定义前端静态资源
+        let content = Self::try_load_custom_frontend(&asset_path)
+            .or_else(|| FrontendAssets::get(&asset_path).map(|c| c.data.into_owned()));
+
+        match content {
+            Some(data) => Ok(HttpResponse::Ok().content_type(content_type).body(data)),
             None => {
                 debug!("Static file not found: {}", path);
                 Ok(HttpResponse::NotFound().body("File not found"))
@@ -92,10 +117,12 @@ impl FrontendService {
     pub async fn handle_favicon(_req: HttpRequest) -> Result<HttpResponse> {
         trace!("Serving favicon");
 
-        match FrontendAssets::get("favicon.ico") {
-            Some(favicon_data) => Ok(HttpResponse::Ok()
-                .content_type("image/x-icon")
-                .body(favicon_data.data.into_owned())),
+        // 优先尝试加载自定义前端 favicon
+        let content = Self::try_load_custom_frontend("favicon.ico")
+            .or_else(|| FrontendAssets::get("favicon.ico").map(|c| c.data.into_owned()));
+
+        match content {
+            Some(data) => Ok(HttpResponse::Ok().content_type("image/x-icon").body(data)),
             None => {
                 // 如果没有找到，返回空的 favicon
                 Ok(HttpResponse::Ok().content_type("image/x-icon").body(vec![]))
@@ -132,10 +159,14 @@ impl FrontendService {
                 .finish());
         }
 
-        match FrontendAssets::get("index.html") {
-            Some(content) => {
+        // 优先尝试加载自定义前端
+        let content = Self::try_load_custom_frontend("index.html")
+            .or_else(|| FrontendAssets::get("index.html").map(|c| c.data.into_owned()));
+
+        match content {
+            Some(data) => {
                 // 将字节数组转换为字符串并替换占位符
-                let html_content = String::from_utf8_lossy(&content.data);
+                let html_content = String::from_utf8_lossy(&data);
                 let processed_html = html_content
                     .replace("%BASE_PATH%", frontend_prefix)
                     .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
@@ -176,19 +207,21 @@ impl FrontendService {
 
         let content_type = Self::get_content_type(file_name);
 
-        match FrontendAssets::get(file_name) {
-            Some(content) => {
+        // 优先尝试加载自定义前端 PWA 资源
+        let content = Self::try_load_custom_frontend(file_name)
+            .or_else(|| FrontendAssets::get(file_name).map(|c| c.data.into_owned()));
+
+        match content {
+            Some(data) => {
                 // 对 manifest.webmanifest 做配置注入
                 if file_name == "manifest.webmanifest" {
-                    let manifest_content = String::from_utf8_lossy(&content.data);
+                    let manifest_content = String::from_utf8_lossy(&data);
                     let processed = manifest_content.replace("%BASE_PATH%", frontend_prefix);
                     Ok(HttpResponse::Ok()
                         .content_type(content_type)
                         .body(processed))
                 } else {
-                    Ok(HttpResponse::Ok()
-                        .content_type(content_type)
-                        .body(content.data.into_owned()))
+                    Ok(HttpResponse::Ok().content_type(content_type).body(data))
                 }
             }
             None => {

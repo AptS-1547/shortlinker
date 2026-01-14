@@ -108,7 +108,12 @@ curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
 ## 相关项目
 
 - [Web 管理面板](admin-panel/) - 图形化链接管理
+- [自定义前端模版](https://github.com/AptS-1547/shortlinker-frontend/) - 构建你自己的前端
 - [Cloudflare Worker](cf-worker/) - Serverless 版本
+
+### 自定义前端
+
+将你的自定义前端放在 `./frontend-panel` 目录下，Shortlinker 会自动检测并使用它替代内置面板。参数注入详情见 [管理面板文档](docs/admin-panel/index.md)。
 
 ## 许可证
 

@@ -1,7 +1,7 @@
 # Web 管理界面
 
-:::warning v0.2.x 版本提醒
-当前版本 (v0.2.x) 正在进行大幅度功能调整和重构，更新频率较高。建议：
+:::warning v0.3.x 版本提醒
+当前版本 (v0.3.x) 正在进行大幅度功能调整和重构，更新频率较高。建议：
 - 📌 生产环境请使用稳定版本标签
 - 🔄 开发环境可跟随最新版本体验新功能
 - 📖 文档可能滞后于代码实现，以实际功能为准
@@ -32,6 +32,38 @@ Shortlinker 提供了基于 Vue 3 + TypeScript 的现代化 Web 管理界面，�
 
 :::tip 提示
 该特性为**实验性功能**，目前处于活跃开发阶段。如遇问题请通过 GitHub Issues 反馈。
+:::
+
+## 自定义前端
+
+Shortlinker 支持使用自定义前端实现。你可以通过将自定义前端放在 `./frontend-panel` 目录来替换内置的管理面板。
+
+### 使用方法
+
+1. **准备你的前端**：
+   - 构建你的前端应用
+   - 将构建产物放在项目根目录的 `./frontend-panel` 目录下
+   - 确保 `index.html` 在该目录的根目录
+
+2. **模版仓库**：
+   - 官方模版：[shortlinker-frontend](https://github.com/AptS-1547/shortlinker-frontend/)
+   - Fork 后根据需求自定义
+
+3. **参数注入**：
+   HTML 文件（`index.html`、`manifest.webmanifest`）中的以下占位符会被自动替换：
+   - `%BASE_PATH%` - 前端路由前缀（如 `/panel`）
+   - `%ADMIN_ROUTE_PREFIX%` - Admin API 前缀（如 `/admin`）
+   - `%HEALTH_ROUTE_PREFIX%` - Health API 前缀（如 `/health`）
+   - `%SHORTLINKER_VERSION%` - 当前 Shortlinker 版本
+
+4. **检测**：
+   Shortlinker 启动时会自动检测 `./frontend-panel` 目录，如果存在则使用它。你会看到日志：
+   ```
+   Custom frontend detected at: ./frontend-panel
+   ```
+
+:::warning 优先级
+自定义前端优先级高于内置管理面板。如果 `./frontend-panel` 存在，将使用它而不是嵌入的前端。
 :::
 
 ## 主要功能

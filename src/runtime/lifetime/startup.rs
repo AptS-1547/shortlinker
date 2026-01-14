@@ -7,7 +7,7 @@ use crate::config::{
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
@@ -169,6 +169,11 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
         // 前端路由未启用
         warn!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
     } else {
+        // 检测自定义前端
+        let custom_frontend = std::path::Path::new("./frontend-panel");
+        if custom_frontend.exists() && custom_frontend.is_dir() {
+            info!("Custom frontend detected at: ./frontend-panel");
+        }
         warn!(
             "Frontend routes available at: {}",
             route_config.frontend_prefix

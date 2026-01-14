@@ -1,7 +1,7 @@
 # Web Admin Panel
 
-:::warning v0.2.x Version Notice
-The current version (v0.2.x) is undergoing significant feature adjustments and refactoring with frequent updates. We recommend:
+:::warning v0.3.x Version Notice
+The current version (v0.3.x) is undergoing significant feature adjustments and refactoring with frequent updates. We recommend:
 - 📌 Use stable version tags for production environments
 - 🔄 Follow the latest version in development to experience new features
 - 📖 Documentation may lag behind code implementation; actual functionality prevails
@@ -32,6 +32,38 @@ To enable the Web admin panel in Shortlinker:
 
 :::tip Note
 This is an **experimental feature** currently under active development. Please report issues via GitHub Issues.
+:::
+
+## Custom Frontend
+
+Shortlinker supports using custom frontend implementations. You can replace the built-in admin panel with your own frontend by placing it in the `./frontend-panel` directory.
+
+### How to Use
+
+1. **Prepare your frontend**:
+   - Build your frontend application
+   - Place the built files in `./frontend-panel` directory at the project root
+   - Ensure `index.html` is in the root of this directory
+
+2. **Template Repository**:
+   - Official template: [shortlinker-frontend](https://github.com/AptS-1547/shortlinker-frontend/)
+   - Fork and customize according to your needs
+
+3. **Parameter Injection**:
+   The following placeholders in HTML files (`index.html`, `manifest.webmanifest`) will be automatically replaced:
+   - `%BASE_PATH%` - Frontend route prefix (e.g., `/panel`)
+   - `%ADMIN_ROUTE_PREFIX%` - Admin API prefix (e.g., `/admin`)
+   - `%HEALTH_ROUTE_PREFIX%` - Health API prefix (e.g., `/health`)
+   - `%SHORTLINKER_VERSION%` - Current Shortlinker version
+
+4. **Detection**:
+   When Shortlinker starts, it will automatically detect the `./frontend-panel` directory and use it if present. You'll see a log message:
+   ```
+   Custom frontend detected at: ./frontend-panel
+   ```
+
+:::warning Priority
+Custom frontend takes priority over the built-in admin panel. If `./frontend-panel` exists, it will be served instead of the embedded frontend.
 :::
 
 ## Main Features

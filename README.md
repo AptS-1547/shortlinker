@@ -108,7 +108,12 @@ See [Configuration docs](docs/en/config/index.md) for all options.
 ## Related
 
 - [Web Admin Panel](admin-panel/) - GUI for link management
+- [Custom Frontend Template](https://github.com/AptS-1547/shortlinker-frontend/) - Build your own frontend
 - [Cloudflare Worker](cf-worker/) - Serverless version
+
+### Custom Frontend
+
+Place your custom frontend in `./frontend-panel` directory. Shortlinker will automatically detect and serve it instead of the built-in panel. See [Admin Panel docs](docs/en/admin-panel/index.md) for parameter injection details.
 
 ## License
 
