@@ -2,7 +2,7 @@
 //!
 //! This module contains all write database operations.
 
-use sea_orm::{EntityTrait, TransactionTrait, sea_query::OnConflict};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait, sea_query::OnConflict};
 use tracing::info;
 
 use super::SeaOrmStorage;
@@ -36,6 +36,46 @@ impl SeaOrmStorage {
         self.invalidate_count_cache();
         info!("Short link deleted: {}", code);
         Ok(())
+    }
+
+    /// 批量删除链接
+    /// 返回 (成功删除的 codes, 不存在的 codes)
+    pub async fn batch_remove(&self, codes: &[String]) -> Result<(Vec<String>, Vec<String>)> {
+        if codes.is_empty() {
+            return Ok((Vec::new(), Vec::new()));
+        }
+
+        // 先查询哪些存在
+        let existing: Vec<String> = short_link::Entity::find()
+            .filter(short_link::Column::ShortCode.is_in(codes.iter().cloned()))
+            .all(&self.db)
+            .await
+            .map_err(|e| ShortlinkerError::database_operation(format!("查询失败: {}", e)))?
+            .into_iter()
+            .map(|m| m.short_code)
+            .collect();
+
+        let not_found: Vec<String> = codes
+            .iter()
+            .filter(|c| !existing.contains(c))
+            .cloned()
+            .collect();
+
+        if existing.is_empty() {
+            return Ok((Vec::new(), not_found));
+        }
+
+        // 批量删除
+        short_link::Entity::delete_many()
+            .filter(short_link::Column::ShortCode.is_in(existing.iter().cloned()))
+            .exec(&self.db)
+            .await
+            .map_err(|e| ShortlinkerError::database_operation(format!("批量删除失败: {}", e)))?;
+
+        self.invalidate_count_cache();
+        info!("批量删除 {} 条链接成功", existing.len());
+
+        Ok((existing, not_found))
     }
 
     /// 批量设置链接（使用事务）

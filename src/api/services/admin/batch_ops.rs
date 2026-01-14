@@ -271,22 +271,20 @@ pub async fn batch_delete_links(
         batch.codes.len()
     );
 
-    let mut success: Vec<String> = Vec::new();
-    let mut failed: Vec<BatchFailedItem> = Vec::new();
+    let (success, not_found) = storage
+        .batch_remove(&batch.codes)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    for code in &batch.codes {
-        match storage.remove(code).await {
-            Ok(_) => success.push(code.clone()),
-            Err(e) => {
-                failed.push(BatchFailedItem {
-                    code: code.clone(),
-                    error: format!("{}", e),
-                });
-            }
-        }
-    }
+    let failed: Vec<BatchFailedItem> = not_found
+        .into_iter()
+        .map(|code| BatchFailedItem {
+            code,
+            error: "短链接不存在".to_string(),
+        })
+        .collect();
 
-    // 增量更新缓存
+    // 批量清除缓存
     for code in &success {
         cache.remove(code).await;
     }
