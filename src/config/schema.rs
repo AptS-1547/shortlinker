@@ -39,38 +39,282 @@ pub struct ConfigSchema {
     pub value_type: ValueType,
     pub default_value: String,
     pub description: String,
-    /// 如果是 enum 类型，这里是可选值列表
+    /// 配置分组（用于前端分组展示）
+    #[ts(optional)]
+    pub category: Option<String>,
+    /// 枚举选项列表（单选用 Enum，多选用 Json 类型）
     #[ts(optional)]
     pub enum_options: Option<Vec<EnumOption>>,
-    /// 如果是 JSON 数组类型且每个元素是 enum，这里是可选值列表
-    #[ts(optional)]
-    pub array_item_options: Option<Vec<EnumOption>>,
     pub requires_restart: bool,
     pub editable: bool,
+}
+
+/// 配置分组常量
+pub mod categories {
+    pub const AUTH: &str = "auth";           // 认证配置
+    pub const COOKIE: &str = "cookie";       // Cookie 配置
+    pub const FEATURES: &str = "features";   // 功能开关
+    pub const ROUTES: &str = "routes";       // 路由配置
+    pub const CORS: &str = "cors";           // CORS 配置
+    pub const TRACKING: &str = "tracking";   // 点击追踪
 }
 
 /// 获取所有配置的 schema
 pub fn get_all_schemas() -> Vec<ConfigSchema> {
     vec![
-        // ========== API 配置 ==========
+        // ========== 认证配置 (auth) ==========
+        ConfigSchema {
+            key: keys::API_ADMIN_TOKEN.to_string(),
+            value_type: ValueType::String,
+            default_value: "".to_string(),
+            description: "Admin API authentication token (Argon2 hashed)".to_string(),
+            category: Some(categories::AUTH.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::API_HEALTH_TOKEN.to_string(),
+            value_type: ValueType::String,
+            default_value: "".to_string(),
+            description: "Health check endpoint authentication token".to_string(),
+            category: Some(categories::AUTH.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::API_JWT_SECRET.to_string(),
+            value_type: ValueType::String,
+            default_value: "".to_string(),
+            description: "JWT token signing secret key".to_string(),
+            category: Some(categories::AUTH.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        // ========== Cookie 配置 (cookie) ==========
         ConfigSchema {
             key: keys::API_COOKIE_SAME_SITE.to_string(),
             value_type: ValueType::Enum,
             default_value: SameSitePolicy::default().to_string(),
             description: "Cookie SameSite policy".to_string(),
+            category: Some(categories::COOKIE.to_string()),
             enum_options: Some(same_site_options()),
-            array_item_options: None,
             requires_restart: true,
             editable: true,
         },
-        // ========== CORS 配置 ==========
+        ConfigSchema {
+            key: keys::API_ACCESS_TOKEN_MINUTES.to_string(),
+            value_type: ValueType::Int,
+            default_value: "60".to_string(),
+            description: "Access token expiration time in minutes".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::API_REFRESH_TOKEN_DAYS.to_string(),
+            value_type: ValueType::Int,
+            default_value: "7".to_string(),
+            description: "Refresh token expiration time in days".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: "api.access_cookie_name".to_string(),
+            value_type: ValueType::String,
+            default_value: "access_token".to_string(),
+            description: "Access token cookie name".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: "api.refresh_cookie_name".to_string(),
+            value_type: ValueType::String,
+            default_value: "refresh_token".to_string(),
+            description: "Refresh token cookie name".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: "api.cookie_secure".to_string(),
+            value_type: ValueType::Bool,
+            default_value: "true".to_string(),
+            description: "Enable secure flag for cookies (HTTPS only)".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: Some(bool_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: "api.cookie_domain".to_string(),
+            value_type: ValueType::String,
+            default_value: "".to_string(),
+            description: "Cookie domain (empty for current domain)".to_string(),
+            category: Some(categories::COOKIE.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        // ========== 功能开关 (features) ==========
+        ConfigSchema {
+            key: keys::FEATURES_RANDOM_CODE_LENGTH.to_string(),
+            value_type: ValueType::Int,
+            default_value: "6".to_string(),
+            description: "Length of randomly generated short codes".to_string(),
+            category: Some(categories::FEATURES.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::FEATURES_DEFAULT_URL.to_string(),
+            value_type: ValueType::String,
+            default_value: "https://example.com".to_string(),
+            description: "Default redirect URL for invalid short codes".to_string(),
+            category: Some(categories::FEATURES.to_string()),
+            enum_options: None,
+            requires_restart: false,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::FEATURES_ENABLE_ADMIN_PANEL.to_string(),
+            value_type: ValueType::Bool,
+            default_value: "true".to_string(),
+            description: "Enable admin panel interface".to_string(),
+            category: Some(categories::FEATURES.to_string()),
+            enum_options: Some(bool_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        // ========== 路由配置 (routes) ==========
+        ConfigSchema {
+            key: keys::ROUTES_ADMIN_PREFIX.to_string(),
+            value_type: ValueType::String,
+            default_value: "/api/admin".to_string(),
+            description: "Admin API route prefix".to_string(),
+            category: Some(categories::ROUTES.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::ROUTES_HEALTH_PREFIX.to_string(),
+            value_type: ValueType::String,
+            default_value: "/api/health".to_string(),
+            description: "Health check route prefix".to_string(),
+            category: Some(categories::ROUTES.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::ROUTES_FRONTEND_PREFIX.to_string(),
+            value_type: ValueType::String,
+            default_value: "/".to_string(),
+            description: "Frontend assets route prefix".to_string(),
+            category: Some(categories::ROUTES.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        // ========== CORS 配置 (cors) ==========
+        ConfigSchema {
+            key: keys::CORS_ENABLED.to_string(),
+            value_type: ValueType::Bool,
+            default_value: "true".to_string(),
+            description: "Enable CORS (Cross-Origin Resource Sharing)".to_string(),
+            category: Some(categories::CORS.to_string()),
+            enum_options: Some(bool_options()),
+            requires_restart: true,
+            editable: true,
+        },
         ConfigSchema {
             key: keys::CORS_ALLOWED_METHODS.to_string(),
             value_type: ValueType::Json,
             default_value: default_http_methods_json(),
             description: "Allowed HTTP methods for CORS".to_string(),
+            category: Some(categories::CORS.to_string()),
+            enum_options: Some(http_method_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::CORS_ALLOWED_ORIGINS.to_string(),
+            value_type: ValueType::Json,
+            default_value: "[\"*\"]".to_string(),
+            description: "Allowed origins for CORS (JSON array)".to_string(),
+            category: Some(categories::CORS.to_string()),
             enum_options: None,
-            array_item_options: Some(http_method_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::CORS_ALLOWED_HEADERS.to_string(),
+            value_type: ValueType::Json,
+            default_value: "[\"*\"]".to_string(),
+            description: "Allowed headers for CORS (JSON array)".to_string(),
+            category: Some(categories::CORS.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::CORS_MAX_AGE.to_string(),
+            value_type: ValueType::Int,
+            default_value: "3600".to_string(),
+            description: "CORS preflight cache duration in seconds".to_string(),
+            category: Some(categories::CORS.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::CORS_ALLOW_CREDENTIALS.to_string(),
+            value_type: ValueType::Bool,
+            default_value: "true".to_string(),
+            description: "Allow credentials in CORS requests".to_string(),
+            category: Some(categories::CORS.to_string()),
+            enum_options: Some(bool_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        // ========== 点击追踪 (tracking) ==========
+        ConfigSchema {
+            key: keys::CLICK_ENABLE_TRACKING.to_string(),
+            value_type: ValueType::Bool,
+            default_value: "true".to_string(),
+            description: "Enable click tracking and analytics".to_string(),
+            category: Some(categories::TRACKING.to_string()),
+            enum_options: Some(bool_options()),
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: keys::CLICK_FLUSH_INTERVAL.to_string(),
+            value_type: ValueType::Int,
+            default_value: "60".to_string(),
+            description: "Click data flush interval in seconds".to_string(),
+            category: Some(categories::TRACKING.to_string()),
+            enum_options: None,
+            requires_restart: true,
+            editable: true,
+        },
+        ConfigSchema {
+            key: "click.max_clicks_before_flush".to_string(),
+            value_type: ValueType::Int,
+            default_value: "1000".to_string(),
+            description: "Maximum clicks before forcing flush".to_string(),
+            category: Some(categories::TRACKING.to_string()),
+            enum_options: None,
             requires_restart: true,
             editable: true,
         },
@@ -116,6 +360,26 @@ fn http_method_options() -> Vec<EnumOption> {
             }
         })
         .collect()
+}
+
+/// Bool 类型的标准 enum 选项
+fn bool_options() -> Vec<EnumOption> {
+    vec![
+        EnumOption {
+            value: "true".to_string(),
+            label: "Enabled".to_string(),
+            label_i18n_key: Some("common.enabled".to_string()),
+            description: None,
+            description_i18n_key: None,
+        },
+        EnumOption {
+            value: "false".to_string(),
+            label: "Disabled".to_string(),
+            label_i18n_key: Some("common.disabled".to_string()),
+            description: None,
+            description_i18n_key: None,
+        },
+    ]
 }
 
 #[cfg(test)]

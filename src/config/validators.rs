@@ -3,12 +3,13 @@
 //! 基于 schema 验证配置值是否合法。
 
 use super::schema::get_schema;
+use crate::api::services::admin::ValueType;
 
 /// 根据配置 key 验证值是否合法
 ///
 /// 基于 schema 进行验证：
-/// - 如果配置有 `enum_options`，验证值是否在选项列表中
-/// - 如果配置有 `array_item_options`，验证 JSON 数组中的每个元素是否合法
+/// - 如果配置有 `enum_options` 且 value_type 是 Json，验证 JSON 数组中的每个元素
+/// - 如果配置有 `enum_options` 且 value_type 是 Enum，验证值是否在选项列表中
 /// - 没有 schema 的配置不做验证
 pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
     let schema = match get_schema(key) {
@@ -16,46 +17,47 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
         None => return Ok(()), // 没有 schema 的配置不验证
     };
 
-    // 验证 enum 类型
+    // 有 enum_options 时进行验证
     if let Some(ref options) = schema.enum_options {
         let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
-        if !valid_values
-            .iter()
-            .any(|v| v.eq_ignore_ascii_case(value))
-        {
-            return Err(format!(
-                "Invalid value '{}'. Valid options: {:?}",
-                value, valid_values
-            ));
-        }
-    }
 
-    // 验证 JSON 数组中的 enum 元素
-    if let Some(ref item_options) = schema.array_item_options {
-        let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
-            format!(
-                "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
-                e
-            )
-        })?;
+        // 根据 value_type 决定验证方式
+        if schema.value_type == ValueType::Json {
+            // JSON 数组类型：验证数组中的每个元素
+            let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+                format!(
+                    "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
+                    e
+                )
+            })?;
 
-        let valid_values: Vec<&str> = item_options.iter().map(|o| o.value.as_str()).collect();
-        let mut invalid_items = Vec::new();
+            let mut invalid_items = Vec::new();
+            for item in &items {
+                if !valid_values
+                    .iter()
+                    .any(|v| v.eq_ignore_ascii_case(item))
+                {
+                    invalid_items.push(item.clone());
+                }
+            }
 
-        for item in &items {
+            if !invalid_items.is_empty() {
+                return Err(format!(
+                    "Invalid items: {:?}. Valid options: {:?}",
+                    invalid_items, valid_values
+                ));
+            }
+        } else {
+            // 单值类型（Enum）：验证值是否在选项列表中
             if !valid_values
                 .iter()
-                .any(|v| v.eq_ignore_ascii_case(item))
+                .any(|v| v.eq_ignore_ascii_case(value))
             {
-                invalid_items.push(item.clone());
+                return Err(format!(
+                    "Invalid value '{}'. Valid options: {:?}",
+                    value, valid_values
+                ));
             }
-        }
-
-        if !invalid_items.is_empty() {
-            return Err(format!(
-                "Invalid items: {:?}. Valid options: {:?}",
-                invalid_items, valid_values
-            ));
         }
     }
 
