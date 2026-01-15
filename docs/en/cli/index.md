@@ -32,6 +32,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 | `import` | Import data | `./shortlinker import backup.json --force` |
 | `generate-config` | Generate config template | `./shortlinker generate-config` |
 | `reset-password` | Reset admin password | `./shortlinker reset-password "new_password"` |
+| `config` | Runtime config management (DB) | `./shortlinker config list` |
 | `tui` | Launch TUI interface (requires build feature) | `./shortlinker tui` |
 
 ## Quick Examples

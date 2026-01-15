@@ -140,7 +140,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | Key | Type | Default | Restart | Description |
 |-----|------|---------|---------|-------------|
 | `api.admin_token` | String | *(auto-generated)* | No | Admin login password for `POST /admin/v1/auth/login` |
-| `api.health_token` | String | *(empty)* | No | Reserved (not used for Health API auth in current version) |
+| `api.health_token` | String | *(empty)* | No | Bearer token for Health API (`Authorization: Bearer ...`, recommended for monitoring/probes; if empty, only JWT cookie auth is available). Note: when `api.admin_token` is empty, health endpoints return `404` and are treated as disabled |
 | `api.jwt_secret` | String | *(auto-generated)* | No | JWT signing secret |
 | `api.access_token_minutes` | Integer | `15` | No | Access token TTL (minutes) |
 | `api.refresh_token_days` | Integer | `7` | No | Refresh token TTL (days) |
@@ -183,7 +183,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | Yes | Allowed methods |
 | `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | Yes | Allowed headers |
 | `cors.max_age` | Integer | `3600` | Yes | Preflight cache TTL (seconds) |
-| `cors.allow_credentials` | Boolean | `false` | Yes | Allow credentials (needed for cross-origin cookies) |
+| `cors.allow_credentials` | Boolean | `true` | Yes | Allow credentials (needed for cross-origin cookies) |
 
 ## Priority
 
@@ -244,10 +244,15 @@ ENABLE_ADMIN_PANEL=true
 
 ## Hot Reload
 
+Shortlinker has two kinds of “hot reload / hot apply”:
+
+1. **Short link data hot reload**: reload links from the storage backend and rebuild in-memory caches (useful after CLI/TUI writes directly to the database).
+2. **Runtime config hot apply**: when you update a “no restart” config via the Admin API, it is synced into memory and takes effect immediately.
+
 ### Supported
 
-- ✅ Most runtime configs marked as “no restart”
-- ✅ Short link data
+- ✅ Short link data (cache rebuild)
+- ✅ Runtime configs marked as “no restart” (applies immediately when updated via Admin API)
 
 ### Not supported
 
@@ -260,10 +265,16 @@ ENABLE_ADMIN_PANEL=true
 ### Reload methods
 
 ```bash
-# Unix: send SIGUSR1
+# 1) Reload short link data / caches (Unix: send SIGUSR1)
+# Note: SIGUSR1 only reloads link data/caches; it does NOT reload runtime config.
 kill -USR1 $(cat shortlinker.pid)
 
-# Admin API reload (requires cookies)
+# 2) Reload runtime config from DB (Admin API; requires cookies)
+# Notes:
+# - If you update a “no restart” config via Admin API (PUT /admin/v1/config/{key}),
+#   it usually applies immediately and you don't need this.
+# - If you changed configs directly in the database (e.g. via `./shortlinker config set`),
+#   call this endpoint to let the server re-load configs from DB.
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -c cookies.txt \
@@ -279,4 +290,3 @@ curl -sS -X POST -b cookies.txt \
 - 📋 [Storage Backends](/en/config/storage)
 - 🛡️ [Admin API](/en/api/admin)
 - 🏥 [Health Check API](/en/api/health)
-

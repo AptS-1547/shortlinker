@@ -15,11 +15,27 @@ Route prefix can be configured via environment variables (see [Configuration](/e
 
 - `HEALTH_ROUTE_PREFIX` - route prefix (optional, default: `/health`)
 
-> Note: `api.health_token` / `HEALTH_TOKEN` is currently not used for Health API authentication (kept as a config field). Health endpoints currently reuse Admin authentication.
+> Note: Health endpoints support two authentication methods:
+> - **Bearer Token**: `Authorization: Bearer <HEALTH_TOKEN>` (recommended for monitoring/probes, no cookies)
+> - **JWT Cookies**: reuse cookies issued by Admin login (recommended for the admin panel/browser)
 
 ## Authentication (Important)
 
-Health endpoints reuse Admin **JWT Cookie** authentication:
+Health endpoints require authentication and depend on `ADMIN_TOKEN` (when `api.admin_token` is empty, health endpoints return `404 Not Found` and are treated as disabled).
+
+### Option A: Bearer token (recommended for monitoring/probes)
+
+If you configure `HEALTH_TOKEN` (or runtime config `api.health_token`), you can call health endpoints directly with an `Authorization` header:
+
+```bash
+HEALTH_TOKEN="your_health_token"
+
+curl -sS \
+  -H "Authorization: Bearer ${HEALTH_TOKEN}" \
+  http://localhost:8080/health
+```
+
+### Option B: JWT cookies (recommended for admin panel/browser)
 
 1. Login via `POST /admin/v1/auth/login` to obtain cookies
 2. Call `/health`, `/health/ready`, `/health/live` with those cookies
@@ -38,7 +54,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> If `api.admin_token` is empty, health endpoints return `404 Not Found` (treated as disabled). If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and print it once in logs.
+> If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and print it once in logs.
 
 ## Endpoints
 
@@ -100,19 +116,40 @@ Returns HTTP 204 when alive.
 |--------|---------|
 | 200 | Healthy/Ready |
 | 204 | Alive (no content) |
-| 401 | Unauthorized (missing/invalid cookie) |
+| 401 | Unauthorized (missing/invalid auth) |
 | 503 | Unhealthy |
 
 > Unauthorized body example: `{"code":401,"data":{"error":"Unauthorized: Invalid or missing token"}}`
 
 ## Monitoring integration notes
 
-Because Health API uses cookie-based auth (access token expires), Kubernetes `httpGet` probes are not convenient to use directly for `/health/*`.
+If you use **Bearer token** (`HEALTH_TOKEN`), you can avoid JWT cookie expiration and make automated monitoring easier.
 
 Recommended options:
 
-1. **Simple liveness**: probe `/` (returns `307`, treated as success in Kubernetes) to ensure the process is up
-2. **Deep checks**: external monitor/script that logs in and calls `/health`
+1. **Recommended: use `HEALTH_TOKEN` to probe `/health/live` or `/health/ready`**
+2. **Fallback: probe `/`** (returns `307`, treated as success in Kubernetes) to ensure the process is up
+3. **Fallback: login + cookies + `/health`** (for monitors that already have a login step)
+
+### Kubernetes probe example (Bearer token)
+
+```yaml
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: shortlinker
+    image: e1saps/shortlinker
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: 8080
+        httpHeaders:
+          - name: Authorization
+            value: "Bearer your_health_token"
+      initialDelaySeconds: 10
+      periodSeconds: 10
+```
 
 ### Kubernetes probe example (simple liveness)
 
@@ -155,4 +192,3 @@ curl -sS -b "$COOKIE_JAR" "${BASE_URL}/health"
 1. Use a strong `ADMIN_TOKEN`
 2. Restrict access to health endpoints to trusted networks
 3. Use HTTPS in production and configure cookie security correctly
-

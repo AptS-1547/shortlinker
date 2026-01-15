@@ -316,6 +316,15 @@ curl -sS -b cookies.txt \
   http://localhost:8080/admin/v1/config
 ```
 
+### GET /config/schema - 获取配置 Schema（元信息）
+
+返回所有配置项的元信息（类型、默认值、是否需要重启、枚举选项等），主要用于前端动态渲染配置表单/校验。
+
+```bash
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config/schema
+```
+
 ### GET /config/{key} - 获取单个配置
 
 ```bash
@@ -404,4 +413,3 @@ print(admin.get_all_links())
 2. **HTTPS**：生产环境建议启用 HTTPS，并将 `api.cookie_secure=true`
 3. **网络隔离**：仅在受信任网络环境中暴露 Admin API
 4. **定期轮换**：定期更换 `ADMIN_TOKEN`（并重新登录获取新 Cookie）
-

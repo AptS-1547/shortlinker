@@ -171,16 +171,16 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
     debug!("Checking enum configuration values for migration");
 
     // cookie_same_site - 只验证值的合法性，value_type 已由 sync_metadata 同步
-    if let Some(item) = store.get_full(keys::API_COOKIE_SAME_SITE).await? {
-        if item.value.parse::<SameSitePolicy>().is_err() {
-            let default = SameSitePolicy::default().to_string();
-            warn!(
-                "Invalid cookie_same_site '{}', migrating to default '{}'",
-                item.value, default
-            );
-            store.set(keys::API_COOKIE_SAME_SITE, &default).await?;
-            crate::config::update_config_by_key(keys::API_COOKIE_SAME_SITE, &default);
-        }
+    if let Some(item) = store.get_full(keys::API_COOKIE_SAME_SITE).await?
+        && item.value.parse::<SameSitePolicy>().is_err()
+    {
+        let default = SameSitePolicy::default().to_string();
+        warn!(
+            "Invalid cookie_same_site '{}', migrating to default '{}'",
+            item.value, default
+        );
+        store.set(keys::API_COOKIE_SAME_SITE, &default).await?;
+        crate::config::update_config_by_key(keys::API_COOKIE_SAME_SITE, &default);
     }
 
     // cors.allowed_methods (JSON 数组类型 enum)

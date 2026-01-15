@@ -20,7 +20,8 @@ port = 8080
 [features]
 default_url = "https://example.com"
 
-# 可选：启用管理功能（Health API 当前复用 Admin 鉴权）
+# 可选：启用管理功能（Admin API + Health API）
+# - Health 支持 Bearer Token（HEALTH_TOKEN）或 Admin 登录后的 JWT Cookie
 # [api]
 # admin_token = "your_admin_token"
 ```
@@ -47,7 +48,8 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# 可选：启用管理功能（Health API 当前复用 Admin 鉴权）
+# 可选：启用管理功能（Admin API + Health API）
+# - Health 支持 Bearer Token（HEALTH_TOKEN）或 Admin 登录后的 JWT Cookie
 # ADMIN_TOKEN=your_admin_token
 ```
 
@@ -109,7 +111,9 @@ curl -I http://localhost:8080/github
 # 方式2：发送信号
 kill $(cat shortlinker.pid)
 
-# 重载配置（Unix 系统）
+# 重载短链接数据/缓存（Unix 系统）
+# 注意：SIGUSR1 只会触发短链接数据/缓存重载，不会重载运行时配置。
+# 运行时配置可通过 Admin API `/admin/v1/config/reload` 重载，或直接重启服务。
 kill -USR1 $(cat shortlinker.pid)
 ```
 

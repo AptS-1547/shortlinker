@@ -153,7 +153,7 @@ curl -sS -b cookies.txt \
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
 | `api.admin_token` | String | *(自动生成)* | 否 | 管理员登录密码（用于 `POST /admin/v1/auth/login`） |
-| `api.health_token` | String | *(空)* | 否 | 保留字段（当前版本不用于 Health API 鉴权） |
+| `api.health_token` | String | *(空)* | 否 | Health API 的 Bearer Token（`Authorization: Bearer ...`，适合监控/探针；为空则仅支持 JWT Cookie）。注意：当 `api.admin_token` 为空时，Health 端点会返回 `404` 视为禁用 |
 | `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
 | `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
 | `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
@@ -196,7 +196,7 @@ curl -sS -b cookies.txt \
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | 是 | 允许的 HTTP 方法 |
 | `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | 是 | 允许的请求头 |
 | `cors.max_age` | Integer | `3600` | 是 | 预检请求缓存时间（秒） |
-| `cors.allow_credentials` | Boolean | `false` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启） |
+| `cors.allow_credentials` | Boolean | `true` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启） |
 
 ## 配置优先级
 
@@ -270,10 +270,15 @@ ENABLE_ADMIN_PANEL=true
 
 ## 热重载
 
-### 支持热重载的配置
+Shortlinker 的“热重载/热生效”主要分两类：
 
-- ✅ 大部分动态配置（标记为"不需要重启"的）
-- ✅ 短链接数据
+1. **短链接数据热重载**：让服务重新从存储加载短链接并重建缓存（适用于 CLI/TUI 直接写数据库后通知服务刷新缓存）。
+2. **运行时配置热生效**：通过 Admin API 更新“无需重启”的配置时，会直接同步到内存配置并立即生效。
+
+### 支持热生效/热重载的内容
+
+- ✅ 短链接数据（缓存重建）
+- ✅ 标记为“无需重启”的运行时配置（通过 Admin API 更新时立即生效）
 
 ### 不支持热重载的配置
 
@@ -286,10 +291,15 @@ ENABLE_ADMIN_PANEL=true
 ### 重载方法
 
 ```bash
-# Unix 系统 - 发送 SIGUSR1 信号
+# 1) 重载短链接数据/缓存（Unix 系统 - 发送 SIGUSR1 信号）
+# 注意：SIGUSR1 只会触发短链接数据/缓存重载，不会重载运行时配置
 kill -USR1 $(cat shortlinker.pid)
 
-# 通过 API
+# 2) 重载运行时配置（通过 Admin API）
+# 说明：如果你是通过 Admin API 直接更新配置（PUT /admin/v1/config/{key}），
+#       且该配置“无需重启”，一般不需要额外 reload。
+#       如果你是直接改数据库（例如使用 `./shortlinker config set`），可以调用该接口让服务重新从 DB 加载配置。
+#
 # 先登录获取 cookies（如已存在 cookies.txt 可跳过）
 curl -sS -X POST \
      -H "Content-Type: application/json" \

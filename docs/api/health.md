@@ -15,11 +15,27 @@ Shortlinker 提供健康检查 API，用于监控服务状态和存储健康状�
 
 - `HEALTH_ROUTE_PREFIX` - 路由前缀（可选，默认 `/health`）
 
-> 备注：配置项 `api.health_token` / 环境变量 `HEALTH_TOKEN` 在当前实现中不会用于 Health API 的鉴权（仅作为配置项保留）；Health API 目前复用 Admin 的鉴权机制。
+> 备注：Health API 支持两种鉴权方式：
+> - **Bearer Token**：`Authorization: Bearer <HEALTH_TOKEN>`（适合监控/探针，无需 Cookie）
+> - **JWT Cookie**：复用 Admin API 登录后下发的 Cookie（适合管理面板/浏览器）
 
 ## 鉴权方式（重要）
 
-Health API 当前复用 Admin API 的 **JWT Cookie** 鉴权：
+Health API 需要鉴权，并且依赖 `ADMIN_TOKEN`（当 `api.admin_token` 为空时，Health 端点会返回 `404 Not Found` 视为禁用）。
+
+### 方式 A：Bearer Token（推荐用于监控/探针）
+
+当你配置了 `HEALTH_TOKEN`（或运行时配置 `api.health_token`）后，可以直接通过请求头访问健康检查接口：
+
+```bash
+HEALTH_TOKEN="your_health_token"
+
+curl -sS \
+  -H "Authorization: Bearer ${HEALTH_TOKEN}" \
+  http://localhost:8080/health
+```
+
+### 方式 B：JWT Cookie（推荐用于管理面板/浏览器）
 
 1. 先调用 `POST /admin/v1/auth/login` 登录获取 Cookie
 2. 再携带 Cookie 调用 `/health`、`/health/ready`、`/health/live`
@@ -38,7 +54,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> 若 `api.admin_token` 为空，Health 端点会返回 `404 Not Found`（视为禁用）。默认情况下若你未显式设置 `ADMIN_TOKEN`，程序会在首次启动时自动生成并在日志中提示一次。
+> 默认情况下若你未显式设置 `ADMIN_TOKEN`，程序会在首次启动时自动生成并在日志中提示一次。
 
 ## API 端点
 
@@ -120,12 +136,33 @@ curl -sS -b cookies.txt -I \
 
 ## 监控集成（注意事项）
 
-由于当前 Health API 采用 Cookie 鉴权，Kubernetes 的 `httpGet` 探针不方便直接携带有效 JWT（Access Token 有有效期）。
+如果你使用 **Bearer Token**（`HEALTH_TOKEN`），就可以避免 JWT Cookie 有有效期的问题，更适合自动化监控。
 
 建议策略：
 
-1. **简单存活探针**：直接探测根路径 `/`（会返回 `307`，Kubernetes 视为成功），用于确认进程存活
-2. **深度健康检查**：使用外部监控系统/脚本先登录获取 Cookie，再调用 `/health`
+1. **推荐：使用 `HEALTH_TOKEN` 探测 `/health/live` 或 `/health/ready`**
+2. **兼容方案：探测根路径 `/`**（会返回 `307`，Kubernetes 视为成功），用于确认进程存活
+3. **兼容方案：登录获取 Cookie 再探测 `/health`**（适合已有登录流程的监控脚本）
+
+### Kubernetes 探针示例（Bearer Token）
+
+```yaml
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: shortlinker
+    image: e1saps/shortlinker
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: 8080
+        httpHeaders:
+          - name: Authorization
+            value: "Bearer your_health_token"
+      initialDelaySeconds: 10
+      periodSeconds: 10
+```
 
 ### Kubernetes 探针示例（简单存活）
 
@@ -181,4 +218,3 @@ curl -sS -b cookies.txt http://localhost:8080/health | jq .
 1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`
 2. **网络隔离**：仅在受信任网络中访问 Health 端点
 3. **HTTPS**：生产环境建议启用 HTTPS，并正确配置 Cookie 安全参数
-

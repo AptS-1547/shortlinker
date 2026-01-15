@@ -32,7 +32,7 @@ The TUI interface consists of several main areas:
 │  Clicks: 142                                           │
 │  Protected: No                                         │
 └─────────────────────────────────────────────────────────┘
-  q:Quit  r:Refresh  ↑↓:Navigate  Enter:Details
+  q:Quit  x:Export/Import  /:Search  ↑↓:Navigate  Enter:Details
 ```
 
 ## Keyboard Shortcuts
@@ -42,11 +42,17 @@ The TUI interface consists of several main areas:
 | Shortcut | Function |
 |----------|----------|
 | `↑` / `↓` | Move selection up/down |
+| `PageUp` / `PageDown` | Page up/down (10 items) |
+| `Home` / `g` | Jump to top |
+| `End` / `G` | Jump to bottom |
+| `/` | Search (fuzzy match on code / target URL) |
+| `Enter` / `v` | View details |
+| `?` / `h` | Help |
 | `a` | Add new short link |
 | `e` | Edit selected short link |
 | `d` | Delete selected short link |
-| `x` / `i` | Export/Import links |
-| `q` | Exit TUI |
+| `x` | Export/Import menu |
+| `q` | Quit (with confirmation) |
 
 ### Add/Edit Interface
 
@@ -55,7 +61,7 @@ The TUI interface consists of several main areas:
 | `Tab` | Switch input fields |
 | `Enter` | Save link |
 | `Esc` | Cancel and return |
-| `f` | Toggle force overwrite (add only) |
+| `Space` | Toggle force overwrite (add only; focus must be on the short code field) |
 
 ## Features
 
@@ -83,7 +89,7 @@ After entering add interface, you can configure:
 
 **Operations**:
 - Press `Tab` to switch between fields
-- Press `f` to toggle "Force Overwrite" option
+- Press `Space` to toggle "Force Overwrite" (when focus is on the Short Code field)
 - Press `Enter` to save
 - Press `Esc` to cancel
 
@@ -103,21 +109,21 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 
 **Warning**: Delete operation cannot be undone!
 
-### 5. Export/Import (Press `x` or `i`)
+### 5. Export/Import (Press `x`)
 
 **Export Function**:
-- Exports to `shortlinks_export.json` by default
+- Default filename is a timestamped name like `shortlinks_export_20250115_183000.json` (editable)
 - Exports all links in JSON format
 - Useful for backup or migration
 
 **Import Function**:
-- Imports from `shortlinks_import.json` by default
-- Supports batch import of links
+- Select a `.json` file via the built-in file browser
+- Batch import links (simple upsert: existing codes will be overwritten)
 - Compatible with CLI export format
 
 ### 6. Auto Server Notification
 
-After all create/update/delete operations, TUI automatically notifies the server to reload configuration (via SIGUSR1 signal or trigger file).
+After create/update/delete (and import), TUI automatically notifies the server to reload **short link data / caches** (Unix: SIGUSR1; Windows: trigger file).
 
 ## Color Scheme
 
@@ -142,8 +148,6 @@ TUI mode is suitable for:
 
 Current version TUI known limitations:
 
-- ⚠️ Export/import paths cannot be customized (fixed to default filenames)
-- ⚠️ No search/filter functionality (planned)
 - ⚠️ No batch selection and batch operations (planned)
 - ⚠️ Password input shown as masked, cannot see actual content
 
@@ -170,7 +174,11 @@ RUST_LOG=debug ./shortlinker tui
 
 ### Data Not Refreshing
 
-Press `r` to manually refresh, or exit and re-enter TUI.
+There is no manual refresh shortcut in the current version:
+
+- Lists are refreshed automatically after create/update/delete/import
+- If you are in a search state, press `Esc` to clear the filter
+- If it still looks stale, exit and re-enter TUI
 
 ## Comparison with Other Tools
 
@@ -180,7 +188,7 @@ Press `r` to manually refresh, or exit and re-enter TUI.
 | Create Links | ✅ | ✅ | ✅ | ✅ |
 | Edit Links | ✅ | ✅ | ✅ | ✅ |
 | Delete Links | ✅ | ✅ | ✅ | ✅ |
-| Export/Import | ✅ | ✅ | ❌ | ✅ |
+| Export/Import | ✅ | ✅ | ✅ (CSV) | ✅ |
 | Visual UI | ✅ | ❌ | ❌ | ✅ |
 | Auth Required | ❌ | ❌ | ✅ | ✅ |
 | Interactive | ✅ | ❌ | ❌ | ✅ |

@@ -286,6 +286,15 @@ curl -sS -b cookies.txt \
   http://localhost:8080/admin/v1/config
 ```
 
+### GET /config/schema
+
+Returns schema metadata for all config keys (type, default value, whether restart is required, enum options, etc.). Mainly used by the admin panel to render/validate config forms.
+
+```bash
+curl -sS -b cookies.txt \
+  http://localhost:8080/admin/v1/config/schema
+```
+
 ### GET /config/{key}
 ```bash
 curl -sS -b cookies.txt \
@@ -356,4 +365,3 @@ print(admin.list_links())
 2. Use HTTPS in production and set `api.cookie_secure=true`
 3. Expose Admin API only to trusted networks
 4. Rotate `ADMIN_TOKEN` regularly and re-login to get new cookies
-

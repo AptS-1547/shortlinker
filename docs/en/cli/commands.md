@@ -118,6 +118,36 @@ Reset the admin API password. The new password will be hashed with Argon2id and 
 ./shortlinker reset-password "my_new_secure_password"
 ```
 
+### config - Runtime config management (DB)
+
+The `config` subcommand manages runtime configuration values stored in the database (the same config system used by the web admin panel).
+
+> Note: `config` writes values into the database. To make a **running** server reload configs from the database, call Admin API `POST /admin/v1/config/reload` or restart the service.  
+> Keys marked as “requires restart” (e.g. route prefixes, cookie settings) may not take full effect even after reload; a restart is still recommended.
+
+Common subcommands:
+
+```bash
+# List configs (optional --category: auth/cookie/features/routes/cors/tracking)
+./shortlinker config list
+./shortlinker config list --category routes
+
+# Get a config (use --json for structured output)
+./shortlinker config get features.random_code_length
+./shortlinker config get api.cookie_same_site --json
+
+# Set/reset
+./shortlinker config set features.random_code_length 8
+./shortlinker config reset features.random_code_length
+
+# Export/import (JSON)
+./shortlinker config export config-backup.json
+./shortlinker config import config-backup.json
+./shortlinker config import config-backup.json --force   # skip interactive confirmation
+```
+
+> Security note: exported config files contain real sensitive values (e.g. `api.admin_token`, `api.jwt_secret`, `api.health_token`). Store them securely.
+
 ### tui - Launch Terminal User Interface
 
 ```bash
@@ -132,9 +162,11 @@ Reset the admin API password. The new password will be hashed with Argon2id and 
 
 **Keyboard Shortcuts**:
 - `↑/↓` or `j/k`: Move selection up/down
-- `Enter`: View details
-- `q` or `Esc`: Exit
-- `r`: Refresh list
+- `Enter` or `v`: View details
+- `/`: Search
+- `?` (or `h`): Help
+- `x`: Export / Import
+- `q`: Quit (`Esc` is commonly used for back/cancel/clear search)
 
 > 💡 **Tip**: TUI mode is ideal for quick browsing and link management. For detailed usage, see [TUI User Guide](/en/cli/tui)
 
@@ -211,7 +243,7 @@ Short links list:
 
 ## Hot Reload Mechanism
 
-CLI operations automatically notify the server to reload configuration:
+After link-management operations (add/update/remove/import), CLI notifies the running server to reload short link data and rebuild in-memory caches:
 
 ```bash
 # Unix/Linux systems - automatically send SIGUSR1 signal
@@ -223,15 +255,14 @@ CLI operations automatically notify the server to reload configuration:
 ./shortlinker add new https://example.com
 ```
 
-## Error Codes
+> Note: this reload mechanism is about **link data / caches**, not runtime config. For runtime config changes done outside the server process (e.g. via `./shortlinker config set`), call Admin API `POST /admin/v1/config/reload` or restart the service.
 
-| Error Code | Description |
-|------------|-------------|
+## Exit Codes
+
+| Exit Code | Meaning |
+|----------|---------|
 | 0 | Success |
-| 1 | General error |
-| 2 | Parameter error |
-| 4 | Short code conflict |
-| 5 | Short code not found |
+| 1 | Failed (validation/storage/command error) |
 
 ## Environment Variables
 

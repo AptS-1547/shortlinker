@@ -99,6 +99,36 @@
 ./shortlinker reset-password "my_new_secure_password"
 ```
 
+### config - 运行时配置管理（数据库）
+
+`config` 子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
+
+> 提示：`config` 命令会把值写入数据库。若要让**正在运行**的服务重新从数据库加载配置，可调用 Admin API `POST /admin/v1/config/reload`，或重启服务。  
+> 另外，标记为“需要重启”的配置（如路由前缀、Cookie 配置）即使 reload 也可能无法完全生效，仍建议重启。
+
+常用子命令：
+
+```bash
+# 列出所有配置（可选 --category 过滤分类：auth/cookie/features/routes/cors/tracking）
+./shortlinker config list
+./shortlinker config list --category routes
+
+# 获取单个配置（--json 输出结构化信息）
+./shortlinker config get features.random_code_length
+./shortlinker config get api.cookie_same_site --json
+
+# 设置/重置配置
+./shortlinker config set features.random_code_length 8
+./shortlinker config reset features.random_code_length
+
+# 导出/导入配置（JSON）
+./shortlinker config export config-backup.json
+./shortlinker config import config-backup.json
+./shortlinker config import config-backup.json --force   # 跳过交互确认
+```
+
+> 安全提醒：配置导出文件会包含敏感字段（如 `api.admin_token`、`api.jwt_secret`、`api.health_token`）的真实值，请妥善保管。
+
 ### tui - 启动终端用户界面
 
 ```bash
@@ -113,9 +143,11 @@
 
 **快捷键**：
 - `↑/↓` 或 `j/k`：上下移动选择
-- `Enter`：查看详情
-- `q` 或 `Esc`：退出
-- `r`：刷新列表
+- `Enter` 或 `v`：查看详情
+- `/`：搜索
+- `?`（或 `h`）：帮助
+- `x`：导出/导入
+- `q`：退出（`Esc` 常用于返回/取消/清除搜索）
 
 > 💡 **提示**：TUI 模式适合快速浏览和管理链接，详细使用说明请参考 [TUI 使用指南](/cli/tui)
 
@@ -158,6 +190,7 @@
     "target": "https://github.com",
     "created_at": "2024-12-15T14:30:22Z",
     "expires_at": null,
+    "password": null,
     "click": 0
   }
 ]

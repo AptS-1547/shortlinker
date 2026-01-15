@@ -20,7 +20,8 @@ port = 8080
 [features]
 default_url = "https://example.com"
 
-# Optional: Enable admin features (Health API currently reuses Admin auth)
+# Optional: Enable admin features (Admin API + Health API)
+# - Health supports Bearer token auth (HEALTH_TOKEN) or Admin JWT cookies
 # [api]
 # admin_token = "your_admin_token"
 ```
@@ -47,7 +48,8 @@ SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
 DEFAULT_URL=https://example.com
 
-# Optional: Enable admin features (Health API currently reuses Admin auth)
+# Optional: Enable admin features (Admin API + Health API)
+# - Health supports Bearer token auth (HEALTH_TOKEN) or Admin JWT cookies
 # ADMIN_TOKEN=your_admin_token
 ```
 
@@ -109,7 +111,9 @@ curl -I http://localhost:8080/github
 # Method 2: Send signal
 kill $(cat shortlinker.pid)
 
-# Reload config (Unix systems)
+# Reload short link data / caches (Unix systems)
+# Note: SIGUSR1 only reloads link data/caches; it does NOT reload runtime config.
+# Reload runtime config via Admin API `/admin/v1/config/reload` or restart the service.
 kill -USR1 $(cat shortlinker.pid)
 ```
 
