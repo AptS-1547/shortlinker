@@ -7,8 +7,8 @@ pub mod commands;
 use crate::cli::Commands;
 use crate::storage::StorageFactory;
 use commands::{
-    add_link, export_links, generate_config, import_links, list_links, remove_link,
-    run_reset_password, update_link,
+    add_link, config_management, export_links, generate_config, import_links, list_links,
+    remove_link, run_reset_password, update_link,
 };
 use std::fmt;
 
@@ -77,6 +77,14 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         return Ok(());
     }
 
+    // Handle config command separately (needs DB connection)
+    if let Commands::Config { action } = cmd {
+        let storage = StorageFactory::create()
+            .await
+            .map_err(|e| CliError::StorageError(e.to_string()))?;
+        return config_management::run_config_command(storage.get_db().clone(), action).await;
+    }
+
     // Create storage for commands that need it
     let storage = StorageFactory::create()
         .await
@@ -111,6 +119,8 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::GenerateConfig { output_path } => generate_config(output_path).await,
 
         Commands::ResetPassword { .. } => unreachable!("handled above"),
+
+        Commands::Config { .. } => unreachable!("handled above"),
 
         #[cfg(feature = "tui")]
         Commands::Tui => unreachable!("TUI handled in main"),

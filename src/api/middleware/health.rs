@@ -52,11 +52,12 @@ where
         }
         if let Some(auth_header) = req.headers().get("Authorization")
             && let Ok(auth_str) = auth_header.to_str()
-                && let Some(token) = auth_str.strip_prefix("Bearer ")
-                    && token == health_token {
-                        trace!("Health Bearer token validation successful");
-                        return true;
-                    }
+            && let Some(token) = auth_str.strip_prefix("Bearer ")
+            && token == health_token
+        {
+            trace!("Health Bearer token validation successful");
+            return true;
+        }
         false
     }
 

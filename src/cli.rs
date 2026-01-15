@@ -101,6 +101,68 @@ pub enum Commands {
         /// New password
         new_password: String,
     },
+
+    /// Manage configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigCommands,
+    },
+}
+
+/// Configuration management commands
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// List all configurations
+    List {
+        /// Filter by category (auth, cookie, features, routes, cors, tracking)
+        #[arg(long)]
+        category: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Get a configuration value
+    Get {
+        /// Configuration key (e.g., api.admin_token)
+        key: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Set a configuration value
+    Set {
+        /// Configuration key
+        key: String,
+
+        /// New value
+        value: String,
+    },
+
+    /// Reset configuration to default value
+    Reset {
+        /// Configuration key
+        key: String,
+    },
+
+    /// Export configurations to file
+    Export {
+        /// Output file path (default: stdout)
+        file_path: Option<String>,
+    },
+
+    /// Import configurations from file
+    Import {
+        /// Input file path
+        file_path: String,
+
+        /// Force overwrite without confirmation
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 impl Commands {
