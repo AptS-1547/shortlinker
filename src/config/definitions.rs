@@ -521,7 +521,11 @@ mod tests {
         let original_len = keys.len();
         keys.sort();
         keys.dedup();
-        assert_eq!(keys.len(), original_len, "Duplicate keys found in ALL_CONFIGS");
+        assert_eq!(
+            keys.len(),
+            original_len,
+            "Duplicate keys found in ALL_CONFIGS"
+        );
     }
 
     #[test]

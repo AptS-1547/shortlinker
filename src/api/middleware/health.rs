@@ -45,6 +45,22 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     B: 'static,
 {
+    /// 验证 Authorization header 中的 Bearer token
+    fn validate_bearer_token(req: &ServiceRequest, health_token: &str) -> bool {
+        if health_token.is_empty() {
+            return false;
+        }
+        if let Some(auth_header) = req.headers().get("Authorization")
+            && let Ok(auth_str) = auth_header.to_str()
+                && let Some(token) = auth_str.strip_prefix("Bearer ")
+                    && token == health_token {
+                        trace!("Health Bearer token validation successful");
+                        return true;
+                    }
+        false
+    }
+
+    /// 验证 JWT Cookie
     fn validate_jwt_cookie(req: &ServiceRequest, cookie_name: &str) -> bool {
         let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
         if let Some(token) = cookie_token {
@@ -105,23 +121,34 @@ where
                 ));
             }
 
-            // Validate JWT Cookie
-            if !Self::validate_jwt_cookie(&req, &access_cookie_name) {
-                warn!("Health authentication failed - invalid or missing JWT");
-                return Ok(req.into_response(
-                    HttpResponse::Unauthorized()
-                        .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                        .json(serde_json::json!({
-                            "code": 401,
-                            "data": { "error": "Unauthorized: Invalid or missing token" }
-                        }))
-                        .map_into_right_body(),
-                ));
+            // 获取 health_token
+            let health_token = &config.api.health_token;
+
+            // 先尝试 Bearer token 认证（给 k8s 等监控工具用）
+            if Self::validate_bearer_token(&req, health_token) {
+                trace!("Health authentication successful via Bearer token");
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
             }
 
-            trace!("Health authentication successful via JWT Cookie");
-            let response = srv.call(req).await?.map_into_left_body();
-            Ok(response)
+            // 再尝试 JWT Cookie 认证（给前端用户用）
+            if Self::validate_jwt_cookie(&req, &access_cookie_name) {
+                trace!("Health authentication successful via JWT Cookie");
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
+            }
+
+            // 两种认证都失败
+            warn!("Health authentication failed - invalid or missing token");
+            Ok(req.into_response(
+                HttpResponse::Unauthorized()
+                    .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
+                    .json(serde_json::json!({
+                        "code": 401,
+                        "data": { "error": "Unauthorized: Invalid or missing token" }
+                    }))
+                    .map_into_right_body(),
+            ))
         })
     }
 }

@@ -2,8 +2,8 @@
 //!
 //! 基于 schema 验证配置值是否合法。
 
-use super::schema::get_schema;
 use super::ValueType;
+use super::schema::get_schema;
 
 /// 根据配置 key 验证值是否合法
 ///
@@ -33,10 +33,7 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
 
             let mut invalid_items = Vec::new();
             for item in &items {
-                if !valid_values
-                    .iter()
-                    .any(|v| v.eq_ignore_ascii_case(item))
-                {
+                if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(item)) {
                     invalid_items.push(item.clone());
                 }
             }
@@ -49,10 +46,7 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
             }
         } else {
             // 单值类型（Enum）：验证值是否在选项列表中
-            if !valid_values
-                .iter()
-                .any(|v| v.eq_ignore_ascii_case(value))
-            {
+            if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(value)) {
                 return Err(format!(
                     "Invalid value '{}'. Valid options: {:?}",
                     value, valid_values
@@ -92,25 +86,21 @@ mod tests {
     #[test]
     fn test_validate_http_methods() {
         // 合法值
+        assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["GET", "POST"]"#).is_ok());
         assert!(
-            validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["GET", "POST"]"#).is_ok()
+            validate_config_value(
+                keys::CORS_ALLOWED_METHODS,
+                r#"["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]"#
+            )
+            .is_ok()
         );
-        assert!(validate_config_value(
-            keys::CORS_ALLOWED_METHODS,
-            r#"["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]"#
-        )
-        .is_ok());
         // 大小写不敏感
-        assert!(
-            validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["get", "post"]"#).is_ok()
-        );
+        assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["get", "post"]"#).is_ok());
         // 空数组也合法
         assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, r#"[]"#).is_ok());
 
         // 非法值
-        assert!(
-            validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["INVALID"]"#).is_err()
-        );
+        assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["INVALID"]"#).is_err());
         assert!(
             validate_config_value(keys::CORS_ALLOWED_METHODS, r#"["GET", "INVALID"]"#).is_err()
         );

@@ -10,7 +10,7 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 use ts_rs::TS;
 
-use super::definitions::{keys, ALL_CONFIGS};
+use super::definitions::{ALL_CONFIGS, keys};
 use super::types::TS_EXPORT_PATH;
 use super::{HttpMethod, SameSitePolicy, ValueType};
 

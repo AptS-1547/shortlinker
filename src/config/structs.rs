@@ -16,8 +16,20 @@ pub fn default_http_methods_json() -> String {
 }
 
 /// Cookie SameSite 策略
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS,
-         EnumIter, AsRefStr, EnumMessage)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Default,
+    TS,
+    EnumIter,
+    AsRefStr,
+    EnumMessage,
+)]
 #[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
 #[serde(rename_all = "PascalCase")]
 #[strum(serialize_all = "PascalCase")]
@@ -57,8 +69,7 @@ impl std::str::FromStr for SameSitePolicy {
 }
 
 /// HTTP 方法枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS,
-         EnumIter, AsRefStr)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS, EnumIter, AsRefStr)]
 #[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
 #[serde(rename_all = "UPPERCASE")]
 #[strum(serialize_all = "UPPERCASE")]

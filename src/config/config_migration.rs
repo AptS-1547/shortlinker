@@ -1,7 +1,7 @@
 use tracing::{debug, info, warn};
 
-use crate::config::definitions::{keys, ALL_CONFIGS};
 use crate::config::AppConfig;
+use crate::config::definitions::{ALL_CONFIGS, keys};
 use crate::config::{HttpMethod, SameSitePolicy, ValueType, default_http_methods_json};
 use crate::errors::Result;
 use crate::storage::ConfigStore;
@@ -39,7 +39,9 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
         // 点击统计
         keys::CLICK_ENABLE_TRACKING => config.click_manager.enable_click_tracking.to_string(),
         keys::CLICK_FLUSH_INTERVAL => config.click_manager.flush_interval.to_string(),
-        keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => config.click_manager.max_clicks_before_flush.to_string(),
+        keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => {
+            config.click_manager.max_clicks_before_flush.to_string()
+        }
 
         // 路由配置
         keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix.clone(),
@@ -48,9 +50,15 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
 
         // CORS 配置
         keys::CORS_ENABLED => config.cors.enabled.to_string(),
-        keys::CORS_ALLOWED_ORIGINS => serde_json::to_string(&config.cors.allowed_origins).unwrap_or_default(),
-        keys::CORS_ALLOWED_METHODS => serde_json::to_string(&config.cors.allowed_methods).unwrap_or_default(),
-        keys::CORS_ALLOWED_HEADERS => serde_json::to_string(&config.cors.allowed_headers).unwrap_or_default(),
+        keys::CORS_ALLOWED_ORIGINS => {
+            serde_json::to_string(&config.cors.allowed_origins).unwrap_or_default()
+        }
+        keys::CORS_ALLOWED_METHODS => {
+            serde_json::to_string(&config.cors.allowed_methods).unwrap_or_default()
+        }
+        keys::CORS_ALLOWED_HEADERS => {
+            serde_json::to_string(&config.cors.allowed_headers).unwrap_or_default()
+        }
         keys::CORS_MAX_AGE => config.cors.max_age.to_string(),
         keys::CORS_ALLOW_CREDENTIALS => config.cors.allow_credentials.to_string(),
 
@@ -153,7 +161,8 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
         if item.value_type != ValueType::Enum {
             info!(
                 "Migrating value_type for '{}' from {:?} to Enum",
-                keys::API_COOKIE_SAME_SITE, item.value_type
+                keys::API_COOKIE_SAME_SITE,
+                item.value_type
             );
             store
                 .update_value_type(keys::API_COOKIE_SAME_SITE, ValueType::Enum)
