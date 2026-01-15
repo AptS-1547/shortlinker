@@ -2,7 +2,7 @@ use tracing::{debug, info, warn};
 
 use crate::config::AppConfig;
 use crate::config::definitions::{ALL_CONFIGS, keys};
-use crate::config::{HttpMethod, SameSitePolicy, ValueType, default_http_methods_json};
+use crate::config::{HttpMethod, SameSitePolicy, default_http_methods_json};
 use crate::errors::Result;
 use crate::storage::ConfigStore;
 use crate::utils::password::{hash_password, is_argon2_hash};
@@ -91,7 +91,7 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
     // 遍历所有配置定义进行迁移
     for def in ALL_CONFIGS {
         let value = get_config_value(file_config, def.key);
-        store
+        let inserted = store
             .insert_if_not_exists(
                 def.key,
                 &value,
@@ -100,6 +100,20 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
                 def.is_sensitive,
             )
             .await?;
+
+        // 兼容旧版本：如果配置已存在，同步元信息（requires_restart / is_sensitive / value_type）
+        if !inserted
+            && store
+                .sync_metadata(
+                    def.key,
+                    def.value_type,
+                    def.requires_restart,
+                    def.is_sensitive,
+                )
+                .await?
+        {
+            debug!("Synced config metadata for key: {}", def.key);
+        }
     }
 
     info!("Configuration migration completed successfully");
@@ -156,19 +170,8 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
 pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
     debug!("Checking enum configuration values for migration");
 
-    // cookie_same_site
+    // cookie_same_site - 只验证值的合法性，value_type 已由 sync_metadata 同步
     if let Some(item) = store.get_full(keys::API_COOKIE_SAME_SITE).await? {
-        if item.value_type != ValueType::Enum {
-            info!(
-                "Migrating value_type for '{}' from {:?} to Enum",
-                keys::API_COOKIE_SAME_SITE,
-                item.value_type
-            );
-            store
-                .update_value_type(keys::API_COOKIE_SAME_SITE, ValueType::Enum)
-                .await?;
-        }
-
         if item.value.parse::<SameSitePolicy>().is_err() {
             let default = SameSitePolicy::default().to_string();
             warn!(

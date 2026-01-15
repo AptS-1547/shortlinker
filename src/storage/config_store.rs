@@ -273,6 +273,67 @@ impl ConfigStore {
         Ok(true)
     }
 
+    /// 同步配置项的元信息（不修改 value / updated_at）
+    ///
+    /// 用于配置定义变更后的兼容处理，确保数据库中的：
+    /// - value_type
+    /// - requires_restart
+    /// - is_sensitive
+    /// 与代码中的定义保持一致。
+    ///
+    /// 返回值表示是否发生了更新。
+    pub async fn sync_metadata(
+        &self,
+        key: &str,
+        value_type: ValueType,
+        requires_restart: bool,
+        is_sensitive: bool,
+    ) -> Result<bool> {
+        let record = system_config::Entity::find_by_id(key)
+            .one(&self.db)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+            })?;
+
+        let Some(r) = record else {
+            return Ok(false);
+        };
+
+        let desired_value_type = value_type.to_string();
+        let current_value_type = r.value_type.clone();
+        let current_requires_restart = r.requires_restart;
+        let current_is_sensitive = r.is_sensitive;
+
+        let mut changed = false;
+        let mut active_model: system_config::ActiveModel = r.into();
+
+        if current_value_type != desired_value_type {
+            active_model.value_type = Set(desired_value_type);
+            changed = true;
+        }
+
+        if current_requires_restart != requires_restart {
+            active_model.requires_restart = Set(requires_restart);
+            changed = true;
+        }
+
+        if current_is_sensitive != is_sensitive {
+            active_model.is_sensitive = Set(is_sensitive);
+            changed = true;
+        }
+
+        if !changed {
+            return Ok(false);
+        }
+
+        active_model.update(&self.db).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("同步配置 '{}' 的元信息失败: {}", key, e))
+        })?;
+
+        Ok(true)
+    }
+
     /// 获取配置表中的记录数
     pub async fn count(&self) -> Result<u64> {
         let count = system_config::Entity::find()
@@ -283,32 +344,5 @@ impl ConfigStore {
             })?;
 
         Ok(count)
-    }
-
-    /// 更新配置项的 value_type
-    ///
-    /// 用于迁移场景，将已有配置的 value_type 从旧类型更新为新类型。
-    pub async fn update_value_type(&self, key: &str, value_type: ValueType) -> Result<()> {
-        let record = system_config::Entity::find_by_id(key)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
-            })?;
-
-        match record {
-            Some(r) => {
-                let mut active_model: system_config::ActiveModel = r.into();
-                active_model.value_type = Set(value_type.to_string());
-                active_model.update(&self.db).await.map_err(|e| {
-                    ShortlinkerError::database_operation(format!(
-                        "更新配置 '{}' 的 value_type 失败: {}",
-                        key, e
-                    ))
-                })?;
-                Ok(())
-            }
-            None => Ok(()), // 记录不存在，忽略
-        }
     }
 }
