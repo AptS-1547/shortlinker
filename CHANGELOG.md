@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-beta.1] - 2026-01-15
+
+### Added
+- **配置管理 CLI 命令** - 新增完整的配置管理命令 (#37)
+  - `config list`：列出所有配置项，支持按类别筛选和 JSON 输出
+  - `config get`：获取指定配置项详细信息，包含类型、默认值等元数据
+  - `config set`：设置配置值，支持验证和敏感信息掩码
+  - `config reset`：重置配置到默认值
+  - `config export`：导出所有配置到 JSON 文件
+  - `config import`：从 JSON 文件导入配置，支持预览和强制覆盖
+- **健康检查 Bearer Token 认证** - 支持 k8s 等监控工具通过 `HEALTH_TOKEN` 访问健康端点 (#38)
+  - 认证流程：先尝试 Bearer token，再尝试 JWT Cookie
+- **配置 Schema 系统** - 支持前端动态渲染配置表单
+  - 为 Cookie SameSite 策略和 HTTP 方法添加类型安全的 enum 定义
+  - 实现配置值验证器，确保 enum 配置值的合法性
+  - 新增配置 Schema API 端点 (`/admin/v1/config/schema`)
+- **配置分组功能** - 配置项按类别分组：认证、Cookie、功能开关、路由、CORS、点击追踪
+- **自定义前端支持** - 可将自定义前端放入 `./frontend-panel` 目录替换内置管理面板 (#32)
+  - 参数注入机制：自动替换 `%BASE_PATH%`、`%ADMIN_ROUTE_PREFIX%` 等占位符
+- **自动生成初始管理员令牌** - 首次部署时自动生成 8 位随机令牌并在日志中提示保存 (#35)
+
+### Changed
+- **配置系统重构为单一数据源架构** - `definitions.rs` 作为配置项的唯一数据源
+  - 集中定义所有配置的元信息（key、类型、默认值、分类等）
+  - 配置迁移和 Schema 生成自动基于定义，减少重复代码
+- **CLI 使用 clap 重构** - 移除自定义参数解析器，使用 clap derive 宏 (#33)
+  - 删除 `src/config/args.rs` 和 `src/interfaces/cli/parser.rs`
+  - 新增 `src/cli.rs` 定义 CLI 结构
+- **Cookie 配置支持热更新** - `cookie_secure`、`cookie_same_site`、`cookie_domain` 的 `requires_restart` 改为 `false`
+- **文档统一认证方式为 JWT Cookie** - 更新 Admin API 和 Health API 文档
+
+### Improved
+- **配置元数据同步机制** - 配置迁移时自动同步 `value_type`、`requires_restart`、`is_sensitive` 字段
+- 新增 `strum` 依赖用于 enum 派生
+
+### Docs
+- 新增管理面板开发指南和故障排除文档
+- 更新 CLI 文档，添加 `config` 命令说明
+- 更新 README，添加自定义前端说明
+
+### Dependencies
+- 添加 `clap` (4.x) 用于命令行解析
+- 添加 `strum` (0.27) 用于 enum 派生
+
 ## [v0.3.0-alpha.7] - 2026-01-14
 
 ### Added
@@ -626,7 +670,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...HEAD
+[v0.3.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...v0.3.0-beta.1
 [v0.3.0-alpha.7]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...v0.3.0-alpha.7
 [v0.3.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...v0.3.0-alpha.6
 [v0.3.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.4...v0.3.0-alpha.5

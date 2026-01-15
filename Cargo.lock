@@ -3570,7 +3570,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shortlinker"
-version = "0.3.0-alpha.8"
+version = "0.3.0-beta.1"
 dependencies = [
  "actix-cors",
  "actix-multipart",
