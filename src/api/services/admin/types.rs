@@ -5,46 +5,11 @@ use ts_rs::TS;
 
 use crate::storage::ShortLink;
 
+// Re-export ValueType from config module
+pub use crate::config::ValueType;
+
 /// 输出目录常量
 pub const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
-
-/// 配置值类型枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
-#[serde(rename_all = "lowercase")]
-pub enum ValueType {
-    String,
-    Int,
-    Bool,
-    Json,
-    Enum,
-}
-
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::String => write!(f, "string"),
-            Self::Int => write!(f, "int"),
-            Self::Bool => write!(f, "bool"),
-            Self::Json => write!(f, "json"),
-            Self::Enum => write!(f, "enum"),
-        }
-    }
-}
-
-impl std::str::FromStr for ValueType {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "string" => Ok(Self::String),
-            "int" => Ok(Self::Int),
-            "bool" => Ok(Self::Bool),
-            "json" => Ok(Self::Json),
-            "enum" => Ok(Self::Enum),
-            _ => Err(format!("Unknown value type: {}", s)),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]
 #[ts(

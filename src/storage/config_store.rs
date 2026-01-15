@@ -5,7 +5,7 @@ use sea_orm::{
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::api::services::admin::ValueType;
+use crate::config::ValueType;
 use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
 

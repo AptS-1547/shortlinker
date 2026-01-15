@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumIter, EnumMessage, IntoEnumIterator};
 use ts_rs::TS;
 
-/// 输出目录常量
-pub(crate) const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
+/// 输出目录常量（用于测试导出）
+#[cfg(test)]
+use super::types::TS_EXPORT_PATH;
 
 /// 获取默认的 HTTP 方法 JSON 数组
 ///
@@ -281,10 +282,6 @@ fn default_server_port() -> u16 {
 
 fn default_cpu_count() -> usize {
     num_cpus::get()
-}
-
-fn default_database_backend() -> String {
-    "sqlite".to_string()
 }
 
 fn default_database_url() -> String {

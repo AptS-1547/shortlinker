@@ -3,7 +3,7 @@
 //! 基于 schema 验证配置值是否合法。
 
 use super::schema::get_schema;
-use crate::api::services::admin::ValueType;
+use super::ValueType;
 
 /// 根据配置 key 验证值是否合法
 ///

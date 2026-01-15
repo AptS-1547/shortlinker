@@ -1,25 +1,78 @@
 use tracing::{debug, info, warn};
 
-use crate::api::services::admin::ValueType;
+use crate::config::definitions::{keys, ALL_CONFIGS};
 use crate::config::AppConfig;
-use crate::config::runtime_config::keys;
-use crate::config::{HttpMethod, SameSitePolicy, default_http_methods_json};
+use crate::config::{HttpMethod, SameSitePolicy, ValueType, default_http_methods_json};
 use crate::errors::Result;
 use crate::storage::ConfigStore;
 use crate::utils::password::{hash_password, is_argon2_hash};
 
+/// 从 AppConfig 中根据 key 获取配置值
+///
+/// # 维护说明
+///
+/// 添加新配置时，需要在此函数的 match 中添加对应的映射。
+/// 这是目前仍需手动维护的地方之一（另一处在 `impl.rs` 的 `update_config_by_key`）。
+///
+/// 如果遗漏了某个 key，编译器不会报错，只会在运行时打印警告并返回空字符串。
+fn get_config_value(config: &AppConfig, key: &str) -> String {
+    match key {
+        // API 认证
+        keys::API_ADMIN_TOKEN => config.api.admin_token.clone(),
+        keys::API_HEALTH_TOKEN => config.api.health_token.clone(),
+        keys::API_JWT_SECRET => config.api.jwt_secret.clone(),
+        keys::API_ACCESS_TOKEN_MINUTES => config.api.access_token_minutes.to_string(),
+        keys::API_REFRESH_TOKEN_DAYS => config.api.refresh_token_days.to_string(),
+
+        // Cookie 配置
+        keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name.clone(),
+        keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name.clone(),
+        keys::API_COOKIE_SECURE => config.api.cookie_secure.to_string(),
+        keys::API_COOKIE_SAME_SITE => config.api.cookie_same_site.to_string(),
+        keys::API_COOKIE_DOMAIN => config.api.cookie_domain.clone().unwrap_or_default(),
+
+        // 功能配置
+        keys::FEATURES_RANDOM_CODE_LENGTH => config.features.random_code_length.to_string(),
+        keys::FEATURES_DEFAULT_URL => config.features.default_url.clone(),
+        keys::FEATURES_ENABLE_ADMIN_PANEL => config.features.enable_admin_panel.to_string(),
+
+        // 点击统计
+        keys::CLICK_ENABLE_TRACKING => config.click_manager.enable_click_tracking.to_string(),
+        keys::CLICK_FLUSH_INTERVAL => config.click_manager.flush_interval.to_string(),
+        keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => config.click_manager.max_clicks_before_flush.to_string(),
+
+        // 路由配置
+        keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix.clone(),
+        keys::ROUTES_HEALTH_PREFIX => config.routes.health_prefix.clone(),
+        keys::ROUTES_FRONTEND_PREFIX => config.routes.frontend_prefix.clone(),
+
+        // CORS 配置
+        keys::CORS_ENABLED => config.cors.enabled.to_string(),
+        keys::CORS_ALLOWED_ORIGINS => serde_json::to_string(&config.cors.allowed_origins).unwrap_or_default(),
+        keys::CORS_ALLOWED_METHODS => serde_json::to_string(&config.cors.allowed_methods).unwrap_or_default(),
+        keys::CORS_ALLOWED_HEADERS => serde_json::to_string(&config.cors.allowed_headers).unwrap_or_default(),
+        keys::CORS_MAX_AGE => config.cors.max_age.to_string(),
+        keys::CORS_ALLOW_CREDENTIALS => config.cors.allow_credentials.to_string(),
+
+        // 未知 key，返回空字符串
+        _ => {
+            warn!("Unknown config key in get_config_value: {}", key);
+            String::new()
+        }
+    }
+}
+
 /// 从文件配置迁移到数据库
 ///
-/// 对每个配置项检查是否已存在，如果不存在则从 config.toml 中读取并写入数据库。
-/// 这样可以支持新增配置项的增量迁移。
+/// 遍历 ALL_CONFIGS 中的所有配置定义，对每个配置项检查是否已存在，
+/// 如果不存在则从 config.toml 中读取并写入数据库。
 pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) -> Result<()> {
     debug!("Checking configuration migration to database");
 
-    // 检测是否需要打印自动生成的 admin_token
+    // 特殊处理：检测是否需要打印自动生成的 admin_token
     let admin_token = &file_config.api.admin_token;
     let is_auto_generated = !admin_token.is_empty() && !is_argon2_hash(admin_token);
 
-    // 如果数据库中还没有这个配置，且是自动生成的，打印一次
     if is_auto_generated && store.get(keys::API_ADMIN_TOKEN).await?.is_none() {
         warn!("===========================================");
         warn!("Auto-generated ADMIN_TOKEN: {}", admin_token);
@@ -27,264 +80,19 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
         warn!("===========================================");
     }
 
-    // API 认证配置（敏感）
-    store
-        .insert_if_not_exists(
-            "api.admin_token",
-            &file_config.api.admin_token,
-            ValueType::String,
-            false,
-            true, // is_sensitive
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.health_token",
-            &file_config.api.health_token,
-            ValueType::String,
-            false,
-            true, // is_sensitive
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.jwt_secret",
-            &file_config.api.jwt_secret,
-            ValueType::String,
-            false,
-            true, // is_sensitive
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.access_token_minutes",
-            &file_config.api.access_token_minutes.to_string(),
-            ValueType::Int,
-            false,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.refresh_token_days",
-            &file_config.api.refresh_token_days.to_string(),
-            ValueType::Int,
-            false,
-            false,
-        )
-        .await?;
-
-    // Cookie 配置（需要重启）
-    store
-        .insert_if_not_exists(
-            "api.access_cookie_name",
-            &file_config.api.access_cookie_name,
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.refresh_cookie_name",
-            &file_config.api.refresh_cookie_name,
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.cookie_secure",
-            &file_config.api.cookie_secure.to_string(),
-            ValueType::Bool,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.cookie_same_site",
-            &file_config.api.cookie_same_site.to_string(),
-            ValueType::Enum,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "api.cookie_domain",
-            file_config.api.cookie_domain.as_deref().unwrap_or(""),
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    // 功能配置
-    store
-        .insert_if_not_exists(
-            "features.random_code_length",
-            &file_config.features.random_code_length.to_string(),
-            ValueType::Int,
-            false,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "features.default_url",
-            &file_config.features.default_url,
-            ValueType::String,
-            false,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "features.enable_admin_panel",
-            &file_config.features.enable_admin_panel.to_string(),
-            ValueType::Bool,
-            true,
-            false,
-        )
-        .await?;
-
-    // 点击统计配置（需要重启 - ClickManager 在启动时创建，配置固化到后台任务）
-    store
-        .insert_if_not_exists(
-            "click.enable_tracking",
-            &file_config.click_manager.enable_click_tracking.to_string(),
-            ValueType::Bool,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "click.flush_interval",
-            &file_config.click_manager.flush_interval.to_string(),
-            ValueType::Int,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "click.max_clicks_before_flush",
-            &file_config
-                .click_manager
-                .max_clicks_before_flush
-                .to_string(),
-            ValueType::Int,
-            true,
-            false,
-        )
-        .await?;
-
-    // 路由配置（全部需要重启）
-    store
-        .insert_if_not_exists(
-            "routes.admin_prefix",
-            &file_config.routes.admin_prefix,
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "routes.health_prefix",
-            &file_config.routes.health_prefix,
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "routes.frontend_prefix",
-            &file_config.routes.frontend_prefix,
-            ValueType::String,
-            true,
-            false,
-        )
-        .await?;
-
-    // CORS 配置（需要重启）
-    store
-        .insert_if_not_exists(
-            "cors.enabled",
-            &file_config.cors.enabled.to_string(),
-            ValueType::Bool,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "cors.allowed_origins",
-            &serde_json::to_string(&file_config.cors.allowed_origins).unwrap_or_default(),
-            ValueType::Json,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "cors.allowed_methods",
-            &serde_json::to_string(&file_config.cors.allowed_methods).unwrap_or_default(),
-            ValueType::Json,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "cors.allowed_headers",
-            &serde_json::to_string(&file_config.cors.allowed_headers).unwrap_or_default(),
-            ValueType::Json,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "cors.max_age",
-            &file_config.cors.max_age.to_string(),
-            ValueType::Int,
-            true,
-            false,
-        )
-        .await?;
-
-    store
-        .insert_if_not_exists(
-            "cors.allow_credentials",
-            &file_config.cors.allow_credentials.to_string(),
-            ValueType::Bool,
-            true,
-            false,
-        )
-        .await?;
+    // 遍历所有配置定义进行迁移
+    for def in ALL_CONFIGS {
+        let value = get_config_value(file_config, def.key);
+        store
+            .insert_if_not_exists(
+                def.key,
+                &value,
+                def.value_type,
+                def.requires_restart,
+                def.is_sensitive,
+            )
+            .await?;
+    }
 
     info!("Configuration migration completed successfully");
     Ok(())
@@ -295,7 +103,6 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
 /// 检测数据库中的 admin_token，如果是明文则自动哈希并保存。
 /// 变更会自动记录到 config_history 表。
 pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
-    // 读取 admin_token
     let admin_token = match store.get(keys::API_ADMIN_TOKEN).await? {
         Some(value) => value,
         None => {
@@ -304,7 +111,6 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
         }
     };
 
-    // 如果为空或已是哈希，跳过
     if admin_token.is_empty() {
         debug!("admin_token is empty, skipping password migration");
         return Ok(());
@@ -315,7 +121,6 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
         return Ok(());
     }
 
-    // 明文密码，进行哈希迁移
     info!("Migrating plaintext admin_token to argon2 hash...");
 
     let hashed = hash_password(&admin_token).map_err(|e| {
@@ -325,10 +130,7 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
         ))
     })?;
 
-    // 保存到数据库（自动记录变更历史）
     store.set(keys::API_ADMIN_TOKEN, &hashed).await?;
-
-    // 同步到 AppConfig
     crate::config::update_config_by_key(keys::API_ADMIN_TOKEN, &hashed);
 
     warn!(
@@ -343,13 +145,11 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
 /// 检查数据库中的 enum 类型配置项：
 /// 1. 如果 value_type 不是 Enum，则更新为 Enum
 /// 2. 如果值不合法，则自动修正为默认值
-/// 变更会自动记录到 config_history 表。
 pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
     debug!("Checking enum configuration values for migration");
 
     // cookie_same_site
     if let Some(item) = store.get_full(keys::API_COOKIE_SAME_SITE).await? {
-        // 检查 value_type 是否需要迁移
         if item.value_type != ValueType::Enum {
             info!(
                 "Migrating value_type for '{}' from {:?} to Enum",
@@ -360,7 +160,6 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
                 .await?;
         }
 
-        // 检查值是否合法
         if item.value.parse::<SameSitePolicy>().is_err() {
             let default = SameSitePolicy::default().to_string();
             warn!(
@@ -368,26 +167,16 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
                 item.value, default
             );
             store.set(keys::API_COOKIE_SAME_SITE, &default).await?;
-
-            // 同步到 AppConfig
             crate::config::update_config_by_key(keys::API_COOKIE_SAME_SITE, &default);
         }
     }
 
-    // 后续扩展其他 enum 配置在这里添加
-
-    // cors.allowed_methods (数组类型 enum)
+    // cors.allowed_methods (JSON 数组类型 enum)
     if let Some(item) = store.get_full(keys::CORS_ALLOWED_METHODS).await? {
-        // 验证 JSON 数组中的每个元素
         let methods: std::result::Result<Vec<String>, _> = serde_json::from_str(&item.value);
         let needs_migration = match methods {
-            Ok(methods) => {
-                // 检查是否有不合法的方法
-                methods
-                    .iter()
-                    .any(|m| m.parse::<HttpMethod>().is_err())
-            }
-            Err(_) => true, // JSON 解析失败，需要迁移
+            Ok(methods) => methods.iter().any(|m| m.parse::<HttpMethod>().is_err()),
+            Err(_) => true,
         };
 
         if needs_migration {
@@ -397,8 +186,6 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
                 item.value, default
             );
             store.set(keys::CORS_ALLOWED_METHODS, &default).await?;
-
-            // 同步到 AppConfig
             crate::config::update_config_by_key(keys::CORS_ALLOWED_METHODS, &default);
         }
     }

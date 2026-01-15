@@ -1,0 +1,102 @@
+//! 配置类型定义模块
+//!
+//! 定义配置系统的核心类型，包括值类型、Rust 类型标识等。
+
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+/// 输出目录常量
+pub const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
+
+/// 配置值类型枚举
+///
+/// 用于标识配置项在数据库和前端的类型。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+#[serde(rename_all = "lowercase")]
+pub enum ValueType {
+    String,
+    Int,
+    Bool,
+    Json,
+    Enum,
+}
+
+impl std::fmt::Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String => write!(f, "string"),
+            Self::Int => write!(f, "int"),
+            Self::Bool => write!(f, "bool"),
+            Self::Json => write!(f, "json"),
+            Self::Enum => write!(f, "enum"),
+        }
+    }
+}
+
+impl std::str::FromStr for ValueType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "string" => Ok(Self::String),
+            "int" => Ok(Self::Int),
+            "bool" => Ok(Self::Bool),
+            "json" => Ok(Self::Json),
+            "enum" => Ok(Self::Enum),
+            _ => Err(format!("Unknown value type: {}", s)),
+        }
+    }
+}
+
+/// Rust 类型标识
+///
+/// 用于类型安全的配置更新，标识配置项在 Rust 代码中的实际类型。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RustType {
+    /// String 类型
+    String,
+    /// u64 类型
+    U64,
+    /// usize 类型
+    Usize,
+    /// bool 类型
+    Bool,
+    /// Option<String> 类型
+    OptionString,
+    /// Vec<String> 类型
+    VecString,
+    /// Vec<HttpMethod> 类型
+    VecHttpMethod,
+    /// SameSitePolicy 枚举类型
+    SameSitePolicy,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_type_display() {
+        assert_eq!(ValueType::String.to_string(), "string");
+        assert_eq!(ValueType::Int.to_string(), "int");
+        assert_eq!(ValueType::Bool.to_string(), "bool");
+        assert_eq!(ValueType::Json.to_string(), "json");
+        assert_eq!(ValueType::Enum.to_string(), "enum");
+    }
+
+    #[test]
+    fn test_value_type_from_str() {
+        assert_eq!("string".parse::<ValueType>().unwrap(), ValueType::String);
+        assert_eq!("int".parse::<ValueType>().unwrap(), ValueType::Int);
+        assert_eq!("bool".parse::<ValueType>().unwrap(), ValueType::Bool);
+        assert_eq!("json".parse::<ValueType>().unwrap(), ValueType::Json);
+        assert_eq!("enum".parse::<ValueType>().unwrap(), ValueType::Enum);
+        assert!("invalid".parse::<ValueType>().is_err());
+    }
+
+    #[test]
+    fn export_typescript_types() {
+        ValueType::export_all().expect("Failed to export ValueType");
+        println!("ValueType exported to {}", TS_EXPORT_PATH);
+    }
+}

@@ -9,6 +9,9 @@ use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateRe
 use super::update_config_by_key;
 use super::validators;
 
+// Re-export keys from definitions module
+pub use super::definitions::keys;
+
 /// 全局运行时配置实例
 static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 
@@ -205,39 +208,4 @@ pub fn get_runtime_config() -> &'static RuntimeConfig {
 /// 如果运行时配置未初始化，返回 None
 pub fn try_get_runtime_config() -> Option<&'static RuntimeConfig> {
     RUNTIME_CONFIG.get()
-}
-
-/// 配置键常量
-pub mod keys {
-    // API 认证
-    pub const API_ADMIN_TOKEN: &str = "api.admin_token";
-    pub const API_HEALTH_TOKEN: &str = "api.health_token";
-    pub const API_JWT_SECRET: &str = "api.jwt_secret";
-    pub const API_ACCESS_TOKEN_MINUTES: &str = "api.access_token_minutes";
-    pub const API_REFRESH_TOKEN_DAYS: &str = "api.refresh_token_days";
-
-    // Cookie 配置
-    pub const API_COOKIE_SAME_SITE: &str = "api.cookie_same_site";
-
-    // 功能配置
-    pub const FEATURES_RANDOM_CODE_LENGTH: &str = "features.random_code_length";
-    pub const FEATURES_DEFAULT_URL: &str = "features.default_url";
-    pub const FEATURES_ENABLE_ADMIN_PANEL: &str = "features.enable_admin_panel";
-
-    // 点击统计
-    pub const CLICK_ENABLE_TRACKING: &str = "click.enable_tracking";
-    pub const CLICK_FLUSH_INTERVAL: &str = "click.flush_interval";
-
-    // 路由配置
-    pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
-    pub const ROUTES_HEALTH_PREFIX: &str = "routes.health_prefix";
-    pub const ROUTES_FRONTEND_PREFIX: &str = "routes.frontend_prefix";
-
-    // CORS 配置
-    pub const CORS_ENABLED: &str = "cors.enabled";
-    pub const CORS_ALLOWED_ORIGINS: &str = "cors.allowed_origins";
-    pub const CORS_ALLOWED_METHODS: &str = "cors.allowed_methods";
-    pub const CORS_ALLOWED_HEADERS: &str = "cors.allowed_headers";
-    pub const CORS_MAX_AGE: &str = "cors.max_age";
-    pub const CORS_ALLOW_CREDENTIALS: &str = "cors.allow_credentials";
 }

@@ -264,6 +264,7 @@ pub fn init_config(config_path: Option<String>) {
 }
 
 /// Get the configuration file path that was used
+#[allow(dead_code)]
 pub fn get_config_path() -> Option<&'static str> {
     CONFIG_PATH.get().map(|s| s.as_str())
 }
@@ -300,77 +301,110 @@ where
 /// Update a specific config field by key
 ///
 /// Returns true if the key was found and updated, false otherwise.
+///
+/// # 维护说明
+///
+/// 添加新配置时，需要在此函数的 match 中添加对应的映射。
+/// 这是目前仍需手动维护的地方之一（另一处在 `config_migration.rs` 的 `get_config_value`）。
+///
+/// 如果遗漏了某个 key，编译器不会报错，配置更新会静默失败。
 pub fn update_config_by_key(key: &str, value: &str) -> bool {
+    use super::definitions::keys;
+
     update_config(|config| {
         match key {
-            // API 配置
-            "api.admin_token" => config.api.admin_token = value.to_string(),
-            "api.health_token" => config.api.health_token = value.to_string(),
-            "api.jwt_secret" => config.api.jwt_secret = value.to_string(),
-            "api.access_token_minutes" => {
+            // API 认证配置
+            keys::API_ADMIN_TOKEN => config.api.admin_token = value.to_string(),
+            keys::API_HEALTH_TOKEN => config.api.health_token = value.to_string(),
+            keys::API_JWT_SECRET => config.api.jwt_secret = value.to_string(),
+            keys::API_ACCESS_TOKEN_MINUTES => {
                 if let Ok(v) = value.parse() {
                     config.api.access_token_minutes = v;
                 }
             }
-            "api.refresh_token_days" => {
+            keys::API_REFRESH_TOKEN_DAYS => {
                 if let Ok(v) = value.parse() {
                     config.api.refresh_token_days = v;
                 }
             }
 
+            // Cookie 配置
+            keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name = value.to_string(),
+            keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name = value.to_string(),
+            keys::API_COOKIE_SECURE => {
+                config.api.cookie_secure = value == "true" || value == "1" || value == "yes";
+            }
+            keys::API_COOKIE_SAME_SITE => {
+                if let Ok(v) = value.parse() {
+                    config.api.cookie_same_site = v;
+                }
+            }
+            keys::API_COOKIE_DOMAIN => {
+                config.api.cookie_domain = if value.is_empty() {
+                    None
+                } else {
+                    Some(value.to_string())
+                };
+            }
+
             // 功能配置
-            "features.random_code_length" => {
+            keys::FEATURES_RANDOM_CODE_LENGTH => {
                 if let Ok(v) = value.parse() {
                     config.features.random_code_length = v;
                 }
             }
-            "features.default_url" => config.features.default_url = value.to_string(),
-            "features.enable_admin_panel" => {
+            keys::FEATURES_DEFAULT_URL => config.features.default_url = value.to_string(),
+            keys::FEATURES_ENABLE_ADMIN_PANEL => {
                 config.features.enable_admin_panel =
                     value == "true" || value == "1" || value == "yes";
             }
 
             // 点击统计配置
-            "click.enable_tracking" => {
+            keys::CLICK_ENABLE_TRACKING => {
                 config.click_manager.enable_click_tracking =
                     value == "true" || value == "1" || value == "yes";
             }
-            "click.flush_interval" => {
+            keys::CLICK_FLUSH_INTERVAL => {
                 if let Ok(v) = value.parse() {
                     config.click_manager.flush_interval = v;
                 }
             }
+            keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => {
+                if let Ok(v) = value.parse() {
+                    config.click_manager.max_clicks_before_flush = v;
+                }
+            }
 
-            // 路由配置 (requires_restart = true，但还是要更新内存)
-            "routes.admin_prefix" => config.routes.admin_prefix = value.to_string(),
-            "routes.health_prefix" => config.routes.health_prefix = value.to_string(),
-            "routes.frontend_prefix" => config.routes.frontend_prefix = value.to_string(),
+            // 路由配置
+            keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix = value.to_string(),
+            keys::ROUTES_HEALTH_PREFIX => config.routes.health_prefix = value.to_string(),
+            keys::ROUTES_FRONTEND_PREFIX => config.routes.frontend_prefix = value.to_string(),
 
-            // CORS 配置 (requires_restart = true，但还是要更新内存)
-            "cors.enabled" => {
+            // CORS 配置
+            keys::CORS_ENABLED => {
                 config.cors.enabled = value == "true" || value == "1" || value == "yes";
             }
-            "cors.allowed_origins" => {
+            keys::CORS_ALLOWED_ORIGINS => {
                 if let Ok(v) = serde_json::from_str(value) {
                     config.cors.allowed_origins = v;
                 }
             }
-            "cors.allowed_methods" => {
+            keys::CORS_ALLOWED_METHODS => {
                 if let Ok(v) = serde_json::from_str(value) {
                     config.cors.allowed_methods = v;
                 }
             }
-            "cors.allowed_headers" => {
+            keys::CORS_ALLOWED_HEADERS => {
                 if let Ok(v) = serde_json::from_str(value) {
                     config.cors.allowed_headers = v;
                 }
             }
-            "cors.max_age" => {
+            keys::CORS_MAX_AGE => {
                 if let Ok(v) = value.parse() {
                     config.cors.max_age = v;
                 }
             }
-            "cors.allow_credentials" => {
+            keys::CORS_ALLOW_CREDENTIALS => {
                 config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
             }
 
