@@ -144,7 +144,7 @@ async fn reload_all(
 
     // Reload storage backend
     storage.reload().await?;
-    let links = storage.load_all().await;
+    let links = storage.load_all().await?;
 
     // Reconfigure cache with new capacity
     cache
