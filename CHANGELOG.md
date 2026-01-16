@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-beta.2] - 2026-01-16
+
+### Added
+- **负向缓存（Negative Cache）** - 缓存数据库中不存在的键，减少无效查询的数据库压力
+  - 重构缓存查询流程：Bloom Filter → 负向缓存 → 对象缓存 → 数据库
+  - 统一缓存结果枚举，将 `ExistsButNoValue` 重命名为 `Miss` 以更准确表达语义
+- **数据库连接重试机制** - 新增指数退避重试策略，增强数据库连接稳定性
+  - 配置项：重试次数、基础延迟、最大延迟
+  - 为所有数据库操作（查询、插入、删除、点击计数刷新）添加重试逻辑
+- **日志初始化回退机制** - 当文件日志初始化失败时，优雅地回退到 stdout 输出
+- **健康检查独立 Token** - `health_token` 不再强制依赖 `admin_token`，支持独立配置
+- **短码格式验证** - 重定向服务增加短码验证（长度≤128，字符集限制），TUI 同步更新规则
+
+### Changed
+- **CORS 默认禁用** - `default_cors_enabled` 的默认值从 `true` 改为 `false`，提升默认安全性
+- **缓存预热策略调整** - 从主动加载改为按需回填（cache-aside），启动时仅加载短码到 Bloom Filter
+- **默认管理员令牌长度** - 从 8 位增加到 16 位，增强安全性
+- **时间格式显示优化** - 使用简洁的英文缩写（如 "2d 3h"）
+
+### Improved
+- **数据库错误处理统一** - 所有查询返回 `Result<Option<T>>`，防止静默失败
+- **健康检查性能** - 改用轻量级 `count()` 查询替代 `load_all()`，避免内存压力
+- **批量查询性能** - `batch_get_existing()` 使用 HashSet 提升查找性能
+- **敏感信息保护** - 敏感配置更新时日志中隐藏明文值
+- **Cookie 安全属性** - 清理时添加 secure、same-site 和 domain 属性
+- **启动流程优化** - 增加错误处理和耗时日志，改进关机信号处理
+- **SQLite 连接池** - 增加健康检查和连接超时设置
+- **时间解析器** - 添加算术溢出检查，错误消息国际化为英文
+
+### Fixed
+- **缓存删除逻辑** - 修复 `CompositeCache::remove` 方法，删除对象缓存后使用负缓存标记键
+- **CSV 导入** - 修复因重复短码导致的批量插入失败问题，改用 HashMap 去重
+- **短链点击计数** - 修复创建时 `click_count` 字段初始化逻辑，使用传入的点击次数而非固定为 0
+- **CORS 配置** - 添加安全验证，防止通配符源与凭据同时启用
+- **配置更新函数** - `update_config_by_key` 遇到未知键时正确返回 `false`
+- **Upsert 操作** - 包含 ClickCount 和 CreatedAt 字段，确保数据完整性
+
+### Refactored
+- **点击缓冲区计数器** - `ClickBuffer.counter` 重命名为 `total_clicks`，用于跟踪总点击数
+- **前端静态资源加载** - 使用异步 IO 并统一加载逻辑
+
+### Dependencies
+- 更新 `aws-lc-rs`、`chrono`、`rust-embed`、`wasm-bindgen` 等依赖版本
+- 升级 `rustc-demangle` 至 `0.1.27`，`unicode-truncate` 至 `2.0.1`
+- 移除 `itertools 0.13.0`
+
+### Admin Panel
+- **PWA 更新检测** - 新增 `usePwaUpdate` hook，每小时自动检查 Service Worker 更新并显示通知提示
+- **短代码路径格式** - 支持使用斜杠作为路径分隔符（如 `abc/def`）
+- **短代码验证规则扩展** - 允许点号（`.`）作为有效字符，最大长度从 50 增加到 128
+- **i18n** - 简化导入覆盖模式的描述文本，改进 CORS 配置项翻译说明
+
 ## [v0.3.0-beta.1] - 2026-01-15
 
 ### Added
@@ -670,7 +722,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.2...HEAD
+[v0.3.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...v0.3.0-beta.2
 [v0.3.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...v0.3.0-beta.1
 [v0.3.0-alpha.7]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...v0.3.0-alpha.7
 [v0.3.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.5...v0.3.0-alpha.6
