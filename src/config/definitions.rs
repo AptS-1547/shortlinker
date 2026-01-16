@@ -100,7 +100,7 @@ fn default_empty() -> String {
 }
 
 fn default_admin_token() -> String {
-    crate::utils::generate_random_code(8)
+    crate::utils::generate_random_code(16)
 }
 
 fn default_jwt_secret() -> String {

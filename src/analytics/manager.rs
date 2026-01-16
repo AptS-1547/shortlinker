@@ -12,7 +12,7 @@ use std::sync::{
 };
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 use crate::analytics::ClickSink;
 
@@ -20,8 +20,8 @@ use crate::analytics::ClickSink;
 struct ClickBuffer {
     /// 点击计数缓冲区（使用 Arc<str> 减少克隆开销）
     data: DashMap<Arc<str>, usize>,
-    /// 缓冲区中唯一键的数量
-    counter: AtomicUsize,
+    /// 缓冲区中的总点击数（用于阈值判断）
+    total_clicks: AtomicUsize,
     /// 刷盘锁，防止并发刷盘
     flush_lock: Mutex<()>,
 }
@@ -30,7 +30,7 @@ impl ClickBuffer {
     fn new() -> Self {
         Self {
             data: DashMap::new(),
-            counter: AtomicUsize::new(0),
+            total_clicks: AtomicUsize::new(0),
             flush_lock: Mutex::new(()),
         }
     }
@@ -41,14 +41,14 @@ impl ClickBuffer {
         if let Some(mut entry) = self.data.get_mut(key) {
             *entry += 1;
             trace!("ClickBuffer: Incremented existing key: {}", key);
-            return self.counter.load(Ordering::Relaxed);
+            return self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1;
         }
 
         // 只有在需要插入新条目时才创建 Arc<str>
         self.data.insert(Arc::from(key), 1);
         trace!("ClickBuffer: Inserted new key: {}", key);
 
-        self.counter.fetch_add(1, Ordering::Relaxed) + 1
+        self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// 收集所有更新并清空缓冲区
@@ -60,16 +60,17 @@ impl ClickBuffer {
             .collect();
 
         if !updates.is_empty() {
+            let total: usize = updates.iter().map(|(_, v)| v).sum();
             self.data.clear();
-            self.counter.store(0, Ordering::Release);
+            self.total_clicks.fetch_sub(total, Ordering::Release);
         }
 
         updates
     }
 
-    /// 获取当前缓冲区大小
-    fn size(&self) -> usize {
-        self.counter.load(Ordering::Relaxed)
+    /// 获取当前缓冲区总点击数
+    fn total(&self) -> usize {
+        self.total_clicks.load(Ordering::Relaxed)
     }
 }
 
@@ -161,15 +162,15 @@ impl ClickManager {
             }
             Err(e) => {
                 // 刷盘失败，数据已丢失（drain 已清空）
-                // 在生产环境中可能需要更好的错误恢复策略
-                debug!("ClickManager: flush_clicks failed: {}", e);
+                // TODO: 考虑更好的错误恢复策略（如写回 buffer 或持久化队列）
+                warn!("ClickManager: flush_clicks failed: {}, {} entries lost", e, count);
             }
         }
     }
 
-    /// 获取当前缓冲区大小（用于监控）
+    /// 获取当前缓冲区总点击数（用于监控）
     pub fn buffer_size(&self) -> usize {
-        self.buffer.size()
+        self.buffer.total()
     }
 }
 
@@ -215,12 +216,13 @@ mod tests {
         manager.increment("key1");
         manager.increment("key2");
 
-        assert_eq!(manager.buffer_size(), 2);
+        // buffer_size() 返回总点击数，不是唯一 key 数量
+        assert_eq!(manager.buffer_size(), 3);
 
         manager.flush().await;
 
         assert_eq!(manager.buffer_size(), 0);
         let flushed = sink.get_flushed();
-        assert_eq!(flushed.len(), 2);
+        assert_eq!(flushed.len(), 2); // 2 个唯一 key
     }
 }

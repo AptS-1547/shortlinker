@@ -310,7 +310,9 @@ where
 /// 如果遗漏了某个 key，编译器不会报错，配置更新会静默失败。
 pub fn update_config_by_key(key: &str, value: &str) -> bool {
     use super::definitions::keys;
+    use std::cell::Cell;
 
+    let found = Cell::new(true);
     update_config(|config| {
         match key {
             // API 认证配置
@@ -408,8 +410,8 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
                 config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
             }
 
-            _ => (),
+            _ => found.set(false),
         }
     });
-    true
+    found.get()
 }
