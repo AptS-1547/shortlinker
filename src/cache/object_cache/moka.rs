@@ -68,7 +68,7 @@ impl ObjectCache for MokaCacheWrapper {
         if let Some(value) = self.inner.get(key).await {
             CacheResult::Found(value.clone())
         } else {
-            CacheResult::ExistsButNoValue
+            CacheResult::Miss
         }
     }
 

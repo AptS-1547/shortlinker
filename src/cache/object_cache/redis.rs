@@ -80,17 +80,17 @@ impl ObjectCache for RedisObjectCache {
                     error!("Failed to deserialize ShortLink for key '{}': {}", key, e);
                     // 删除损坏的数据
                     let _ = conn.del::<&str, ()>(&redis_key).await;
-                    CacheResult::ExistsButNoValue
+                    CacheResult::Miss
                 }
             },
             Ok(None) => {
                 trace!("Key not found in cache: {}", key);
-                CacheResult::NotFound
+                CacheResult::Miss
             }
             Err(e) => {
                 // ConnectionManager 自动处理重连，这里只记录错误
                 error!("Redis get error (will auto-reconnect): {}", e);
-                CacheResult::ExistsButNoValue
+                CacheResult::Miss
             }
         }
     }

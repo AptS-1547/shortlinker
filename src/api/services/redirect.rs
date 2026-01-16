@@ -41,12 +41,13 @@ impl RedirectService {
                 Self::update_click(&capture_path);
                 Self::finish_redirect(link)
             }
-            CacheResult::ExistsButNoValue => {
-                trace!("L2 cache miss for path: {}", &capture_path);
+            CacheResult::Miss => {
+                trace!("Cache miss for path: {}", &capture_path);
                 match storage.get(&capture_path).await {
                     Some(link) => match link.cache_ttl(get_config().cache.default_ttl) {
                         None => {
                             debug!("Expired link from storage: {}", &capture_path);
+                            cache.mark_not_found(&capture_path).await;
                             Self::not_found_response()
                         }
                         Some(ttl) => {
@@ -56,7 +57,8 @@ impl RedirectService {
                         }
                     },
                     None => {
-                        debug!("Redirect link not found: {}", &capture_path);
+                        debug!("Redirect link not found in database: {}", &capture_path);
+                        cache.mark_not_found(&capture_path).await;
                         Self::not_found_response()
                     }
                 }

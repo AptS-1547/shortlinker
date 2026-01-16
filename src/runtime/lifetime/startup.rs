@@ -115,17 +115,18 @@ pub async fn prepare_server_startup() -> StartupContext {
         .await
         .expect("Failed to create cache");
 
-    let links = storage.load_all().await;
-    let links_count = links.len();
+    // 只加载短码到 Bloom Filter（不加载完整数据到 Object Cache）
+    let codes = storage.load_all_codes().await;
+    let codes_count = codes.len();
     cache
         .reconfigure(cache::traits::BloomConfig {
-            capacity: links_count,
+            capacity: codes_count,
             fp_rate: 0.001,
         })
         .await
         .expect("Failed to reconfigure cache");
-    cache.load_cache(links).await;
-    debug!("L1/L2 cache initialized with {} links", links_count);
+    cache.load_bloom(&codes).await;
+    debug!("Bloom filter initialized with {} codes", codes_count);
 
     #[cfg(any(feature = "cli", feature = "tui"))]
     crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;

@@ -53,13 +53,15 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
 
     async fn clear(&self, count: usize, fp_rate: f64) -> Result<()> {
         let mut bloom = self.inner.write();
-        let capacity = count.max(9_000) + 1000;
+        // 预留 20% 空间，但至少预留 1000
+        let reserve = (count / 5).max(1000);
+        let capacity = count + reserve;
         *bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
             ShortlinkerError::cache_connection(format!("Failed to clear bloom filter: {e}"))
         })?;
         debug!(
-            "Bloom filter cleared with count: {}, fp_rate: {}",
-            capacity, fp_rate
+            "Bloom filter cleared with capacity: {} (count: {} + reserve: {}), fp_rate: {}",
+            capacity, count, reserve, fp_rate
         );
         Ok(())
     }

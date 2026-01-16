@@ -20,7 +20,7 @@ impl NullObjectCache {
 impl ObjectCache for NullObjectCache {
     async fn get(&self, key: &str) -> CacheResult {
         trace!("NullObjectCache.get called for key: {}", key);
-        CacheResult::NotFound
+        CacheResult::Miss
     }
 
     async fn insert(&self, key: &str, _: ShortLink, _ttl_secs: Option<u64>) {

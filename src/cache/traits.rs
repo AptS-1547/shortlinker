@@ -12,10 +12,10 @@ pub struct BloomConfig {
 /// 缓存查询结果
 #[derive(Debug, Clone)]
 pub enum CacheResult {
-    /// 确定不存在
+    /// 确定不存在（来自 Negative Cache 或数据库确认）
     NotFound,
-    /// 存在但没有缓存值
-    ExistsButNoValue,
+    /// 缓存未命中，需要回源数据库
+    Miss,
     /// 成功获取到缓存值
     Found(ShortLink),
 }
@@ -27,8 +27,14 @@ pub trait CompositeCacheTrait: Send + Sync {
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
+    /// 标记 key 为不存在（写入 Negative Cache）
+    async fn mark_not_found(&self, key: &str);
+
     /// 批量加载 Filter 和 Object Cache
     async fn load_cache(&self, links: HashMap<String, ShortLink>);
+
+    /// 只加载 Bloom Filter（不加载 Object Cache）
+    async fn load_bloom(&self, codes: &[String]);
 
     /// 重新初始化 Filter
     async fn reconfigure(&self, config: BloomConfig) -> Result<()>;
@@ -70,4 +76,20 @@ pub trait ObjectCache: Send + Sync {
         // 默认实现：子类可以选择覆盖
         tracing::trace!("Not loading Object Cache, no operation defined");
     }
+}
+
+/// 负向缓存：存储确认不存在的 key
+#[async_trait]
+pub trait NegativeCache: Send + Sync {
+    /// 检查 key 是否在 Negative Cache 中（确认不存在）
+    async fn contains(&self, key: &str) -> bool;
+
+    /// 标记 key 为不存在
+    async fn mark(&self, key: &str);
+
+    /// 清除指定 key（用于新增数据时）
+    async fn remove(&self, key: &str);
+
+    /// 清空所有
+    async fn clear(&self);
 }
