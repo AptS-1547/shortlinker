@@ -11,6 +11,19 @@ use crate::cache::CompositeCacheTrait;
 use crate::config::get_config;
 use crate::storage::{SeaOrmStorage, ShortLink};
 
+/// 短码最大长度
+const MAX_SHORT_CODE_LEN: usize = 128;
+
+/// 验证短码格式：长度 ≤ 128，字符集 [a-zA-Z0-9_.-/]
+#[inline]
+fn is_valid_short_code(code: &str) -> bool {
+    !code.is_empty()
+        && code.len() <= MAX_SHORT_CODE_LEN
+        && code.bytes().all(
+            |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' | b'.' | b'/'),
+        )
+}
+
 pub struct RedirectService {}
 
 impl RedirectService {
@@ -26,6 +39,10 @@ impl RedirectService {
             HttpResponse::TemporaryRedirect()
                 .insert_header(("Location", default_url))
                 .finish()
+        } else if !is_valid_short_code(&captured_path) {
+            // 非法短码，直接 404（不进缓存、不进 DashMap）
+            trace!("Invalid short code rejected: {}", &captured_path);
+            Self::not_found_response()
         } else {
             Self::process_redirect(captured_path, cache, storage).await
         }
@@ -89,21 +106,12 @@ impl RedirectService {
             .body("Internal Server Error")
     }
 
+    /// 更新点击计数（同步无锁操作，无需 spawn）
+    #[inline]
     fn update_click(code: &str) {
-        let code: Arc<str> = Arc::from(code);
-        tokio::spawn(async move {
-            match get_click_manager() {
-                Some(manager) => {
-                    manager.increment(&code);
-                }
-                None => {
-                    trace!(
-                        "Click manager not initialized, skipping increment for code: {}",
-                        code
-                    );
-                }
-            }
-        });
+        if let Some(manager) = get_click_manager() {
+            manager.increment(code);
+        }
     }
 
     fn finish_redirect(link: ShortLink) -> HttpResponse {

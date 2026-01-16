@@ -20,19 +20,26 @@ static HEALTH_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 const CUSTOM_FRONTEND_DIR: &str = "./frontend-panel";
 
 impl FrontendService {
-    /// 尝试从自定义前端目录加载文件
-    fn try_load_custom_frontend(file_path: &str) -> Option<Vec<u8>> {
+    /// 尝试从自定义前端目录加载文件（异步 IO）
+    async fn try_load_custom_frontend(file_path: &str) -> Option<Vec<u8>> {
         // 防止路径遍历攻击
         if file_path.contains("..") {
             return None;
         }
 
         let custom_path = PathBuf::from(CUSTOM_FRONTEND_DIR).join(file_path);
-        if custom_path.exists() && custom_path.is_file() {
-            std::fs::read(&custom_path).ok()
-        } else {
-            None
+        match tokio::fs::metadata(&custom_path).await {
+            Ok(meta) if meta.is_file() => tokio::fs::read(&custom_path).await.ok(),
+            _ => None,
         }
+    }
+
+    /// 尝试加载自定义前端，fallback 到嵌入资源
+    async fn load_frontend_file(file_path: &str) -> Option<Vec<u8>> {
+        if let Some(data) = Self::try_load_custom_frontend(file_path).await {
+            return Some(data);
+        }
+        FrontendAssets::get(file_path).map(|c| c.data.into_owned())
     }
 
     /// 处理前端首页 - 服务构建好的 index.html
@@ -55,8 +62,7 @@ impl FrontendService {
         }
 
         // 优先尝试加载自定义前端
-        let content = Self::try_load_custom_frontend("index.html")
-            .or_else(|| FrontendAssets::get("index.html").map(|c| c.data.into_owned()));
+        let content = Self::load_frontend_file("index.html").await;
 
         match content {
             Some(data) => {
@@ -101,8 +107,7 @@ impl FrontendService {
         let asset_path = format!("assets/{}", path);
 
         // 优先尝试加载自定义前端静态资源
-        let content = Self::try_load_custom_frontend(&asset_path)
-            .or_else(|| FrontendAssets::get(&asset_path).map(|c| c.data.into_owned()));
+        let content = Self::load_frontend_file(&asset_path).await;
 
         match content {
             Some(data) => Ok(HttpResponse::Ok().content_type(content_type).body(data)),
@@ -118,8 +123,7 @@ impl FrontendService {
         trace!("Serving favicon");
 
         // 优先尝试加载自定义前端 favicon
-        let content = Self::try_load_custom_frontend("favicon.ico")
-            .or_else(|| FrontendAssets::get("favicon.ico").map(|c| c.data.into_owned()));
+        let content = Self::load_frontend_file("favicon.ico").await;
 
         match content {
             Some(data) => Ok(HttpResponse::Ok().content_type("image/x-icon").body(data)),
@@ -160,8 +164,7 @@ impl FrontendService {
         }
 
         // 优先尝试加载自定义前端
-        let content = Self::try_load_custom_frontend("index.html")
-            .or_else(|| FrontendAssets::get("index.html").map(|c| c.data.into_owned()));
+        let content = Self::load_frontend_file("index.html").await;
 
         match content {
             Some(data) => {
@@ -208,8 +211,7 @@ impl FrontendService {
         let content_type = Self::get_content_type(file_name);
 
         // 优先尝试加载自定义前端 PWA 资源
-        let content = Self::try_load_custom_frontend(file_name)
-            .or_else(|| FrontendAssets::get(file_name).map(|c| c.data.into_owned()));
+        let content = Self::load_frontend_file(file_name).await;
 
         match content {
             Some(data) => {

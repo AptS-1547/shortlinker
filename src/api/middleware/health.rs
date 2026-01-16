@@ -100,10 +100,11 @@ where
             // 每次请求都读取最新配置
             let config = get_config();
             let admin_token = &config.api.admin_token;
+            let health_token = &config.api.health_token;
 
-            // Check if admin token is configured (health requires admin access)
-            if admin_token.is_empty() {
-                warn!("Admin token not configured - health endpoint disabled");
+            // 两个 token 都为空才禁用健康接口
+            if admin_token.is_empty() && health_token.is_empty() {
+                warn!("Neither admin_token nor health_token configured - health endpoint disabled");
                 return Ok(req.into_response(
                     HttpResponse::NotFound()
                         .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
@@ -121,9 +122,6 @@ where
                         .map_into_right_body(),
                 ));
             }
-
-            // 获取 health_token
-            let health_token = &config.api.health_token;
 
             // 先尝试 Bearer token 认证（给 k8s 等监控工具用）
             if Self::validate_bearer_token(&req, health_token) {

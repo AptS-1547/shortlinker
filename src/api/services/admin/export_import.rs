@@ -6,7 +6,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use chrono::Utc;
 use csv::{ReaderBuilder, WriterBuilder};
 use futures_util::StreamExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -187,18 +187,18 @@ pub async fn import_links(
     let mut success_count = 0;
     let mut skipped_count = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
-    let mut links_to_insert: Vec<ShortLink> = Vec::new();
+    // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
+    let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
 
-    // 预加载所有现有链接代码（用于检查冲突）
+    // 预加载所有现有链接代码（用于检查冲突）- 只查 short_code 列
     let existing_codes: HashSet<String> = storage
-        .load_all()
+        .load_all_codes()
         .await
         .map_err(|e| {
-            error!("Failed to load existing links for import: {}", e);
+            error!("Failed to load existing codes for import: {}", e);
             actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
         })?
-        .keys()
-        .cloned()
+        .into_iter()
         .collect();
 
     // 已处理的代码（用于 overwrite 模式下检测重复）
@@ -310,14 +310,15 @@ pub async fn import_links(
             click: row.click_count,
         };
 
-        processed_codes.insert(row.code);
-        links_to_insert.push(link);
+        processed_codes.insert(row.code.clone());
+        links_to_insert.insert(row.code, link);
         success_count += 1;
     }
 
     // 批量插入数据库
-    if !links_to_insert.is_empty() {
-        if let Err(e) = storage.batch_set(links_to_insert.clone()).await {
+    let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
+    if !links_vec.is_empty() {
+        if let Err(e) = storage.batch_set(links_vec.clone()).await {
             error!("Failed to batch insert links: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -327,7 +328,7 @@ pub async fn import_links(
 
         // 更新缓存
         let default_ttl = crate::config::get_config().cache.default_ttl;
-        for link in links_to_insert {
+        for link in links_vec {
             let code = link.code.clone();
             let ttl = link.cache_ttl(default_ttl);
             cache.insert(&code, link, ttl).await;

@@ -11,21 +11,21 @@ impl App {
 
         // Validate short code
         if !self.short_code_input.is_empty() {
-            if self.short_code_input.len() > 50 {
+            if self.short_code_input.len() > 128 {
                 self.validation_errors.insert(
                     "short_code".to_string(),
-                    "Code too long (max 50 chars)".to_string(),
+                    "Code too long (max 128 chars)".to_string(),
                 );
             }
-            // Check for invalid characters
+            // Check for invalid characters: [a-zA-Z0-9_.-/]
             if !self
                 .short_code_input
                 .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                .all(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
             {
                 self.validation_errors.insert(
                     "short_code".to_string(),
-                    "Only alphanumeric, dash and underscore allowed".to_string(),
+                    "Only alphanumeric, dash, underscore, dot and slash allowed".to_string(),
                 );
             }
         }
