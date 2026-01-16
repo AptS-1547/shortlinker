@@ -35,13 +35,13 @@ impl TimeParser {
                 .unwrap_or(remaining.len());
 
             if digit_end == 0 {
-                return Err(format!("无效的时间格式: '{}'", input));
+                return Err(format!("Invalid time format: '{}'", input));
             }
 
             let num_str = &remaining[..digit_end];
             let num: i64 = num_str
                 .parse()
-                .map_err(|_| format!("无效的数字: '{}'", num_str))?;
+                .map_err(|_| format!("Invalid number: '{}'", num_str))?;
 
             remaining = &remaining[digit_end..];
 
@@ -53,26 +53,44 @@ impl TimeParser {
                 .unwrap_or(remaining.len());
 
             if unit_end == 0 {
-                return Err(format!("缺少时间单位，数字 '{}' 后应跟时间单位", num));
+                return Err(format!("Missing time unit after number '{}'", num));
             }
 
             let unit_str = &remaining[..unit_end];
 
             // 解析单位并计算持续时间
             // 注意：大写 M 表示月份，小写 m 表示分钟
+            // 使用 try_* 方法避免极端数值导致 panic
             let lower_unit_str = unit_str.to_lowercase();
             let duration =
                 if unit_str == "M" || lower_unit_str == "month" || lower_unit_str == "months" {
-                    Duration::days(num * 30) // 近似30天
+                    // Approximate 30 days per month
+                    let days = num
+                        .checked_mul(30)
+                        .ok_or_else(|| format!("Time value overflow: {} * 30", num))?;
+                    Duration::try_days(days)
+                        .ok_or_else(|| format!("Duration out of range: {} days", days))?
                 } else {
                     match lower_unit_str.as_str() {
-                        "s" | "sec" | "second" | "seconds" => Duration::seconds(num),
-                        "m" | "min" | "minute" | "minutes" => Duration::minutes(num),
-                        "h" | "hour" | "hours" => Duration::hours(num),
-                        "d" | "day" | "days" => Duration::days(num),
-                        "w" | "week" | "weeks" => Duration::weeks(num),
-                        "y" | "year" | "years" => Duration::days(num * 365), // 近似365天
-                        _ => return Err(format!("不支持的时间单位: '{}'", unit_str)),
+                        "s" | "sec" | "second" | "seconds" => Duration::try_seconds(num)
+                            .ok_or_else(|| format!("Duration out of range: {} seconds", num))?,
+                        "m" | "min" | "minute" | "minutes" => Duration::try_minutes(num)
+                            .ok_or_else(|| format!("Duration out of range: {} minutes", num))?,
+                        "h" | "hour" | "hours" => Duration::try_hours(num)
+                            .ok_or_else(|| format!("Duration out of range: {} hours", num))?,
+                        "d" | "day" | "days" => Duration::try_days(num)
+                            .ok_or_else(|| format!("Duration out of range: {} days", num))?,
+                        "w" | "week" | "weeks" => Duration::try_weeks(num)
+                            .ok_or_else(|| format!("Duration out of range: {} weeks", num))?,
+                        "y" | "year" | "years" => {
+                            // Approximate 365 days per year
+                            let days = num
+                                .checked_mul(365)
+                                .ok_or_else(|| format!("Time value overflow: {} * 365", num))?;
+                            Duration::try_days(days)
+                                .ok_or_else(|| format!("Duration out of range: {} days", days))?
+                        }
+                        _ => return Err(format!("Unsupported time unit: '{}'", unit_str)),
                     }
                 };
 
@@ -81,13 +99,13 @@ impl TimeParser {
         }
 
         if total_duration == Duration::zero() {
-            return Err("时间间隔不能为零".to_string());
+            return Err("Duration cannot be zero".to_string());
         }
 
         let now = Utc::now();
         match now.checked_add_signed(total_duration) {
             Some(future_time) => Ok(future_time),
-            None => Err("计算的过期时间超出了有效范围".to_string()),
+            None => Err("Calculated expiration time is out of valid range".to_string()),
         }
     }
 
@@ -96,7 +114,7 @@ impl TimeParser {
         let duration = to.signed_duration_since(from);
 
         if duration.num_seconds() < 0 {
-            return "已过期".to_string();
+            return "Expired".to_string();
         }
 
         let days = duration.num_days();
@@ -105,20 +123,20 @@ impl TimeParser {
 
         if days > 0 {
             if hours > 0 {
-                format!("{}天{}小时", days, hours)
+                format!("{}d {}h", days, hours)
             } else {
-                format!("{}天", days)
+                format!("{}d", days)
             }
         } else if hours > 0 {
             if minutes > 0 {
-                format!("{}小时{}分钟", hours, minutes)
+                format!("{}h {}m", hours, minutes)
             } else {
-                format!("{}小时", hours)
+                format!("{}h", hours)
             }
         } else if minutes > 0 {
-            format!("{}分钟", minutes)
+            format!("{}m", minutes)
         } else {
-            format!("{}秒", duration.num_seconds())
+            format!("{}s", duration.num_seconds())
         }
     }
 }
@@ -211,5 +229,52 @@ mod tests {
         assert!(TimeParser::parse_expire_time("invalid").is_err());
         assert!(TimeParser::parse_expire_time("1x").is_err());
         assert!(TimeParser::parse_expire_time("abc").is_err());
+    }
+
+    #[test]
+    fn test_extreme_values_no_panic() {
+        // 测试极端数值不会 panic，而是返回错误
+        // 这些值会导致 chrono::Duration 溢出
+        let extreme_cases = [
+            "999999999999999999d",
+            "999999999999999999y",
+            "999999999999999999w",
+            "999999999999999999h",
+            "999999999999999999m",
+            "999999999999999999s",
+            "999999999999999999M",
+        ];
+
+        for case in extreme_cases {
+            let result = TimeParser::parse_expire_time(case);
+            assert!(
+                result.is_err(),
+                "极端值 '{}' 应该返回错误而非 panic",
+                case
+            );
+        }
+    }
+
+    #[test]
+    fn test_overflow_multiplication() {
+        // 测试乘法溢出的情况 (num * 30 和 num * 365)
+        let result = TimeParser::parse_expire_time("999999999999999M"); // months: num * 30
+        assert!(result.is_err(), "月份乘法溢出应返回错误");
+
+        let result = TimeParser::parse_expire_time("999999999999999y"); // years: num * 365
+        assert!(result.is_err(), "年份乘法溢出应返回错误");
+    }
+
+    #[test]
+    fn test_reasonable_large_values() {
+        // 合理的大值应该正常工作
+        let result = TimeParser::parse_expire_time("100y"); // 100 年
+        assert!(result.is_ok(), "100年应该是有效值");
+
+        let result = TimeParser::parse_expire_time("3650d"); // 约 10 年
+        assert!(result.is_ok(), "3650天应该是有效值");
+
+        let result = TimeParser::parse_expire_time("520w"); // 约 10 年
+        assert!(result.is_ok(), "520周应该是有效值");
     }
 }
