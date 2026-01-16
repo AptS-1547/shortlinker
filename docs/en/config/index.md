@@ -140,15 +140,15 @@ These settings are stored in the database and can be changed at runtime via the 
 | Key | Type | Default | Restart | Description |
 |-----|------|---------|---------|-------------|
 | `api.admin_token` | String | *(auto-generated)* | No | Admin login password for `POST /admin/v1/auth/login` |
-| `api.health_token` | String | *(empty)* | No | Bearer token for Health API (`Authorization: Bearer ...`, recommended for monitoring/probes; if empty, only JWT cookie auth is available). Note: when `api.admin_token` is empty, health endpoints return `404` and are treated as disabled |
+| `api.health_token` | String | *(empty)* | No | Bearer token for Health API (`Authorization: Bearer ...`, recommended for monitoring/probes; if empty, only JWT cookie auth is available). Note: health endpoints are treated as disabled only when both `api.admin_token` and `api.health_token` are empty (returns `404`) |
 | `api.jwt_secret` | String | *(auto-generated)* | No | JWT signing secret |
 | `api.access_token_minutes` | Integer | `15` | No | Access token TTL (minutes) |
 | `api.refresh_token_days` | Integer | `7` | No | Refresh token TTL (days) |
 | `api.access_cookie_name` | String | `shortlinker_access` | Yes | Access cookie name |
 | `api.refresh_cookie_name` | String | `shortlinker_refresh` | Yes | Refresh cookie name |
-| `api.cookie_secure` | Boolean | `false` | Yes | HTTPS-only cookies |
-| `api.cookie_same_site` | String | `Lax` | Yes | SameSite policy |
-| `api.cookie_domain` | String | *(empty)* | Yes | Cookie domain |
+| `api.cookie_secure` | Boolean | `false` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
+| `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
+| `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
 
 ### Routes
 
@@ -178,12 +178,12 @@ These settings are stored in the database and can be changed at runtime via the 
 
 | Key | Type | Default | Restart | Description |
 |-----|------|---------|---------|-------------|
-| `cors.enabled` | Boolean | `true` | Yes | Enable CORS |
-| `cors.allowed_origins` | Json | `[]` | Yes | Allowed origins (empty array = allow all) |
+| `cors.enabled` | Boolean | `false` | Yes | Enable CORS (when disabled, no CORS headers are added; browser keeps same-origin policy) |
+| `cors.allowed_origins` | Json | `[]` | Yes | Allowed origins (JSON array; `["*"]` = allow any origin; empty array = same-origin only / no cross-origin) |
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | Yes | Allowed methods |
 | `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | Yes | Allowed headers |
 | `cors.max_age` | Integer | `3600` | Yes | Preflight cache TTL (seconds) |
-| `cors.allow_credentials` | Boolean | `true` | Yes | Allow credentials (needed for cross-origin cookies) |
+| `cors.allow_credentials` | Boolean | `false` | Yes | Allow credentials (needed for cross-origin cookies; not recommended together with `["*"]` for security) |
 
 ## Priority
 

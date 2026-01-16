@@ -7,7 +7,7 @@ Shortlinker supports multiple deployment methods, from simple local running to p
 ### 🚀 Quick Deployment
 - **Docker Deployment**: Recommended production solution, no Rust installation required
 - **Pre-compiled Binaries**: Download and run, supports multiple platforms
-- **Source Compilation**: Requires Rust 1.82+, suitable for custom needs
+- **Source Compilation**: Requires Rust 1.85+ (Edition 2024), suitable for custom needs
 
 ### 🔧 Production Environment
 - **Reverse Proxy**: Nginx, Caddy, Apache configuration
@@ -21,7 +21,7 @@ Shortlinker supports multiple deployment methods, from simple local running to p
 - **Architecture**: x86_64, ARM64
 
 ### Source Compilation Requirements
-- **Rust**: >= 1.82.0 (required)
+- **Rust**: >= 1.85.0 (required, Edition 2024)
 - **Git**: For cloning the project
 
 ## Quick Start

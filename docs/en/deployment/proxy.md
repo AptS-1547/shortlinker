@@ -230,13 +230,17 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### Health Check
 
-> Note: In the current version, `/health/*` endpoints require JWT cookies issued after Admin login, so they are not suitable as a simple reverse-proxy health probe.
->
-> If you only need a liveness probe, check `/` (default returns `307`), or expose a dedicated proxy health path that forwards to `/`.
+> Note: `/health/*` endpoints require authentication by default. In production, it’s recommended to set `HEALTH_TOKEN` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`.  
+> If adding request headers is not convenient, probing `/` (default returns `307`) can be used as a simple liveness check.
 
 ```nginx
 location = /_healthz {
     access_log off;
+    # Recommended: authenticated probe (requires HEALTH_TOKEN configured)
+    # proxy_set_header Authorization "Bearer your_health_token";
+    # proxy_pass http://127.0.0.1:8080/health/live;
+
+    # Fallback: simple liveness probe (probes `/`, 307 counts as alive)
     proxy_pass http://127.0.0.1:8080/;
     proxy_connect_timeout 1s;
     proxy_send_timeout 1s;

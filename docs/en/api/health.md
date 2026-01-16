@@ -21,7 +21,8 @@ Route prefix can be configured via environment variables (see [Configuration](/e
 
 ## Authentication (Important)
 
-Health endpoints require authentication and depend on `ADMIN_TOKEN` (when `api.admin_token` is empty, health endpoints return `404 Not Found` and are treated as disabled).
+Health endpoints require authentication and can be accessed via **Bearer token** (`HEALTH_TOKEN`) or **JWT cookies** (issued after Admin login).  
+Health endpoints are treated as disabled only when **both** `api.admin_token` and `api.health_token` are empty (returns `404 Not Found`).
 
 ### Option A: Bearer token (recommended for monitoring/probes)
 

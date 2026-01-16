@@ -15,16 +15,20 @@ Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 
 ## 接口详情
 
-### GET/HEAD /{path}
+### GET/HEAD /{path...}
 
 重定向到指定短码对应的目标 URL。
 
 **请求方法**: `GET` | `HEAD`
 
-**请求路径**: `/{short_code}`
+**请求路径**: `/{path}`（支持多级路径，例如 `/foo/bar`）
 
 **路径参数**:
-- `short_code` (string): 短链接代码
+- `path` (string): 短链接代码（大小写敏感）
+
+**短码格式约束**（不满足会直接返回 `404`）：
+- 最大长度：128
+- 允许字符：`[a-zA-Z0-9_.-/]`
 
 **响应**:
 
@@ -50,7 +54,7 @@ Not Found
 
 ### 根路径重定向
 
-当访问根路径 `/` 时，会重定向到默认 URL（通过 `DEFAULT_URL` 环境变量配置）。
+当访问根路径 `/` 时，会重定向到默认 URL（配置项 `features.default_url`，也可用 `DEFAULT_URL` 环境变量覆盖）。
 
 **请求**:
 ```http

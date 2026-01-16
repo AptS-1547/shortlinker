@@ -15,16 +15,20 @@ Shortlinker mainly provides a redirection interface that supports GET and HEAD m
 
 ## API Details
 
-### GET/HEAD /{path}
+### GET/HEAD /{path...}
 
 Redirects to the target URL corresponding to the specified short code.
 
 **Request Methods**: `GET` | `HEAD`
 
-**Request Path**: `/{short_code}`
+**Request Path**: `/{path}` (multi-level paths supported, e.g. `/foo/bar`)
 
 **Path Parameters**:
-- `short_code` (string): Short link code
+- `path` (string): Short link code (case-sensitive)
+
+**Short code constraints** (violations return `404` immediately):
+- Max length: 128
+- Allowed characters: `[a-zA-Z0-9_.-/]`
 
 **Responses**:
 
@@ -48,7 +52,7 @@ Not Found
 
 ### Root Path Redirect
 
-When accessing the root path `/`, it redirects to the default URL (configured via `DEFAULT_URL` environment variable).
+When accessing the root path `/`, it redirects to the default URL (config key `features.default_url`, can also be overridden via `DEFAULT_URL` environment variable).
 
 **Request**:
 ```http

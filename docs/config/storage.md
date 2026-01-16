@@ -15,7 +15,10 @@ Shortlinker 支持多种存储后端，您可以根据需求选择最适合的�
 - ✅ **统一接口**：所有数据库使用相同的代码路径
 - ✅ **类型安全**：编译时检查数据库操作
 
-> 💡 **提示**：`DATABASE_BACKEND` 环境变量现在是**可选的**。数据库类型会从 `DATABASE_URL` 的 scheme 自动推断（`sqlite://`、`postgres://`、`mysql://`、`mariadb://`）。只有在需要覆盖自动检测时才需要显式指定。
+> 💡 **提示**：当前版本 **不读取** `DATABASE_BACKEND`。Shortlinker 会从 `DATABASE_URL` 自动推断数据库类型：  
+> - SQLite：`sqlite://...` / 以 `.db` 或 `.sqlite` 结尾的文件路径 / `:memory:`  
+> - MySQL/MariaDB：`mysql://...` / `mariadb://...`（会按 MySQL 协议处理）  
+> - PostgreSQL：`postgres://...` / `postgresql://...`
 
 ## 存储后端功能对比
 
@@ -135,7 +138,6 @@ Shortlinker 支持多种存储后端，您可以根据需求选择最适合的�
 | PostgreSQL | 15,000 | < 0.01% | 3ms |
 | MySQL | 12,000 | < 0.01% | 4ms |
 | MariaDB | 12,500 | < 0.01% | 4ms |
-| 文件存储 | 500 | < 1% | 100ms |
 
 > 📊 **测试环境**：4核8GB内存，基于 Docker 容器
 
@@ -157,9 +159,6 @@ Shortlinker 支持多种存储后端，您可以根据需求选择最适合的�
 **配置示例**：
 
 ```bash
-# DATABASE_BACKEND 是可选的（会自动检测）
-# DATABASE_BACKEND=sqlite
-
 # 相对路径（自动创建）
 DATABASE_URL=./shortlinker.db
 DATABASE_URL=data/links.db
@@ -173,7 +172,6 @@ DATABASE_URL=sqlite:///absolute/path/to/links.db
 
 # 内存数据库（测试用）
 DATABASE_URL=:memory:
-DATABASE_URL=sqlite::memory:
 ```
 
 **性能优化**（自动应用）：
@@ -205,9 +203,6 @@ DATABASE_URL=sqlite::memory:
 **配置示例**：
 
 ```bash
-# DATABASE_BACKEND 是可选的（会自动检测）
-# DATABASE_BACKEND=postgres
-
 # 标准连接 URL
 DATABASE_URL=postgresql://user:password@localhost:5432/shortlinker
 DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
@@ -248,9 +243,6 @@ docker run --name postgres-shortlinker \
 **配置示例**：
 
 ```bash
-# DATABASE_BACKEND 是可选的（会自动检测）
-# DATABASE_BACKEND=mysql
-
 # 标准连接 URL
 DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
 
@@ -290,9 +282,6 @@ docker run --name mysql-shortlinker \
 **配置示例**：
 
 ```bash
-# DATABASE_BACKEND 是可选的（会自动检测为 mysql）
-# DATABASE_BACKEND=mariadb
-
 # MariaDB 使用 mariadb:// scheme（自动转换为 MySQL 协议）
 DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
 
@@ -323,19 +312,16 @@ docker run --name mariadb-shortlinker \
 
 ```bash
 # 小规模部署（< 10,000 链接）
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=./links.db
 # 或使用显式 URL
 DATABASE_URL=sqlite://./links.db
 
 # 中等规模（10,000 - 100,000 链接）
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=sqlite://./links.db
 # 或使用 MySQL/MariaDB
 DATABASE_URL=mysql://user:pass@host:3306/db
 
 # 大规模（> 100,000 链接）
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=postgresql://user:pass@host:5432/db
 # 或使用 MySQL/MariaDB
 DATABASE_URL=mysql://user:pass@host:3306/db
@@ -345,20 +331,16 @@ DATABASE_URL=mysql://user:pass@host:3306/db
 
 ```bash
 # 开发环境
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=dev-links.db
 DATABASE_URL=sqlite://./dev.db
 
 # 测试环境
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=:memory:
 
 # 生产环境（单机）
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=/data/links.db
 
 # 生产环境（集群）
-# DATABASE_BACKEND 可选，会自动检测
 DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 ```
 
@@ -366,16 +348,13 @@ DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
 
 ```bash
 # 低并发（< 100 QPS）
-# DATABASE_BACKEND=sqlite  # 可选，会自动检测
 DATABASE_URL=links.db
 
 # 中等并发（100-1000 QPS）
-# DATABASE_BACKEND=sqlite  # 或 mysql/mariadb，可选，会自动检测
 DATABASE_URL=sqlite://links.db
 # DATABASE_URL=mysql://user:pass@host:3306/db
 
 # 高并发（> 1000 QPS）
-# DATABASE_BACKEND=postgres  # 可选，会自动检测（推荐）
 DATABASE_URL=postgres://user:pass@host:5432/shortlinker
 ```
 
@@ -408,7 +387,7 @@ v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
 - ✅ 自动 schema 迁移
 
 **配置变更**：
-- `DATABASE_BACKEND` 现在是**可选的**（推荐省略，让系统自动检测）
+- 存储后端类型完全由 `DATABASE_URL` 决定（`sqlite://` / `mysql://` / `mariadb://` / `postgres://` 等）
 
 **数据迁移**：
 
@@ -455,7 +434,11 @@ chmod 644 links.*
 使用健康检查 API 监控存储状态：
 
 ```bash
-# Health API 复用 Admin 的 JWT Cookie 鉴权，需要先登录获取 cookies
+# 方案 A（推荐）：配置 HEALTH_TOKEN 后使用 Bearer Token（更适合监控/探针）
+# HEALTH_TOKEN="your_health_token"
+# curl -sS -H "Authorization: Bearer ${HEALTH_TOKEN}" http://localhost:8080/health/live -I
+
+# 方案 B：复用 Admin 的 JWT Cookie（需要先登录获取 cookies）
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -c cookies.txt \
@@ -473,6 +456,8 @@ curl -sS -b cookies.txt http://localhost:8080/health
   "code": 0,
   "data": {
     "status": "healthy",
+    "timestamp": "2025-06-01T12:00:00Z",
+    "uptime": 3600,
     "checks": {
       "storage": {
         "status": "healthy",
@@ -482,7 +467,8 @@ curl -sS -b cookies.txt http://localhost:8080/health
           "support_click": true
         }
       }
-    }
+    },
+    "response_time_ms": 15
   }
 }
 ```

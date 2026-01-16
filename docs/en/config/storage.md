@@ -124,7 +124,7 @@ DATABASE_URL=sqlite:///var/lib/shortlinker/links.db
 DATABASE_URL=sqlite://./data/links.db
 
 # In-memory database (for testing)
-DATABASE_URL=sqlite::memory:
+DATABASE_URL=:memory:
 ```
 
 **Use Cases**:
@@ -275,7 +275,7 @@ DATABASE_URL=mysql://user:pass@host:3306/db
 DATABASE_URL=sqlite://./dev.db
 
 # Testing environment
-DATABASE_URL=sqlite::memory:
+DATABASE_URL=:memory:
 
 # Production environment (single machine)
 DATABASE_URL=sqlite:///data/links.db
@@ -364,7 +364,11 @@ chmod 644 links.*
 Use health check API to monitor storage status:
 
 ```bash
-# Health API reuses Admin JWT-cookie auth, login first to obtain cookies
+# Option A (recommended): configure HEALTH_TOKEN and use Bearer auth (best for monitoring/probes)
+# HEALTH_TOKEN="your_health_token"
+# curl -sS -H "Authorization: Bearer ${HEALTH_TOKEN}" http://localhost:8080/health/live -I
+
+# Option B: reuse Admin JWT-cookie auth, login first to obtain cookies
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -c cookies.txt \
@@ -382,6 +386,8 @@ Response example:
   "code": 0,
   "data": {
     "status": "healthy",
+    "timestamp": "2025-06-01T12:00:00Z",
+    "uptime": 3600,
     "checks": {
       "storage": {
         "status": "healthy",
@@ -391,7 +397,8 @@ Response example:
           "support_click": true
         }
       }
-    }
+    },
+    "response_time_ms": 15
   }
 }
 ```

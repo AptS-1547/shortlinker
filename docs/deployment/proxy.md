@@ -230,13 +230,17 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### 健康检查
 
-> 注意：当前版本的 `/health/*` 端点需要 Admin 登录后下发的 JWT Cookie，不适合作为反向代理层的简单探活接口。
->
-> 如果你只需要确认后端进程存活，建议探测根路径 `/`（默认会返回 `307`），或在反代层自定义一个探活路径转发到 `/`。
+> 注意：`/health/*` 端点默认需要鉴权。推荐在生产环境设置 `HEALTH_TOKEN`，并使用 `Authorization: Bearer <token>` 探测 `/health/live` 或 `/health/ready`。  
+> 如果不方便在探活请求中添加请求头，也可以探测根路径 `/`（默认返回 `307`）作为简单存活检查。
 
 ```nginx
 location = /_healthz {
     access_log off;
+    # 推荐：带 Bearer Token 的健康探测（需要你已配置 HEALTH_TOKEN）
+    # proxy_set_header Authorization "Bearer your_health_token";
+    # proxy_pass http://127.0.0.1:8080/health/live;
+
+    # 兼容：不带鉴权的简单存活探测（探测根路径 /，返回 307 也视为存活）
     proxy_pass http://127.0.0.1:8080/;
     proxy_connect_timeout 1s;
     proxy_send_timeout 1s;

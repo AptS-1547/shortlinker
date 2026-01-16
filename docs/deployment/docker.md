@@ -126,7 +126,7 @@ docker-compose pull && docker-compose up -d
 ### 多阶段构建
 ```dockerfile
 # 构建阶段
-FROM rust:1.70 as builder
+FROM rust:1.92-slim as builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release
@@ -144,7 +144,6 @@ CMD ["/shortlinker"]
 ```
 data/
 ├── links.db            # SQLite 数据库文件
-├── links.json          # JSON 文件存储（如果使用）
 └── backup/            # 备份目录（可选）
     └── links.db.20240101
 ```

@@ -153,15 +153,15 @@ curl -sS -b cookies.txt \
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
 | `api.admin_token` | String | *(自动生成)* | 否 | 管理员登录密码（用于 `POST /admin/v1/auth/login`） |
-| `api.health_token` | String | *(空)* | 否 | Health API 的 Bearer Token（`Authorization: Bearer ...`，适合监控/探针；为空则仅支持 JWT Cookie）。注意：当 `api.admin_token` 为空时，Health 端点会返回 `404` 视为禁用 |
+| `api.health_token` | String | *(空)* | 否 | Health API 的 Bearer Token（`Authorization: Bearer ...`，适合监控/探针；为空则仅支持 JWT Cookie）。注意：当 `api.admin_token` 与 `api.health_token` 都为空时，Health 端点会返回 `404` 视为禁用 |
 | `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
 | `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
 | `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
 | `api.access_cookie_name` | String | `shortlinker_access` | 是 | Access Token Cookie 名称 |
 | `api.refresh_cookie_name` | String | `shortlinker_refresh` | 是 | Refresh Token Cookie 名称 |
-| `api.cookie_secure` | Boolean | `false` | 是 | 是否仅 HTTPS 传输 |
-| `api.cookie_same_site` | String | `Lax` | 是 | Cookie SameSite 策略 |
-| `api.cookie_domain` | String | *(空)* | 是 | Cookie 域名 |
+| `api.cookie_secure` | Boolean | `false` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
+| `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
+| `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
 
 ### 路由配置
 
@@ -191,12 +191,12 @@ curl -sS -b cookies.txt \
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
-| `cors.enabled` | Boolean | `true` | 是 | 启用 CORS |
-| `cors.allowed_origins` | Json | `[]` | 是 | 允许的来源（空数组 = 允许全部） |
+| `cors.enabled` | Boolean | `false` | 是 | 启用 CORS（禁用时不添加 CORS 头，浏览器维持同源策略） |
+| `cors.allowed_origins` | Json | `[]` | 是 | 允许的来源（JSON 数组；`["*"]` = 允许任意来源；空数组 = 仅同源/不允许跨域） |
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | 是 | 允许的 HTTP 方法 |
 | `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | 是 | 允许的请求头 |
 | `cors.max_age` | Integer | `3600` | 是 | 预检请求缓存时间（秒） |
-| `cors.allow_credentials` | Boolean | `true` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启） |
+| `cors.allow_credentials` | Boolean | `false` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启；出于安全原因不建议与 `["*"]` 同时使用） |
 
 ## 配置优先级
 
