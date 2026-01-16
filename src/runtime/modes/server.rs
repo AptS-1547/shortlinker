@@ -10,7 +10,7 @@ use actix_web::{
     web,
 };
 use anyhow::Result;
-use tracing::{debug, warn};
+use tracing::warn;
 
 use crate::api::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::api::services::{
@@ -32,16 +32,47 @@ pub struct ServerConfig {
     pub unix_socket_path: Option<String>,
 }
 
+/// Validate CORS configuration at startup (runs once)
+fn validate_cors_config(cors_config: &CorsConfig) {
+    if !cors_config.enabled {
+        return;
+    }
+
+    if cors_config.allowed_origins.is_empty() {
+        warn!(
+            "CORS enabled but allowed_origins is empty. \
+            No cross-origin requests will be allowed. \
+            Set allowed_origins explicitly or use '[\"*\"]' for any origin."
+        );
+    }
+
+    let is_any_origin = cors_config.allowed_origins.iter().any(|o| o == "*");
+    if is_any_origin && cors_config.allow_credentials {
+        tracing::error!(
+            "SECURITY WARNING: allow_any_origin + allow_credentials is a dangerous combination! \
+            Any website can make authenticated cross-origin requests. \
+            Disabling credentials for safety."
+        );
+    }
+}
+
 /// Build CORS middleware from configuration
 fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
+    // When CORS is disabled, use browser's default same-origin policy (restrictive)
     if !cors_config.enabled {
-        return Cors::permissive();
+        return Cors::default();
     }
 
     let mut cors = Cors::default();
 
+    // Track if we're using wildcard origins
+    let is_any_origin = cors_config.allowed_origins.iter().any(|o| o == "*");
+
     // Configure allowed origins
     if cors_config.allowed_origins.is_empty() {
+        // Empty origins = same-origin only (no cross-origin requests allowed)
+        // Don't call allow_any_origin(), use default same-origin policy
+    } else if is_any_origin {
         cors = cors.allow_any_origin();
     } else {
         for origin in &cors_config.allowed_origins {
@@ -50,10 +81,13 @@ fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
     }
 
     // Configure allowed methods
-    for method in &cors_config.allowed_methods {
-        if let Ok(m) = method.to_string().parse::<actix_web::http::Method>() {
-            cors = cors.allowed_methods(vec![m]);
-        }
+    let methods: Vec<actix_web::http::Method> = cors_config
+        .allowed_methods
+        .iter()
+        .filter_map(|m| m.to_string().parse().ok())
+        .collect();
+    if !methods.is_empty() {
+        cors = cors.allowed_methods(methods);
     }
 
     // Configure allowed headers
@@ -64,8 +98,12 @@ fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
     // Configure max age
     cors = cors.max_age(cors_config.max_age as usize);
 
-    // Configure credentials
-    if cors_config.allow_credentials {
+    // Configure credentials with security check
+    // Disallow any_origin + credentials combination as it's a security vulnerability
+    // (actix-cors echoes Origin header instead of *, which browsers accept)
+    if is_any_origin && cors_config.allow_credentials {
+        // Don't call supports_credentials() - force disable for security
+    } else if cors_config.allow_credentials {
         cors = cors.supports_credentials();
     }
 
@@ -81,16 +119,20 @@ fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
 /// 4. Listens for graceful shutdown signals
 ///
 /// **Note**: Logging system must be initialized before calling this function
-pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
+pub async fn run_server() -> Result<()> {
     // Record application start time
     let app_start_time = AppStartTime {
         start_datetime: chrono::Utc::now(),
     };
 
-    debug!("Starting pre-startup processing...");
-
     // Prepare server startup (cache, storage, routes)
-    let startup = lifetime::startup::prepare_server_startup().await;
+    // This also syncs database config to AppConfig
+    let startup = lifetime::startup::prepare_server_startup()
+        .await
+        .map_err(|e| {
+            tracing::error!("Server startup failed: {}", e);
+            e
+        })?;
 
     let cache = startup.cache.clone();
     let storage = startup.storage.clone();
@@ -100,12 +142,8 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
     let health_prefix = route.health_prefix;
     let frontend_prefix = route.frontend_prefix;
 
-    debug!(
-        "Pre-startup processing completed in {} ms",
-        chrono::Utc::now()
-            .signed_duration_since(app_start_time.start_datetime)
-            .num_milliseconds()
-    );
+    // Load configuration (after database sync in prepare_server_startup)
+    let config = crate::config::get_config();
 
     // Load server configuration
     let server_config = ServerConfig {
@@ -120,6 +158,9 @@ pub async fn run_server(config: &crate::config::AppConfig) -> Result<()> {
 
     // Load CORS configuration
     let cors_config = config.cors.clone();
+
+    // Validate CORS configuration at startup (runs once, not per worker)
+    validate_cors_config(&cors_config);
 
     // Configure HTTP server
     let server = HttpServer::new(move || {

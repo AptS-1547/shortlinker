@@ -279,6 +279,7 @@ impl ConfigStore {
     /// - value_type
     /// - requires_restart
     /// - is_sensitive
+    ///
     /// 与代码中的定义保持一致。
     ///
     /// 返回值表示是否发生了更新。

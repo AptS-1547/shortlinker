@@ -5,8 +5,17 @@ use crate::analytics::global::get_click_manager;
 
 pub async fn listen_for_shutdown() {
     // 等待 Ctrl+C 信号
-    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    warn!("Shutdown signal received, flushing click data...");
+    match signal::ctrl_c().await {
+        Ok(()) => {
+            warn!("Shutdown signal received, flushing click data...");
+        }
+        Err(e) => {
+            warn!(
+                "Failed to listen for Ctrl+C: {}. Proceeding with shutdown anyway.",
+                e
+            );
+        }
+    }
 
     // 调用点击管理器的 manual_flush
     let manager = get_click_manager();

@@ -188,7 +188,7 @@ fn default_cors_max_age() -> String {
 }
 
 fn default_cors_allow_credentials() -> String {
-    "true".to_string()
+    "false".to_string()
 }
 
 /// 所有配置定义（单一数据源）
@@ -437,7 +437,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::CORS,
-        description: "Enable CORS (Cross-Origin Resource Sharing)",
+        description: "Enable CORS configuration. When disabled, uses browser's same-origin policy (no cross-origin requests allowed)",
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_ORIGINS,
@@ -449,7 +449,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::CORS,
-        description: "Allowed origins for CORS (JSON array)",
+        description: "Allowed origins for CORS (JSON array). Use [\"*\"] to allow any origin, empty array means same-origin only",
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_METHODS,
@@ -497,7 +497,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::CORS,
-        description: "Allow credentials in CORS requests",
+        description: "Allow credentials in CORS requests. Cannot be used with wildcard origins for security reasons",
     },
 ];
 

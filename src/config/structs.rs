@@ -455,7 +455,7 @@ fn default_cors_max_age() -> u64 {
 }
 
 fn default_cors_credentials() -> bool {
-    true
+    false
 }
 
 impl Default for ServerConfig {

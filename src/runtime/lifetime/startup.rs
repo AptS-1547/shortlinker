@@ -6,6 +6,7 @@ use crate::config::{
     migrate_plaintext_passwords,
 };
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
@@ -32,16 +33,19 @@ pub async fn cli_tui_pre_startup() {
 
 /// 准备服务器启动的上下文
 /// 包括存储、缓存和路由配置等
-pub async fn prepare_server_startup() -> StartupContext {
-    crate::system::platform::init_lockfile().expect("Failed to initialize lockfile");
+pub async fn prepare_server_startup() -> Result<StartupContext> {
+    let start_time = std::time::Instant::now();
+    debug!("Starting pre-startup processing...");
+
+    crate::system::platform::init_lockfile().context("Failed to initialize lockfile")?;
 
     rustls::crypto::ring::default_provider()
         .install_default()
-        .expect("Failed to install rustls crypto provider");
+        .map_err(|e| anyhow::anyhow!("Failed to install rustls crypto provider: {:?}", e))?;
 
     let storage = StorageFactory::create()
         .await
-        .expect("Failed to create storage backend");
+        .context("Failed to create storage backend")?;
     warn!(
         "Using storage backend: {}",
         storage.get_backend_config().await.storage_type
@@ -58,22 +62,22 @@ pub async fn prepare_server_startup() -> StartupContext {
         // 从文件配置迁移到数据库（首次启动时）
         migrate_config_to_db(&file_config, &config_store)
             .await
-            .expect("Failed to migrate config to database");
+            .context("Failed to migrate config to database")?;
 
         // 初始化运行时配置缓存
         init_runtime_config(db)
             .await
-            .expect("Failed to initialize runtime config");
+            .context("Failed to initialize runtime config")?;
 
         // 自动迁移明文密码到 argon2 哈希
         migrate_plaintext_passwords(&config_store)
             .await
-            .expect("Failed to migrate plaintext passwords");
+            .context("Failed to migrate plaintext passwords")?;
 
         // 自动迁移不合法的 enum 配置值
         migrate_enum_configs(&config_store)
             .await
-            .expect("Failed to migrate enum configs");
+            .context("Failed to migrate enum configs")?;
 
         debug!("Runtime config system initialized");
     }
@@ -113,7 +117,7 @@ pub async fn prepare_server_startup() -> StartupContext {
     // 初始化缓存
     let cache = cache::CompositeCache::create()
         .await
-        .expect("Failed to create cache");
+        .context("Failed to create cache")?;
 
     // 只加载短码到 Bloom Filter（不加载完整数据到 Object Cache）
     let codes = storage.load_all_codes().await;
@@ -124,7 +128,7 @@ pub async fn prepare_server_startup() -> StartupContext {
             fp_rate: 0.001,
         })
         .await
-        .expect("Failed to reconfigure cache");
+        .context("Failed to reconfigure cache")?;
     cache.load_bloom(&codes).await;
     debug!("Bloom filter initialized with {} codes", codes_count);
 
@@ -142,11 +146,16 @@ pub async fn prepare_server_startup() -> StartupContext {
 
     check_compoment_enabled(&route_config);
 
-    StartupContext {
+    debug!(
+        "Pre-startup processing completed in {} ms",
+        start_time.elapsed().as_millis()
+    );
+
+    Ok(StartupContext {
         storage,
         cache,
         route_config,
-    }
+    })
 }
 
 fn check_compoment_enabled(route_config: &RouteConfig) {

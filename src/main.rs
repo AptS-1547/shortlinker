@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
                 // Initialize logging system based on config
                 let _log_guard = shortlinker::system::logging::init_logging(&config);
 
-                if let Err(e) = shortlinker::runtime::modes::run_server(&config).await {
+                if let Err(e) = shortlinker::runtime::modes::run_server().await {
                     eprintln!("Server error: {:#}", e);
                     std::process::exit(1);
                 }

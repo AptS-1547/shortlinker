@@ -8,6 +8,7 @@ impl TimeParser {
     /// - RFC3339 格式：2023-10-01T12:00:00Z
     /// - 相对时间：1d, 2w, 3M (大写M表示月), 1y, 1h30m, 2d12h
     /// - 组合格式：1d2h30m
+    ///
     /// 注意：m 表示分钟，M 表示月份
     pub fn parse_expire_time(input: &str) -> Result<DateTime<Utc>, String> {
         let input = input.trim();

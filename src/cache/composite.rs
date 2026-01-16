@@ -79,6 +79,8 @@ impl CompositeCacheTrait for CompositeCache {
 
     async fn remove(&self, key: &str) {
         self.object_cache.remove(key).await;
+        // Bloom Filter 不支持删除，用 Negative Cache 拦截后续请求
+        self.negative_cache.mark(key).await;
     }
 
     async fn mark_not_found(&self, key: &str) {
@@ -95,11 +97,10 @@ impl CompositeCacheTrait for CompositeCache {
             .bulk_set(&links.keys().cloned().collect::<Vec<_>>())
             .await;
 
-        // object_cache 需要先清空再加载
-        self.object_cache.invalidate_all().await;
-        self.object_cache.load_object_cache(links).await;
+        // ObjectCache 不预热，走 cache-aside 按需回填
+        // 旧数据会在 TTL 到期后自然过期
 
-        // 清空 negative cache
+        // 清空 negative cache（因为 Bloom 重新加载了，之前的 not_found 状态可能已失效）
         self.negative_cache.clear().await;
     }
 
