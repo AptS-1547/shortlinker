@@ -110,7 +110,12 @@ impl CookieBuilder {
         let mut cookie = Cookie::new(self.access_cookie_name.clone(), "");
         cookie.set_path("/");
         cookie.set_http_only(true);
+        cookie.set_secure(self.secure);
+        cookie.set_same_site(self.same_site);
         cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
+        if let Some(ref domain) = self.domain {
+            cookie.set_domain(domain.clone());
+        }
         cookie
     }
 
@@ -119,7 +124,12 @@ impl CookieBuilder {
         let mut cookie = Cookie::new(self.refresh_cookie_name.clone(), "");
         cookie.set_path(refresh_path);
         cookie.set_http_only(true);
+        cookie.set_secure(self.secure);
+        cookie.set_same_site(self.same_site);
         cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
+        if let Some(ref domain) = self.domain {
+            cookie.set_domain(domain.clone());
+        }
         cookie
     }
 

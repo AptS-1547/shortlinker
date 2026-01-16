@@ -22,6 +22,8 @@ pub async fn upsert(db: &DatabaseConnection, link: &ShortLink) -> Result<()> {
                         short_link::Column::TargetUrl,
                         short_link::Column::ExpiresAt,
                         short_link::Column::Password,
+                        short_link::Column::ClickCount,
+                        short_link::Column::CreatedAt,
                     ])
                     .to_owned(),
             )

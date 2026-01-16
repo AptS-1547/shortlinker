@@ -160,7 +160,12 @@ pub async fn update_config(
 
     match rc.set(&key, &body.value).await {
         Ok(result) => {
-            info!("Config updated: {} = {}", key, body.value);
+            // 敏感配置不记录明文值
+            if result.is_sensitive {
+                info!("Config updated: {} = ********", key);
+            } else {
+                info!("Config updated: {} = {}", key, body.value);
+            }
 
             let message = if result.requires_restart {
                 Some("此配置需要重启服务后生效".to_string())

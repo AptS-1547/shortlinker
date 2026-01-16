@@ -23,6 +23,10 @@ pub fn shortlink_to_active_model(link: &ShortLink, is_new: bool) -> short_link::
         created_at: if is_new { Set(link.created_at) } else { NotSet },
         expires_at: Set(link.expires_at),
         password: Set(link.password.clone()),
-        click_count: if is_new { Set(0) } else { NotSet },
+        click_count: if is_new {
+            Set(link.click as i64)
+        } else {
+            NotSet
+        },
     }
 }
