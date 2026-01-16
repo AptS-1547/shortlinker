@@ -54,6 +54,7 @@ impl App {
     }
 
     /// Check if current form has any validation errors
+    #[allow(dead_code)]
     pub fn has_validation_errors(&self) -> bool {
         !self.validation_errors.is_empty()
     }

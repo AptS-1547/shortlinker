@@ -7,7 +7,10 @@ use crate::interfaces::cli::CliError;
 use crate::storage::SeaOrmStorage;
 
 pub async fn list_links(storage: Arc<SeaOrmStorage>) -> Result<(), CliError> {
-    let links = storage.load_all().await;
+    let links = storage
+        .load_all()
+        .await
+        .map_err(|e| CliError::CommandError(format!("Failed to load links: {}", e)))?;
 
     if links.is_empty() {
         println!("{} No short links found", "ℹ".bold().blue());

@@ -13,7 +13,10 @@ pub async fn export_links(
     storage: Arc<SeaOrmStorage>,
     file_path: Option<String>,
 ) -> Result<(), CliError> {
-    let links = storage.load_all().await;
+    let links = storage
+        .load_all()
+        .await
+        .map_err(|e| CliError::CommandError(format!("Failed to load links: {}", e)))?;
 
     if links.is_empty() {
         println!("{} No short links to export", "ℹ".bold().blue());
@@ -76,7 +79,10 @@ pub async fn import_links(
     }
 
     let existing_links = if !force_overwrite {
-        storage.load_all().await
+        storage
+            .load_all()
+            .await
+            .map_err(|e| CliError::CommandError(format!("Failed to load existing links: {}", e)))?
     } else {
         std::collections::HashMap::new()
     };

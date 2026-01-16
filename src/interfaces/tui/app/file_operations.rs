@@ -110,6 +110,7 @@ impl App {
     }
 
     /// Get selected entry in browser
+    #[allow(dead_code)]
     pub fn get_selected_entry(&self) -> Option<&std::path::PathBuf> {
         self.dir_entries.get(self.browser_selected_index)
     }

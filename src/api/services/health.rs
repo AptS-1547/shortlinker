@@ -32,16 +32,25 @@ impl HealthService {
             support_click: backend_config.support_click,
         };
 
-        // 检查存储健康状况
+        // 检查存储健康状况（只查 count，不加载全表）
         let storage_status =
-            match tokio::time::timeout(Duration::from_secs(5), storage.load_all()).await {
-                Ok(links) => {
-                    trace!("Storage health check passed, {} links found", links.len());
+            match tokio::time::timeout(Duration::from_secs(5), storage.count()).await {
+                Ok(Ok(count)) => {
+                    trace!("Storage health check passed, {} links found", count);
                     HealthStorageCheck {
                         status: "healthy".to_string(),
-                        links_count: Some(links.len()),
+                        links_count: Some(count as usize),
                         backend,
                         error: None,
+                    }
+                }
+                Ok(Err(e)) => {
+                    error!("Storage health check failed: {}", e);
+                    HealthStorageCheck {
+                        status: "unhealthy".to_string(),
+                        links_count: None,
+                        backend,
+                        error: Some(format!("database error: {}", e)),
                     }
                 }
                 Err(_) => {

@@ -39,7 +39,12 @@ pub async fn add_link(
     };
 
     // Check if short code already exists
-    if let Some(existing_link) = storage.get(&final_short_code).await {
+    let existing_link = storage
+        .get(&final_short_code)
+        .await
+        .map_err(|e| CliError::CommandError(format!("Failed to check existing link: {}", e)))?;
+
+    if let Some(existing_link) = existing_link {
         if force_overwrite {
             println!(
                 "{} Force overwriting code '{}': {} -> {}",

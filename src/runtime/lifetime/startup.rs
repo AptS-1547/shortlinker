@@ -120,7 +120,10 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         .context("Failed to create cache")?;
 
     // 只加载短码到 Bloom Filter（不加载完整数据到 Object Cache）
-    let codes = storage.load_all_codes().await;
+    let codes = storage
+        .load_all_codes()
+        .await
+        .context("Failed to load codes for bloom filter")?;
     let codes_count = codes.len();
     cache
         .reconfigure(cache::traits::BloomConfig {

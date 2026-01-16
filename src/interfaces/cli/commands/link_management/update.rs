@@ -22,11 +22,17 @@ pub async fn update_link(
 
     // Check if short code exists
     let old_link = match storage.get(&short_code).await {
-        Some(link) => link,
-        None => {
+        Ok(Some(link)) => link,
+        Ok(None) => {
             return Err(CliError::CommandError(format!(
                 "Short link does not exist: {}",
                 short_code
+            )));
+        }
+        Err(e) => {
+            return Err(CliError::CommandError(format!(
+                "Failed to check link: {}",
+                e
             )));
         }
     };

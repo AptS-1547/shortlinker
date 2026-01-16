@@ -22,7 +22,7 @@ pub async fn reload_all(
 
     // 重新加载存储
     storage.reload().await?;
-    let links = storage.load_all().await;
+    let links = storage.load_all().await?;
 
     // 重新配置缓存
     cache

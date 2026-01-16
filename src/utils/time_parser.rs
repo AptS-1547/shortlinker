@@ -247,11 +247,7 @@ mod tests {
 
         for case in extreme_cases {
             let result = TimeParser::parse_expire_time(case);
-            assert!(
-                result.is_err(),
-                "极端值 '{}' 应该返回错误而非 panic",
-                case
-            );
+            assert!(result.is_err(), "极端值 '{}' 应该返回错误而非 panic", case);
         }
     }
 

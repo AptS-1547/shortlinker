@@ -3,7 +3,7 @@
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, Responder, web};
 use std::sync::Arc;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::analytics::global::get_click_manager;
 use crate::cache::CacheResult;
@@ -44,7 +44,7 @@ impl RedirectService {
             CacheResult::Miss => {
                 trace!("Cache miss for path: {}", &capture_path);
                 match storage.get(&capture_path).await {
-                    Some(link) => match link.cache_ttl(get_config().cache.default_ttl) {
+                    Ok(Some(link)) => match link.cache_ttl(get_config().cache.default_ttl) {
                         None => {
                             debug!("Expired link from storage: {}", &capture_path);
                             cache.mark_not_found(&capture_path).await;
@@ -56,10 +56,14 @@ impl RedirectService {
                             Self::finish_redirect(link)
                         }
                     },
-                    None => {
+                    Ok(None) => {
                         debug!("Redirect link not found in database: {}", &capture_path);
                         cache.mark_not_found(&capture_path).await;
                         Self::not_found_response()
+                    }
+                    Err(e) => {
+                        error!("Database error during redirect lookup: {}", e);
+                        Self::error_response()
                     }
                 }
             }
@@ -76,6 +80,13 @@ impl RedirectService {
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
             .insert_header(("Cache-Control", "public, max-age=60"))
             .body("Not Found")
+    }
+
+    #[inline]
+    fn error_response() -> HttpResponse {
+        HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
+            .insert_header(("Content-Type", "text/html; charset=utf-8"))
+            .body("Internal Server Error")
     }
 
     fn update_click(code: &str) {

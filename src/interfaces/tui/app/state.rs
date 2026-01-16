@@ -67,7 +67,7 @@ pub struct App {
 impl App {
     pub async fn new() -> Result<App, ShortlinkerError> {
         let storage = StorageFactory::create().await?;
-        let links = storage.load_all().await;
+        let links = storage.load_all().await?;
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
@@ -98,7 +98,7 @@ impl App {
     }
 
     pub async fn refresh_links(&mut self) -> Result<(), ShortlinkerError> {
-        self.links = self.storage.load_all().await;
+        self.links = self.storage.load_all().await?;
         if let Err(e) = crate::system::platform::notify_server() {
             return Err(ShortlinkerError::notify_server(format!(
                 "Failed to notify server: {}",

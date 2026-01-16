@@ -45,7 +45,10 @@ pub async fn export_links(
     };
 
     // 加载符合条件的所有链接
-    let links = storage.load_all_filtered(filter).await;
+    let links = storage.load_all_filtered(filter).await.map_err(|e| {
+        error!("Failed to load links for export: {}", e);
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
 
     // 构建 CSV
     let mut csv_writer = WriterBuilder::new().from_writer(vec![]);
@@ -187,7 +190,16 @@ pub async fn import_links(
     let mut links_to_insert: Vec<ShortLink> = Vec::new();
 
     // 预加载所有现有链接代码（用于检查冲突）
-    let existing_codes: HashSet<String> = storage.load_all().await.keys().cloned().collect();
+    let existing_codes: HashSet<String> = storage
+        .load_all()
+        .await
+        .map_err(|e| {
+            error!("Failed to load existing links for import: {}", e);
+            actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+        })?
+        .keys()
+        .cloned()
+        .collect();
 
     // 已处理的代码（用于 overwrite 模式下检测重复）
     let mut processed_codes: HashSet<String> = HashSet::new();

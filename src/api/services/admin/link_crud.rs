@@ -52,7 +52,11 @@ pub async fn get_all_links(
     // 使用数据库分页
     let (links, total) = storage
         .load_paginated_filtered(page, page_size, filter)
-        .await;
+        .await
+        .map_err(|e| {
+            error!("Failed to load paginated links: {}", e);
+            actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+        })?;
     let total = total as usize;
     let page = page as usize;
     let page_size = page_size as usize;
@@ -114,7 +118,10 @@ pub async fn post_link(
     }
 
     // Check if link already exists
-    let existing_link = storage.get(&code).await;
+    let existing_link = storage.get(&code).await.map_err(|e| {
+        error!("Failed to check existing link: {}", e);
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
     let force = link.force.unwrap_or(false);
 
     if existing_link.is_some() && !force {
@@ -223,10 +230,17 @@ pub async fn get_link(
     info!("Admin API: get link request - code: {}", code);
 
     match storage.get(&code).await {
-        Some(link) => Ok(success_response(LinkResponse::from(link))),
-        None => {
+        Ok(Some(link)) => Ok(success_response(LinkResponse::from(link))),
+        Ok(None) => {
             info!("Admin API: link not found - {}", code);
             Ok(error_response(StatusCode::NOT_FOUND, "Link not found"))
+        }
+        Err(e) => {
+            error!("Admin API: failed to get link - {}: {}", code, e);
+            Err(actix_web::error::ErrorInternalServerError(format!(
+                "Database error: {}",
+                e
+            )))
         }
     }
 }
@@ -281,10 +295,17 @@ pub async fn update_link(
 
     // Get existing link to preserve creation time
     let existing_link = match storage.get(&code).await {
-        Some(link) => link,
-        None => {
+        Ok(Some(link)) => link,
+        Ok(None) => {
             info!("Admin API: attempt to update nonexistent link - {}", code);
             return Ok(error_response(StatusCode::NOT_FOUND, "Link not found"));
+        }
+        Err(e) => {
+            error!("Admin API: failed to get link for update - {}: {}", code, e);
+            return Err(actix_web::error::ErrorInternalServerError(format!(
+                "Database error: {}",
+                e
+            )));
         }
     };
 
@@ -367,7 +388,10 @@ pub async fn get_stats(
 ) -> ActixResult<impl Responder> {
     trace!("Admin API: request to get link stats");
 
-    let stats = storage.get_stats().await;
+    let stats = storage.get_stats().await.map_err(|e| {
+        error!("Failed to get link stats: {}", e);
+        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
+    })?;
 
     info!(
         "Admin API: returning stats - total: {}, clicks: {}, active: {}",

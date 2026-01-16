@@ -49,7 +49,16 @@ pub async fn batch_create_links(
         }
 
         // Check if link already exists
-        let existing = storage.get(&code).await;
+        let existing = match storage.get(&code).await {
+            Ok(opt) => opt,
+            Err(e) => {
+                failed.push(BatchFailedItem {
+                    code: code.clone(),
+                    error: format!("Database query error: {}", e),
+                });
+                continue;
+            }
+        };
         let force = link_req.force.unwrap_or(false);
 
         if existing.is_some() && !force {
@@ -173,11 +182,18 @@ pub async fn batch_update_links(
 
         // Get existing link
         let existing = match storage.get(code).await {
-            Some(link) => link,
-            None => {
+            Ok(Some(link)) => link,
+            Ok(None) => {
                 failed.push(BatchFailedItem {
                     code: code.clone(),
                     error: "Link not found".to_string(),
+                });
+                continue;
+            }
+            Err(e) => {
+                failed.push(BatchFailedItem {
+                    code: code.clone(),
+                    error: format!("Database query error: {}", e),
                 });
                 continue;
             }

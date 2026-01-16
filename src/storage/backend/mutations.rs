@@ -2,6 +2,8 @@
 //!
 //! This module contains all write database operations.
 
+use std::collections::HashSet;
+
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait, sea_query::OnConflict};
 use tracing::info;
 
@@ -74,9 +76,11 @@ impl SeaOrmStorage {
             .map(|m| m.short_code)
             .collect();
 
+        // 使用 HashSet 优化 contains 查找（O(1) vs O(n)）
+        let existing_set: HashSet<&String> = existing.iter().collect();
         let not_found: Vec<String> = codes
             .iter()
-            .filter(|c| !existing.contains(c))
+            .filter(|c| !existing_set.contains(c))
             .cloned()
             .collect();
 
