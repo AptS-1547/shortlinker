@@ -4,8 +4,17 @@
 //! based on application configuration.
 
 use crate::config::AppConfig;
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling;
 use tracing_subscriber;
+
+/// Result of logging initialization
+pub struct LoggingInitResult {
+    /// Worker guard that must be kept alive for the duration of the program
+    pub guard: WorkerGuard,
+    /// Warning message if logging failed to initialize as configured (fell back to stdout)
+    pub warning: Option<String>,
+}
 
 /// Initialize logging system based on configuration
 ///
@@ -15,53 +24,70 @@ use tracing_subscriber;
 /// **Note**: This should be called only once during application startup,
 /// after the configuration has been loaded.
 ///
+/// If file-based logging fails (e.g., permission denied, disk full),
+/// the system will fall back to stdout and return a warning message.
+///
 /// # Arguments
 /// * `config` - Application configuration containing logging settings
 ///
 /// # Returns
-/// * `WorkerGuard` - Must be kept alive for the duration of the program
-///   to ensure non-blocking log writes are flushed
-///
-/// # Panics
-/// * If creating the log appender fails
-/// * If setting the global subscriber fails (e.g., already initialized)
-pub fn init_logging(config: &AppConfig) -> tracing_appender::non_blocking::WorkerGuard {
+/// * `LoggingInitResult` - Contains the worker guard and optional warning
+pub fn init_logging(config: &AppConfig) -> LoggingInitResult {
     // Create writer based on config
-    let writer: Box<dyn std::io::Write + Send + Sync> =
-        if let Some(ref log_file) = config.logging.file {
-            if !log_file.is_empty() && config.logging.enable_rotation {
-                // Use rolling log files
-                let dir = std::path::Path::new(log_file)
-                    .parent()
-                    .unwrap_or(std::path::Path::new("."));
-                let filename = std::path::Path::new(log_file)
-                    .file_name()
-                    .unwrap_or(std::ffi::OsStr::new("shortlinker.log"));
-                let filename_str = filename.to_str().unwrap_or("shortlinker.log");
-                let appender = rolling::Builder::new()
-                    .rotation(rolling::Rotation::DAILY)
-                    .filename_prefix(filename_str.trim_end_matches(".log"))
-                    .filename_suffix("log")
-                    .max_log_files(config.logging.max_backups as usize)
-                    .build(dir)
-                    .expect("Failed to create rolling log appender");
-                Box::new(appender)
-            } else if !log_file.is_empty() {
-                // Non-rotating, append to file
-                let file = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(log_file)
-                    .expect("Failed to open log file");
-                Box::new(file)
-            } else {
-                // Empty filename, output to console
-                Box::new(std::io::stdout())
+    let (writer, warning): (Box<dyn std::io::Write + Send + Sync>, Option<String>) = if let Some(
+        ref log_file,
+    ) =
+        config.logging.file
+    {
+        if !log_file.is_empty() && config.logging.enable_rotation {
+            // Use rolling log files
+            let dir = std::path::Path::new(log_file)
+                .parent()
+                .unwrap_or(std::path::Path::new("."));
+            let filename = std::path::Path::new(log_file)
+                .file_name()
+                .unwrap_or(std::ffi::OsStr::new("shortlinker.log"));
+            let filename_str = filename.to_str().unwrap_or("shortlinker.log");
+            match rolling::Builder::new()
+                .rotation(rolling::Rotation::DAILY)
+                .filename_prefix(filename_str.trim_end_matches(".log"))
+                .filename_suffix("log")
+                .max_log_files(config.logging.max_backups as usize)
+                .build(dir)
+            {
+                Ok(appender) => (Box::new(appender), None),
+                Err(e) => (
+                    Box::new(std::io::stdout()),
+                    Some(format!(
+                        "Failed to create rolling log appender for '{}': {}. Falling back to stdout.",
+                        log_file, e
+                    )),
+                ),
+            }
+        } else if !log_file.is_empty() {
+            // Non-rotating, append to file
+            match std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_file)
+            {
+                Ok(file) => (Box::new(file), None),
+                Err(e) => (
+                    Box::new(std::io::stdout()),
+                    Some(format!(
+                        "Failed to open log file '{}': {}. Falling back to stdout.",
+                        log_file, e
+                    )),
+                ),
             }
         } else {
-            // Output to console
-            Box::new(std::io::stdout())
-        };
+            // Empty filename, output to console
+            (Box::new(std::io::stdout()), None)
+        }
+    } else {
+        // Output to console
+        (Box::new(std::io::stdout()), None)
+    };
 
     let (non_blocking_writer, guard) = tracing_appender::non_blocking(writer);
     let filter = tracing_subscriber::EnvFilter::new(config.logging.level.clone());
@@ -78,5 +104,5 @@ pub fn init_logging(config: &AppConfig) -> tracing_appender::non_blocking::Worke
         subscriber_builder.init();
     }
 
-    guard
+    LoggingInitResult { guard, warning }
 }

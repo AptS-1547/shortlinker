@@ -78,7 +78,11 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "server")]
             {
                 // Initialize logging system based on config
-                let _log_guard = shortlinker::system::logging::init_logging(&config);
+                let log_result = shortlinker::system::logging::init_logging(&config);
+                let _log_guard = log_result.guard;
+                if let Some(warning) = log_result.warning {
+                    eprintln!("Warning: {}", warning);
+                }
 
                 if let Err(e) = shortlinker::runtime::modes::run_server().await {
                     eprintln!("Server error: {:#}", e);

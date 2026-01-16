@@ -171,7 +171,7 @@ pub async fn config_import(
             "\nProceed with importing {} configurations? [y/N] ",
             valid_configs.len()
         );
-        io::stdout().flush().unwrap();
+        let _ = io::stdout().flush();
 
         let mut input = String::new();
         io::stdin()
