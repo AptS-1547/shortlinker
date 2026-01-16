@@ -168,7 +168,7 @@ fn default_frontend_prefix() -> String {
 }
 
 fn default_cors_enabled() -> String {
-    "true".to_string()
+    "false".to_string()
 }
 
 fn default_cors_allowed_origins() -> String {
