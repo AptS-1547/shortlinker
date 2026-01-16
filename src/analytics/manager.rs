@@ -51,21 +51,39 @@ impl ClickBuffer {
         self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
     }
 
-    /// 收集所有更新并清空缓冲区
+    /// 收集所有更新并清空缓冲区（逐个 remove 避免竞态）
     fn drain(&self) -> Vec<(String, usize)> {
-        let updates: Vec<_> = self
-            .data
-            .iter()
-            .map(|entry| (entry.key().to_string(), *entry.value()))
-            .collect();
+        // 1. 收集所有 key（snapshot）
+        let keys: Vec<Arc<str>> = self.data.iter().map(|r| r.key().clone()).collect();
 
-        if !updates.is_empty() {
-            let total: usize = updates.iter().map(|(_, v)| v).sum();
-            self.data.clear();
-            self.total_clicks.fetch_sub(total, Ordering::Release);
+        // 2. 逐个 remove（只删除 snapshot 中的 key，不影响窗口期新增）
+        let mut updates = Vec::with_capacity(keys.len());
+        let mut total_removed = 0;
+        for key in keys {
+            if let Some((k, v)) = self.data.remove(&key) {
+                total_removed += v;
+                updates.push((k.to_string(), v));
+            }
+        }
+
+        // 3. 更新总计数
+        if total_removed > 0 {
+            self.total_clicks
+                .fetch_sub(total_removed, Ordering::Release);
         }
 
         updates
+    }
+
+    /// 恢复数据到缓冲区（用于刷盘失败时的恢复）
+    fn restore(&self, updates: Vec<(String, usize)>) {
+        let mut restored_total = 0;
+        for (k, v) in updates {
+            *self.data.entry(Arc::from(k.as_str())).or_insert(0) += v;
+            restored_total += v;
+        }
+        self.total_clicks
+            .fetch_add(restored_total, Ordering::Relaxed);
     }
 
     /// 获取当前缓冲区总点击数
@@ -156,14 +174,17 @@ impl ClickManager {
         }
 
         let count = updates.len();
-        match sink.flush_clicks(updates).await {
+        match sink.flush_clicks(updates.clone()).await {
             Ok(_) => {
                 debug!("ClickManager: Successfully flushed {} entries", count);
             }
             Err(e) => {
-                // 刷盘失败，数据已丢失（drain 已清空）
-                // TODO: 考虑更好的错误恢复策略（如写回 buffer 或持久化队列）
-                warn!("ClickManager: flush_clicks failed: {}, {} entries lost", e, count);
+                // 刷盘失败，恢复数据到 buffer
+                buffer.restore(updates);
+                warn!(
+                    "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
+                    e, count
+                );
             }
         }
     }
