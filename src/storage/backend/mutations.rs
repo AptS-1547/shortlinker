@@ -8,6 +8,7 @@ use tracing::info;
 use super::SeaOrmStorage;
 use super::converters::shortlink_to_active_model;
 use super::operations::upsert;
+use super::retry;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
 
@@ -15,16 +16,34 @@ use migration::entities::short_link;
 
 impl SeaOrmStorage {
     pub async fn set(&self, link: ShortLink) -> Result<()> {
-        upsert(&self.db, &link).await?;
+        let db = &self.db;
+
+        retry::with_retry(
+            &format!("set({})", link.code),
+            self.retry_config,
+            || async {
+                upsert(db, &link).await.map_err(|e| {
+                    // 转换为 DbErr 以便重试机制判断
+                    sea_orm::DbErr::Custom(e.to_string())
+                })
+            },
+        )
+        .await
+        .map_err(|e| ShortlinkerError::database_operation(format!("设置短链接失败: {}", e)))?;
+
         self.invalidate_count_cache();
         Ok(())
     }
 
     pub async fn remove(&self, code: &str) -> Result<()> {
-        let result = short_link::Entity::delete_by_id(code)
-            .exec(&self.db)
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
+        let db = &self.db;
+        let code_owned = code.to_string();
+
+        let result = retry::with_retry(&format!("remove({})", code), self.retry_config, || async {
+            short_link::Entity::delete_by_id(&code_owned).exec(db).await
+        })
+        .await
+        .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
 
         if result.rows_affected == 0 {
             return Err(ShortlinkerError::not_found(format!(

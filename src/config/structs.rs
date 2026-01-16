@@ -161,6 +161,12 @@ pub struct DatabaseConfig {
     pub pool_size: u32,
     #[serde(default = "default_database_timeout")]
     pub timeout: u64,
+    #[serde(default = "default_retry_count")]
+    pub retry_count: u32,
+    #[serde(default = "default_retry_base_delay_ms")]
+    pub retry_base_delay_ms: u64,
+    #[serde(default = "default_retry_max_delay_ms")]
+    pub retry_max_delay_ms: u64,
 }
 
 /// 缓存系统配置
@@ -305,6 +311,18 @@ fn default_database_pool_size() -> u32 {
 
 fn default_database_timeout() -> u64 {
     30
+}
+
+fn default_retry_count() -> u32 {
+    3
+}
+
+fn default_retry_base_delay_ms() -> u64 {
+    100
+}
+
+fn default_retry_max_delay_ms() -> u64 {
+    2000
 }
 
 fn default_cache_type() -> String {
@@ -457,6 +475,9 @@ impl Default for DatabaseConfig {
             database_url: default_database_url(),
             pool_size: default_database_pool_size(),
             timeout: default_database_timeout(),
+            retry_count: default_retry_count(),
+            retry_base_delay_ms: default_retry_base_delay_ms(),
+            retry_max_delay_ms: default_retry_max_delay_ms(),
         }
     }
 }

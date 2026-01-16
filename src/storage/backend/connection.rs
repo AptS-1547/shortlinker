@@ -7,8 +7,9 @@ use migration::{Migrator, MigratorTrait};
 /// 连接 SQLite 数据库（带自动创建和性能优化）
 pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
     use sea_orm::SqlxSqliteConnector;
-    use sea_orm::sqlx::SqlitePool;
-    use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
+    use sea_orm::sqlx::sqlite::{
+        SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous,
+    };
     use std::str::FromStr;
 
     let opt = SqliteConnectOptions::from_str(database_url)
@@ -22,10 +23,18 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
         .pragma("mmap_size", "536870912")
         .pragma("wal_autocheckpoint", "1000");
 
-    // 使用 sqlx 的连接池
-    let pool = SqlitePool::connect_with(opt).await.map_err(|e| {
-        ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
-    })?;
+    // 使用 SqlitePoolOptions 配置连接池，包含健康检查
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5) // SQLite 通常不需要太多连接
+        .min_connections(1)
+        .test_before_acquire(true) // 获取连接前测试有效性
+        .acquire_timeout(std::time::Duration::from_secs(8))
+        .idle_timeout(std::time::Duration::from_secs(300))
+        .connect_with(opt)
+        .await
+        .map_err(|e| {
+            ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
+        })?;
 
     // 转换为 Sea-ORM 的 DatabaseConnection
     Ok(SqlxSqliteConnector::from_sqlx_sqlite_pool(pool))
@@ -43,6 +52,7 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
         .acquire_timeout(std::time::Duration::from_secs(8))
         .idle_timeout(std::time::Duration::from_secs(300)) // 5分钟空闲超时
         .max_lifetime(std::time::Duration::from_secs(3600)) // 1小时最大生命周期
+        .test_before_acquire(true) // 获取连接前测试有效性
         .sqlx_logging(false);
 
     Database::connect(opt).await.map_err(|e| {

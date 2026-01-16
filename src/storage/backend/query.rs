@@ -11,7 +11,7 @@ use sea_orm::{
 };
 use tracing::{debug, error, info};
 
-use super::{LinkFilter, SeaOrmStorage};
+use super::{LinkFilter, SeaOrmStorage, retry};
 use crate::storage::ShortLink;
 use crate::storage::models::LinkStats;
 
@@ -29,13 +29,19 @@ struct StatsResult {
 
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Option<ShortLink> {
-        let result = short_link::Entity::find_by_id(code).one(&self.db).await;
+        let db = &self.db;
+        let code_owned = code.to_string();
+
+        let result = retry::with_retry(&format!("get({})", code), self.retry_config, || async {
+            short_link::Entity::find_by_id(&code_owned).one(db).await
+        })
+        .await;
 
         match result {
             Ok(Some(model)) => Some(model_to_shortlink(model)),
             Ok(None) => None,
             Err(e) => {
-                error!("查询短链接失败: {}", e);
+                error!("查询短链接失败（重试后仍失败）: {}", e);
                 None
             }
         }
@@ -58,6 +64,26 @@ impl SeaOrmStorage {
             Err(e) => {
                 error!("加载所有短链接失败: {}", e);
                 HashMap::new()
+            }
+        }
+    }
+
+    /// 只加载所有短码（用于 Bloom Filter 初始化，内存占用小）
+    pub async fn load_all_codes(&self) -> Vec<String> {
+        match short_link::Entity::find()
+            .select_only()
+            .column(short_link::Column::ShortCode)
+            .into_tuple::<String>()
+            .all(&self.db)
+            .await
+        {
+            Ok(codes) => {
+                info!("Loaded {} short codes for Bloom filter", codes.len());
+                codes
+            }
+            Err(e) => {
+                error!("加载短码列表失败: {}", e);
+                Vec::new()
             }
         }
     }
@@ -124,27 +150,47 @@ impl SeaOrmStorage {
             debug!("count cache hit: key={}, value={}", cache_key, cached);
             cached
         } else {
-            // 缓存未命中，执行 COUNT 查询
-            let count = short_link::Entity::find()
-                .filter(condition.clone())
-                .count(&self.db)
-                .await
-                .unwrap_or(0);
+            // 缓存未命中，执行 COUNT 查询（带重试）
+            let db = &self.db;
+            let cond = condition.clone();
+            let count_result = retry::with_retry(
+                "load_paginated_filtered(count)",
+                self.retry_config,
+                || async {
+                    short_link::Entity::find()
+                        .filter(cond.clone())
+                        .count(db)
+                        .await
+                },
+            )
+            .await;
+
+            let count = count_result.unwrap_or(0);
             self.count_cache.insert(cache_key, count);
             count
         };
 
-        // 执行分页数据查询
-        let models = match short_link::Entity::find()
-            .filter(condition)
-            .order_by_desc(short_link::Column::CreatedAt)
-            .paginate(&self.db, page_size)
-            .fetch_page(page.saturating_sub(1))
-            .await
-        {
+        // 执行分页数据查询（带重试）
+        let db = &self.db;
+        let page_offset = page.saturating_sub(1);
+        let models_result = retry::with_retry(
+            "load_paginated_filtered(data)",
+            self.retry_config,
+            || async {
+                short_link::Entity::find()
+                    .filter(condition.clone())
+                    .order_by_desc(short_link::Column::CreatedAt)
+                    .paginate(db, page_size)
+                    .fetch_page(page_offset)
+                    .await
+            },
+        )
+        .await;
+
+        let models = match models_result {
             Ok(models) => models,
             Err(e) => {
-                error!("分页查询失败: {}", e);
+                error!("分页查询失败（重试后仍失败）: {}", e);
                 return (Vec::new(), total);
             }
         };
@@ -159,10 +205,16 @@ impl SeaOrmStorage {
             return HashMap::new();
         }
 
-        let result = short_link::Entity::find()
-            .filter(short_link::Column::ShortCode.is_in(codes.iter().map(|s| s.to_string())))
-            .all(&self.db)
-            .await;
+        let db = &self.db;
+        let codes_owned: Vec<String> = codes.iter().map(|s| s.to_string()).collect();
+
+        let result = retry::with_retry("batch_get", self.retry_config, || async {
+            short_link::Entity::find()
+                .filter(short_link::Column::ShortCode.is_in(codes_owned.clone()))
+                .all(db)
+                .await
+        })
+        .await;
 
         match result {
             Ok(models) => models
@@ -173,7 +225,7 @@ impl SeaOrmStorage {
                 })
                 .collect(),
             Err(e) => {
-                error!("批量查询失败: {}", e);
+                error!("批量查询失败（重试后仍失败）: {}", e);
                 HashMap::new()
             }
         }

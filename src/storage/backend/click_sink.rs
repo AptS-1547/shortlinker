@@ -10,6 +10,7 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, ExprTrait};
 use tracing::debug;
 
 use super::SeaOrmStorage;
+use super::retry;
 use crate::analytics::ClickSink;
 
 use migration::entities::short_link;
@@ -52,10 +53,12 @@ impl ClickSink for SeaOrmStorage {
             _ => stmt.to_string(SqliteQueryBuilder), // fallback to SQLite
         };
 
-        self.db
-            .execute_unprepared(&sql)
-            .await
-            .map_err(|e| anyhow::anyhow!("批量更新点击数失败: {}", e))?;
+        let db = &self.db;
+        retry::with_retry("flush_clicks", self.retry_config, || async {
+            db.execute_unprepared(&sql).await
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("批量更新点击数失败（重试后仍失败）: {}", e))?;
 
         debug!(
             "点击计数已刷新到 {} 数据库 ({} 条记录)",

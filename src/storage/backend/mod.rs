@@ -9,6 +9,7 @@ mod converters;
 mod mutations;
 mod operations;
 mod query;
+pub mod retry;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -76,6 +77,8 @@ pub struct SeaOrmStorage {
     backend_name: String,
     /// 分页 COUNT 缓存（TTL 30秒）
     count_cache: Cache<String, u64>,
+    /// 重试配置
+    retry_config: retry::RetryConfig,
 }
 
 impl SeaOrmStorage {
@@ -85,6 +88,14 @@ impl SeaOrmStorage {
                 "DATABASE_URL 未设置".to_string(),
             ));
         }
+
+        // 读取重试配置
+        let config = crate::config::get_config();
+        let retry_config = retry::RetryConfig {
+            max_retries: config.database.retry_count,
+            base_delay_ms: config.database.retry_base_delay_ms,
+            max_delay_ms: config.database.retry_max_delay_ms,
+        };
 
         // 根据不同数据库类型配置连接选项
         let db = if backend_name == "sqlite" {
@@ -100,6 +111,7 @@ impl SeaOrmStorage {
                 .time_to_live(Duration::from_secs(30))
                 .max_capacity(100)
                 .build(),
+            retry_config,
         };
 
         // 运行迁移
