@@ -37,16 +37,12 @@ impl ClickBuffer {
 
     /// 增加点击计数
     fn increment(&self, key: &str) -> usize {
-        // 先检查是否存在，避免不必要的字符串分配
-        if let Some(mut entry) = self.data.get_mut(key) {
-            *entry += 1;
-            trace!("ClickBuffer: Incremented existing key: {}", key);
-            return self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1;
-        }
-
-        // 只有在需要插入新条目时才创建 Arc<str>
-        self.data.insert(Arc::from(key), 1);
-        trace!("ClickBuffer: Inserted new key: {}", key);
+        // 使用 entry API 保证操作原子性，避免 TOCTOU 竞态条件
+        self.data
+            .entry(Arc::from(key))
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+        trace!("ClickBuffer: Incremented key: {}", key);
 
         self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
     }
@@ -69,7 +65,10 @@ impl ClickBuffer {
         // 3. 更新总计数
         if total_removed > 0 {
             self.total_clicks
-                .fetch_sub(total_removed, Ordering::Release);
+                .fetch_update(Ordering::Release, Ordering::Relaxed, |current| {
+                    Some(current.saturating_sub(total_removed))
+                })
+                .ok();
         }
 
         updates
