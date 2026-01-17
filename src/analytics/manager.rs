@@ -213,6 +213,10 @@ mod tests {
         fn get_flushed(&self) -> Vec<(String, usize)> {
             self.flushed.lock().unwrap().clone()
         }
+
+        fn total_clicks(&self) -> usize {
+            self.flushed.lock().unwrap().iter().map(|(_, v)| v).sum()
+        }
     }
 
     #[async_trait]
@@ -244,5 +248,101 @@ mod tests {
         assert_eq!(manager.buffer_size(), 0);
         let flushed = sink.get_flushed();
         assert_eq!(flushed.len(), 2); // 2 个唯一 key
+    }
+
+    /// 测试并发 increment 不会丢失点击
+    #[tokio::test]
+    async fn test_concurrent_increment() {
+        let sink = Arc::new(MockSink::new());
+        let manager = Arc::new(ClickManager::new(
+            Arc::clone(&sink) as Arc<dyn ClickSink>,
+            Duration::from_secs(60),
+            100000, // 高阈值，避免自动刷盘
+        ));
+
+        const NUM_THREADS: usize = 10;
+        const INCREMENTS_PER_THREAD: usize = 1000;
+
+        let mut handles = vec![];
+        for _ in 0..NUM_THREADS {
+            let mgr = Arc::clone(&manager);
+            handles.push(tokio::spawn(async move {
+                for _ in 0..INCREMENTS_PER_THREAD {
+                    mgr.increment("shared_key");
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        // 验证 buffer 中的计数正确
+        assert_eq!(manager.buffer_size(), NUM_THREADS * INCREMENTS_PER_THREAD);
+
+        manager.flush().await;
+
+        // 验证刷盘后的数据正确
+        assert_eq!(sink.total_clicks(), NUM_THREADS * INCREMENTS_PER_THREAD);
+    }
+
+    /// 测试并发 increment + drain 不会丢失数据
+    #[tokio::test]
+    async fn test_concurrent_increment_and_drain() {
+        let sink = Arc::new(MockSink::new());
+        let manager = Arc::new(ClickManager::new(
+            Arc::clone(&sink) as Arc<dyn ClickSink>,
+            Duration::from_secs(60),
+            100000, // 高阈值，避免自动刷盘
+        ));
+
+        const NUM_THREADS: usize = 10;
+        const INCREMENTS_PER_THREAD: usize = 1000;
+        const NUM_FLUSHES: usize = 5;
+
+        // 启动 increment 线程
+        let mut handles = vec![];
+        for _ in 0..NUM_THREADS {
+            let mgr = Arc::clone(&manager);
+            handles.push(tokio::spawn(async move {
+                for _ in 0..INCREMENTS_PER_THREAD {
+                    mgr.increment("shared_key");
+                    // 偶尔 yield，增加与 drain 交错的机会
+                    if rand::random::<u8>() < 10 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+            }));
+        }
+
+        // 启动 flush 线程
+        let mgr_flush = Arc::clone(&manager);
+        let flush_handle = tokio::spawn(async move {
+            for _ in 0..NUM_FLUSHES {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                mgr_flush.flush().await;
+            }
+        });
+
+        // 等待所有 increment 完成
+        for handle in handles {
+            handle.await.unwrap();
+        }
+        flush_handle.await.unwrap();
+
+        // 最后一次 flush 确保所有数据都写入
+        manager.flush().await;
+
+        // 验证总点击数 = 已刷盘 + buffer 中剩余
+        let flushed = sink.total_clicks();
+        let remaining = manager.buffer_size();
+        assert_eq!(
+            flushed + remaining,
+            NUM_THREADS * INCREMENTS_PER_THREAD,
+            "flushed={}, remaining={}, expected={}",
+            flushed,
+            remaining,
+            NUM_THREADS * INCREMENTS_PER_THREAD
+        );
     }
 }
