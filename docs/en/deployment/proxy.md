@@ -2,6 +2,10 @@
 
 In production environments, it's recommended to expose Shortlinker service through a reverse proxy.
 
+::: warning Important: Reverse Proxy Configuration Requirements
+When deploying behind a reverse proxy, you **must** set `X-Real-IP` and `X-Forwarded-For` headers. These headers are required for obtaining the client's real IP address, which is essential for the login rate limiting feature to function properly. Missing these headers will result in a 500 error during login.
+:::
+
 ## Caddy Configuration
 
 ### Basic Configuration
@@ -9,8 +13,11 @@ In production environments, it's recommended to expose Shortlinker service throu
 ```caddy
 # TCP port
 esap.cc {
-    reverse_proxy 127.0.0.1:8080
-    
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     # Optional: Add cache control
     header {
         Cache-Control "no-cache, no-store, must-revalidate"
@@ -19,8 +26,11 @@ esap.cc {
 
 # Unix socket
 esap.cc {
-    reverse_proxy unix//tmp/shortlinker.sock
-    
+    reverse_proxy unix//tmp/shortlinker.sock {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     header {
         Cache-Control "no-cache, no-store, must-revalidate"
     }
@@ -31,13 +41,16 @@ esap.cc {
 
 ```caddy
 esap.cc {
-    reverse_proxy 127.0.0.1:8080
-    
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     # Automatic HTTPS
     tls {
         protocols tls1.2 tls1.3
     }
-    
+
     # Log configuration
     log {
         output file /var/log/caddy/shortlinker.log
@@ -130,14 +143,18 @@ server {
 # TCP port
 <VirtualHost *:80>
     ServerName esap.cc
-    
+
     ProxyPreserveHost On
     ProxyPass / http://127.0.0.1:8080/
     ProxyPassReverse / http://127.0.0.1:8080/
-    
+
+    # Forward client real IP (requires mod_headers)
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
     # Disable cache
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
-    
+
     # Logs
     CustomLog /var/log/apache2/shortlinker.access.log combined
     ErrorLog /var/log/apache2/shortlinker.error.log
@@ -146,13 +163,17 @@ server {
 # Unix socket
 <VirtualHost *:80>
     ServerName esap.cc
-    
+
     ProxyPreserveHost On
     ProxyPass / unix:/tmp/shortlinker.sock|http://localhost/
     ProxyPassReverse / unix:/tmp/shortlinker.sock|http://localhost/
-    
+
+    # Forward client real IP (requires mod_headers)
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
-    
+
     CustomLog /var/log/apache2/shortlinker.access.log combined
     ErrorLog /var/log/apache2/shortlinker.error.log
 </VirtualHost>

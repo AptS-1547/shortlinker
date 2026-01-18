@@ -2,6 +2,10 @@
 
 在生产环境中，建议通过反向代理来暴露 Shortlinker 服务。
 
+::: warning 重要：反向代理配置要求
+通过反向代理部署时，**必须**设置 `X-Real-IP` 和 `X-Forwarded-For` 请求头。这些头用于获取客户端真实 IP 地址，是登录限流功能正常工作的前提。如果缺少这些配置，登录时会返回 500 错误。
+:::
+
 ## Caddy 配置
 
 ### 基础配置
@@ -9,8 +13,11 @@
 ```caddy
 # TCP 端口
 esap.cc {
-    reverse_proxy 127.0.0.1:8080
-    
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     # 可选：添加缓存控制
     header {
         Cache-Control "no-cache, no-store, must-revalidate"
@@ -19,8 +26,11 @@ esap.cc {
 
 # Unix 套接字
 esap.cc {
-    reverse_proxy unix//tmp/shortlinker.sock
-    
+    reverse_proxy unix//tmp/shortlinker.sock {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     header {
         Cache-Control "no-cache, no-store, must-revalidate"
     }
@@ -31,13 +41,16 @@ esap.cc {
 
 ```caddy
 esap.cc {
-    reverse_proxy 127.0.0.1:8080
-    
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
     # 自动 HTTPS
     tls {
         protocols tls1.2 tls1.3
     }
-    
+
     # 日志配置
     log {
         output file /var/log/caddy/shortlinker.log
@@ -130,14 +143,18 @@ server {
 # TCP 端口
 <VirtualHost *:80>
     ServerName esap.cc
-    
+
     ProxyPreserveHost On
     ProxyPass / http://127.0.0.1:8080/
     ProxyPassReverse / http://127.0.0.1:8080/
-    
+
+    # 传递客户端真实 IP（需要 mod_headers）
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
     # 禁用缓存
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
-    
+
     # 日志
     CustomLog /var/log/apache2/shortlinker.access.log combined
     ErrorLog /var/log/apache2/shortlinker.error.log
@@ -146,13 +163,17 @@ server {
 # Unix 套接字
 <VirtualHost *:80>
     ServerName esap.cc
-    
+
     ProxyPreserveHost On
     ProxyPass / unix:/tmp/shortlinker.sock|http://localhost/
     ProxyPassReverse / unix:/tmp/shortlinker.sock|http://localhost/
-    
+
+    # 传递客户端真实 IP（需要 mod_remoteip）
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+    RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"
+
     Header always set Cache-Control "no-cache, no-store, must-revalidate"
-    
+
     CustomLog /var/log/apache2/shortlinker.access.log combined
     ErrorLog /var/log/apache2/shortlinker.error.log
 </VirtualHost>
