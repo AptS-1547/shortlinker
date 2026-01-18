@@ -153,7 +153,8 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
     })?;
 
     store.set(keys::API_ADMIN_TOKEN, &hashed).await?;
-    crate::config::update_config_by_key(keys::API_ADMIN_TOKEN, &hashed);
+    // 值已经过验证，忽略返回值
+    let _ = crate::config::update_config_by_key(keys::API_ADMIN_TOKEN, &hashed);
 
     warn!(
         "admin_token migrated to argon2 hash successfully. The plaintext password in config.toml is now obsolete."
@@ -180,7 +181,8 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
             item.value, default
         );
         store.set(keys::API_COOKIE_SAME_SITE, &default).await?;
-        crate::config::update_config_by_key(keys::API_COOKIE_SAME_SITE, &default);
+        // 值已经过验证，忽略返回值
+        let _ = crate::config::update_config_by_key(keys::API_COOKIE_SAME_SITE, &default);
     }
 
     // cors.allowed_methods (JSON 数组类型 enum)
@@ -198,7 +200,8 @@ pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
                 item.value, default
             );
             store.set(keys::CORS_ALLOWED_METHODS, &default).await?;
-            crate::config::update_config_by_key(keys::CORS_ALLOWED_METHODS, &default);
+            // 值已经过验证，忽略返回值
+            let _ = crate::config::update_config_by_key(keys::CORS_ALLOWED_METHODS, &default);
         }
     }
 

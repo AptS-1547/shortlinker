@@ -180,7 +180,7 @@ mod tests {
         let result = TimeParser::parse_expire_time("1M").unwrap();
         let days_diff = (result - now).num_days();
         assert!(
-            days_diff >= 29 && days_diff <= 31,
+            (29..=31).contains(&days_diff),
             "1M should be approximately 30 days, got {}",
             days_diff
         );
@@ -189,7 +189,7 @@ mod tests {
         let result = TimeParser::parse_expire_time("1m").unwrap();
         let seconds_diff = (result - now).num_seconds();
         assert!(
-            seconds_diff >= 59 && seconds_diff <= 61,
+            (59..=61).contains(&seconds_diff),
             "1m should be approximately 60 seconds, got {}",
             seconds_diff
         );
@@ -198,7 +198,7 @@ mod tests {
         let result = TimeParser::parse_expire_time("2months").unwrap();
         let days_diff = (result - now).num_days();
         assert!(
-            days_diff >= 59 && days_diff <= 61,
+            (59..=61).contains(&days_diff),
             "2months should be approximately 60 days, got {}",
             days_diff
         );

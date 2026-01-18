@@ -50,7 +50,9 @@ impl RuntimeConfig {
 
         // 同步到 AppConfig
         for (key, item) in &configs {
-            update_config_by_key(key, &item.value);
+            if let Err(e) = update_config_by_key(key, &item.value) {
+                warn!("Failed to update config '{}': {}", key, e);
+            }
         }
 
         info!("Loaded {} runtime configuration items from database", count);
@@ -159,8 +161,10 @@ impl RuntimeConfig {
         }
 
         // 如果不需要重启，同步更新 AppConfig
-        if !result.requires_restart {
-            update_config_by_key(key, value);
+        if !result.requires_restart
+            && let Err(e) = update_config_by_key(key, value)
+        {
+            warn!("Failed to update AppConfig for '{}': {}", key, e);
         }
 
         Ok(result)

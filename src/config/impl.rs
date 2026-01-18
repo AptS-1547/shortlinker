@@ -300,7 +300,10 @@ where
 
 /// Update a specific config field by key
 ///
-/// Returns true if the key was found and updated, false otherwise.
+/// Returns:
+/// - `Ok(true)` if the key was found and updated successfully
+/// - `Ok(false)` if the key was not found
+/// - `Err(message)` if the key was found but the value was invalid
 ///
 /// # 维护说明
 ///
@@ -308,27 +311,27 @@ where
 /// 这是目前仍需手动维护的地方之一（另一处在 `config_migration.rs` 的 `get_config_value`）。
 ///
 /// 如果遗漏了某个 key，编译器不会报错，配置更新会静默失败。
-pub fn update_config_by_key(key: &str, value: &str) -> bool {
+pub fn update_config_by_key(key: &str, value: &str) -> Result<bool, String> {
     use super::definitions::keys;
     use std::cell::Cell;
 
     let found = Cell::new(true);
+    let error: Cell<Option<String>> = Cell::new(None);
+
     update_config(|config| {
         match key {
             // API 认证配置
             keys::API_ADMIN_TOKEN => config.api.admin_token = value.to_string(),
             keys::API_HEALTH_TOKEN => config.api.health_token = value.to_string(),
             keys::API_JWT_SECRET => config.api.jwt_secret = value.to_string(),
-            keys::API_ACCESS_TOKEN_MINUTES => {
-                if let Ok(v) = value.parse() {
-                    config.api.access_token_minutes = v;
-                }
-            }
-            keys::API_REFRESH_TOKEN_DAYS => {
-                if let Ok(v) = value.parse() {
-                    config.api.refresh_token_days = v;
-                }
-            }
+            keys::API_ACCESS_TOKEN_MINUTES => match value.parse() {
+                Ok(v) => config.api.access_token_minutes = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
+            keys::API_REFRESH_TOKEN_DAYS => match value.parse() {
+                Ok(v) => config.api.refresh_token_days = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
 
             // Cookie 配置
             keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name = value.to_string(),
@@ -336,11 +339,13 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
             keys::API_COOKIE_SECURE => {
                 config.api.cookie_secure = value == "true" || value == "1" || value == "yes";
             }
-            keys::API_COOKIE_SAME_SITE => {
-                if let Ok(v) = value.parse() {
-                    config.api.cookie_same_site = v;
-                }
-            }
+            keys::API_COOKIE_SAME_SITE => match value.parse() {
+                Ok(v) => config.api.cookie_same_site = v,
+                Err(_) => error.set(Some(format!(
+                    "Invalid SameSite policy for {}: '{}'. Expected: strict, lax, none",
+                    key, value
+                ))),
+            },
             keys::API_COOKIE_DOMAIN => {
                 config.api.cookie_domain = if value.is_empty() {
                     None
@@ -350,11 +355,10 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
             }
 
             // 功能配置
-            keys::FEATURES_RANDOM_CODE_LENGTH => {
-                if let Ok(v) = value.parse() {
-                    config.features.random_code_length = v;
-                }
-            }
+            keys::FEATURES_RANDOM_CODE_LENGTH => match value.parse() {
+                Ok(v) => config.features.random_code_length = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
             keys::FEATURES_DEFAULT_URL => config.features.default_url = value.to_string(),
             keys::FEATURES_ENABLE_ADMIN_PANEL => {
                 config.features.enable_admin_panel =
@@ -366,16 +370,14 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
                 config.click_manager.enable_click_tracking =
                     value == "true" || value == "1" || value == "yes";
             }
-            keys::CLICK_FLUSH_INTERVAL => {
-                if let Ok(v) = value.parse() {
-                    config.click_manager.flush_interval = v;
-                }
-            }
-            keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => {
-                if let Ok(v) = value.parse() {
-                    config.click_manager.max_clicks_before_flush = v;
-                }
-            }
+            keys::CLICK_FLUSH_INTERVAL => match value.parse() {
+                Ok(v) => config.click_manager.flush_interval = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
+            keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => match value.parse() {
+                Ok(v) => config.click_manager.max_clicks_before_flush = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
 
             // 路由配置
             keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix = value.to_string(),
@@ -386,26 +388,22 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
             keys::CORS_ENABLED => {
                 config.cors.enabled = value == "true" || value == "1" || value == "yes";
             }
-            keys::CORS_ALLOWED_ORIGINS => {
-                if let Ok(v) = serde_json::from_str(value) {
-                    config.cors.allowed_origins = v;
-                }
-            }
-            keys::CORS_ALLOWED_METHODS => {
-                if let Ok(v) = serde_json::from_str(value) {
-                    config.cors.allowed_methods = v;
-                }
-            }
-            keys::CORS_ALLOWED_HEADERS => {
-                if let Ok(v) = serde_json::from_str(value) {
-                    config.cors.allowed_headers = v;
-                }
-            }
-            keys::CORS_MAX_AGE => {
-                if let Ok(v) = value.parse() {
-                    config.cors.max_age = v;
-                }
-            }
+            keys::CORS_ALLOWED_ORIGINS => match serde_json::from_str(value) {
+                Ok(v) => config.cors.allowed_origins = v,
+                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+            },
+            keys::CORS_ALLOWED_METHODS => match serde_json::from_str(value) {
+                Ok(v) => config.cors.allowed_methods = v,
+                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+            },
+            keys::CORS_ALLOWED_HEADERS => match serde_json::from_str(value) {
+                Ok(v) => config.cors.allowed_headers = v,
+                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+            },
+            keys::CORS_MAX_AGE => match value.parse() {
+                Ok(v) => config.cors.max_age = v,
+                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+            },
             keys::CORS_ALLOW_CREDENTIALS => {
                 config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
             }
@@ -413,5 +411,9 @@ pub fn update_config_by_key(key: &str, value: &str) -> bool {
             _ => found.set(false),
         }
     });
-    found.get()
+
+    if let Some(err) = error.take() {
+        return Err(err);
+    }
+    Ok(found.get())
 }

@@ -11,6 +11,10 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 use tracing::trace;
 
+// NOTE: These values are cached at first request and require server restart to change.
+// This is intentional - changing `enable_admin_panel` or whether `admin_token` is set
+// requires a restart to take effect for frontend routes.
+// See: config/definitions.rs where `enable_admin_panel` has `requires_restart: true`
 static ENABLE_ADMIN_PANEL: OnceLock<bool> = OnceLock::new();
 static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
 

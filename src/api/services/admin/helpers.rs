@@ -77,7 +77,7 @@ impl CookieBuilder {
 
     pub fn build_access_cookie(&self, token: String) -> Cookie<'static> {
         let mut cookie = Cookie::new(self.access_cookie_name.clone(), token);
-        cookie.set_path("/");
+        cookie.set_path(self.admin_prefix.clone());
         cookie.set_http_only(true);
         cookie.set_secure(self.secure);
         cookie.set_same_site(self.same_site);
@@ -108,7 +108,7 @@ impl CookieBuilder {
 
     pub fn build_expired_access_cookie(&self) -> Cookie<'static> {
         let mut cookie = Cookie::new(self.access_cookie_name.clone(), "");
-        cookie.set_path("/");
+        cookie.set_path(self.admin_prefix.clone());
         cookie.set_http_only(true);
         cookie.set_secure(self.secure);
         cookie.set_same_site(self.same_site);

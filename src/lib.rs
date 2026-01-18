@@ -31,15 +31,3 @@ pub mod runtime;
 pub mod storage;
 pub mod system;
 pub mod utils;
-
-#[cfg(test)]
-mod tests {
-    #![allow(unused_imports)]
-    use super::*;
-
-    #[test]
-    fn test_modules_exist() {
-        // 确保所有模块都能正确编译
-        assert!(true);
-    }
-}
