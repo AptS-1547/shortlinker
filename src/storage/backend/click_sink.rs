@@ -1,6 +1,12 @@
 //! ClickSink implementation for SeaOrmStorage
 //!
 //! This module implements the click tracking flush functionality.
+//!
+//! # Security Note
+//!
+//! This module uses `execute_unprepared()` with inline SQL values for batch performance.
+//! All `short_code` values are validated via `utils::is_valid_short_code()` before being
+//! used in SQL. This validation acts as defense-in-depth against SQL injection.
 
 use async_trait::async_trait;
 use sea_orm::sea_query::{
@@ -12,6 +18,7 @@ use tracing::debug;
 use super::SeaOrmStorage;
 use super::retry;
 use crate::analytics::ClickSink;
+use crate::utils::is_valid_short_code;
 
 use migration::entities::short_link;
 
@@ -20,6 +27,16 @@ impl ClickSink for SeaOrmStorage {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
         if updates.is_empty() {
             return Ok(());
+        }
+
+        // 安全校验：确保所有 short_code 格式合法，防止 SQL 注入
+        for (code, _) in &updates {
+            if !is_valid_short_code(code) {
+                return Err(anyhow::anyhow!(
+                    "Invalid short_code format detected: '{}' - refusing to execute SQL",
+                    code
+                ));
+            }
         }
 
         let total_count = updates.len();

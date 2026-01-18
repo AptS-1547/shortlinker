@@ -15,6 +15,14 @@ pub use super::definitions::keys;
 /// 全局运行时配置实例
 static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 
+/// 配置加载模式
+enum LoadMode {
+    /// 启动时加载（同步所有配置到 AppConfig）
+    Startup,
+    /// 运行时热重载（仅同步 requires_restart=false 的配置）
+    HotReload,
+}
+
 /// 运行时配置管理器
 ///
 /// 提供从数据库加载配置并缓存到内存的功能，
@@ -33,12 +41,15 @@ impl RuntimeConfig {
         }
     }
 
-    /// 从数据库加载所有配置到缓存，并同步到 AppConfig
-    pub async fn load(&self) -> Result<()> {
+    /// 内部加载方法
+    ///
+    /// - `Startup` 模式：同步所有配置到 AppConfig（启动时使用）
+    /// - `HotReload` 模式：仅同步 requires_restart=false 的配置（运行时热更新）
+    async fn load_internal(&self, mode: LoadMode) -> Result<()> {
         let configs = self.store.get_all().await?;
         let count = configs.len();
 
-        // 更新内部缓存
+        // 更新内部缓存（始终全量更新）
         {
             let mut cache = self.cache.write().map_err(|_| {
                 ShortlinkerError::database_operation(
@@ -48,11 +59,13 @@ impl RuntimeConfig {
             *cache = configs.clone();
         }
 
-        // 批量同步到 AppConfig（单次 clone + 单次 store）
-        // 跳过需要重启的配置
+        // 根据模式过滤要同步到 AppConfig 的配置
         let updates: HashMap<String, String> = configs
             .iter()
-            .filter(|(_, item)| !item.requires_restart)
+            .filter(|(_, item)| match mode {
+                LoadMode::Startup => true,
+                LoadMode::HotReload => !item.requires_restart,
+            })
             .map(|(k, item)| (k.clone(), (*item.value).clone()))
             .collect();
 
@@ -62,18 +75,33 @@ impl RuntimeConfig {
             warn!("Failed to update config '{}': {}", key, err);
         }
 
+        let mode_str = match mode {
+            LoadMode::Startup => "startup",
+            LoadMode::HotReload => "hot-reload",
+        };
         info!(
-            "Loaded {} runtime configuration items ({} applied, {} errors)",
+            "Loaded {} runtime configuration items ({} applied, {} errors) [{}]",
             count,
             applied_count - errors.len(),
-            errors.len()
+            errors.len(),
+            mode_str
         );
         Ok(())
     }
 
-    /// 重新从数据库加载配置
+    /// 从数据库加载所有配置到缓存，并同步到 AppConfig
+    ///
+    /// 启动时调用，会同步所有配置（包括 requires_restart=true）
+    pub async fn load(&self) -> Result<()> {
+        self.load_internal(LoadMode::Startup).await
+    }
+
+    /// 运行时热重载配置
+    ///
+    /// 仅同步 requires_restart=false 的配置到 AppConfig，
+    /// 需要重启的配置会在下次启动时生效。
     pub async fn reload(&self) -> Result<()> {
-        self.load().await
+        self.load_internal(LoadMode::HotReload).await
     }
 
     /// 获取配置值

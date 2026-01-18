@@ -207,7 +207,7 @@ mod tests {
         let result = TimeParser::parse_expire_time("30minutes").unwrap();
         let seconds_diff = (result - now).num_seconds();
         assert!(
-            seconds_diff >= 1799 && seconds_diff <= 1801,
+            (1799..=1801).contains(&seconds_diff),
             "30minutes should be approximately 1800 seconds, got {}",
             seconds_diff
         );

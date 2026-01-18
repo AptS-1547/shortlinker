@@ -77,20 +77,48 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
 pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) -> Result<()> {
     debug!("Checking configuration migration to database");
 
-    // 特殊处理：检测是否需要打印自动生成的 admin_token
+    // 特殊处理：检测是否需要保存自动生成的 admin_token
+    // 安全修复：不再打印到日志，而是写入一次性文件
     let admin_token = &file_config.api.admin_token;
     let is_auto_generated = !admin_token.is_empty() && !is_argon2_hash(admin_token);
 
     if is_auto_generated && store.get(keys::API_ADMIN_TOKEN).await?.is_none() {
-        warn!("===========================================");
-        warn!("Auto-generated ADMIN_TOKEN: {}", admin_token);
-        warn!("Please save this token, it will only be shown once!");
-        warn!("===========================================");
+        let token_file = std::path::Path::new("admin_token.txt");
+        if !token_file.exists() {
+            std::fs::write(
+                token_file,
+                format!(
+                    "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}\n",
+                    admin_token
+                ),
+            )
+            .map_err(|e| {
+                crate::errors::ShortlinkerError::database_operation(format!(
+                    "Failed to write admin_token.txt: {}",
+                    e
+                ))
+            })?;
+            info!(
+                "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
+            );
+        }
     }
 
     // 遍历所有配置定义进行迁移
     for def in ALL_CONFIGS {
-        let value = get_config_value(file_config, def.key);
+        let mut value = get_config_value(file_config, def.key);
+
+        // 安全修复：如果是 admin_token 且是明文，直接哈希后再存入数据库
+        // 避免明文先写入数据库再调用 migrate_plaintext_passwords 哈希
+        if def.key == keys::API_ADMIN_TOKEN && !value.is_empty() && !is_argon2_hash(&value) {
+            value = hash_password(&value).map_err(|e| {
+                crate::errors::ShortlinkerError::database_operation(format!(
+                    "Failed to hash admin_token during migration: {}",
+                    e
+                ))
+            })?;
+        }
+
         let inserted = store
             .insert_if_not_exists(
                 def.key,

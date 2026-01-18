@@ -10,19 +10,7 @@ use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
 use crate::config::get_config;
 use crate::storage::{SeaOrmStorage, ShortLink};
-
-/// 短码最大长度
-const MAX_SHORT_CODE_LEN: usize = 128;
-
-/// 验证短码格式：长度 ≤ 128，字符集 [a-zA-Z0-9_.-/]
-#[inline]
-fn is_valid_short_code(code: &str) -> bool {
-    !code.is_empty()
-        && code.len() <= MAX_SHORT_CODE_LEN
-        && code.bytes().all(
-            |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' | b'.' | b'/'),
-        )
-}
+use crate::utils::is_valid_short_code;
 
 pub struct RedirectService {}
 
