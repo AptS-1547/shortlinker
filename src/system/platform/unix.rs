@@ -10,7 +10,7 @@ use crate::errors::{Result, ShortlinkerError};
 use crate::storage::SeaOrmStorage;
 use std::fs;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use super::PlatformOps;
 
@@ -108,8 +108,17 @@ impl PlatformOps for UnixPlatform {
         use tokio::signal::unix::{SignalKind, signal};
 
         tokio::spawn(async move {
-            let mut stream =
-                signal(SignalKind::user_defined1()).expect("Failed to create SIGUSR1 handler");
+            // 使用 match 处理信号创建失败，降级为禁用信号重载而不是 panic
+            let mut stream = match signal(SignalKind::user_defined1()) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!(
+                        "Failed to create SIGUSR1 handler: {}. Config reload via signal disabled.",
+                        e
+                    );
+                    return;
+                }
+            };
 
             while (stream.recv().await).is_some() {
                 info!("Received SIGUSR1, reloading...");

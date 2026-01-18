@@ -30,52 +30,74 @@ pub async fn batch_create_links(
 
     let mut success: Vec<String> = Vec::new();
     let mut failed: Vec<BatchFailedItem> = Vec::new();
-    let mut created_links: Vec<ShortLink> = Vec::new();
+
+    // 第一步：预处理所有请求，收集 codes 并验证 URL
+    struct ValidatedRequest {
+        code: String,
+        target: String,
+        expires_at_str: Option<String>,
+        password: Option<String>,
+        force: bool,
+    }
+
+    let mut codes_to_check: Vec<String> = Vec::new();
+    let mut valid_requests: Vec<ValidatedRequest> = Vec::new();
 
     for link_req in &batch.links {
-        // Generate code if not provided
+        // 生成或使用提供的 code
         let code = match &link_req.code {
             Some(c) if !c.is_empty() => c.clone(),
             _ => generate_random_code(get_random_code_length()),
         };
 
-        // Validate target URL
+        // 验证目标 URL
         if let Err(e) = validate_url(&link_req.target) {
             failed.push(BatchFailedItem {
-                code: code.clone(),
+                code,
                 error: e.to_string(),
             });
             continue;
         }
 
-        // Check if link already exists
-        let existing = match storage.get(&code).await {
-            Ok(opt) => opt,
-            Err(e) => {
-                failed.push(BatchFailedItem {
-                    code: code.clone(),
-                    error: format!("Database query error: {}", e),
-                });
-                continue;
-            }
-        };
-        let force = link_req.force.unwrap_or(false);
+        codes_to_check.push(code.clone());
+        valid_requests.push(ValidatedRequest {
+            code,
+            target: link_req.target.clone(),
+            expires_at_str: link_req.expires_at.clone(),
+            password: link_req.password.clone(),
+            force: link_req.force.unwrap_or(false),
+        });
+    }
 
-        if existing.is_some() && !force {
+    // 第二步：批量查询现有链接（1 次 DB 查询替代 N 次）
+    let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+    let existing_map = storage
+        .batch_get(&codes_refs)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    // 第三步：内存中验证 + 构建待插入列表
+    let mut links_to_insert: Vec<ShortLink> = Vec::new();
+
+    for req in valid_requests {
+        let existing = existing_map.get(&req.code);
+
+        // 检查是否允许覆盖
+        if existing.is_some() && !req.force {
             failed.push(BatchFailedItem {
-                code: code.clone(),
+                code: req.code,
                 error: "Link already exists".to_string(),
             });
             continue;
         }
 
-        // Parse expiration time
-        let expires_at = match &link_req.expires_at {
+        // 解析过期时间
+        let expires_at = match &req.expires_at_str {
             Some(expire_str) => match parse_expires_at(expire_str) {
                 Ok(time) => Some(time),
                 Err(error_msg) => {
                     failed.push(BatchFailedItem {
-                        code: code.clone(),
+                        code: req.code,
                         error: error_msg,
                     });
                     continue;
@@ -84,15 +106,15 @@ pub async fn batch_create_links(
             None => None,
         };
 
-        // Preserve original data if force overwriting
-        let (created_at, click) = if let Some(ref ex) = existing {
+        // 保留原始数据（如果强制覆盖）
+        let (created_at, click) = if let Some(ex) = existing {
             (ex.created_at, ex.click)
         } else {
             (chrono::Utc::now(), 0)
         };
 
-        // Hash password if provided
-        let hashed_password = match &link_req.password {
+        // 处理密码哈希
+        let hashed_password = match &req.password {
             Some(pwd) if !pwd.is_empty() => {
                 if is_argon2_hash(pwd) {
                     Some(pwd.clone())
@@ -101,7 +123,7 @@ pub async fn batch_create_links(
                         Ok(hash) => Some(hash),
                         Err(e) => {
                             failed.push(BatchFailedItem {
-                                code: code.clone(),
+                                code: req.code,
                                 error: format!("Failed to hash password: {}", e),
                             });
                             continue;
@@ -113,33 +135,37 @@ pub async fn batch_create_links(
         };
 
         let new_link = ShortLink {
-            code: code.clone(),
-            target: link_req.target.clone(),
+            code: req.code.clone(),
+            target: req.target,
             created_at,
             expires_at,
             password: hashed_password,
             click,
         };
 
-        match storage.set(new_link.clone()).await {
-            Ok(_) => {
-                success.push(code);
-                created_links.push(new_link);
-            }
-            Err(e) => {
-                failed.push(BatchFailedItem {
-                    code,
-                    error: format!("Database error: {}", e),
-                });
-            }
+        success.push(req.code);
+        links_to_insert.push(new_link);
+    }
+
+    // 第四步：批量插入（1 次 DB 事务替代 N 次单独写入）
+    if !links_to_insert.is_empty()
+        && let Err(e) = storage.batch_set(links_to_insert.clone()).await
+    {
+        // 批量写入失败，将所有成功标记移回失败
+        for code in success.drain(..) {
+            failed.push(BatchFailedItem {
+                code,
+                error: format!("Database error: {}", e),
+            });
         }
     }
 
-    // 增量更新缓存
-    for link in created_links {
-        let code = link.code.clone();
-        let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
-        cache.insert(&code, link, ttl).await;
+    // 第五步：增量更新缓存
+    for link in &links_to_insert {
+        if success.contains(&link.code) {
+            let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
+            cache.insert(&link.code, link.clone(), ttl).await;
+        }
     }
 
     info!(
@@ -165,13 +191,23 @@ pub async fn batch_update_links(
 
     let mut success: Vec<String> = Vec::new();
     let mut failed: Vec<BatchFailedItem> = Vec::new();
-    let mut updated_links: Vec<ShortLink> = Vec::new();
+
+    // 第一步：预处理所有请求，收集 codes 并验证 URL
+    struct ValidatedUpdate<'a> {
+        code: String,
+        target: String,
+        expires_at_str: Option<&'a String>,
+        password: Option<&'a String>,
+    }
+
+    let mut codes_to_check: Vec<String> = Vec::new();
+    let mut valid_updates: Vec<ValidatedUpdate> = Vec::new();
 
     for update in &batch.updates {
         let code = &update.code;
         let payload = &update.payload;
 
-        // Validate target URL
+        // 验证目标 URL
         if let Err(e) = validate_url(&payload.target) {
             failed.push(BatchFailedItem {
                 code: code.clone(),
@@ -180,32 +216,45 @@ pub async fn batch_update_links(
             continue;
         }
 
-        // Get existing link
-        let existing = match storage.get(code).await {
-            Ok(Some(link)) => link,
-            Ok(None) => {
+        codes_to_check.push(code.clone());
+        valid_updates.push(ValidatedUpdate {
+            code: code.clone(),
+            target: payload.target.clone(),
+            expires_at_str: payload.expires_at.as_ref(),
+            password: payload.password.as_ref(),
+        });
+    }
+
+    // 第二步：批量查询现有链接（1 次 DB 查询替代 N 次）
+    let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+    let existing_map = storage
+        .batch_get(&codes_refs)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    // 第三步：内存中验证 + 构建待更新列表
+    let mut links_to_update: Vec<ShortLink> = Vec::new();
+
+    for update in valid_updates {
+        // 检查链接是否存在
+        let existing = match existing_map.get(&update.code) {
+            Some(link) => link,
+            None => {
                 failed.push(BatchFailedItem {
-                    code: code.clone(),
+                    code: update.code,
                     error: "Link not found".to_string(),
-                });
-                continue;
-            }
-            Err(e) => {
-                failed.push(BatchFailedItem {
-                    code: code.clone(),
-                    error: format!("Database query error: {}", e),
                 });
                 continue;
             }
         };
 
-        // Parse expiration time
-        let expires_at = match &payload.expires_at {
+        // 解析过期时间
+        let expires_at = match update.expires_at_str {
             Some(expire_str) => match parse_expires_at(expire_str) {
                 Ok(time) => Some(time),
                 Err(error_msg) => {
                     failed.push(BatchFailedItem {
-                        code: code.clone(),
+                        code: update.code,
                         error: error_msg,
                     });
                     continue;
@@ -214,8 +263,8 @@ pub async fn batch_update_links(
             None => existing.expires_at,
         };
 
-        // Hash password if provided
-        let updated_password = match &payload.password {
+        // 处理密码
+        let updated_password = match update.password {
             Some(pwd) if !pwd.is_empty() => {
                 if is_argon2_hash(pwd) {
                     Some(pwd.clone())
@@ -224,7 +273,7 @@ pub async fn batch_update_links(
                         Ok(hash) => Some(hash),
                         Err(e) => {
                             failed.push(BatchFailedItem {
-                                code: code.clone(),
+                                code: update.code,
                                 error: format!("Failed to hash password: {}", e),
                             });
                             continue;
@@ -232,38 +281,42 @@ pub async fn batch_update_links(
                     }
                 }
             }
-            Some(_) => None,                   // Empty string means remove password
-            None => existing.password.clone(), // Not provided, keep existing
+            Some(_) => None,                   // 空字符串表示移除密码
+            None => existing.password.clone(), // 未提供则保留原密码
         };
 
         let updated_link = ShortLink {
-            code: code.clone(),
-            target: payload.target.clone(),
+            code: update.code.clone(),
+            target: update.target,
             created_at: existing.created_at,
             expires_at,
             password: updated_password,
             click: existing.click,
         };
 
-        match storage.set(updated_link.clone()).await {
-            Ok(_) => {
-                success.push(code.clone());
-                updated_links.push(updated_link);
-            }
-            Err(e) => {
-                failed.push(BatchFailedItem {
-                    code: code.clone(),
-                    error: format!("Database error: {}", e),
-                });
-            }
+        success.push(update.code);
+        links_to_update.push(updated_link);
+    }
+
+    // 第四步：批量更新（1 次 DB 事务替代 N 次单独写入）
+    if !links_to_update.is_empty()
+        && let Err(e) = storage.batch_set(links_to_update.clone()).await
+    {
+        // 批量写入失败，将所有成功标记移回失败
+        for code in success.drain(..) {
+            failed.push(BatchFailedItem {
+                code,
+                error: format!("Database error: {}", e),
+            });
         }
     }
 
-    // 增量更新缓存
-    for link in updated_links {
-        let code = link.code.clone();
-        let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
-        cache.insert(&code, link, ttl).await;
+    // 第五步：增量更新缓存
+    for link in &links_to_update {
+        if success.contains(&link.code) {
+            let ttl = link.cache_ttl(crate::config::get_config().cache.default_ttl);
+            cache.insert(&link.code, link.clone(), ttl).await;
+        }
     }
 
     info!(

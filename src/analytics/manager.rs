@@ -8,7 +8,7 @@
 use dashmap::DashMap;
 use std::sync::{
     Arc,
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
@@ -24,6 +24,8 @@ struct ClickBuffer {
     total_clicks: AtomicUsize,
     /// 刷盘锁，防止并发刷盘
     flush_lock: Mutex<()>,
+    /// 是否有 flush 任务待处理（防止重复 spawn）
+    flush_pending: AtomicBool,
 }
 
 impl ClickBuffer {
@@ -32,16 +34,25 @@ impl ClickBuffer {
             data: DashMap::new(),
             total_clicks: AtomicUsize::new(0),
             flush_lock: Mutex::new(()),
+            flush_pending: AtomicBool::new(false),
         }
     }
 
     /// 增加点击计数
     fn increment(&self, key: &str) -> usize {
-        // 使用 entry API 保证操作原子性，避免 TOCTOU 竞态条件
-        self.data
-            .entry(Arc::from(key))
-            .and_modify(|v| *v += 1)
-            .or_insert(1);
+        // 优化：先尝试 get_mut 更新已存在的 key（无 Arc 分配）
+        // 高并发下大多数请求是热点 key，可显著减少分配开销
+        if let Some(mut entry) = self.data.get_mut(key) {
+            *entry += 1;
+        } else {
+            // 只有新 key 才需要分配 Arc
+            // 注意：这里有 TOCTOU 窗口，但在点击统计场景下可接受
+            // 最坏情况只是多分配一次 Arc
+            self.data
+                .entry(Arc::from(key))
+                .and_modify(|v| *v += 1)
+                .or_insert(1);
+        }
         trace!("ClickBuffer: Incremented key: {}", key);
 
         self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
@@ -126,17 +137,28 @@ impl ClickManager {
         let current_size = self.buffer.increment(key);
         trace!("ClickManager: Current buffer size: {}", current_size);
 
-        // 检查是否达到阈值，尝试获取锁进行刷盘
+        // 检查是否达到阈值，尝试触发刷盘
         if current_size >= self.max_clicks_before_flush {
-            let buffer = Arc::clone(&self.buffer);
-            let sink = Arc::clone(&self.sink);
-            tokio::spawn(async move {
-                if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                    Self::flush_buffer(&buffer, &sink).await;
-                } else {
-                    trace!("ClickManager: flush already in progress, skipping");
-                }
-            });
+            // 使用 compare_exchange 防止任务风暴：
+            // 只有成功将 flush_pending 从 false 设为 true 的线程才 spawn
+            if self
+                .buffer
+                .flush_pending
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                .is_ok()
+            {
+                let buffer = Arc::clone(&self.buffer);
+                let sink = Arc::clone(&self.sink);
+                tokio::spawn(async move {
+                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                        Self::flush_buffer(&buffer, &sink).await;
+                    } else {
+                        trace!("ClickManager: flush already in progress, skipping");
+                    }
+                    // 无论成功与否都重置标志，允许下次触发
+                    buffer.flush_pending.store(false, Ordering::Release);
+                });
+            }
         }
     }
 
