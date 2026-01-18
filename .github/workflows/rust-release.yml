@@ -149,6 +149,13 @@ jobs:
   build-macos:
     needs: build-frontend
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            name: macos_aarch64
+          - target: x86_64-apple-darwin
+            name: macos_x86_64
     steps:
     - uses: actions/checkout@v4
 
@@ -159,25 +166,25 @@ jobs:
 
     - uses: dtolnay/rust-toolchain@stable
       with:
-        targets: aarch64-apple-darwin
+        targets: ${{ matrix.target }}
 
     - uses: Swatinem/rust-cache@v2
       with:
-        key: aarch64-apple-darwin
+        key: ${{ matrix.target }}
 
     - name: Build
       env:
         RUSTFLAGS: "-C link-arg=-s"
-      run: cargo build --release --target aarch64-apple-darwin --all-features
+      run: cargo build --release --target ${{ matrix.target }} --all-features
 
     - name: Rename binary
       run: |
         VERSION="${GITHUB_REF#refs/tags/}"
-        mv target/aarch64-apple-darwin/release/shortlinker "shortlinker_${VERSION}_macos_aarch64"
+        mv target/${{ matrix.target }}/release/shortlinker "shortlinker_${VERSION}_${{ matrix.name }}"
 
     - uses: actions/upload-artifact@v4
       with:
-        name: binary-macos_aarch64
+        name: binary-${{ matrix.name }}
         path: shortlinker_*
 
   release:
@@ -223,13 +230,26 @@ jobs:
 
           ---
 
-          ## Downloads
+          ## Installation
+
+          ### Homebrew (macOS/Linux)
+          ```bash
+          brew install AptS-1547/tap/shortlinker
+          ```
+
+          ### Cargo Binstall
+          ```bash
+          cargo binstall shortlinker
+          ```
+
+          ### Manual Download
 
           | Platform | Architecture | Download |
           |----------|--------------|----------|
           | Linux | x86_64 | [shortlinker_${{ github.ref_name }}_linux_x86_64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_linux_x86_64) |
           | Linux | ARM64 | [shortlinker_${{ github.ref_name }}_linux_aarch64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_linux_aarch64) |
           | Windows | x86_64 | [shortlinker_${{ github.ref_name }}_windows_x86_64.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_windows_x86_64.exe) |
+          | macOS | x86_64 | [shortlinker_${{ github.ref_name }}_macos_x86_64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_macos_x86_64) |
           | macOS | ARM64 | [shortlinker_${{ github.ref_name }}_macos_aarch64](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker_${{ github.ref_name }}_macos_aarch64) |
           | Admin Panel | - | [shortlinker-admin-panel_${{ github.ref_name }}.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/shortlinker-admin-panel_${{ github.ref_name }}.tar.gz) |
 
@@ -239,3 +259,119 @@ jobs:
         prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: release
+    runs-on: ubuntu-latest
+    # 只在非预发布版本时更新 Homebrew
+    if: ${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+    steps:
+    - name: Download release assets and calculate SHA256
+      id: sha256
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        BASE_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}"
+
+        curl -sL "${BASE_URL}/shortlinker_${VERSION}_macos_aarch64" -o macos-arm64
+        curl -sL "${BASE_URL}/shortlinker_${VERSION}_macos_x86_64" -o macos-amd64
+        curl -sL "${BASE_URL}/shortlinker_${VERSION}_linux_aarch64" -o linux-arm64
+        curl -sL "${BASE_URL}/shortlinker_${VERSION}_linux_x86_64" -o linux-amd64
+
+        echo "macos_arm64=$(sha256sum macos-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "macos_amd64=$(sha256sum macos-amd64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "linux_arm64=$(sha256sum linux-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "linux_amd64=$(sha256sum linux-amd64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+    - name: Update Homebrew Formula
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        script: |
+          const version = '${{ github.ref_name }}'.replace(/^v/, '');
+          const tagVersion = '${{ github.ref_name }}';
+          const sha256 = {
+            macos_arm64: '${{ steps.sha256.outputs.macos_arm64 }}',
+            macos_amd64: '${{ steps.sha256.outputs.macos_amd64 }}',
+            linux_arm64: '${{ steps.sha256.outputs.linux_arm64 }}',
+            linux_amd64: '${{ steps.sha256.outputs.linux_amd64 }}'
+          };
+
+          const formula = `# typed: false
+          # frozen_string_literal: true
+
+          class Shortlinker < Formula
+            desc "A minimalist URL shortener service supporting HTTP 307 redirection"
+            homepage "https://github.com/AptS-1547/shortlinker"
+            version "${version}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/AptS-1547/shortlinker/releases/download/${tagVersion}/shortlinker_${tagVersion}_macos_aarch64"
+                sha256 "${sha256.macos_arm64}"
+
+                def install
+                  bin.install "shortlinker_${tagVersion}_macos_aarch64" => "shortlinker"
+                end
+              end
+
+              on_intel do
+                url "https://github.com/AptS-1547/shortlinker/releases/download/${tagVersion}/shortlinker_${tagVersion}_macos_x86_64"
+                sha256 "${sha256.macos_amd64}"
+
+                def install
+                  bin.install "shortlinker_${tagVersion}_macos_x86_64" => "shortlinker"
+                end
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/AptS-1547/shortlinker/releases/download/${tagVersion}/shortlinker_${tagVersion}_linux_aarch64"
+                sha256 "${sha256.linux_arm64}"
+
+                def install
+                  bin.install "shortlinker_${tagVersion}_linux_aarch64" => "shortlinker"
+                end
+              end
+
+              on_intel do
+                url "https://github.com/AptS-1547/shortlinker/releases/download/${tagVersion}/shortlinker_${tagVersion}_linux_x86_64"
+                sha256 "${sha256.linux_amd64}"
+
+                def install
+                  bin.install "shortlinker_${tagVersion}_linux_x86_64" => "shortlinker"
+                end
+              end
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/shortlinker --version")
+            end
+          end
+          `.split('\n').map(line => line.replace(/^          /, '')).join('\n');
+
+          // Get current file (if exists) to get its SHA
+          let fileSha;
+          try {
+            const { data } = await github.rest.repos.getContent({
+              owner: 'AptS-1547',
+              repo: 'homebrew-tap',
+              path: 'Formula/shortlinker.rb'
+            });
+            fileSha = data.sha;
+          } catch (e) {
+            // File doesn't exist yet
+            fileSha = undefined;
+          }
+
+          // Create or update the formula file
+          await github.rest.repos.createOrUpdateFileContents({
+            owner: 'AptS-1547',
+            repo: 'homebrew-tap',
+            path: 'Formula/shortlinker.rb',
+            message: `chore: bump shortlinker to ${tagVersion}`,
+            content: Buffer.from(formula).toString('base64'),
+            sha: fileSha
+          });

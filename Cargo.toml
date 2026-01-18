@@ -1,8 +1,9 @@
 [package]
 name = "shortlinker"
-version = "0.3.0-beta.2"
+version = "0.3.0-beta.3"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
+repository = "https://github.com/AptS-1547/shortlinker"
 edition = "2024"
 
 [features]
@@ -111,3 +112,30 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 [[bench]]
 name = "click_manager"
 harness = false
+
+# cargo-binstall 配置
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_{ target }{ binary-ext }"
+bin-dir = "shortlinker_{ version }_{ target }{ binary-ext }"
+pkg-fmt = "bin"
+
+[package.metadata.binstall.overrides.x86_64-apple-darwin]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_macos_x86_64"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_macos_aarch64"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_linux_x86_64"
+
+[package.metadata.binstall.overrides.x86_64-unknown-linux-musl]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_linux_x86_64"
+
+[package.metadata.binstall.overrides.aarch64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_linux_aarch64"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-gnu]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_windows_x86_64.exe"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_windows_x86_64.exe"

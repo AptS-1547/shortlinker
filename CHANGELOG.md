@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0-beta.3] - 2026-01-18
+
+### Added
+- **ClickManager 性能基准测试** - 新增 criterion 基准测试套件
+  - 包括单线程/多线程 increment、不同 key 场景和 drain 操作的性能测试
+  - 添加并发 increment 和 increment+drain 场景的单元测试，验证数据一致性
+- **cargo-binstall 支持** - 用户可通过 `cargo binstall shortlinker` 直接安装预编译二进制
+- **Homebrew 发布支持** - 用户可通过 `brew install AptS-1547/tap/shortlinker` 安装
+- **macOS x86_64 (Intel Mac) 构建** - Release 现已支持 Intel Mac 平台
+
+### Fixed
+- **ClickBuffer 数据竞争修复** - 重构 `drain` 方法，通过先快照 key 再逐个删除的方式避免数据竞争 (#40, #41)
+- **刷盘失败恢复机制** - 新增 `restore` 方法，刷盘失败时自动将数据写回缓冲区，避免数据丢失
+- **ClickBuffer 竞态条件修复** - 使用 `entry` API 重构 `increment` 方法，消除检查后插入（TOCTOU）的竞态条件
+- **点击计数下溢防护** - 将 `fetch_sub` 替换为 `fetch_update`，确保总点击数减法操作不会下溢
+
+### Docs
+- 更新健康检查 API 鉴权逻辑文档
+- 更新短链接路径格式约束说明
+- 更新配置项说明：CORS 默认禁用、Cookie 配置热更新说明
+- 更新存储配置文档：移除 `DATABASE_BACKEND` 说明，明确从 `DATABASE_URL` 自动推断
+- 更新部署要求：Rust 版本提升至 1.85+ (Edition 2024)
+- 同步更新英文文档
+
+### Dependencies
+- 添加 `criterion` 依赖用于基准测试
+- 升级 `colored` 至 3.1.1
+
 ## [v0.3.0-beta.2] - 2026-01-16
 
 ### Added
@@ -722,7 +750,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.2...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.3...HEAD
+[v0.3.0-beta.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.2...v0.3.0-beta.3
 [v0.3.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...v0.3.0-beta.2
 [v0.3.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...v0.3.0-beta.1
 [v0.3.0-alpha.7]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.6...v0.3.0-alpha.7
