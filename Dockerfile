@@ -35,6 +35,7 @@ WORKDIR /app
 
 # 复制源代码
 COPY Cargo.toml Cargo.lock ./
+COPY benches ./benches
 COPY migration ./migration
 COPY src ./src
 
