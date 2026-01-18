@@ -5,6 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0] - 2026-01-19
+
+### 🎉 Release Highlights
+
+v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和新功能。主要亮点：
+
+- **动态配置系统** - 支持运行时热更新配置，无需重启服务
+- **JWT 认证** - 完整的访问令牌/刷新令牌认证体系
+- **负向缓存** - 优化缓存架构，减少无效查询
+- **管理员登录限流** - 防止暴力破解攻击
+- **敏感信息保护** - 全面加强日志和数据库中的敏感信息处理
+
+### Added
+- **动态配置系统** - 基于数据库的运行时配置管理，支持配置热重载
+  - 新增 `system_config` 和 `config_history` 数据表
+  - 配置管理 API 端点（`GET/PUT /admin/v1/config`）
+  - 首次启动自动从 `config.toml` 迁移配置到数据库
+- **配置管理 CLI 命令** - `config list/get/set/reset/export/import`
+- **配置 Schema 系统** - 支持前端动态渲染配置表单，按类别分组展示
+- **JWT 认证系统** - 替换 Bearer Token，支持 Access/Refresh Token
+- **健康检查 Bearer Token 认证** - 支持 k8s 等监控工具通过 `HEALTH_TOKEN` 访问
+- **负向缓存（Negative Cache）** - 缓存不存在的键，减少数据库压力
+- **数据库连接重试机制** - 指数退避重试策略，增强连接稳定性
+- **链接导出导入功能** - CSV 格式批量导出导入，支持冲突处理模式
+- **管理员登录限流** - 基于 IP 的速率限制（1 req/s，burst 5），防止暴力破解
+- **短码格式验证** - 长度≤128，字符集 `[a-zA-Z0-9_.-/]`
+- **自定义前端支持** - `./frontend-panel` 目录替换内置管理面板
+- **ClickManager 基准测试** - criterion 性能测试套件
+- **cargo-binstall / Homebrew / macOS x86_64 构建支持**
+
+### Changed
+- **CORS 默认禁用** - 提升默认安全性，需显式启用
+- **缓存预热策略** - 从主动加载改为按需回填（cache-aside）
+- **默认管理员令牌长度** - 从 8 位增加到 16 位
+- **敏感配置掩码** - 统一使用 `[REDACTED]` 替代 `********`
+- **Cookie 配置支持热更新** - `cookie_secure`、`cookie_same_site`、`cookie_domain`
+
+### Improved
+- **ClickManager 性能优化** - 添加原子标志消除任务风暴，优化 Arc 分配（单线程 -40%，并发 +40%~+62%）
+- **批量接口性能** - N+1 查询优化为 2 次 DB 往返
+- **数据库错误处理统一** - 所有查询返回 `Result<Option<T>>`
+- **健康检查性能** - 改用轻量级 `count()` 查询
+- **启动流程优化** - 返回 Result 替代 panic，增加错误处理
+- **日志初始化回退** - 文件日志失败时优雅回退到 stdout
+
+### Fixed
+- **敏感信息泄露修复**
+  - 自动生成的 `admin_token` 不再打印到日志，改为写入 `admin_token.txt` 文件
+  - 配置迁移时直接写入哈希值，避免明文先存入数据库
+  - 配置历史表添加敏感 key 兜底列表，确保脱敏
+- **SQL 注入防护** - `click_sink` 增加短码格式校验作为防御性检查
+- **运行时配置加载** - 区分启动模式和热重载模式，启动时正确加载所有配置
+- **ClickBuffer 数据竞争修复** - 通过先快照 key 再逐个删除避免竞态
+- **刷盘失败恢复机制** - 失败时自动将数据写回缓冲区
+- **缓存删除逻辑** - 使用负缓存标记已删除的键
+- **CSV 导入重复短码** - 改用 HashMap 去重
+- **CORS 配置** - 防止通配符源与凭据同时启用
+- **Cookie 路径设置** - Access Cookie path 收窄到 `admin_prefix`
+
+### Refactored
+- **配置系统重构** - `definitions.rs` 作为配置项的唯一数据源
+- **API 路由模块化** - admin、frontend、health、redirect 拆分为独立模块
+- **CLI 使用 clap 重构** - 移除自定义参数解析器
+- **点击缓冲区计数器** - 重命名为 `total_clicks`，跟踪总点击数
+- **短码验证统一** - 提取到 `utils::is_valid_short_code()` 共用
+
+### Dependencies
+- 添加 `actix-governor`、`governor` 用于速率限制
+- 添加 `clap` 用于命令行解析
+- 添加 `strum` 用于 enum 派生
+- 添加 `criterion` 用于基准测试
+- SeaORM 升级至 2.0.0-rc.28
+- actix-web 升级至 4.12
+
+### Admin Panel
+- **PWA 支持** - 可作为渐进式 Web 应用安装，支持自动更新检测
+- **短代码路径格式** - 支持斜杠作为路径分隔符（如 `abc/def`）
+- **短代码验证规则** - 允许点号，最大长度从 50 增加到 128
+- **系统配置界面重构** - 新增分类展示和 UI 组件
+- **i18n 改进** - 简化导入覆盖模式描述，改进 CORS 配置项翻译
+
+### Migration Notes
+
+**⚠️ 从 v0.2.x 升级注意事项：**
+
+1. 首次启动时，系统会自动从 `config.toml` 迁移配置到数据库
+2. 迁移完成后，数据库配置作为主配置源，`config.toml` 中的动态配置项不再生效
+3. 自动生成的 `admin_token` 会写入 `admin_token.txt` 文件，请保存后删除
+4. CORS 默认禁用，如需跨域访问请显式配置
+5. 建议检查并更新 `admin_token` 为更强的密码
+
 ## [v0.3.0-beta.3] - 2026-01-18
 
 ### Added
@@ -750,7 +841,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.3...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0...HEAD
+[v0.3.0]: https://github.com/AptS-1547/shortlinker/compare/v0.2.2...v0.3.0
 [v0.3.0-beta.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.2...v0.3.0-beta.3
 [v0.3.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...v0.3.0-beta.2
 [v0.3.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-alpha.7...v0.3.0-beta.1
