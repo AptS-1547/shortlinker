@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::config::ValueType;
+use crate::config::definitions::get_def;
 use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
 
@@ -156,12 +157,26 @@ impl ConfigStore {
             ShortlinkerError::database_operation(format!("更新配置 '{}' 失败: {}", key, e))
         })?;
 
-        // 记录变更历史
+        // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
+        let is_sensitive_config = get_def(key)
+            .map(|def| def.is_sensitive)
+            .unwrap_or(is_sensitive);
+
+        // 记录变更历史（敏感配置的值脱敏为 [REDACTED]）
+        let (history_old_value, history_new_value) = if is_sensitive_config {
+            (
+                old_value.as_ref().map(|_| "[REDACTED]".to_string()),
+                "[REDACTED]".to_string(),
+            )
+        } else {
+            (old_value.clone(), value.to_string())
+        };
+
         let history = config_history::ActiveModel {
             id: Default::default(),
             config_key: Set(key.to_string()),
-            old_value: Set(old_value.clone()),
-            new_value: Set(value.to_string()),
+            old_value: Set(history_old_value),
+            new_value: Set(history_new_value),
             changed_at: Set(chrono::Utc::now()),
             changed_by: Set(None), // TODO: 未来可以传入操作者信息
         };

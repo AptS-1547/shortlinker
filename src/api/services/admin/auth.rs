@@ -1,8 +1,11 @@
 //! Admin API 认证相关端点
 
+use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExtractionError};
+use actix_web::dev::ServiceRequest;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
-use tracing::{error, info, warn};
+use governor::middleware::NoOpMiddleware;
+use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
 use crate::config::get_config;
@@ -10,6 +13,42 @@ use crate::utils::password::verify_password;
 
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, LoginCredentials};
+
+/// 基于 IP 地址的限流 key 提取器
+///
+/// 优先使用 X-Forwarded-For 头部（反向代理场景），
+/// 回退到直连 IP。
+#[derive(Clone, Copy)]
+pub struct LoginKeyExtractor;
+
+impl KeyExtractor for LoginKeyExtractor {
+    type Key = String;
+    type KeyExtractionError = SimpleKeyExtractionError<&'static str>;
+
+    fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
+        // 优先使用 X-Forwarded-For（反向代理场景）
+        req.connection_info()
+            .realip_remote_addr()
+            .map(|ip| ip.to_string())
+            .ok_or_else(|| SimpleKeyExtractionError::new("Unable to extract IP"))
+    }
+}
+
+/// 创建登录限流器
+///
+/// 配置：每秒补充 2 个令牌，突发最多 5 次请求
+/// 超限返回 HTTP 429 Too Many Requests
+pub fn login_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
+    let config = GovernorConfigBuilder::default()
+        .seconds_per_request(1) // 令牌补充速率：每秒 1 个（等效于 per_second(1)）
+        .burst_size(5) // 突发最多 5 次请求
+        .key_extractor(LoginKeyExtractor)
+        .finish()
+        .expect("Invalid rate limit config");
+
+    debug!("Login rate limiter created: 1 req/s, burst 5");
+    Governor::new(&config)
+}
 
 /// 登录验证 - 检查管理员 token
 pub async fn check_admin_token(

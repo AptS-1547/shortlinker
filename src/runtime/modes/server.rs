@@ -14,11 +14,7 @@ use tracing::warn;
 
 use crate::api::middleware::{AdminAuth, FrontendGuard, HealthAuth};
 use crate::api::services::{
-    AdminService, AppStartTime, FrontendService, HealthService, RedirectService,
-    admin::{
-        get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
-        update_config,
-    },
+    AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
 };
 use crate::config::CorsConfig;
 use crate::runtime::lifetime;
@@ -181,155 +177,21 @@ pub async fn run_server() -> Result<()> {
                     .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
             )
             .service(
-                web::scope(&admin_prefix).wrap(AdminAuth).service(
-                    web::scope("/v1")
-                        .route("/links", web::get().to(AdminService::get_all_links))
-                        .route("/links", web::head().to(AdminService::get_all_links))
-                        .route("/links", web::post().to(AdminService::post_link))
-                        // Batch operations (must be before /links/{code:.*} to avoid matching)
-                        .route(
-                            "/links/batch",
-                            web::post().to(AdminService::batch_create_links),
-                        )
-                        .route(
-                            "/links/batch",
-                            web::put().to(AdminService::batch_update_links),
-                        )
-                        .route(
-                            "/links/batch",
-                            web::delete().to(AdminService::batch_delete_links),
-                        )
-                        // Export/Import operations (must be before /links/{code:.*})
-                        .route("/links/export", web::get().to(AdminService::export_links))
-                        .route("/links/import", web::post().to(AdminService::import_links))
-                        // Stats endpoint (must be before /links/{code:.*} to avoid matching)
-                        .route("/stats", web::get().to(AdminService::get_stats))
-                        .route("/stats", web::head().to(AdminService::get_stats))
-                        .route("/links/{code:.*}", web::get().to(AdminService::get_link))
-                        .route("/links/{code:.*}", web::head().to(AdminService::get_link))
-                        .route(
-                            "/links/{code:.*}",
-                            web::delete().to(AdminService::delete_link),
-                        )
-                        .route("/links/{code:.*}", web::put().to(AdminService::update_link))
-                        .route(
-                            "/auth/login",
-                            web::post().to(AdminService::check_admin_token),
-                        )
-                        .route("/auth/refresh", web::post().to(AdminService::refresh_token))
-                        .route("/auth/logout", web::post().to(AdminService::logout))
-                        .route("/auth/verify", web::get().to(AdminService::verify_token))
-                        // Config management endpoints
-                        .route("/config", web::get().to(get_all_configs))
-                        .route("/config/reload", web::post().to(reload_config))
-                        .route("/config/schema", web::get().to(get_config_schema))
-                        .route(
-                            "/config/{key:.*}/history",
-                            web::get().to(get_config_history),
-                        )
-                        .route("/config/{key:.*}", web::get().to(get_config))
-                        .route("/config/{key:.*}", web::put().to(update_config)),
-                ),
+                web::scope(&admin_prefix)
+                    .wrap(AdminAuth)
+                    .service(admin_v1_routes()),
             )
             .service(
                 web::scope(&health_prefix)
                     .wrap(HealthAuth)
-                    .route("", web::get().to(HealthService::health_check))
-                    .route("", web::head().to(HealthService::health_check))
-                    .route("/ready", web::get().to(HealthService::readiness_check))
-                    .route("/ready", web::head().to(HealthService::readiness_check))
-                    .route("/live", web::get().to(HealthService::liveness_check))
-                    .route("/live", web::head().to(HealthService::liveness_check)),
+                    .service(health_routes()),
             )
             .service(
                 web::scope(&frontend_prefix)
                     .wrap(FrontendGuard)
-                    .route("", web::get().to(FrontendService::handle_index))
-                    .route("", web::head().to(FrontendService::handle_index))
-                    .route(
-                        "/assets/{path:.*}",
-                        web::get().to(FrontendService::handle_static),
-                    )
-                    .route(
-                        "/assets/{path:.*}",
-                        web::head().to(FrontendService::handle_static),
-                    )
-                    .route("/admin", web::get().to(FrontendService::handle_admin_panel))
-                    .route(
-                        "/admin",
-                        web::head().to(FrontendService::handle_admin_panel),
-                    )
-                    .route(
-                        "/favicon.ico",
-                        web::get().to(FrontendService::handle_favicon),
-                    )
-                    .route(
-                        "/favicon.ico",
-                        web::head().to(FrontendService::handle_favicon),
-                    )
-                    // PWA 文件（必须在 SPA fallback 之前）
-                    .route("/sw.js", web::get().to(FrontendService::handle_pwa_assets))
-                    .route("/sw.js", web::head().to(FrontendService::handle_pwa_assets))
-                    .route(
-                        "/registerSW.js",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/registerSW.js",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/manifest.webmanifest",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/manifest.webmanifest",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/pwa-192x192.png",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/pwa-192x192.png",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/pwa-512x512.png",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/pwa-512x512.png",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/apple-touch-icon.png",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/apple-touch-icon.png",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/workbox-{hash}.js",
-                        web::get().to(FrontendService::handle_pwa_assets),
-                    )
-                    .route(
-                        "/workbox-{hash}.js",
-                        web::head().to(FrontendService::handle_pwa_assets),
-                    )
-                    // SPA fallback（必须在最后）
-                    .route(
-                        "/{path:.*}",
-                        web::get().to(FrontendService::handle_spa_fallback),
-                    )
-                    .route(
-                        "/{path:.*}",
-                        web::head().to(FrontendService::handle_spa_fallback),
-                    ),
+                    .service(frontend_routes()),
             )
-            .route("/{path}*", web::get().to(RedirectService::handle_redirect))
-            .route("/{path}*", web::head().to(RedirectService::handle_redirect))
+            .service(redirect_routes())
     })
     .keep_alive(std::time::Duration::from_secs(30))
     .client_request_timeout(std::time::Duration::from_millis(5000))

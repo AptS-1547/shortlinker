@@ -127,3 +127,14 @@ impl HealthService {
         HttpResponse::NoContent().finish()
     }
 }
+
+/// Health 路由配置
+pub fn health_routes() -> actix_web::Scope {
+    web::scope("")
+        .route("", web::get().to(HealthService::health_check))
+        .route("", web::head().to(HealthService::health_check))
+        .route("/ready", web::get().to(HealthService::readiness_check))
+        .route("/ready", web::head().to(HealthService::readiness_check))
+        .route("/live", web::get().to(HealthService::liveness_check))
+        .route("/live", web::head().to(HealthService::liveness_check))
+}

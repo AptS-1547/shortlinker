@@ -407,7 +407,7 @@ fn default_jwt_secret() -> String {
 }
 
 fn default_admin_token() -> String {
-    crate::utils::generate_random_code(8) // 8 字符随机字符串
+    crate::utils::generate_random_code(16) // 16 字符随机字符串
 }
 
 fn default_access_token_minutes() -> u64 {

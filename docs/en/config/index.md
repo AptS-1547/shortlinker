@@ -88,7 +88,7 @@ curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
 ```
 
-> Sensitive values (e.g. `api.admin_token`, `api.jwt_secret`) are masked as `********` in API responses.
+> Sensitive values (e.g. `api.admin_token`, `api.jwt_secret`) are masked as `[REDACTED]` in API responses.
 
 ## Startup Config Parameters
 

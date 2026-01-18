@@ -84,7 +84,7 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
         .map(|item| {
             // 对敏感配置屏蔽值
             let value = if item.is_sensitive {
-                "********".to_string()
+                "[REDACTED]".to_string()
             } else {
                 (*item.value).clone()
             };
@@ -120,7 +120,7 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
         Some(item) => {
             // 对敏感配置屏蔽值
             let value = if item.is_sensitive {
-                "********".to_string()
+                "[REDACTED]".to_string()
             } else {
                 (*item.value).clone()
             };
@@ -162,7 +162,7 @@ pub async fn update_config(
         Ok(result) => {
             // 敏感配置不记录明文值
             if result.is_sensitive {
-                info!("Config updated: {} = ********", key);
+                info!("Config updated: {} = [REDACTED]", key);
             } else {
                 info!("Config updated: {} = {}", key, body.value);
             }
@@ -175,7 +175,7 @@ pub async fn update_config(
 
             // 对敏感配置屏蔽返回值
             let value = if result.is_sensitive {
-                "********".to_string()
+                "[REDACTED]".to_string()
             } else {
                 result.value
             };
@@ -232,8 +232,8 @@ pub async fn get_config_history(
                     // 对敏感配置屏蔽历史值
                     let (old_value, new_value) = if is_sensitive {
                         (
-                            h.old_value.map(|_| "********".to_string()),
-                            "********".to_string(),
+                            h.old_value.map(|_| "[REDACTED]".to_string()),
+                            "[REDACTED]".to_string(),
                         )
                     } else {
                         (h.old_value, h.new_value)

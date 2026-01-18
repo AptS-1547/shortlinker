@@ -312,108 +312,151 @@ where
 ///
 /// 如果遗漏了某个 key，编译器不会报错，配置更新会静默失败。
 pub fn update_config_by_key(key: &str, value: &str) -> Result<bool, String> {
-    use super::definitions::keys;
     use std::cell::Cell;
 
     let found = Cell::new(true);
     let error: Cell<Option<String>> = Cell::new(None);
 
     update_config(|config| {
-        match key {
-            // API 认证配置
-            keys::API_ADMIN_TOKEN => config.api.admin_token = value.to_string(),
-            keys::API_HEALTH_TOKEN => config.api.health_token = value.to_string(),
-            keys::API_JWT_SECRET => config.api.jwt_secret = value.to_string(),
-            keys::API_ACCESS_TOKEN_MINUTES => match value.parse() {
-                Ok(v) => config.api.access_token_minutes = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-            keys::API_REFRESH_TOKEN_DAYS => match value.parse() {
-                Ok(v) => config.api.refresh_token_days = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-
-            // Cookie 配置
-            keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name = value.to_string(),
-            keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name = value.to_string(),
-            keys::API_COOKIE_SECURE => {
-                config.api.cookie_secure = value == "true" || value == "1" || value == "yes";
-            }
-            keys::API_COOKIE_SAME_SITE => match value.parse() {
-                Ok(v) => config.api.cookie_same_site = v,
-                Err(_) => error.set(Some(format!(
-                    "Invalid SameSite policy for {}: '{}'. Expected: strict, lax, none",
-                    key, value
-                ))),
-            },
-            keys::API_COOKIE_DOMAIN => {
-                config.api.cookie_domain = if value.is_empty() {
-                    None
-                } else {
-                    Some(value.to_string())
-                };
-            }
-
-            // 功能配置
-            keys::FEATURES_RANDOM_CODE_LENGTH => match value.parse() {
-                Ok(v) => config.features.random_code_length = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-            keys::FEATURES_DEFAULT_URL => config.features.default_url = value.to_string(),
-            keys::FEATURES_ENABLE_ADMIN_PANEL => {
-                config.features.enable_admin_panel =
-                    value == "true" || value == "1" || value == "yes";
-            }
-
-            // 点击统计配置
-            keys::CLICK_ENABLE_TRACKING => {
-                config.click_manager.enable_click_tracking =
-                    value == "true" || value == "1" || value == "yes";
-            }
-            keys::CLICK_FLUSH_INTERVAL => match value.parse() {
-                Ok(v) => config.click_manager.flush_interval = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-            keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => match value.parse() {
-                Ok(v) => config.click_manager.max_clicks_before_flush = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-
-            // 路由配置
-            keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix = value.to_string(),
-            keys::ROUTES_HEALTH_PREFIX => config.routes.health_prefix = value.to_string(),
-            keys::ROUTES_FRONTEND_PREFIX => config.routes.frontend_prefix = value.to_string(),
-
-            // CORS 配置
-            keys::CORS_ENABLED => {
-                config.cors.enabled = value == "true" || value == "1" || value == "yes";
-            }
-            keys::CORS_ALLOWED_ORIGINS => match serde_json::from_str(value) {
-                Ok(v) => config.cors.allowed_origins = v,
-                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
-            },
-            keys::CORS_ALLOWED_METHODS => match serde_json::from_str(value) {
-                Ok(v) => config.cors.allowed_methods = v,
-                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
-            },
-            keys::CORS_ALLOWED_HEADERS => match serde_json::from_str(value) {
-                Ok(v) => config.cors.allowed_headers = v,
-                Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
-            },
-            keys::CORS_MAX_AGE => match value.parse() {
-                Ok(v) => config.cors.max_age = v,
-                Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
-            },
-            keys::CORS_ALLOW_CREDENTIALS => {
-                config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
-            }
-
-            _ => found.set(false),
-        }
+        apply_config_key(config, key, value, &found, &error);
     });
 
     if let Some(err) = error.take() {
         return Err(err);
     }
     Ok(found.get())
+}
+
+/// 批量更新配置（单次 clone + 单次 store）
+///
+/// 相比逐个调用 `update_config_by_key`，这个函数只执行一次 clone 和一次 atomic store，
+/// 避免了中间态不一致和多次内存分配。
+///
+/// # Returns
+/// 返回更新失败的 key 及其错误信息列表。空列表表示全部成功。
+pub fn batch_update_config_by_keys(
+    updates: &std::collections::HashMap<String, String>,
+) -> Vec<(String, String)> {
+    use std::cell::Cell;
+
+    let mut errors = Vec::new();
+
+    update_config(|config| {
+        for (key, value) in updates {
+            let found = Cell::new(true);
+            let error: Cell<Option<String>> = Cell::new(None);
+
+            apply_config_key(config, key, value, &found, &error);
+
+            if let Some(err) = error.take() {
+                errors.push((key.clone(), err));
+            } else if !found.get() {
+                errors.push((key.clone(), format!("Unknown config key: {}", key)));
+            }
+        }
+    });
+
+    errors
+}
+
+/// 内部函数：应用单个 key 到 config（不触发 store）
+fn apply_config_key(
+    config: &mut AppConfig,
+    key: &str,
+    value: &str,
+    found: &std::cell::Cell<bool>,
+    error: &std::cell::Cell<Option<String>>,
+) {
+    use super::definitions::keys;
+
+    match key {
+        // API 认证配置
+        keys::API_ADMIN_TOKEN => config.api.admin_token = value.to_string(),
+        keys::API_HEALTH_TOKEN => config.api.health_token = value.to_string(),
+        keys::API_JWT_SECRET => config.api.jwt_secret = value.to_string(),
+        keys::API_ACCESS_TOKEN_MINUTES => match value.parse() {
+            Ok(v) => config.api.access_token_minutes = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+        keys::API_REFRESH_TOKEN_DAYS => match value.parse() {
+            Ok(v) => config.api.refresh_token_days = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+
+        // Cookie 配置
+        keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name = value.to_string(),
+        keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name = value.to_string(),
+        keys::API_COOKIE_SECURE => {
+            config.api.cookie_secure = value == "true" || value == "1" || value == "yes";
+        }
+        keys::API_COOKIE_SAME_SITE => match value.parse() {
+            Ok(v) => config.api.cookie_same_site = v,
+            Err(_) => error.set(Some(format!(
+                "Invalid SameSite policy for {}: '{}'. Expected: strict, lax, none",
+                key, value
+            ))),
+        },
+        keys::API_COOKIE_DOMAIN => {
+            config.api.cookie_domain = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+
+        // 功能配置
+        keys::FEATURES_RANDOM_CODE_LENGTH => match value.parse() {
+            Ok(v) => config.features.random_code_length = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+        keys::FEATURES_DEFAULT_URL => config.features.default_url = value.to_string(),
+        keys::FEATURES_ENABLE_ADMIN_PANEL => {
+            config.features.enable_admin_panel = value == "true" || value == "1" || value == "yes";
+        }
+
+        // 点击统计配置
+        keys::CLICK_ENABLE_TRACKING => {
+            config.click_manager.enable_click_tracking =
+                value == "true" || value == "1" || value == "yes";
+        }
+        keys::CLICK_FLUSH_INTERVAL => match value.parse() {
+            Ok(v) => config.click_manager.flush_interval = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+        keys::CLICK_MAX_CLICKS_BEFORE_FLUSH => match value.parse() {
+            Ok(v) => config.click_manager.max_clicks_before_flush = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+
+        // 路由配置
+        keys::ROUTES_ADMIN_PREFIX => config.routes.admin_prefix = value.to_string(),
+        keys::ROUTES_HEALTH_PREFIX => config.routes.health_prefix = value.to_string(),
+        keys::ROUTES_FRONTEND_PREFIX => config.routes.frontend_prefix = value.to_string(),
+
+        // CORS 配置
+        keys::CORS_ENABLED => {
+            config.cors.enabled = value == "true" || value == "1" || value == "yes";
+        }
+        keys::CORS_ALLOWED_ORIGINS => match serde_json::from_str(value) {
+            Ok(v) => config.cors.allowed_origins = v,
+            Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+        },
+        keys::CORS_ALLOWED_METHODS => match serde_json::from_str(value) {
+            Ok(v) => config.cors.allowed_methods = v,
+            Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+        },
+        keys::CORS_ALLOWED_HEADERS => match serde_json::from_str(value) {
+            Ok(v) => config.cors.allowed_headers = v,
+            Err(_) => error.set(Some(format!("Invalid JSON array for {}: '{}'", key, value))),
+        },
+        keys::CORS_MAX_AGE => match value.parse() {
+            Ok(v) => config.cors.max_age = v,
+            Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
+        },
+        keys::CORS_ALLOW_CREDENTIALS => {
+            config.cors.allow_credentials = value == "true" || value == "1" || value == "yes";
+        }
+
+        _ => found.set(false),
+    }
 }

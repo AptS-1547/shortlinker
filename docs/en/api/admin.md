@@ -278,7 +278,7 @@ curl -sS -X POST \
 
 ## Runtime config management
 
-Config endpoints are under `/{ADMIN_ROUTE_PREFIX}/v1/config`. Sensitive values are masked as `********`.
+Config endpoints are under `/{ADMIN_ROUTE_PREFIX}/v1/config`. Sensitive values are masked as `[REDACTED]`.
 
 ### GET /config
 ```bash

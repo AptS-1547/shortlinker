@@ -253,3 +253,99 @@ impl FrontendService {
         }
     }
 }
+
+/// Frontend 路由配置
+///
+/// 包含：
+/// - 首页 index.html
+/// - 静态资源 /assets/*
+/// - PWA 相关文件 (manifest, service worker, 图标)
+/// - SPA fallback
+pub fn frontend_routes() -> actix_web::Scope {
+    use actix_web::web;
+
+    web::scope("")
+        .route("", web::get().to(FrontendService::handle_index))
+        .route("", web::head().to(FrontendService::handle_index))
+        .route(
+            "/assets/{path:.*}",
+            web::get().to(FrontendService::handle_static),
+        )
+        .route(
+            "/assets/{path:.*}",
+            web::head().to(FrontendService::handle_static),
+        )
+        .route("/admin", web::get().to(FrontendService::handle_admin_panel))
+        .route(
+            "/admin",
+            web::head().to(FrontendService::handle_admin_panel),
+        )
+        .route(
+            "/favicon.ico",
+            web::get().to(FrontendService::handle_favicon),
+        )
+        .route(
+            "/favicon.ico",
+            web::head().to(FrontendService::handle_favicon),
+        )
+        // PWA 文件
+        .route("/sw.js", web::get().to(FrontendService::handle_pwa_assets))
+        .route("/sw.js", web::head().to(FrontendService::handle_pwa_assets))
+        .route(
+            "/registerSW.js",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/registerSW.js",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/manifest.webmanifest",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/manifest.webmanifest",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/pwa-192x192.png",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/pwa-192x192.png",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/pwa-512x512.png",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/pwa-512x512.png",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/apple-touch-icon.png",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/apple-touch-icon.png",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/workbox-{hash}.js",
+            web::get().to(FrontendService::handle_pwa_assets),
+        )
+        .route(
+            "/workbox-{hash}.js",
+            web::head().to(FrontendService::handle_pwa_assets),
+        )
+        // SPA fallback（必须在最后）
+        .route(
+            "/{path:.*}",
+            web::get().to(FrontendService::handle_spa_fallback),
+        )
+        .route(
+            "/{path:.*}",
+            web::head().to(FrontendService::handle_spa_fallback),
+        )
+}

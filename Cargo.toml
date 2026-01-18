@@ -94,6 +94,8 @@ ts-rs = { version = "11.1", features = ["chrono-impl"] }
 csv = "1.4"
 actix-multipart = "0.7"
 strum = { version = "0.27", features = ["derive"] }
+governor = "0.10.4"
+actix-governor = "0.10.0"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = { version = "0.4", default-features = false, features = ["iterator"] }

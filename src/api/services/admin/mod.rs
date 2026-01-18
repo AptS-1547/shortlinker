@@ -6,12 +6,13 @@
 //! - 批量操作
 //! - 配置管理
 
-mod auth;
+pub mod auth;
 mod batch_ops;
 mod config_ops;
 mod export_import;
 mod helpers;
 mod link_crud;
+pub mod routes;
 mod types;
 
 // 重新导出类型

@@ -101,7 +101,7 @@ curl -sS -b cookies.txt \
 }
 ```
 
-> **注意**：敏感配置（如 `api.admin_token`、`api.jwt_secret`）在 API 响应中会自动掩码为 `********`。
+> **注意**：敏感配置（如 `api.admin_token`、`api.jwt_secret`）在 API 响应中会自动掩码为 `[REDACTED]`。
 
 ## 启动配置参数
 

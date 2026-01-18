@@ -307,7 +307,7 @@ curl -sS -X POST \
 
 ## 运行时配置管理
 
-配置管理接口位于 `/{ADMIN_ROUTE_PREFIX}/v1/config` 下，返回值统一为 `{code,data}` 结构；敏感配置会自动掩码为 `********`。
+配置管理接口位于 `/{ADMIN_ROUTE_PREFIX}/v1/config` 下，返回值统一为 `{code,data}` 结构；敏感配置会自动掩码为 `[REDACTED]`。
 
 ### GET /config - 获取所有配置
 

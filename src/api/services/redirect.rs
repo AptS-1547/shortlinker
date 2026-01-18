@@ -120,3 +120,12 @@ impl RedirectService {
             .finish()
     }
 }
+
+/// Redirect 路由配置
+pub fn redirect_routes() -> actix_web::Scope {
+    use actix_web::web;
+
+    web::scope("")
+        .route("/{path}*", web::get().to(RedirectService::handle_redirect))
+        .route("/{path}*", web::head().to(RedirectService::handle_redirect))
+}

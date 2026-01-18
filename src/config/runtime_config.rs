@@ -6,8 +6,8 @@ use tracing::{info, warn};
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 
-use super::update_config_by_key;
 use super::validators;
+use super::{batch_update_config_by_keys, update_config_by_key};
 
 // Re-export keys from definitions module
 pub use super::definitions::keys;
@@ -48,14 +48,26 @@ impl RuntimeConfig {
             *cache = configs.clone();
         }
 
-        // 同步到 AppConfig
-        for (key, item) in &configs {
-            if let Err(e) = update_config_by_key(key, &item.value) {
-                warn!("Failed to update config '{}': {}", key, e);
-            }
+        // 批量同步到 AppConfig（单次 clone + 单次 store）
+        // 跳过需要重启的配置
+        let updates: HashMap<String, String> = configs
+            .iter()
+            .filter(|(_, item)| !item.requires_restart)
+            .map(|(k, item)| (k.clone(), (*item.value).clone()))
+            .collect();
+
+        let applied_count = updates.len();
+        let errors = batch_update_config_by_keys(&updates);
+        for (key, err) in &errors {
+            warn!("Failed to update config '{}': {}", key, err);
         }
 
-        info!("Loaded {} runtime configuration items from database", count);
+        info!(
+            "Loaded {} runtime configuration items ({} applied, {} errors)",
+            count,
+            applied_count - errors.len(),
+            errors.len()
+        );
         Ok(())
     }
 
