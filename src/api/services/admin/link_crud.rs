@@ -14,8 +14,8 @@ use crate::utils::url_validator::validate_url;
 use super::get_random_code_length;
 use super::helpers::{error_response, parse_expires_at, success_response};
 use super::types::{
-    ApiResponse, GetLinksQuery, LinkResponse, PaginatedResponse, PaginationInfo, PostNewLink,
-    StatsResponse,
+    ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
+    PostNewLink, StatsResponse,
 };
 
 /// 获取所有链接（支持分页和过滤）
@@ -259,9 +259,9 @@ pub async fn delete_link(
             info!("Admin API: link deleted - {}", code);
             // 增量更新缓存
             cache.remove(&code).await;
-            Ok(success_response(serde_json::json!({
-                "message": "Link deleted successfully"
-            })))
+            Ok(success_response(MessageResponse {
+                message: "Link deleted successfully".to_string(),
+            }))
         }
         Err(e) => {
             let error_msg = format!("Error deleting link: {}", e);

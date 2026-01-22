@@ -24,9 +24,7 @@ pub enum IpcCommand {
     Ping,
 
     /// Reload request with specific target
-    Reload {
-        target: ReloadTarget,
-    },
+    Reload { target: ReloadTarget },
 
     /// Query current server status
     GetStatus,

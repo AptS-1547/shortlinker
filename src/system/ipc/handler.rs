@@ -21,10 +21,7 @@ pub fn init_start_time() {
 
 /// Get server uptime in seconds
 fn get_uptime_secs() -> u64 {
-    START_TIME
-        .get()
-        .map(|t| t.elapsed().as_secs())
-        .unwrap_or(0)
+    START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0)
 }
 
 /// Handle an IPC command and return a response
@@ -32,12 +29,10 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
     debug!("Handling IPC command: {:?}", cmd);
 
     match cmd {
-        IpcCommand::Ping => {
-            IpcResponse::Pong {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                uptime_secs: get_uptime_secs(),
-            }
-        }
+        IpcCommand::Ping => IpcResponse::Pong {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            uptime_secs: get_uptime_secs(),
+        },
 
         IpcCommand::Reload { target } => {
             info!("IPC reload request received: {:?}", target);

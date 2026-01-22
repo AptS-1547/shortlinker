@@ -7,7 +7,7 @@
 //! This module provides functions for encoding and decoding IPC messages.
 
 use bytes::{Buf, BufMut, BytesMut};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt;
 
 /// Maximum allowed message size (64KB)

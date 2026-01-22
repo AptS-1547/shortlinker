@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::config::SameSitePolicy;
 use crate::utils::TimeParser;
 
-use super::types::ApiResponse;
+use super::types::{ApiResponse, ErrorData};
 
 /// 解析过期时间字符串，支持相对格式（如 '1h', '30m'）和 RFC3339 格式
 pub fn parse_expires_at(expire_str: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
@@ -38,7 +38,13 @@ pub fn success_response<T: Serialize>(data: T) -> HttpResponse {
 
 /// 构建错误响应
 pub fn error_response(status: StatusCode, message: &str) -> HttpResponse {
-    json_response(status, 1, serde_json::json!({ "error": message }))
+    json_response(
+        status,
+        1,
+        ErrorData {
+            error: message.to_string(),
+        },
+    )
 }
 
 /// Cookie 构建器，消除重复的 cookie 创建代码

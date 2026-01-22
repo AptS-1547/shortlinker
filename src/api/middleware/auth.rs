@@ -10,6 +10,7 @@ use std::rc::Rc;
 use tracing::{trace, warn};
 
 use crate::api::jwt::JwtService;
+use crate::api::services::admin::{ApiResponse, ErrorData};
 use crate::config::get_config;
 
 /// Admin authentication middleware
@@ -75,10 +76,12 @@ where
         req.into_response(
             HttpResponse::Unauthorized()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                .json(serde_json::json!({
-                    "code": 1,
-                    "data": { "error": "Unauthorized: Invalid or missing token" }
-                }))
+                .json(ApiResponse {
+                    code: 1,
+                    data: ErrorData {
+                        error: "Unauthorized: Invalid or missing token".to_string(),
+                    },
+                })
                 .map_into_right_body(),
         )
     }

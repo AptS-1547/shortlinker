@@ -78,10 +78,7 @@ pub async fn notify_config_change(requires_restart: bool) {
             }
         }
         Err(IpcError::Timeout) => {
-            println!(
-                "{} Server config reload timed out",
-                "⚠".bold().yellow()
-            );
+            println!("{} Server config reload timed out", "⚠".bold().yellow());
         }
         Err(e) => {
             println!("{} Could not notify server: {}", "⚠".bold().yellow(), e);

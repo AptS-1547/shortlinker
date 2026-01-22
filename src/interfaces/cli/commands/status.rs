@@ -56,12 +56,10 @@ pub async fn server_status() -> Result<(), CliError> {
 
             Ok(())
         }
-        Ok(IpcResponse::Error { code, message }) => {
-            Err(CliError::CommandError(format!(
-                "Server error: {} - {}",
-                code, message
-            )))
-        }
+        Ok(IpcResponse::Error { code, message }) => Err(CliError::CommandError(format!(
+            "Server error: {} - {}",
+            code, message
+        ))),
         Err(IpcError::ServerNotRunning) => {
             println!("{} Server is not running", "ℹ".bold().blue());
             Ok(())

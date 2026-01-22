@@ -50,7 +50,10 @@ impl PlatformOps for UnixPlatform {
                         } else if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
                             // Process is still running but IPC check failed
                             // This could mean the process is starting up or shutting down
-                            warn!("PID {} exists but IPC not responding, assuming stale", old_pid);
+                            warn!(
+                                "PID {} exists but IPC not responding, assuming stale",
+                                old_pid
+                            );
                             let _ = fs::remove_file(pid_file);
                         } else {
                             // Process is dead, clean up stale PID file
