@@ -16,10 +16,7 @@
 //! Upper layers interact with platform operations through the exported functions,
 //! which automatically dispatch to the correct platform implementation.
 
-use crate::cache::CompositeCacheTrait;
 use crate::errors::Result;
-use crate::storage::SeaOrmStorage;
-use std::sync::Arc;
 
 #[cfg(unix)]
 mod unix;
@@ -59,11 +56,8 @@ pub trait PlatformOps {
     /// On Unix: Sets up a signal handler for SIGUSR1
     /// On Windows: Sets up a file polling mechanism
     ///
-    /// When triggered, reloads the cache and storage
-    fn setup_reload_mechanism(
-        cache: Arc<dyn CompositeCacheTrait + 'static>,
-        storage: Arc<SeaOrmStorage>,
-    ) -> impl std::future::Future<Output = ()> + Send;
+    /// When triggered, uses the global ReloadCoordinator to reload data.
+    fn setup_reload_mechanism() -> impl std::future::Future<Output = ()> + Send;
 }
 
 /// Get the platform name for logging/debugging

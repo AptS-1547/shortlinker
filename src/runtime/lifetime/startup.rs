@@ -135,8 +135,13 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     cache.load_bloom(&codes).await;
     debug!("Bloom filter initialized with {} codes", codes_count);
 
+    // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)
+    crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
+    debug!("ReloadCoordinator initialized");
+
+    // Setup platform-specific reload mechanism
     #[cfg(any(feature = "cli", feature = "tui"))]
-    crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;
+    crate::system::platform::setup_reload_mechanism().await;
 
     // 提取路由配置（配置已从数据库加载到 AppConfig）
     let config = get_config();

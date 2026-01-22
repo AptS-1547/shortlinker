@@ -1,5 +1,6 @@
 //! Config set command
 
+use super::helpers::notify_config_change;
 use crate::config::definitions::get_def;
 use crate::config::schema::get_schema;
 use crate::config::validators;
@@ -83,10 +84,8 @@ pub async fn config_set(
         );
     }
 
-    // Notify server to reload
-    if let Err(e) = crate::system::platform::notify_server() {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
-    }
+    // Notify about config change (triggers hot-reload if not requires_restart)
+    notify_config_change(result.requires_restart).await;
 
     Ok(())
 }

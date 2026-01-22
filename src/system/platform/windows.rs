@@ -8,11 +8,9 @@
 //! Note: Windows implementation is simplified compared to Unix due to
 //! lack of signal support. It uses file-based polling instead.
 
-use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::errors::{Result, ShortlinkerError};
-use crate::storage::SeaOrmStorage;
+use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
-use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use super::PlatformOps;
@@ -77,10 +75,7 @@ impl PlatformOps for WindowsPlatform {
         }
     }
 
-    async fn setup_reload_mechanism(
-        cache: Arc<dyn CompositeCacheTrait + 'static>,
-        storage: Arc<SeaOrmStorage>,
-    ) {
+    async fn setup_reload_mechanism() {
         use std::time::SystemTime;
         use tokio::fs;
         use tokio::time::{Duration, sleep};
@@ -100,21 +95,28 @@ impl PlatformOps for WindowsPlatform {
                         match metadata.modified() {
                             Ok(modified) => {
                                 if modified > last_check {
-                                    info!("Reload request detected, reloading...");
+                                    info!("Reload request detected, triggering data reload...");
 
-                                    match reload_all(cache.clone(), storage.clone()).await {
-                                        Ok(_) => {
-                                            info!("Reload successful");
-                                            last_check = SystemTime::now();
+                                    if let Some(coordinator) = get_reload_coordinator() {
+                                        match coordinator.reload(ReloadTarget::Data).await {
+                                            Ok(result) => {
+                                                info!(
+                                                    "Reload completed in {}ms",
+                                                    result.duration_ms
+                                                );
+                                                last_check = SystemTime::now();
 
-                                            // Remove the trigger file
-                                            if let Err(e) = fs::remove_file(reload_file).await {
-                                                warn!("Failed to remove reload file: {}", e);
+                                                // Remove the trigger file
+                                                if let Err(e) = fs::remove_file(reload_file).await {
+                                                    warn!("Failed to remove reload file: {}", e);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("Reload failed: {}", e);
                                             }
                                         }
-                                        Err(e) => {
-                                            error!("Reload failed: {}", e);
-                                        }
+                                    } else {
+                                        warn!("ReloadCoordinator not initialized, skipping reload");
                                     }
                                 }
                             }
@@ -130,35 +132,6 @@ impl PlatformOps for WindowsPlatform {
             }
         });
     }
-}
-
-/// Reload cache and storage
-///
-/// This function is called when a reload trigger is detected.
-/// It reloads the storage backend and rebuilds the cache.
-async fn reload_all(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) -> anyhow::Result<()> {
-    info!("Starting reload process...");
-
-    // Reload storage backend
-    storage.reload().await?;
-    let links = storage.load_all().await?;
-
-    // Reconfigure cache with new capacity
-    cache
-        .reconfigure(BloomConfig {
-            capacity: links.len(),
-            fp_rate: 0.001,
-        })
-        .await?;
-
-    // Load data into cache
-    cache.load_cache(links).await;
-
-    info!("Reload process completed successfully");
-    Ok(())
 }
 
 // Export convenience functions for backwards compatibility
@@ -180,9 +153,8 @@ pub fn notify_server() -> Result<()> {
 }
 
 /// Setup file polling for reload
-pub async fn setup_reload_mechanism(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) {
-    WindowsPlatform::setup_reload_mechanism(cache, storage).await
+///
+/// Uses the global ReloadCoordinator to handle reload requests.
+pub async fn setup_reload_mechanism() {
+    WindowsPlatform::setup_reload_mechanism().await
 }

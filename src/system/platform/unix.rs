@@ -5,11 +5,9 @@
 //! - SIGUSR1 signal-based reload mechanism
 //! - Efficient signal-driven notification
 
-use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
 use crate::errors::{Result, ShortlinkerError};
-use crate::storage::SeaOrmStorage;
+use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use super::PlatformOps;
@@ -101,14 +99,11 @@ impl PlatformOps for UnixPlatform {
         }
     }
 
-    async fn setup_reload_mechanism(
-        cache: Arc<dyn CompositeCacheTrait + 'static>,
-        storage: Arc<SeaOrmStorage>,
-    ) {
+    async fn setup_reload_mechanism() {
         use tokio::signal::unix::{SignalKind, signal};
 
         tokio::spawn(async move {
-            // 使用 match 处理信号创建失败，降级为禁用信号重载而不是 panic
+            // Use match to handle signal creation failure, degrade to disabled signal reload instead of panic
             let mut stream = match signal(SignalKind::user_defined1()) {
                 Ok(s) => s,
                 Err(e) => {
@@ -121,45 +116,23 @@ impl PlatformOps for UnixPlatform {
             };
 
             while (stream.recv().await).is_some() {
-                info!("Received SIGUSR1, reloading...");
+                info!("Received SIGUSR1, triggering data reload...");
 
-                if let Err(e) = reload_all(cache.clone(), storage.clone()).await {
-                    error!("Reload failed: {}", e);
+                if let Some(coordinator) = get_reload_coordinator() {
+                    match coordinator.reload(ReloadTarget::Data).await {
+                        Ok(result) => {
+                            info!("Reload completed in {}ms", result.duration_ms);
+                        }
+                        Err(e) => {
+                            error!("Reload failed: {}", e);
+                        }
+                    }
                 } else {
-                    info!("Reload successful");
+                    warn!("ReloadCoordinator not initialized, skipping reload");
                 }
             }
         });
     }
-}
-
-/// Reload cache and storage
-///
-/// This function is called when a reload signal is received.
-/// It reloads the storage backend and rebuilds the cache.
-async fn reload_all(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) -> anyhow::Result<()> {
-    info!("Starting reload process...");
-
-    // Reload storage backend
-    storage.reload().await?;
-    let links = storage.load_all().await?;
-
-    // Reconfigure cache with new capacity
-    cache
-        .reconfigure(BloomConfig {
-            capacity: links.len(),
-            fp_rate: 0.001,
-        })
-        .await?;
-
-    // Load data into cache
-    cache.load_cache(links).await;
-
-    info!("Reload process completed successfully");
-    Ok(())
 }
 
 // Export convenience functions for backwards compatibility
@@ -180,9 +153,8 @@ pub fn notify_server() -> Result<()> {
 }
 
 /// Setup SIGUSR1 signal handler for reload
-pub async fn setup_reload_mechanism(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) {
-    UnixPlatform::setup_reload_mechanism(cache, storage).await
+///
+/// Uses the global ReloadCoordinator to handle reload requests.
+pub async fn setup_reload_mechanism() {
+    UnixPlatform::setup_reload_mechanism().await
 }
