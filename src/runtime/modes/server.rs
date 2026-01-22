@@ -132,6 +132,7 @@ pub async fn run_server() -> Result<()> {
 
     let cache = startup.cache.clone();
     let storage = startup.storage.clone();
+    let link_service = startup.link_service.clone();
     let route = startup.route_config.clone();
 
     let admin_prefix = route.admin_prefix;
@@ -168,6 +169,7 @@ pub async fn run_server() -> Result<()> {
             .wrap(Compress::default())
             .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
+            .app_data(web::Data::new(link_service.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024))
             .wrap(

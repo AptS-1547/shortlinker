@@ -5,6 +5,7 @@ use crate::config::{
     get_config, init_runtime_config, migrate_config_to_db, migrate_enum_configs,
     migrate_plaintext_passwords,
 };
+use crate::services::LinkService;
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use tracing::{debug, info, warn};
 pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
     pub cache: Arc<dyn CompositeCacheTrait>,
+    pub link_service: Arc<LinkService>,
     pub route_config: RouteConfig,
 }
 
@@ -139,8 +141,11 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
     debug!("ReloadCoordinator initialized");
 
-    // Initialize IPC handler with storage and cache for link management
-    crate::system::ipc::handler::init_storage_cache(storage.clone(), cache.clone());
+    // Create LinkService for unified link management
+    let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
+
+    // Initialize IPC handler with LinkService
+    crate::system::ipc::handler::init_link_service(link_service.clone());
 
     // Initialize IPC start time and start IPC server
     crate::system::ipc::handler::init_start_time();
@@ -169,6 +174,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     Ok(StartupContext {
         storage,
         cache,
+        link_service,
         route_config,
     })
 }
