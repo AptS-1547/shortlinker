@@ -55,7 +55,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> 默认情况下若你未显式设置 `ADMIN_TOKEN`，程序会在首次启动时自动生成并在日志中提示一次。
+> 若你未显式设置 `ADMIN_TOKEN`，首次启动会自动生成一个随机密码并写入 `admin_token.txt`（保存后请删除该文件）。
 
 ## API 端点
 

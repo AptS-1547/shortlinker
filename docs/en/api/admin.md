@@ -6,7 +6,7 @@ Shortlinker provides a full-featured HTTP Admin API for managing short links, in
 
 Admin API settings can come from `config.toml`, environment variables, or runtime config (database). See [Configuration](/en/config/).
 
-- `ADMIN_TOKEN`: admin login password (recommended to set explicitly in production; if not set, the server will auto-generate one and print it once in logs on first startup)
+- `ADMIN_TOKEN`: admin login password (recommended to set explicitly in production; if not set, the server will auto-generate one and write it once to `admin_token.txt` (save it and delete the file))
 - `ADMIN_ROUTE_PREFIX`: route prefix (optional, default: `/admin`)
 
 > All API paths include `/v1`, e.g. the default login endpoint is `http://localhost:8080/admin/v1/auth/login`.

@@ -163,6 +163,10 @@ curl -sS -b cookies.txt \
 | `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
 
+> 提示：
+> - `api.admin_token` 在数据库中存储为 Argon2 哈希；推荐使用 `./shortlinker reset-password` 重置管理员密码。
+> - 若未显式设置 `ADMIN_TOKEN`，首次启动会自动生成一个随机密码并写入 `admin_token.txt`（保存后请删除该文件）。
+
 ### 路由配置
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |

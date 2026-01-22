@@ -55,7 +55,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and print it once in logs.
+> If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and write it to `admin_token.txt` (save it and delete the file).
 
 ## Endpoints
 

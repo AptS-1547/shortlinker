@@ -8,7 +8,7 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 - 🔄 **实时同步** - 命令执行立即生效  
 - ⚡ **快速响应** - 支持 SQLite、PostgreSQL、MySQL、MariaDB 等数据库存储后端
 - 🛡️ **错误处理** - 详细的错误信息和建议
-- 📦 **数据导入导出** - JSON 格式备份和迁移支持
+- 📦 **数据导入导出** - CSV 格式备份和迁移支持（JSON 仅兼容旧格式，已废弃）
 
 ## 基本语法
 
@@ -28,10 +28,10 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 | `remove` | 删除短链接 | `./shortlinker remove github` |
 | `update` | 更新短链接 | `./shortlinker update github https://new-url.com` |
 | `list` | 列出所有链接 | `./shortlinker list` |
-| `export` | 导出数据 | `./shortlinker export backup.json` |
-| `import` | 导入数据 | `./shortlinker import backup.json --force` |
+| `export` | 导出数据 | `./shortlinker export backup.csv` |
+| `import` | 导入数据 | `./shortlinker import backup.csv --force` |
 | `generate-config` | 生成配置模板 | `./shortlinker generate-config` |
-| `reset-password` | 重置管理员密码 | `./shortlinker reset-password "new_password"` |
+| `reset-password` | 重置管理员密码 | `./shortlinker reset-password` |
 | `config` | 运行时配置管理（数据库） | `./shortlinker config list` |
 | `tui` | 启动 TUI 界面（需编译启用） | `./shortlinker tui` |
 
@@ -52,10 +52,10 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 ### 数据管理
 ```bash
 # 导出数据
-./shortlinker export backup.json
+./shortlinker export backup.csv
 
 # 导入数据
-./shortlinker import backup.json --force
+./shortlinker import backup.csv --force
 ```
 
 ### 高级功能

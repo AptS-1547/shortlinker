@@ -6,7 +6,7 @@ Shortlinker 提供完整的 HTTP Admin API 用于管理短链接，支持 CRUD�
 
 Admin API 相关配置可来自 `config.toml`、环境变量或运行时配置（数据库）。详细配置见 [配置指南](/config/)。
 
-- `ADMIN_TOKEN`：管理员登录密码（建议生产环境显式设置；未设置时程序会在首次启动时自动生成并在日志中提示一次）
+- `ADMIN_TOKEN`：管理员登录密码（建议生产环境显式设置；未设置时程序会在首次启动时自动生成，并写入 `admin_token.txt`（仅一次，保存后请删除该文件））
 - `ADMIN_ROUTE_PREFIX`：路由前缀（可选，默认 `/admin`）
 
 > 实际接口路径固定包含 `/v1`，例如默认登录地址为 `http://localhost:8080/admin/v1/auth/login`。
