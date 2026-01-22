@@ -42,3 +42,51 @@ impl ExistenceFilter for NullExistenceFilterPlugin {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_succeeds() {
+        let plugin = NullExistenceFilterPlugin::new();
+        assert!(plugin.is_ok());
+    }
+
+    #[test]
+    fn test_default_succeeds() {
+        let _plugin = NullExistenceFilterPlugin;
+    }
+
+    #[tokio::test]
+    async fn test_check_always_returns_true() {
+        let plugin = NullExistenceFilterPlugin::new().unwrap();
+        assert!(plugin.check("any_key").await);
+        assert!(plugin.check("").await);
+        assert!(plugin.check("nonexistent").await);
+    }
+
+    #[tokio::test]
+    async fn test_set_is_noop() {
+        let plugin = NullExistenceFilterPlugin::new().unwrap();
+        // set 应该是空操作，不会改变 check 的结果
+        plugin.set("key1").await;
+        assert!(plugin.check("key1").await);
+    }
+
+    #[tokio::test]
+    async fn test_bulk_set_is_noop() {
+        let plugin = NullExistenceFilterPlugin::new().unwrap();
+        let keys = vec!["k1".to_string(), "k2".to_string(), "k3".to_string()];
+        plugin.bulk_set(&keys).await;
+        // 仍然返回 true
+        assert!(plugin.check("k1").await);
+    }
+
+    #[tokio::test]
+    async fn test_clear_succeeds() {
+        let plugin = NullExistenceFilterPlugin::new().unwrap();
+        let result = plugin.clear(1000, 0.01).await;
+        assert!(result.is_ok());
+    }
+}

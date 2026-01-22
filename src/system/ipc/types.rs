@@ -234,3 +234,164 @@ impl From<io::Error> for IpcError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn test_ipc_error_display() {
+        assert_eq!(
+            format!("{}", IpcError::ServerNotRunning),
+            "Server is not running"
+        );
+        assert_eq!(format!("{}", IpcError::Timeout), "Connection timeout");
+        assert_eq!(
+            format!("{}", IpcError::ProtocolError("bad data".into())),
+            "Protocol error: bad data"
+        );
+
+        let io_err = io::Error::other("test error");
+        let ipc_err = IpcError::IoError(io_err);
+        assert!(format!("{}", ipc_err).contains("IO error"));
+    }
+
+    #[test]
+    fn test_ipc_error_from_io_connection_refused() {
+        let io_err = io::Error::new(io::ErrorKind::ConnectionRefused, "refused");
+        let ipc_err: IpcError = io_err.into();
+        assert!(matches!(ipc_err, IpcError::ServerNotRunning));
+    }
+
+    #[test]
+    fn test_ipc_error_from_io_not_found() {
+        let io_err = io::Error::new(io::ErrorKind::NotFound, "not found");
+        let ipc_err: IpcError = io_err.into();
+        assert!(matches!(ipc_err, IpcError::ServerNotRunning));
+    }
+
+    #[test]
+    fn test_ipc_error_from_io_other() {
+        let io_err = io::Error::other("other error");
+        let ipc_err: IpcError = io_err.into();
+        assert!(matches!(ipc_err, IpcError::IoError(_)));
+    }
+
+    #[test]
+    fn test_ipc_error_source() {
+        // ServerNotRunning has no source
+        let err = IpcError::ServerNotRunning;
+        assert!(err.source().is_none());
+
+        // IoError has source
+        let io_err = io::Error::other("test");
+        let err = IpcError::IoError(io_err);
+        assert!(err.source().is_some());
+    }
+
+    #[test]
+    fn test_ipc_command_serialization() {
+        // Test Ping
+        let cmd = IpcCommand::Ping;
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
+        assert!(matches!(decoded, IpcCommand::Ping));
+
+        // Test AddLink
+        let cmd = IpcCommand::AddLink {
+            code: Some("test".into()),
+            target: "https://example.com".into(),
+            force: true,
+            expires_at: Some("2025-12-31T23:59:59Z".into()),
+            password: None,
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
+        if let IpcCommand::AddLink {
+            code,
+            target,
+            force,
+            ..
+        } = decoded
+        {
+            assert_eq!(code, Some("test".into()));
+            assert_eq!(target, "https://example.com");
+            assert!(force);
+        } else {
+            panic!("Expected AddLink");
+        }
+    }
+
+    #[test]
+    fn test_ipc_response_serialization() {
+        // Test Pong
+        let resp = IpcResponse::Pong {
+            version: "1.0.0".into(),
+            uptime_secs: 3600,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
+        if let IpcResponse::Pong {
+            version,
+            uptime_secs,
+        } = decoded
+        {
+            assert_eq!(version, "1.0.0");
+            assert_eq!(uptime_secs, 3600);
+        } else {
+            panic!("Expected Pong");
+        }
+
+        // Test Error
+        let resp = IpcResponse::Error {
+            code: "E001".into(),
+            message: "Something went wrong".into(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
+        if let IpcResponse::Error { code, message } = decoded {
+            assert_eq!(code, "E001");
+            assert_eq!(message, "Something went wrong");
+        } else {
+            panic!("Expected Error");
+        }
+    }
+
+    #[test]
+    fn test_short_link_data_serialization() {
+        let data = ShortLinkData {
+            code: "abc123".into(),
+            target: "https://example.com".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
+            expires_at: Some("2025-12-31T23:59:59Z".into()),
+            password: None,
+            click: 42,
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let decoded: ShortLinkData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.code, "abc123");
+        assert_eq!(decoded.click, 42);
+    }
+
+    #[test]
+    fn test_import_link_data_serialization() {
+        let data = ImportLinkData {
+            code: "test".into(),
+            target: "https://example.com".into(),
+            expires_at: None,
+            password: Some("secret".into()),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.code, "test");
+        assert_eq!(decoded.password, Some("secret".into()));
+    }
+
+    #[test]
+    fn test_socket_paths() {
+        assert!(!SOCKET_PATH_UNIX.is_empty());
+        assert!(!PIPE_NAME_WINDOWS.is_empty());
+        assert!(PIPE_NAME_WINDOWS.starts_with(r"\\.\pipe\"));
+    }
+}

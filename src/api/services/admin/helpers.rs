@@ -147,3 +147,96 @@ impl CookieBuilder {
         self.access_token_minutes
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+
+    #[test]
+    fn test_parse_expires_at_relative_hours() {
+        let result = parse_expires_at("1h");
+        assert!(result.is_ok());
+        let time = result.unwrap();
+        let now = Utc::now();
+        // 应该在 59-61 分钟之间（允许一些误差）
+        let diff = (time - now).num_minutes();
+        assert!((59..=61).contains(&diff));
+    }
+
+    #[test]
+    fn test_parse_expires_at_relative_minutes() {
+        let result = parse_expires_at("30m");
+        assert!(result.is_ok());
+        let time = result.unwrap();
+        let now = Utc::now();
+        let diff = (time - now).num_minutes();
+        assert!((29..=31).contains(&diff));
+    }
+
+    #[test]
+    fn test_parse_expires_at_relative_days() {
+        let result = parse_expires_at("7d");
+        assert!(result.is_ok());
+        let time = result.unwrap();
+        let now = Utc::now();
+        let diff = (time - now).num_days();
+        assert!((6..=7).contains(&diff));
+    }
+
+    #[test]
+    fn test_parse_expires_at_rfc3339() {
+        let future = Utc::now() + Duration::hours(2);
+        let rfc3339_str = future.to_rfc3339();
+        let result = parse_expires_at(&rfc3339_str);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        // 解析后的时间应该接近原始时间（秒级精度）
+        let diff = (parsed - future).num_seconds().abs();
+        assert!(diff <= 1);
+    }
+
+    #[test]
+    fn test_parse_expires_at_invalid_format() {
+        let result = parse_expires_at("invalid");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid expires_at format"));
+    }
+
+    #[test]
+    fn test_parse_expires_at_empty_string() {
+        let result = parse_expires_at("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_json_response_structure() {
+        let response = json_response(StatusCode::OK, 0, "test_data");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_success_response() {
+        let response = success_response("success_data");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_error_response() {
+        let response = error_response(StatusCode::BAD_REQUEST, "Something went wrong");
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_error_response_not_found() {
+        let response = error_response(StatusCode::NOT_FOUND, "Resource not found");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_error_response_internal_error() {
+        let response = error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

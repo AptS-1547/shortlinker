@@ -79,3 +79,115 @@ pub fn debug_cache_registry() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // 使用唯一的插件名称避免测试间干扰
+    static TEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    fn unique_name(prefix: &str) -> String {
+        let id = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
+        format!("{}_{}", prefix, id)
+    }
+
+    #[test]
+    fn test_register_and_get_filter_plugin() {
+        let name = unique_name("test_filter");
+
+        // 注册一个 mock filter 插件
+        let constructor: ExistenceFilterConstructor = Arc::new(|| {
+            Box::pin(async {
+                // 返回一个简单的 mock
+                Err(crate::errors::ShortlinkerError::cache_plugin_not_found(
+                    "mock filter for test",
+                ))
+            })
+        });
+
+        register_filter_plugin(name.clone(), constructor);
+
+        // 应该能获取到
+        let retrieved = get_filter_plugin(&name);
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_get_nonexistent_filter_plugin() {
+        let name = unique_name("nonexistent_filter");
+        let retrieved = get_filter_plugin(&name);
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_register_and_get_object_cache_plugin() {
+        let name = unique_name("test_object_cache");
+
+        // 注册一个 mock object cache 插件
+        let constructor: ObjectCacheConstructor = Arc::new(|| {
+            Box::pin(async {
+                Err(crate::errors::ShortlinkerError::cache_plugin_not_found(
+                    "mock object cache for test",
+                ))
+            })
+        });
+
+        register_object_cache_plugin(name.clone(), constructor);
+
+        // 应该能获取到
+        let retrieved = get_object_cache_plugin(&name);
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_get_nonexistent_object_cache_plugin() {
+        let name = unique_name("nonexistent_object_cache");
+        let retrieved = get_object_cache_plugin(&name);
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_register_overwrites_existing() {
+        let name = unique_name("overwrite_test");
+        static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+        // 第一次注册
+        let constructor1: ObjectCacheConstructor = Arc::new(|| {
+            CALL_COUNT.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async {
+                Err(crate::errors::ShortlinkerError::cache_plugin_not_found(
+                    "first",
+                ))
+            })
+        });
+        register_object_cache_plugin(name.clone(), constructor1);
+
+        // 第二次注册（覆盖）
+        let constructor2: ObjectCacheConstructor = Arc::new(|| {
+            CALL_COUNT.fetch_add(10, Ordering::SeqCst);
+            Box::pin(async {
+                Err(crate::errors::ShortlinkerError::cache_plugin_not_found(
+                    "second",
+                ))
+            })
+        });
+        register_object_cache_plugin(name.clone(), constructor2);
+
+        // 获取并调用，应该是第二个构造函数
+        let retrieved = get_object_cache_plugin(&name).unwrap();
+        let before = CALL_COUNT.load(Ordering::SeqCst);
+        let _ = retrieved(); // 调用构造函数
+        let after = CALL_COUNT.load(Ordering::SeqCst);
+
+        // 第二个构造函数加 10
+        assert_eq!(after - before, 10);
+    }
+
+    #[test]
+    fn test_debug_cache_registry_does_not_panic() {
+        // 只测试不会 panic
+        debug_cache_registry();
+    }
+}
