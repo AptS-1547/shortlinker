@@ -6,6 +6,7 @@
 //! - Efficient signal-driven notification
 
 use crate::errors::{Result, ShortlinkerError};
+use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
 use tracing::{debug, error, info, warn};
@@ -24,7 +25,17 @@ impl PlatformOps for UnixPlatform {
 
         let pid_file = "shortlinker.pid";
 
-        // Check if PID file already exists
+        // First, check if server is running via IPC (more reliable)
+        if PlatformIpc::is_server_running() {
+            error!("Server already running (IPC socket active)");
+            error!("You can check with: ./shortlinker status");
+            std::process::exit(1);
+        }
+
+        // Clean up any stale IPC socket file
+        PlatformIpc::cleanup();
+
+        // Check if PID file already exists (fallback check)
         if Path::new(pid_file).exists() {
             match fs::read_to_string(pid_file) {
                 Ok(old_pid_str) => {
@@ -37,11 +48,10 @@ impl PlatformOps for UnixPlatform {
                             info!("Container restart detected, removing old PID file");
                             let _ = fs::remove_file(pid_file);
                         } else if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
-                            // Process is still running
-                            error!("Server already running (PID: {}), stop it first", old_pid);
-                            error!("You can stop it with:");
-                            error!("  kill {}", old_pid);
-                            std::process::exit(1);
+                            // Process is still running but IPC check failed
+                            // This could mean the process is starting up or shutting down
+                            warn!("PID {} exists but IPC not responding, assuming stale", old_pid);
+                            let _ = fs::remove_file(pid_file);
                         } else {
                             // Process is dead, clean up stale PID file
                             info!("Stale PID file detected, cleaning up...");
@@ -75,6 +85,10 @@ impl PlatformOps for UnixPlatform {
         } else {
             info!("PID file cleaned: {}", pid_file);
         }
+
+        // Also clean up IPC socket
+        PlatformIpc::cleanup();
+        info!("IPC socket cleaned");
     }
 
     fn notify_server() -> Result<()> {

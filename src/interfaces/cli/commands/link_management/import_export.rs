@@ -6,6 +6,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 
+use super::helpers::notify_data_reload;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 
@@ -149,11 +150,9 @@ pub async fn import_links(
         error_count.to_string().red()
     );
 
-    // Notify server to reload
-    if imported_count > 0
-        && let Err(e) = crate::system::platform::notify_server()
-    {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
+    // Notify server to reload via IPC if any links were imported
+    if imported_count > 0 {
+        notify_data_reload().await;
     }
 
     Ok(())

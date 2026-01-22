@@ -5,7 +5,9 @@
 //! - Logging system initialization
 //! - Panic handler
 //! - Hot reload functionality
+//! - IPC (Inter-Process Communication) for CLI-server communication
 
+pub mod ipc;
 pub mod logging;
 pub mod panic_handler;
 pub mod platform;

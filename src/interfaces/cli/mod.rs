@@ -8,7 +8,7 @@ use crate::cli::Commands;
 use crate::storage::StorageFactory;
 use commands::{
     add_link, config_management, export_links, generate_config, import_links, list_links,
-    remove_link, run_reset_password, update_link,
+    remove_link, run_reset_password, server_status, update_link,
 };
 use std::fmt;
 
@@ -68,6 +68,11 @@ impl From<crate::errors::ShortlinkerError> for CliError {
 
 /// Run a CLI command from clap-parsed input
 pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
+    // Handle status command separately (uses IPC, no storage needed)
+    if let Commands::Status = cmd {
+        return server_status().await;
+    }
+
     // Handle reset-password command separately (needs DB connection)
     if let Commands::ResetPassword { new_password } = cmd {
         let storage = StorageFactory::create()
@@ -117,6 +122,8 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
 
         Commands::GenerateConfig { output_path } => generate_config(output_path).await,
+
+        Commands::Status => unreachable!("handled above"),
 
         Commands::ResetPassword { .. } => unreachable!("handled above"),
 

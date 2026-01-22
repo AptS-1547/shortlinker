@@ -3,6 +3,7 @@
 use colored::Colorize;
 use std::sync::Arc;
 
+use super::helpers::notify_data_reload;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
@@ -112,10 +113,8 @@ pub async fn add_link(
         );
     }
 
-    // Notify server to reload
-    if let Err(e) = crate::system::platform::notify_server() {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
-    }
+    // Notify server to reload via IPC
+    notify_data_reload().await;
 
     Ok(())
 }

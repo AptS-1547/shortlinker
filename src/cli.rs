@@ -96,6 +96,9 @@ pub enum Commands {
         output_path: Option<String>,
     },
 
+    /// Show server status (via IPC)
+    Status,
+
     /// Reset admin password
     ResetPassword {
         /// New password

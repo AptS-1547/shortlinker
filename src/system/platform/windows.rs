@@ -9,6 +9,7 @@
 //! lack of signal support. It uses file-based polling instead.
 
 use crate::errors::{Result, ShortlinkerError};
+use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
 use tracing::{error, info, warn};
@@ -25,17 +26,22 @@ impl PlatformOps for WindowsPlatform {
 
         let lock_file = ".shortlinker.lock";
 
-        // Check if lock file already exists
-        if Path::new(lock_file).exists() {
-            error!("Server already running, stop it first");
-            error!(
-                "If the server is not running, delete the lock file: {}",
-                lock_file
-            );
+        // First, check if server is running via IPC (more reliable)
+        if PlatformIpc::is_server_running() {
+            error!("Server already running (IPC pipe active)");
+            error!("You can check with: shortlinker.exe status");
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
-                "Server is already running",
+                "Server is already running (IPC active)",
             ));
+        }
+
+        // Check if lock file already exists (fallback check)
+        if Path::new(lock_file).exists() {
+            // On Windows, we can't reliably check if the process is still running
+            // So we just warn and remove the lock file since IPC check passed
+            warn!("Lock file exists but IPC not responding, assuming stale");
+            let _ = fs::remove_file(lock_file);
         }
 
         // Create lock file
@@ -62,6 +68,9 @@ impl PlatformOps for WindowsPlatform {
         } else {
             info!("Lock file cleaned: {}", lock_file);
         }
+
+        // Also clean up IPC (no-op on Windows for named pipes)
+        PlatformIpc::cleanup();
     }
 
     fn notify_server() -> Result<()> {

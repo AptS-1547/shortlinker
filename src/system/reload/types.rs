@@ -7,11 +7,12 @@
 //! - `ReloadStatus`: Current reload system status
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Reload target type
 ///
 /// Specifies what should be reloaded when triggering a reload operation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ReloadTarget {
     /// Data reload: Storage + Bloom Filter + Cache
     ///

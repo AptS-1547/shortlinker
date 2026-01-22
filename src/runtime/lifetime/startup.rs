@@ -139,7 +139,16 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
     debug!("ReloadCoordinator initialized");
 
-    // Setup platform-specific reload mechanism
+    // Initialize IPC start time and start IPC server
+    crate::system::ipc::handler::init_start_time();
+    #[cfg(any(feature = "cli", feature = "tui"))]
+    {
+        crate::system::ipc::server::start_ipc_server().await;
+        debug!("IPC server started");
+    }
+
+    // Setup platform-specific reload mechanism (kept for backward compatibility)
+    // TODO: Remove this once IPC is fully tested
     #[cfg(any(feature = "cli", feature = "tui"))]
     crate::system::platform::setup_reload_mechanism().await;
 
