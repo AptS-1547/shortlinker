@@ -133,9 +133,10 @@ impl<'a> InputField<'a> {
 
         // 添加占位符提示
         if self.value.is_empty()
-            && let Some(placeholder) = self.placeholder {
-                title = format!("{} ({})", self.title, placeholder);
-            }
+            && let Some(placeholder) = self.placeholder
+        {
+            title = format!("{} ({})", self.title, placeholder);
+        }
 
         // 添加只读标记
         if self.readonly {

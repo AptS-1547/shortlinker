@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 
 /// 当前正在编辑的字段
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EditingField {
     #[default]
     ShortCode,
@@ -61,7 +60,6 @@ impl EditingField {
         }
     }
 }
-
 
 /// 表单状态
 #[derive(Debug, Default)]

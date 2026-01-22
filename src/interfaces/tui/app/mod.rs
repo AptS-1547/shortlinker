@@ -14,6 +14,4 @@ pub mod state;
 mod validation;
 
 // Re-export main types
-pub use state::{App, CurrentScreen, CurrentlyEditing};
-
-// Re-export new state types
+pub use state::{App, CurrentScreen, CurrentlyEditing, SortColumn};

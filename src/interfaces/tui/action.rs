@@ -8,8 +8,7 @@ use super::app::CurrentScreen;
 ///
 /// 组件通过返回 Action 来通知 App 需要执行的操作
 /// App 处理 Action 并可能产生新的 Action（Action 链）
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Action {
     // ========== 导航 ==========
     /// 向上移动选择
@@ -128,4 +127,3 @@ impl Action {
         matches!(self, Action::Quit)
     }
 }
-

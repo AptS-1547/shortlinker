@@ -9,8 +9,30 @@ pub use form_state::EditingField;
 use crate::errors::ShortlinkerError;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
 
-use std::collections::HashMap;
+use ratatui::widgets::TableState;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+
+/// 排序列
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortColumn {
+    Code,
+    Url,
+    Clicks,
+    Status,
+}
+
+impl SortColumn {
+    /// 循环切换到下一个排序列
+    pub fn next(self) -> Self {
+        match self {
+            Self::Code => Self::Url,
+            Self::Url => Self::Clicks,
+            Self::Clicks => Self::Status,
+            Self::Status => Self::Code,
+        }
+    }
+}
 
 /// 当前屏幕
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +41,7 @@ pub enum CurrentScreen {
     AddLink,
     EditLink,
     DeleteConfirm,
+    BatchDeleteConfirm,
     ExportImport,
     Exiting,
     Search,
@@ -79,9 +102,18 @@ pub struct App {
     pub search_input: String,
     pub filtered_links: Vec<String>,
     pub is_searching: bool,
+    pub inline_search_mode: bool,
+
+    // Sorting
+    pub sort_column: Option<SortColumn>,
+    pub sort_ascending: bool,
+
+    // Batch selection
+    pub selected_items: HashSet<String>,
 
     // UI state
     pub selected_index: usize,
+    pub table_state: TableState,
     pub status_message: String,
     pub error_message: String,
 
@@ -103,6 +135,9 @@ impl App {
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
+        let mut table_state = TableState::default();
+        table_state.select(Some(0));
+
         Ok(App {
             storage,
             links,
@@ -117,7 +152,12 @@ impl App {
             search_input: String::new(),
             filtered_links: Vec::new(),
             is_searching: false,
+            inline_search_mode: false,
+            sort_column: None,
+            sort_ascending: true,
+            selected_items: HashSet::new(),
             selected_index: 0,
+            table_state,
             status_message: String::new(),
             error_message: String::new(),
             export_path: "shortlinks_export.json".to_string(),
@@ -205,17 +245,86 @@ impl App {
         self.status_message.clear();
     }
 
-    /// Get links to display (filtered or all)
+    /// Get links to display (filtered or all, with sorting applied)
     pub fn get_display_links(&self) -> Vec<(&String, &ShortLink)> {
-        if self.is_searching && !self.filtered_links.is_empty() {
-            self.filtered_links
-                .iter()
-                .filter_map(|code| self.links.get(code).map(|link| (code, link)))
-                .collect()
-        } else if self.is_searching {
-            Vec::new()
-        } else {
-            self.links.iter().collect()
+        let mut links: Vec<(&String, &ShortLink)> =
+            if self.is_searching && !self.filtered_links.is_empty() {
+                self.filtered_links
+                    .iter()
+                    .filter_map(|code| self.links.get(code).map(|link| (code, link)))
+                    .collect()
+            } else if self.is_searching {
+                Vec::new()
+            } else {
+                self.links.iter().collect()
+            };
+
+        // Apply sorting if a sort column is set
+        if let Some(column) = self.sort_column {
+            links.sort_by(|a, b| {
+                let cmp = match column {
+                    SortColumn::Code => a.0.cmp(b.0),
+                    SortColumn::Url => a.1.target.cmp(&b.1.target),
+                    SortColumn::Clicks => a.1.click.cmp(&b.1.click),
+                    SortColumn::Status => {
+                        let status_a = !a.1.is_expired();
+                        let status_b = !b.1.is_expired();
+                        status_a.cmp(&status_b)
+                    }
+                };
+                if self.sort_ascending {
+                    cmp
+                } else {
+                    cmp.reverse()
+                }
+            });
         }
+
+        links
+    }
+
+    /// Cycle through sort columns
+    pub fn cycle_sort_column(&mut self) {
+        self.sort_column = Some(match self.sort_column {
+            None => SortColumn::Code,
+            Some(col) => col.next(),
+        });
+    }
+
+    /// Toggle sort direction
+    pub fn toggle_sort_direction(&mut self) {
+        self.sort_ascending = !self.sort_ascending;
+    }
+
+    /// Toggle selection of current item
+    pub fn toggle_selection(&mut self) {
+        if let Some(link) = self.get_selected_link() {
+            let code = link.code.clone();
+            if self.selected_items.contains(&code) {
+                self.selected_items.remove(&code);
+            } else {
+                self.selected_items.insert(code);
+            }
+        }
+    }
+
+    /// Select all visible links
+    pub fn select_all(&mut self) {
+        let codes: Vec<String> = self
+            .get_display_links()
+            .iter()
+            .map(|(k, _)| (*k).clone())
+            .collect();
+        self.selected_items.extend(codes);
+    }
+
+    /// Clear all selections
+    pub fn clear_selection(&mut self) {
+        self.selected_items.clear();
+    }
+
+    /// Check if an item is selected
+    pub fn is_selected(&self, code: &str) -> bool {
+        self.selected_items.contains(code)
     }
 }
