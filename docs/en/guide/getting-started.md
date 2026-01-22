@@ -10,7 +10,14 @@ Please complete any installation method from the [Installation Guide](/en/guide/
 
 ### Method 1: Using TOML Configuration File (Recommended)
 
-Create `config.toml` file:
+Use the `generate-config` command to generate a configuration file:
+
+```bash
+./shortlinker generate-config
+# Generates config.toml with all configurable options and default values
+```
+
+Then modify `config.toml` as needed:
 
 ```toml
 [server]
@@ -26,17 +33,9 @@ default_url = "https://example.com"
 # admin_token = "your_admin_token"
 ```
 
-Or use a custom path:
-
-```bash
-# Use -c or --config to specify config file path
-./shortlinker -c /etc/shortlinker/myconfig.toml
-
-# If the file doesn't exist, it will be created automatically with defaults
-./shortlinker -c ./custom.toml
-# [INFO] Configuration file not found: ./custom.toml
-# [INFO] Creating default configuration file...
-```
+::: tip
+If you don't create a configuration file, the program will run with built-in default settings.
+:::
 
 ### Method 2: Using Environment Variables
 

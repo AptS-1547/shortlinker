@@ -10,10 +10,6 @@ use clap::{Parser, Subcommand};
 #[command(version)]
 #[command(about = "A high-performance URL shortener service", long_about = None)]
 pub struct Cli {
-    /// Configuration file path
-    #[arg(short, long, global = true)]
-    pub config: Option<String>,
-
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
