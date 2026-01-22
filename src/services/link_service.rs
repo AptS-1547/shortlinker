@@ -317,12 +317,15 @@ impl LinkService {
             existing.expires_at
         };
 
-        // Process password
-        let password = match req.password.as_deref() {
-            Some(pwd) if !pwd.is_empty() => self.process_password(Some(pwd))?,
-            Some(_) => None,                   // Empty string = remove password
-            None => existing.password.clone(), // Not provided = keep existing
-        };
+        // Process password using the shared utility function
+        let password = crate::utils::password::process_update_password(
+            req.password.as_deref(),
+            existing.password.clone(),
+        )
+        .map_err(|e| {
+            error!("Failed to hash password: {}", e);
+            ServiceError::PasswordHashError
+        })?;
 
         let updated_link = ShortLink {
             code: code.to_string(),

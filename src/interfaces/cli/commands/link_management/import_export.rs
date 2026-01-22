@@ -165,6 +165,7 @@ pub async fn import_links(
         match ipc::import_links(import_data, force_overwrite).await {
             Ok(IpcResponse::ImportResult {
                 success,
+                skipped,
                 failed,
                 errors,
             }) => {
@@ -174,9 +175,10 @@ pub async fn import_links(
                 }
                 println!();
                 println!(
-                    "{} Success: {} , failed {}",
+                    "{} Success: {}, skipped: {}, failed: {}",
                     "Import finished:".bold().green(),
                     success.to_string().green(),
+                    skipped.to_string().yellow(),
                     failed.to_string().red()
                 );
                 return Ok(());

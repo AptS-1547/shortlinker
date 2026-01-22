@@ -310,7 +310,8 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
                 .collect();
             IpcResponse::ImportResult {
                 success: result.success,
-                failed: result.failed + result.skipped,
+                skipped: result.skipped,
+                failed: result.failed,
                 errors,
             }
         }

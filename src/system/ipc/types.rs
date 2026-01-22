@@ -174,6 +174,7 @@ pub enum IpcResponse {
     /// Import result
     ImportResult {
         success: usize,
+        skipped: usize,
         failed: usize,
         errors: Vec<String>,
     },
