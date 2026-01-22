@@ -99,11 +99,20 @@ impl App {
 
     pub async fn refresh_links(&mut self) -> Result<(), ShortlinkerError> {
         self.links = self.storage.load_all().await?;
-        if let Err(e) = crate::system::platform::notify_server() {
-            return Err(ShortlinkerError::notify_server(format!(
-                "Failed to notify server: {}",
-                e
-            )));
+        // Notify server via IPC to reload (best effort, don't fail if server not running)
+        use crate::system::ipc::{self, IpcResponse};
+        use crate::system::reload::ReloadTarget;
+        if ipc::is_server_running() {
+            if let Err(e) = ipc::reload(ReloadTarget::Data).await {
+                tracing::warn!("Failed to notify server via IPC: {}", e);
+            } else if let Ok(IpcResponse::ReloadResult {
+                success: false,
+                message,
+                ..
+            }) = ipc::reload(ReloadTarget::Data).await
+            {
+                tracing::warn!("Server reload failed: {:?}", message);
+            }
         }
         Ok(())
     }

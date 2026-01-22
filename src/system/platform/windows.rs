@@ -2,15 +2,12 @@
 //!
 //! This module provides simplified Windows platform support:
 //! - Lock file-based instance management (no process checking)
-//! - File-based notification mechanism (trigger files)
-//! - Polling-based reload mechanism (checks every 3 seconds)
+//! - Lockfile operations
 //!
 //! Note: Windows implementation is simplified compared to Unix due to
-//! lack of signal support. It uses file-based polling instead.
+//! lack of signal support.
 
-use crate::errors::{Result, ShortlinkerError};
 use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
-use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
 use tracing::{error, info, warn};
 
@@ -72,75 +69,6 @@ impl PlatformOps for WindowsPlatform {
         // Also clean up IPC (no-op on Windows for named pipes)
         PlatformIpc::cleanup();
     }
-
-    fn notify_server() -> Result<()> {
-        // On Windows, use a trigger file
-        match fs::write("shortlinker.reload", "") {
-            Ok(_) => Ok(()),
-            Err(e) => Err(ShortlinkerError::notify_server(format!(
-                "Failed to notify server: {}",
-                e
-            ))),
-        }
-    }
-
-    async fn setup_reload_mechanism() {
-        use std::time::SystemTime;
-        use tokio::fs;
-        use tokio::time::{Duration, sleep};
-
-        let reload_file = "shortlinker.reload";
-        let mut last_check = SystemTime::now();
-        let check_interval = Duration::from_secs(3);
-
-        tokio::spawn(async move {
-            loop {
-                // Sleep for the check interval
-                sleep(check_interval).await;
-
-                // Check if reload file exists and was modified
-                match fs::metadata(reload_file).await {
-                    Ok(metadata) => {
-                        match metadata.modified() {
-                            Ok(modified) => {
-                                if modified > last_check {
-                                    info!("Reload request detected, triggering data reload...");
-
-                                    if let Some(coordinator) = get_reload_coordinator() {
-                                        match coordinator.reload(ReloadTarget::Data).await {
-                                            Ok(result) => {
-                                                info!(
-                                                    "Reload completed in {}ms",
-                                                    result.duration_ms
-                                                );
-                                                last_check = SystemTime::now();
-
-                                                // Remove the trigger file
-                                                if let Err(e) = fs::remove_file(reload_file).await {
-                                                    warn!("Failed to remove reload file: {}", e);
-                                                }
-                                            }
-                                            Err(e) => {
-                                                error!("Reload failed: {}", e);
-                                            }
-                                        }
-                                    } else {
-                                        warn!("ReloadCoordinator not initialized, skipping reload");
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                error!("Failed to get file modification time: {}", e);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        // File doesn't exist, this is normal
-                    }
-                }
-            }
-        });
-    }
 }
 
 // Export convenience functions for backwards compatibility
@@ -154,16 +82,4 @@ pub fn init_lockfile() -> std::io::Result<()> {
 /// Clean up the lock file
 pub fn cleanup_lockfile() {
     WindowsPlatform::cleanup_lockfile()
-}
-
-/// Notify server via trigger file
-pub fn notify_server() -> Result<()> {
-    WindowsPlatform::notify_server()
-}
-
-/// Setup file polling for reload
-///
-/// Uses the global ReloadCoordinator to handle reload requests.
-pub async fn setup_reload_mechanism() {
-    WindowsPlatform::setup_reload_mechanism().await
 }

@@ -46,6 +46,9 @@ pub mod protocol;
 pub mod server;
 pub mod types;
 
-pub use client::{is_server_running, ping, reload, send_command};
+pub use client::{
+    add_link, export_links, get_link, get_link_stats, import_links, is_server_running, list_links,
+    ping, reload, remove_link, send_command, update_link,
+};
 pub use platform::PlatformIpc;
-pub use types::{IpcCommand, IpcError, IpcResponse};
+pub use types::{ImportLinkData, IpcCommand, IpcError, IpcResponse, ShortLinkData};

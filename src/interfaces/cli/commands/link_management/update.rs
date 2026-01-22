@@ -3,13 +3,64 @@
 use colored::Colorize;
 use std::sync::Arc;
 
-use super::helpers::notify_data_reload;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::system::ipc::{self, IpcError, IpcResponse};
 use crate::utils::TimeParser;
 use crate::utils::url_validator::validate_url;
 
 pub async fn update_link(
+    storage: Arc<SeaOrmStorage>,
+    short_code: String,
+    target_url: String,
+    expire_time: Option<String>,
+    password: Option<String>,
+) -> Result<(), CliError> {
+    // Try IPC first if server is running
+    if ipc::is_server_running() {
+        match ipc::update_link(
+            short_code.clone(),
+            target_url.clone(),
+            expire_time.clone(),
+            password.clone(),
+        )
+        .await
+        {
+            Ok(IpcResponse::LinkUpdated { link }) => {
+                println!(
+                    "{} Short link updated: {} -> {}",
+                    "✓".bold().green(),
+                    link.code.cyan(),
+                    link.target.blue().underline()
+                );
+                if let Some(expires_at) = &link.expires_at {
+                    println!("{} Expiration: {}", "ℹ".bold().blue(), expires_at.yellow());
+                }
+                return Ok(());
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(CliError::CommandError(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                // Fall through to direct database operation
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(CliError::CommandError(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Fallback: Direct database operation when server is not running
+    update_link_direct(storage, short_code, target_url, expire_time, password).await
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn update_link_direct(
     storage: Arc<SeaOrmStorage>,
     short_code: String,
     target_url: String,
@@ -86,9 +137,6 @@ pub async fn update_link(
             expire.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
         );
     }
-
-    // Notify server to reload via IPC
-    notify_data_reload().await;
 
     Ok(())
 }

@@ -3,14 +3,95 @@
 use colored::Colorize;
 use std::sync::Arc;
 
-use super::helpers::notify_data_reload;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::system::ipc::{self, IpcError, IpcResponse};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
 use crate::utils::url_validator::validate_url;
 
 pub async fn add_link(
+    storage: Arc<SeaOrmStorage>,
+    short_code: Option<String>,
+    target_url: String,
+    force_overwrite: bool,
+    expire_time: Option<String>,
+    password: Option<String>,
+) -> Result<(), CliError> {
+    // Try IPC first if server is running
+    if ipc::is_server_running() {
+        match ipc::add_link(
+            short_code.clone(),
+            target_url.clone(),
+            force_overwrite,
+            expire_time.clone(),
+            password.clone(),
+        )
+        .await
+        {
+            Ok(IpcResponse::LinkCreated {
+                link,
+                generated_code,
+            }) => {
+                // Show generated code info
+                if generated_code {
+                    println!(
+                        "{} Generated random code: {}",
+                        "ℹ".bold().blue(),
+                        link.code.magenta()
+                    );
+                }
+
+                // Show result
+                if let Some(expires_at) = &link.expires_at {
+                    println!(
+                        "{} Added short link: {} -> {} (expires: {})",
+                        "✓".bold().green(),
+                        link.code.cyan(),
+                        link.target.blue().underline(),
+                        expires_at.yellow()
+                    );
+                } else {
+                    println!(
+                        "{} Added short link: {} -> {}",
+                        "✓".bold().green(),
+                        link.code.cyan(),
+                        link.target.blue().underline()
+                    );
+                }
+                return Ok(());
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(CliError::CommandError(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                // Fall through to direct database operation
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(CliError::CommandError(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Fallback: Direct database operation when server is not running
+    add_link_direct(
+        storage,
+        short_code,
+        target_url,
+        force_overwrite,
+        expire_time,
+        password,
+    )
+    .await
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn add_link_direct(
     storage: Arc<SeaOrmStorage>,
     short_code: Option<String>,
     target_url: String,
@@ -113,8 +194,8 @@ pub async fn add_link(
         );
     }
 
-    // Notify server to reload via IPC
-    notify_data_reload().await;
+    // Note: No reload notification needed when server is not running
+    // The server will load data from database when it starts
 
     Ok(())
 }

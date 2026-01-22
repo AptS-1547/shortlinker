@@ -17,6 +17,26 @@ pub const SOCKET_PATH_UNIX: &str = "./shortlinker.sock";
 /// Named pipe path for Windows
 pub const PIPE_NAME_WINDOWS: &str = r"\\.\pipe\shortlinker";
 
+/// Short link data for IPC transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortLinkData {
+    pub code: String,
+    pub target: String,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+    pub password: Option<String>,
+    pub click: i64,
+}
+
+/// Import link data structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportLinkData {
+    pub code: String,
+    pub target: String,
+    pub expires_at: Option<String>,
+    pub password: Option<String>,
+}
+
 /// IPC commands sent from client to server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcCommand {
@@ -31,6 +51,49 @@ pub enum IpcCommand {
 
     /// Request graceful shutdown
     Shutdown,
+
+    // ============ Link Management Commands ============
+    /// Add a new short link
+    AddLink {
+        code: Option<String>,
+        target: String,
+        force: bool,
+        expires_at: Option<String>,
+        password: Option<String>,
+    },
+
+    /// Remove a short link
+    RemoveLink { code: String },
+
+    /// Update an existing short link
+    UpdateLink {
+        code: String,
+        target: String,
+        expires_at: Option<String>,
+        password: Option<String>,
+    },
+
+    /// Get a single short link
+    GetLink { code: String },
+
+    /// List all short links with pagination
+    ListLinks {
+        page: u64,
+        page_size: u64,
+        search: Option<String>,
+    },
+
+    /// Import multiple links
+    ImportLinks {
+        links: Vec<ImportLinkData>,
+        overwrite: bool,
+    },
+
+    /// Export all links
+    ExportLinks,
+
+    /// Get link statistics
+    GetLinkStats,
 }
 
 /// IPC responses sent from server to client
@@ -81,6 +144,48 @@ pub enum IpcResponse {
         code: String,
         /// Error message
         message: String,
+    },
+
+    // ============ Link Management Responses ============
+    /// Link created successfully
+    LinkCreated {
+        link: ShortLinkData,
+        /// Generated code if none was provided
+        generated_code: bool,
+    },
+
+    /// Link deleted successfully
+    LinkDeleted { code: String },
+
+    /// Link updated successfully
+    LinkUpdated { link: ShortLinkData },
+
+    /// Get link result
+    LinkFound { link: Option<ShortLinkData> },
+
+    /// List links result
+    LinkList {
+        links: Vec<ShortLinkData>,
+        total: usize,
+        page: u64,
+        page_size: u64,
+    },
+
+    /// Import result
+    ImportResult {
+        success: usize,
+        failed: usize,
+        errors: Vec<String>,
+    },
+
+    /// Export result
+    ExportResult { links: Vec<ShortLinkData> },
+
+    /// Stats result
+    StatsResult {
+        total_links: usize,
+        total_clicks: i64,
+        active_links: usize,
     },
 }
 

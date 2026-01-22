@@ -9,7 +9,7 @@ use tokio::time::timeout;
 
 use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
-use super::types::{IpcCommand, IpcError, IpcResponse};
+use super::types::{ImportLinkData, IpcCommand, IpcError, IpcResponse};
 use crate::system::reload::ReloadTarget;
 
 /// Default timeout for IPC operations
@@ -17,6 +17,9 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Reload operation timeout (longer since reload can take time)
 const RELOAD_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Import/export operation timeout (can be long for large datasets)
+const BULK_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Check if the server is running
 ///
@@ -31,6 +34,7 @@ pub fn is_server_running() -> bool {
 pub async fn send_command(cmd: IpcCommand) -> Result<IpcResponse, IpcError> {
     let timeout_duration = match &cmd {
         IpcCommand::Reload { .. } => RELOAD_TIMEOUT,
+        IpcCommand::ImportLinks { .. } | IpcCommand::ExportLinks => BULK_TIMEOUT,
         _ => DEFAULT_TIMEOUT,
     };
     send_command_with_timeout(cmd, timeout_duration).await
@@ -113,4 +117,82 @@ pub async fn get_status() -> Result<IpcResponse, IpcError> {
 /// Request server shutdown
 pub async fn shutdown() -> Result<IpcResponse, IpcError> {
     send_command(IpcCommand::Shutdown).await
+}
+
+// ============ Link Management Client Functions ============
+
+/// Add a new link via IPC
+pub async fn add_link(
+    code: Option<String>,
+    target: String,
+    force: bool,
+    expires_at: Option<String>,
+    password: Option<String>,
+) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::AddLink {
+        code,
+        target,
+        force,
+        expires_at,
+        password,
+    })
+    .await
+}
+
+/// Remove a link via IPC
+pub async fn remove_link(code: String) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::RemoveLink { code }).await
+}
+
+/// Update a link via IPC
+pub async fn update_link(
+    code: String,
+    target: String,
+    expires_at: Option<String>,
+    password: Option<String>,
+) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::UpdateLink {
+        code,
+        target,
+        expires_at,
+        password,
+    })
+    .await
+}
+
+/// Get a single link via IPC
+pub async fn get_link(code: String) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::GetLink { code }).await
+}
+
+/// List links via IPC
+pub async fn list_links(
+    page: u64,
+    page_size: u64,
+    search: Option<String>,
+) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ListLinks {
+        page,
+        page_size,
+        search,
+    })
+    .await
+}
+
+/// Import links via IPC
+pub async fn import_links(
+    links: Vec<ImportLinkData>,
+    overwrite: bool,
+) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ImportLinks { links, overwrite }).await
+}
+
+/// Export all links via IPC
+pub async fn export_links() -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ExportLinks).await
+}
+
+/// Get link statistics via IPC
+pub async fn get_link_stats() -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::GetLinkStats).await
 }

@@ -6,11 +6,80 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 
-use super::helpers::notify_data_reload;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
 
 pub async fn export_links(
+    storage: Arc<SeaOrmStorage>,
+    file_path: Option<String>,
+) -> Result<(), CliError> {
+    // Try IPC first if server is running
+    if ipc::is_server_running() {
+        match ipc::export_links().await {
+            Ok(IpcResponse::ExportResult { links }) => {
+                return export_links_to_file(&links, file_path);
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(CliError::CommandError(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                // Fall through to direct database operation
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(CliError::CommandError(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Fallback: Direct database operation when server is not running
+    export_links_direct(storage, file_path).await
+}
+
+/// Export links to file (shared logic for IPC and direct)
+fn export_links_to_file(
+    links: &[crate::system::ipc::ShortLinkData],
+    file_path: Option<String>,
+) -> Result<(), CliError> {
+    if links.is_empty() {
+        println!("{} No short links to export", "ℹ".bold().blue());
+        return Ok(());
+    }
+
+    let output_path = file_path.unwrap_or_else(|| {
+        format!(
+            "shortlinks_export_{}.json",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        )
+    });
+
+    let file = File::create(&output_path).map_err(|e| {
+        CliError::CommandError(format!(
+            "Failed to create export file '{}': {}",
+            output_path, e
+        ))
+    })?;
+    let writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, &links)
+        .map_err(|e| CliError::CommandError(format!("Failed to export JSON data: {}", e)))?;
+
+    println!(
+        "{} Exported {} short links to: {}",
+        "✓".bold().green(),
+        links.len().to_string().green(),
+        output_path.cyan()
+    );
+
+    Ok(())
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn export_links_direct(
     storage: Arc<SeaOrmStorage>,
     file_path: Option<String>,
 ) -> Result<(), CliError> {
@@ -67,6 +136,7 @@ pub async fn import_links(
         )));
     }
 
+    // Read and parse the import file
     let file = File::open(&file_path).map_err(|e| {
         CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
     })?;
@@ -79,6 +149,65 @@ pub async fn import_links(
         return Ok(());
     }
 
+    // Try IPC first if server is running
+    if ipc::is_server_running() {
+        // Convert to ImportLinkData
+        let import_data: Vec<ImportLinkData> = imported_links
+            .iter()
+            .map(|link| ImportLinkData {
+                code: link.code.clone(),
+                target: link.target.clone(),
+                expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+                password: link.password.clone(),
+            })
+            .collect();
+
+        match ipc::import_links(import_data, force_overwrite).await {
+            Ok(IpcResponse::ImportResult {
+                success,
+                failed,
+                errors,
+            }) => {
+                // Print errors if any
+                for error in &errors {
+                    println!("{} {}", "✗".bold().red(), error);
+                }
+                println!();
+                println!(
+                    "{} Success: {} , failed {}",
+                    "Import finished:".bold().green(),
+                    success.to_string().green(),
+                    failed.to_string().red()
+                );
+                return Ok(());
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(CliError::CommandError(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                // Fall through to direct database operation
+            }
+            Err(e) => {
+                return Err(CliError::CommandError(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(CliError::CommandError(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Fallback: Direct database operation when server is not running
+    import_links_direct(storage, imported_links, force_overwrite).await
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn import_links_direct(
+    storage: Arc<SeaOrmStorage>,
+    imported_links: Vec<ShortLink>,
+    force_overwrite: bool,
+) -> Result<(), CliError> {
     let existing_links = if !force_overwrite {
         storage
             .load_all()
@@ -149,11 +278,6 @@ pub async fn import_links(
         skipped_count.to_string().yellow(),
         error_count.to_string().red()
     );
-
-    // Notify server to reload via IPC if any links were imported
-    if imported_count > 0 {
-        notify_data_reload().await;
-    }
 
     Ok(())
 }

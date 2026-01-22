@@ -1,13 +1,10 @@
 //! Unix/Linux platform implementation
 //!
-//! This module provides full-featured Unix/Linux platform support:
+//! This module provides Unix/Linux platform support:
 //! - PID file management with process checking
-//! - SIGUSR1 signal-based reload mechanism
-//! - Efficient signal-driven notification
+//! - Lockfile operations
 
-use crate::errors::{Result, ShortlinkerError};
 use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
-use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 use std::fs;
 use tracing::{debug, error, info, warn};
 
@@ -93,63 +90,6 @@ impl PlatformOps for UnixPlatform {
         PlatformIpc::cleanup();
         info!("IPC socket cleaned");
     }
-
-    fn notify_server() -> Result<()> {
-        use nix::sys::signal::{self, Signal};
-        use nix::unistd::Pid;
-
-        // Read the PID from file and send SIGUSR1 to the server process
-        match fs::read_to_string("shortlinker.pid") {
-            Ok(pid_str) => {
-                let pid: i32 = pid_str.trim().parse().map_err(|e| {
-                    ShortlinkerError::validation(format!("Invalid PID format: {}", e))
-                })?;
-                signal::kill(Pid::from_raw(pid), Signal::SIGUSR1).map_err(|e| {
-                    ShortlinkerError::signal_operation(format!("Failed to send signal: {}", e))
-                })?;
-                Ok(())
-            }
-            Err(e) => Err(ShortlinkerError::notify_server(format!(
-                "Failed to notify server: {}",
-                e
-            ))),
-        }
-    }
-
-    async fn setup_reload_mechanism() {
-        use tokio::signal::unix::{SignalKind, signal};
-
-        tokio::spawn(async move {
-            // Use match to handle signal creation failure, degrade to disabled signal reload instead of panic
-            let mut stream = match signal(SignalKind::user_defined1()) {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!(
-                        "Failed to create SIGUSR1 handler: {}. Config reload via signal disabled.",
-                        e
-                    );
-                    return;
-                }
-            };
-
-            while (stream.recv().await).is_some() {
-                info!("Received SIGUSR1, triggering data reload...");
-
-                if let Some(coordinator) = get_reload_coordinator() {
-                    match coordinator.reload(ReloadTarget::Data).await {
-                        Ok(result) => {
-                            info!("Reload completed in {}ms", result.duration_ms);
-                        }
-                        Err(e) => {
-                            error!("Reload failed: {}", e);
-                        }
-                    }
-                } else {
-                    warn!("ReloadCoordinator not initialized, skipping reload");
-                }
-            }
-        });
-    }
 }
 
 // Export convenience functions for backwards compatibility
@@ -162,16 +102,4 @@ pub fn init_lockfile() -> std::io::Result<()> {
 /// Clean up the PID file
 pub fn cleanup_lockfile() {
     UnixPlatform::cleanup_lockfile()
-}
-
-/// Notify server via SIGUSR1
-pub fn notify_server() -> Result<()> {
-    UnixPlatform::notify_server()
-}
-
-/// Setup SIGUSR1 signal handler for reload
-///
-/// Uses the global ReloadCoordinator to handle reload requests.
-pub async fn setup_reload_mechanism() {
-    UnixPlatform::setup_reload_mechanism().await
 }
