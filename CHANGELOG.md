@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.0] - 2026-01-23
+
+### 🎉 Release Highlights
+
+v0.4.0 是一次架构级别的重大更新，主要亮点：
+
+- **IPC 跨进程通信系统** - 全新的 Unix 域套接字 / Windows 命名管道通信机制，CLI 可直接与运行中的服务器交互
+- **TUI 全面重构** - 组件化架构、模糊搜索、批量操作、详情面板、排序功能
+- **CSV 导入导出** - 统一的 CSV 格式，替代原有 JSON 格式（JSON 将在 v0.5.0 移除）
+- **服务层抽象** - 新增 LinkService 统一业务逻辑，消除代码重复
+
+### Added
+- **IPC 跨进程通信系统** - 替代原有的 Unix 信号和 Windows 文件轮询机制
+  - Unix 域套接字 (`/tmp/shortlinker.sock`) 和 Windows 命名管道 (`\\.\pipe\shortlinker`)
+  - 长度前缀 JSON 协议，支持链接 CRUD、导入导出、状态查询等命令
+  - CLI 命令优先通过 IPC 与服务器通信，确保缓存同步
+- **CLI `status` 命令** - 通过 IPC 查询服务器状态（版本、运行时间、链接数量等）
+- **TUI 模糊搜索** - 使用 `nucleo-matcher` 实现智能匹配，按 `/` 进入搜索模式
+- **TUI 批量操作** - 支持多选（Space 键）和批量删除
+- **TUI 详情面板** - 右侧面板显示选中链接的完整信息，支持剪贴板复制
+- **TUI 排序功能** - 按短代码、URL、点击量、状态排序
+- **CSV 导入导出** - 统一 CLI、TUI、Web Admin 的导入导出格式
+  - 自动检测文件格式（CSV/JSON）
+  - JSON 格式已标记废弃
+- **LinkService 服务层** - 统一的业务逻辑层，被 IPC 和 HTTP 处理器共享
+- **重载协调器** - 新增 `ReloadCoordinator` 支持数据重载和配置热重载
+
+### Changed
+- **CLI IPC 优先架构** - 服务器运行时优先使用 IPC 通信，否则直接访问数据库
+- **API 强类型响应** - 将动态 JSON 替换为强类型结构体，提高类型安全性
+- **reset-password 命令改进** - 支持交互式密码输入（使用 `rpassword`）
+
+### Improved
+- **TUI 组件化架构** - 引入 Action 系统、Component trait、可复用 UI 组件
+- **导入性能优化** - 使用批量查询替代循环单次查询
+- **密码处理统一** - 新增 `password.rs` 工具模块，统一密码哈希处理逻辑
+
+### Fixed
+- **URL 验证增强** - 统一 CLI 和 TUI 的 URL 验证，阻止危险协议
+- **导入密码处理** - 正确区分新密码和已哈希密码，阻止明文密码直接存储
+- **Unix 守护进程启动** - 修复 IPC 无响应时错误清理 PID 文件的问题
+- **导入结果统计** - 区分 `skipped` 和 `failed` 字段
+
+### Refactored
+- **TUI 状态管理** - 拆分 `state.rs` 为 `form_state.rs` 和模块化状态管理
+- **错误定义宏** - 使用宏重构 `ShortlinkerError` 枚举
+- **平台层简化** - 移除旧的 `reload.rs`，功能迁移到 `reload/` 模块
+
+### Dependencies
+- 添加 `bytes` (1.11) 用于 IPC 协议编解码
+- 添加 `arboard` (3.6) 用于 TUI 剪贴板支持
+- 添加 `nucleo-matcher` (0.3) 用于 TUI 模糊搜索
+- 添加 `rpassword` (7) 用于 CLI 密码输入
+
+### Docs
+- 更新 CLI 命令文档以反映 IPC 优先行为
+- 更新 TUI 帮助文档以反映新增功能快捷键
+- 新增 `TUI_REFACTOR_REPORT.md` 记录架构改进
+
+### Migration Notes
+
+**⚠️ 从 v0.3.x 升级注意事项：**
+
+1. CLI 命令现在优先通过 IPC 与运行中的服务器通信，确保缓存同步
+2. 导入导出默认使用 CSV 格式，JSON 格式仍可读取但已标记废弃
+3. IPC 套接字路径：Unix `/tmp/shortlinker.sock`，Windows `\\.\pipe\shortlinker`
+
 ## [v0.3.0] - 2026-01-19
 
 ### 🎉 Release Highlights
@@ -841,7 +908,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.0...HEAD
+[v0.4.0]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/AptS-1547/shortlinker/compare/v0.2.2...v0.3.0
 [v0.3.0-beta.3]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.2...v0.3.0-beta.3
 [v0.3.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0-beta.1...v0.3.0-beta.2

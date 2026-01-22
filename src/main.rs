@@ -23,8 +23,7 @@ use shortlinker::system::panic_handler::RunMode;
 /// - `./shortlinker` -> Server mode (default, if compiled with server feature)
 ///
 /// # Configuration
-/// - `-c <path>` or `--config <path>` -> Use custom configuration file
-/// - No config flag -> Use default "config.toml" if it exists
+/// Uses "config.toml" in the current directory if it exists
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     // Load environment variables
@@ -43,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     shortlinker::system::panic_handler::install_panic_hook(panic_mode);
 
     // Initialize configuration system
-    shortlinker::config::init_config(cli.config);
+    shortlinker::config::init_config();
     let config = shortlinker::config::get_config();
 
     // Run appropriate mode based on command

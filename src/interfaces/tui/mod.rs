@@ -14,6 +14,11 @@ use ratatui::{
     },
 };
 
+// 新增模块
+pub mod action;
+pub mod component;
+pub mod constants;
+
 mod app;
 mod event_handler;
 mod input_handler;

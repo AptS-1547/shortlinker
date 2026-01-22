@@ -112,12 +112,12 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 ### 5. Export/Import (Press `x`)
 
 **Export Function**:
-- Default filename is a timestamped name like `shortlinks_export_20250115_183000.json` (editable)
-- Exports all links in JSON format
+- Default filename is a timestamped name like `shortlinks_export_20250115_183000.csv` (editable)
+- Exports all links in CSV format (with header)
 - Useful for backup or migration
 
 **Import Function**:
-- Select a `.json` file via the built-in file browser
+- Select a `.csv` file via the built-in file browser (`.json` is legacy/deprecated)
 - Batch import links (simple upsert: existing codes will be overwritten)
 - Compatible with CLI export format
 

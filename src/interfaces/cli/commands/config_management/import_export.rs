@@ -1,5 +1,6 @@
 //! Config export/import commands
 
+use super::helpers::notify_config_change;
 use crate::config::definitions::{ALL_CONFIGS, get_def};
 use crate::config::validators;
 use crate::interfaces::cli::CliError;
@@ -215,10 +216,10 @@ pub async fn config_import(
         );
     }
 
-    // Notify server to reload
-    if let Err(e) = crate::system::platform::notify_server() {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
-    }
+    // Notify about config change (triggers hot-reload)
+    // Import may include configs that require restart, so we pass false
+    // to always attempt hot-reload for the ones that don't
+    notify_config_change(false).await;
 
     Ok(())
 }

@@ -20,6 +20,48 @@ use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
 
+/// 根据 LinkFilter 构建 SeaORM 查询条件
+fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Condition {
+    let mut condition = Condition::all();
+
+    // search: 模糊匹配 code 或 target
+    if let Some(ref search) = filter.search {
+        let pattern = format!("%{}%", search);
+        condition = condition.add(
+            Condition::any()
+                .add(short_link::Column::ShortCode.contains(&pattern))
+                .add(short_link::Column::TargetUrl.contains(&pattern)),
+        );
+    }
+
+    // created_after
+    if let Some(ref after) = filter.created_after {
+        condition = condition.add(short_link::Column::CreatedAt.gte(*after));
+    }
+
+    // created_before
+    if let Some(ref before) = filter.created_before {
+        condition = condition.add(short_link::Column::CreatedAt.lte(*before));
+    }
+
+    // only_expired: 只返回已过期的
+    if filter.only_expired {
+        condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
+        condition = condition.add(short_link::Column::ExpiresAt.lt(now));
+    }
+
+    // only_active: 只返回未过期的（expires_at 为 null 或 > now）
+    if filter.only_active {
+        condition = condition.add(
+            Condition::any()
+                .add(short_link::Column::ExpiresAt.is_null())
+                .add(short_link::Column::ExpiresAt.gt(now)),
+        );
+    }
+
+    condition
+}
+
 /// 用于统计查询的结果结构体（DSL 聚合查询）
 #[derive(Debug, FromQueryResult)]
 struct StatsResult {
@@ -110,42 +152,7 @@ impl SeaOrmStorage {
         );
 
         // 构建查询条件
-        let mut condition = Condition::all();
-
-        // search: 模糊匹配 code 或 target
-        if let Some(ref search) = filter.search {
-            let pattern = format!("%{}%", search);
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ShortCode.contains(&pattern))
-                    .add(short_link::Column::TargetUrl.contains(&pattern)),
-            );
-        }
-
-        // created_after
-        if let Some(ref after) = filter.created_after {
-            condition = condition.add(short_link::Column::CreatedAt.gte(*after));
-        }
-
-        // created_before
-        if let Some(ref before) = filter.created_before {
-            condition = condition.add(short_link::Column::CreatedAt.lte(*before));
-        }
-
-        // only_expired: 只返回已过期的
-        if filter.only_expired {
-            condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
-            condition = condition.add(short_link::Column::ExpiresAt.lt(now));
-        }
-
-        // only_active: 只返回未过期的（expires_at 为 null 或 > now）
-        if filter.only_active {
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ExpiresAt.is_null())
-                    .add(short_link::Column::ExpiresAt.gt(now)),
-            );
-        }
+        let condition = build_filter_condition(&filter, now);
 
         // 尝试从缓存获取总数
         let total = if let Some(cached) = self.count_cache.get(&cache_key) {
@@ -228,39 +235,7 @@ impl SeaOrmStorage {
     /// 带过滤条件加载所有链接（不分页，用于导出）
     pub async fn load_all_filtered(&self, filter: LinkFilter) -> Result<Vec<ShortLink>> {
         let now = Utc::now();
-
-        // 构建查询条件（复用 load_paginated_filtered 的逻辑）
-        let mut condition = Condition::all();
-
-        if let Some(ref search) = filter.search {
-            let pattern = format!("%{}%", search);
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ShortCode.contains(&pattern))
-                    .add(short_link::Column::TargetUrl.contains(&pattern)),
-            );
-        }
-
-        if let Some(ref after) = filter.created_after {
-            condition = condition.add(short_link::Column::CreatedAt.gte(*after));
-        }
-
-        if let Some(ref before) = filter.created_before {
-            condition = condition.add(short_link::Column::CreatedAt.lte(*before));
-        }
-
-        if filter.only_expired {
-            condition = condition.add(short_link::Column::ExpiresAt.is_not_null());
-            condition = condition.add(short_link::Column::ExpiresAt.lt(now));
-        }
-
-        if filter.only_active {
-            condition = condition.add(
-                Condition::any()
-                    .add(short_link::Column::ExpiresAt.is_null())
-                    .add(short_link::Column::ExpiresAt.gt(now)),
-            );
-        }
+        let condition = build_filter_condition(&filter, now);
 
         let models = short_link::Entity::find()
             .filter(condition)

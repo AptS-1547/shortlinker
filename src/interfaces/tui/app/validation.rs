@@ -1,6 +1,7 @@
 //! Input validation logic
 
 use super::state::{App, CurrentScreen};
+use crate::interfaces::tui::constants::MAX_SHORT_CODE_LENGTH;
 use crate::utils::TimeParser;
 use crate::utils::url_validator::validate_url;
 
@@ -11,10 +12,10 @@ impl App {
 
         // Validate short code
         if !self.short_code_input.is_empty() {
-            if self.short_code_input.len() > 128 {
+            if self.short_code_input.len() > MAX_SHORT_CODE_LENGTH {
                 self.validation_errors.insert(
                     "short_code".to_string(),
-                    "Code too long (max 128 chars)".to_string(),
+                    format!("Code too long (max {} chars)", MAX_SHORT_CODE_LENGTH),
                 );
             }
             // Check for invalid characters: [a-zA-Z0-9_.-/]

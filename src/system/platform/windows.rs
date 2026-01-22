@@ -2,17 +2,13 @@
 //!
 //! This module provides simplified Windows platform support:
 //! - Lock file-based instance management (no process checking)
-//! - File-based notification mechanism (trigger files)
-//! - Polling-based reload mechanism (checks every 3 seconds)
+//! - Lockfile operations
 //!
 //! Note: Windows implementation is simplified compared to Unix due to
-//! lack of signal support. It uses file-based polling instead.
+//! lack of signal support.
 
-use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
-use crate::errors::{Result, ShortlinkerError};
-use crate::storage::SeaOrmStorage;
+use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
 use std::fs;
-use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use super::PlatformOps;
@@ -27,17 +23,22 @@ impl PlatformOps for WindowsPlatform {
 
         let lock_file = ".shortlinker.lock";
 
-        // Check if lock file already exists
-        if Path::new(lock_file).exists() {
-            error!("Server already running, stop it first");
-            error!(
-                "If the server is not running, delete the lock file: {}",
-                lock_file
-            );
+        // First, check if server is running via IPC (more reliable)
+        if PlatformIpc::is_server_running() {
+            error!("Server already running (IPC pipe active)");
+            error!("You can check with: shortlinker.exe status");
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
-                "Server is already running",
+                "Server is already running (IPC active)",
             ));
+        }
+
+        // Check if lock file already exists (fallback check)
+        if Path::new(lock_file).exists() {
+            // On Windows, we can't reliably check if the process is still running
+            // So we just warn and remove the lock file since IPC check passed
+            warn!("Lock file exists but IPC not responding, assuming stale");
+            let _ = fs::remove_file(lock_file);
         }
 
         // Create lock file
@@ -64,101 +65,10 @@ impl PlatformOps for WindowsPlatform {
         } else {
             info!("Lock file cleaned: {}", lock_file);
         }
+
+        // Also clean up IPC (no-op on Windows for named pipes)
+        PlatformIpc::cleanup();
     }
-
-    fn notify_server() -> Result<()> {
-        // On Windows, use a trigger file
-        match fs::write("shortlinker.reload", "") {
-            Ok(_) => Ok(()),
-            Err(e) => Err(ShortlinkerError::notify_server(format!(
-                "Failed to notify server: {}",
-                e
-            ))),
-        }
-    }
-
-    async fn setup_reload_mechanism(
-        cache: Arc<dyn CompositeCacheTrait + 'static>,
-        storage: Arc<SeaOrmStorage>,
-    ) {
-        use std::time::SystemTime;
-        use tokio::fs;
-        use tokio::time::{Duration, sleep};
-
-        let reload_file = "shortlinker.reload";
-        let mut last_check = SystemTime::now();
-        let check_interval = Duration::from_secs(3);
-
-        tokio::spawn(async move {
-            loop {
-                // Sleep for the check interval
-                sleep(check_interval).await;
-
-                // Check if reload file exists and was modified
-                match fs::metadata(reload_file).await {
-                    Ok(metadata) => {
-                        match metadata.modified() {
-                            Ok(modified) => {
-                                if modified > last_check {
-                                    info!("Reload request detected, reloading...");
-
-                                    match reload_all(cache.clone(), storage.clone()).await {
-                                        Ok(_) => {
-                                            info!("Reload successful");
-                                            last_check = SystemTime::now();
-
-                                            // Remove the trigger file
-                                            if let Err(e) = fs::remove_file(reload_file).await {
-                                                warn!("Failed to remove reload file: {}", e);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("Reload failed: {}", e);
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                error!("Failed to get file modification time: {}", e);
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        // File doesn't exist, this is normal
-                    }
-                }
-            }
-        });
-    }
-}
-
-/// Reload cache and storage
-///
-/// This function is called when a reload trigger is detected.
-/// It reloads the storage backend and rebuilds the cache.
-async fn reload_all(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) -> anyhow::Result<()> {
-    info!("Starting reload process...");
-
-    // Reload storage backend
-    storage.reload().await?;
-    let links = storage.load_all().await?;
-
-    // Reconfigure cache with new capacity
-    cache
-        .reconfigure(BloomConfig {
-            capacity: links.len(),
-            fp_rate: 0.001,
-        })
-        .await?;
-
-    // Load data into cache
-    cache.load_cache(links).await;
-
-    info!("Reload process completed successfully");
-    Ok(())
 }
 
 // Export convenience functions for backwards compatibility
@@ -172,17 +82,4 @@ pub fn init_lockfile() -> std::io::Result<()> {
 /// Clean up the lock file
 pub fn cleanup_lockfile() {
     WindowsPlatform::cleanup_lockfile()
-}
-
-/// Notify server via trigger file
-pub fn notify_server() -> Result<()> {
-    WindowsPlatform::notify_server()
-}
-
-/// Setup file polling for reload
-pub async fn setup_reload_mechanism(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) {
-    WindowsPlatform::setup_reload_mechanism(cache, storage).await
 }

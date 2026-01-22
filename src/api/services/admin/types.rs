@@ -170,6 +170,36 @@ pub struct StatsResponse {
     pub active_links: usize,
 }
 
+/// 简单消息响应
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct MessageResponse {
+    pub message: String,
+}
+
+/// 错误响应数据
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ErrorData {
+    pub error: String,
+}
+
+/// 认证成功响应
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct AuthSuccessResponse {
+    pub message: String,
+    pub expires_in: u64,
+}
+
+/// Reload 成功响应
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ReloadResponse {
+    pub message: String,
+    pub duration_ms: u64,
+}
+
 // ============ 健康检查相关类型 ============
 
 /// 存储后端信息
@@ -265,19 +295,8 @@ pub struct ImportResponse {
     pub failed_items: Vec<ImportFailedItem>,
 }
 
-/// CSV 行数据结构（用于序列化/反序列化）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CsvLinkRow {
-    pub code: String,
-    pub target: String,
-    pub created_at: String,
-    #[serde(default)]
-    pub expires_at: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
-    #[serde(default)]
-    pub click_count: usize,
-}
+// Re-export CsvLinkRow from shared csv_handler module
+pub use crate::utils::csv_handler::CsvLinkRow;
 
 #[cfg(test)]
 mod tests {
@@ -304,6 +323,12 @@ mod tests {
         BatchFailedItem::export_all().expect("Failed to export BatchFailedItem");
         LinkResponse::export_all().expect("Failed to export LinkResponse");
         StatsResponse::export_all().expect("Failed to export StatsResponse");
+
+        // Response types
+        MessageResponse::export_all().expect("Failed to export MessageResponse");
+        ErrorData::export_all().expect("Failed to export ErrorData");
+        AuthSuccessResponse::export_all().expect("Failed to export AuthSuccessResponse");
+        ReloadResponse::export_all().expect("Failed to export ReloadResponse");
 
         // Health check types
         HealthStorageBackend::export_all().expect("Failed to export HealthStorageBackend");

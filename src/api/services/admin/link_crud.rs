@@ -1,28 +1,40 @@
 //! Admin API 链接 CRUD 操作
+//!
+//! Uses LinkService for unified business logic.
 
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use std::sync::Arc;
-use tracing::{error, info, trace, warn};
+use tracing::{info, trace};
 
-use crate::cache::traits::CompositeCacheTrait;
-use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
-use crate::utils::generate_random_code;
-use crate::utils::password::{hash_password, is_argon2_hash};
-use crate::utils::url_validator::validate_url;
+use crate::services::{CreateLinkRequest, LinkService, ServiceError, UpdateLinkRequest};
+use crate::storage::LinkFilter;
 
-use super::get_random_code_length;
-use super::helpers::{error_response, parse_expires_at, success_response};
+use super::helpers::{error_response, success_response};
 use super::types::{
-    ApiResponse, GetLinksQuery, LinkResponse, PaginatedResponse, PaginationInfo, PostNewLink,
-    StatsResponse,
+    ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
+    PostNewLink, StatsResponse,
 };
+
+/// Convert ServiceError to HTTP response
+fn service_error_response(err: ServiceError) -> HttpResponse {
+    let status = match &err {
+        ServiceError::InvalidUrl(_) | ServiceError::InvalidExpireTime(_) => StatusCode::BAD_REQUEST,
+        ServiceError::PasswordHashError | ServiceError::DatabaseError(_) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+        ServiceError::NotFound(_) => StatusCode::NOT_FOUND,
+        ServiceError::Conflict(_) => StatusCode::CONFLICT,
+        ServiceError::NotInitialized => StatusCode::SERVICE_UNAVAILABLE,
+    };
+    error_response(status, &err.to_string())
+}
 
 /// 获取所有链接（支持分页和过滤）
 pub async fn get_all_links(
     _req: HttpRequest,
     query: web::Query<GetLinksQuery>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     trace!(
         "Admin API: request to list all links with filters: {:?}",
@@ -49,175 +61,83 @@ pub async fn get_all_links(
         only_active: query.only_active.unwrap_or(false),
     };
 
-    // 使用数据库分页
-    let (links, total) = storage
-        .load_paginated_filtered(page, page_size, filter)
-        .await
-        .map_err(|e| {
-            error!("Failed to load paginated links: {}", e);
-            actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-        })?;
-    let total = total as usize;
-    let page = page as usize;
-    let page_size = page_size as usize;
-    let total_pages = total.div_ceil(page_size);
+    match service.list_links(filter, page, page_size).await {
+        Ok((links, total)) => {
+            let total = total as usize;
+            let page = page as usize;
+            let page_size = page_size as usize;
+            let total_pages = total.div_ceil(page_size);
 
-    let paginated_links: Vec<LinkResponse> = links.into_iter().map(LinkResponse::from).collect();
+            let paginated_links: Vec<LinkResponse> =
+                links.into_iter().map(LinkResponse::from).collect();
 
-    info!(
-        "Admin API: returning {} links (page {} of {}, total: {})",
-        paginated_links.len(),
-        page,
-        total_pages,
-        total
-    );
-
-    Ok(HttpResponse::Ok()
-        .append_header(("Content-Type", "application/json; charset=utf-8"))
-        .json(PaginatedResponse {
-            code: 0,
-            data: paginated_links,
-            pagination: PaginationInfo {
+            info!(
+                "Admin API: returning {} links (page {} of {}, total: {})",
+                paginated_links.len(),
                 page,
-                page_size,
-                total,
                 total_pages,
-            },
-        }))
+                total
+            );
+
+            Ok(HttpResponse::Ok()
+                .append_header(("Content-Type", "application/json; charset=utf-8"))
+                .json(PaginatedResponse {
+                    code: 0,
+                    data: paginated_links,
+                    pagination: PaginationInfo {
+                        page,
+                        page_size,
+                        total,
+                        total_pages,
+                    },
+                }))
+        }
+        Err(e) => Ok(service_error_response(e)),
+    }
 }
 
 /// 创建新链接
 pub async fn post_link(
     _req: HttpRequest,
-    mut link: web::Json<PostNewLink>,
-    cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    link: web::Json<PostNewLink>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
-    // Generate code if not provided, or use the provided one
-    let code = match link.code.as_ref().filter(|c| !c.is_empty()) {
-        Some(provided_code) => {
-            info!("Admin API: using provided code: {}", provided_code);
-            provided_code.clone()
-        }
-        None => {
-            trace!("Admin API: no code provided, generating a new one");
-            let random_code = generate_random_code(get_random_code_length());
-            link.code = Some(random_code.clone());
-            random_code
-        }
-    };
     info!(
-        "Admin API: create link request - code: {}, target: {}",
-        code, link.target
+        "Admin API: create link request - code: {:?}, target: {}",
+        link.code, link.target
     );
 
-    // Validate target URL
-    if let Err(e) = validate_url(&link.target) {
-        error!("Admin API: invalid target URL - {}: {}", link.target, e);
-        return Ok(error_response(StatusCode::BAD_REQUEST, &e.to_string()));
-    }
-
-    // Check if link already exists
-    let existing_link = storage.get(&code).await.map_err(|e| {
-        error!("Failed to check existing link: {}", e);
-        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-    })?;
-    let force = link.force.unwrap_or(false);
-
-    if existing_link.is_some() && !force {
-        warn!("Admin API: link already exists - {}", code);
-        return Ok(error_response(
-            StatusCode::CONFLICT,
-            "Link already exists. Use force=true to overwrite.",
-        ));
-    }
-
-    // Parse expiration time
-    let expires_at = match &link.expires_at {
-        Some(expire_str) => match parse_expires_at(expire_str) {
-            Ok(time) => Some(time),
-            Err(error_msg) => {
-                error!("Admin API: {}", error_msg);
-                return Ok(error_response(StatusCode::BAD_REQUEST, &error_msg));
-            }
-        },
-        None => None,
-    };
-
-    // If force overwriting, preserve original created_at and click count
-    let (created_at, click) = if let Some(ref existing) = existing_link {
-        (existing.created_at, existing.click)
-    } else {
-        (chrono::Utc::now(), 0)
-    };
-
-    // Hash password if provided and not already hashed
-    let hashed_password = match &link.password {
-        Some(pwd) if !pwd.is_empty() => {
-            if is_argon2_hash(pwd) {
-                // Already hashed, use as-is
-                Some(pwd.clone())
-            } else {
-                // Hash the plaintext password
-                match hash_password(pwd) {
-                    Ok(hash) => Some(hash),
-                    Err(e) => {
-                        error!("Admin API: failed to hash password: {}", e);
-                        return Ok(error_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Failed to process password",
-                        ));
-                    }
-                }
-            }
-        }
-        _ => None,
-    };
-
-    let new_link = ShortLink {
-        code: code.clone(),
+    let req = CreateLinkRequest {
+        code: link.code.clone(),
         target: link.target.clone(),
-        created_at,
-        expires_at,
-        password: hashed_password.clone(),
-        click,
+        force: link.force.unwrap_or(false),
+        expires_at: link.expires_at.clone(),
+        password: link.password.clone(),
     };
 
-    match storage.set(new_link.clone()).await {
-        Ok(_) => {
-            let action = if existing_link.is_some() {
-                "overwritten"
+    match service.create_link(req).await {
+        Ok(result) => {
+            let action = if result.generated_code {
+                "created with generated code"
             } else {
                 "created"
             };
-            info!("Admin API: link {} - {}", action, new_link.code);
-            // 增量更新缓存
-            let ttl = new_link.cache_ttl(crate::config::get_config().cache.default_ttl);
-            cache.insert(&new_link.code, new_link.clone(), ttl).await;
+            info!("Admin API: link {} - {}", action, result.link.code);
+
             Ok(HttpResponse::Created()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(ApiResponse {
                     code: 0,
                     data: PostNewLink {
-                        code: Some(new_link.code),
-                        target: new_link.target,
+                        code: Some(result.link.code),
+                        target: result.link.target,
                         expires_at: link.expires_at.clone(),
-                        password: new_link.password,
+                        password: result.link.password,
                         force: None,
                     },
                 }))
         }
-        Err(e) => {
-            let error_msg = format!("Error creating link: {}", e);
-            error!(
-                "Admin API: failed to create link - {}: {}",
-                new_link.code, e
-            );
-            Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &error_msg,
-            ))
-        }
+        Err(e) => Ok(service_error_response(e)),
     }
 }
 
@@ -225,23 +145,17 @@ pub async fn post_link(
 pub async fn get_link(
     _req: HttpRequest,
     code: web::Path<String>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!("Admin API: get link request - code: {}", code);
 
-    match storage.get(&code).await {
+    match service.get_link(&code).await {
         Ok(Some(link)) => Ok(success_response(LinkResponse::from(link))),
         Ok(None) => {
             info!("Admin API: link not found - {}", code);
             Ok(error_response(StatusCode::NOT_FOUND, "Link not found"))
         }
-        Err(e) => {
-            error!("Admin API: failed to get link - {}: {}", code, e);
-            Err(actix_web::error::ErrorInternalServerError(format!(
-                "Database error: {}",
-                e
-            )))
-        }
+        Err(e) => Ok(service_error_response(e)),
     }
 }
 
@@ -249,28 +163,18 @@ pub async fn get_link(
 pub async fn delete_link(
     _req: HttpRequest,
     code: web::Path<String>,
-    cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!("Admin API: delete link request - code: {}", code);
 
-    match storage.remove(&code).await {
-        Ok(_) => {
+    match service.delete_link(&code).await {
+        Ok(()) => {
             info!("Admin API: link deleted - {}", code);
-            // 增量更新缓存
-            cache.remove(&code).await;
-            Ok(success_response(serde_json::json!({
-                "message": "Link deleted successfully"
-            })))
+            Ok(success_response(MessageResponse {
+                message: "Link deleted successfully".to_string(),
+            }))
         }
-        Err(e) => {
-            let error_msg = format!("Error deleting link: {}", e);
-            error!("Admin API: failed to delete link - {}: {}", code, e);
-            Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &error_msg,
-            ))
-        }
+        Err(e) => Ok(service_error_response(e)),
     }
 }
 
@@ -279,89 +183,22 @@ pub async fn update_link(
     _req: HttpRequest,
     code: web::Path<String>,
     link: web::Json<PostNewLink>,
-    cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!(
         "Admin API: update link request - code: {}, target: {}",
         code, link.target
     );
 
-    // Validate target URL
-    if let Err(e) = validate_url(&link.target) {
-        error!("Admin API: invalid target URL - {}: {}", link.target, e);
-        return Ok(error_response(StatusCode::BAD_REQUEST, &e.to_string()));
-    }
-
-    // Get existing link to preserve creation time
-    let existing_link = match storage.get(&code).await {
-        Ok(Some(link)) => link,
-        Ok(None) => {
-            info!("Admin API: attempt to update nonexistent link - {}", code);
-            return Ok(error_response(StatusCode::NOT_FOUND, "Link not found"));
-        }
-        Err(e) => {
-            error!("Admin API: failed to get link for update - {}: {}", code, e);
-            return Err(actix_web::error::ErrorInternalServerError(format!(
-                "Database error: {}",
-                e
-            )));
-        }
-    };
-
-    // Parse expiration time
-    let expires_at = match &link.expires_at {
-        Some(expire_str) => match parse_expires_at(expire_str) {
-            Ok(time) => Some(time),
-            Err(error_msg) => {
-                error!("Admin API: {}", error_msg);
-                return Ok(error_response(StatusCode::BAD_REQUEST, &error_msg));
-            }
-        },
-        None => existing_link.expires_at,
-    };
-
-    // Hash password if provided and not already hashed
-    let updated_password = match &link.password {
-        Some(pwd) if !pwd.is_empty() => {
-            if is_argon2_hash(pwd) {
-                // Already hashed, use as-is
-                Some(pwd.clone())
-            } else {
-                // Hash the plaintext password
-                match hash_password(pwd) {
-                    Ok(hash) => Some(hash),
-                    Err(e) => {
-                        error!("Admin API: failed to hash password: {}", e);
-                        return Ok(error_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Failed to process password",
-                        ));
-                    }
-                }
-            }
-        }
-        Some(_) => None,                        // Empty string means remove password
-        None => existing_link.password.clone(), // Not provided, keep existing
-    };
-
-    let updated_link = ShortLink {
-        code: code.clone(),
+    let req = UpdateLinkRequest {
         target: link.target.clone(),
-        created_at: existing_link.created_at,
-        expires_at,
-        password: updated_password.clone(),
-        click: existing_link.click, // 保持原有的点击计数
+        expires_at: link.expires_at.clone(),
+        password: link.password.clone(),
     };
 
-    match storage.set(updated_link.clone()).await {
-        Ok(_) => {
+    match service.update_link(&code, req).await {
+        Ok(updated_link) => {
             info!("Admin API: link updated - {}", code);
-            // 增量更新缓存
-            let ttl = updated_link.cache_ttl(crate::config::get_config().cache.default_ttl);
-            cache
-                .insert(&updated_link.code, updated_link.clone(), ttl)
-                .await;
             Ok(success_response(PostNewLink {
                 code: Some(updated_link.code),
                 target: updated_link.target,
@@ -370,42 +207,35 @@ pub async fn update_link(
                 force: None,
             }))
         }
-        Err(e) => {
-            let error_msg = format!("Error updating link: {}", e);
-            error!("Admin API: failed to update link - {}: {}", code, e);
-            Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &error_msg,
-            ))
-        }
+        Err(e) => Ok(service_error_response(e)),
     }
 }
 
 /// 获取链接统计信息
 pub async fn get_stats(
     _req: HttpRequest,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     trace!("Admin API: request to get link stats");
 
-    let stats = storage.get_stats().await.map_err(|e| {
-        error!("Failed to get link stats: {}", e);
-        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-    })?;
+    match service.get_stats().await {
+        Ok(stats) => {
+            info!(
+                "Admin API: returning stats - total: {}, clicks: {}, active: {}",
+                stats.total_links, stats.total_clicks, stats.active_links
+            );
 
-    info!(
-        "Admin API: returning stats - total: {}, clicks: {}, active: {}",
-        stats.total_links, stats.total_clicks, stats.active_links
-    );
-
-    Ok(HttpResponse::Ok()
-        .append_header(("Content-Type", "application/json; charset=utf-8"))
-        .json(ApiResponse {
-            code: 0,
-            data: StatsResponse {
-                total_links: stats.total_links,
-                total_clicks: stats.total_clicks,
-                active_links: stats.active_links,
-            },
-        }))
+            Ok(HttpResponse::Ok()
+                .append_header(("Content-Type", "application/json; charset=utf-8"))
+                .json(ApiResponse {
+                    code: 0,
+                    data: StatsResponse {
+                        total_links: stats.total_links,
+                        total_clicks: stats.total_clicks,
+                        active_links: stats.active_links,
+                    },
+                }))
+        }
+        Err(e) => Ok(service_error_response(e)),
+    }
 }

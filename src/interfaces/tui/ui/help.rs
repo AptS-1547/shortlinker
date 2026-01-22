@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
@@ -9,13 +9,17 @@ use ratatui::{
 use super::common::centered_rect;
 
 pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(80, 85, area);
+    let popup_area = centered_rect(80, 90, area);
 
     frame.render_widget(Clear, popup_area);
 
     let block = Block::default()
         .title("Help - Keyboard Shortcuts")
-        .title_style(Style::default().fg(Color::Cyan).bold())
+        .title_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .borders(Borders::ALL)
         .border_type(BorderType::Double)
         .border_style(Style::default().fg(Color::Cyan));
@@ -27,7 +31,9 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![Span::styled(
             "NAVIGATION",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
             Span::styled("  Up/Down, j/k    ", Style::default().fg(Color::Cyan)),
@@ -48,7 +54,9 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![Span::styled(
             "ACTIONS",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
             Span::styled("  a                ", Style::default().fg(Color::Green)),
@@ -60,7 +68,7 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled("  d                ", Style::default().fg(Color::Red)),
-            Span::styled("Delete selected link", Style::default().fg(Color::White)),
+            Span::styled("Delete selected/batch", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
             Span::styled("  Enter, v         ", Style::default().fg(Color::Cyan)),
@@ -68,12 +76,52 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
+            "SORTING & SELECTION",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  s                ", Style::default().fg(Color::Cyan)),
+            Span::styled("Cycle sort column", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  S                ", Style::default().fg(Color::Cyan)),
+            Span::styled("Toggle sort direction", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Space            ", Style::default().fg(Color::Green)),
+            Span::styled("Toggle selection", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc              ", Style::default().fg(Color::Red)),
+            Span::styled("Clear selection/search", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "CLIPBOARD",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  y                ", Style::default().fg(Color::Green)),
+            Span::styled("Copy short code", Style::default().fg(Color::White)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Y                ", Style::default().fg(Color::Green)),
+            Span::styled("Copy full URL", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
             "SEARCH & UTILITY",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
             Span::styled("  /                ", Style::default().fg(Color::Cyan)),
-            Span::styled("Search links", Style::default().fg(Color::White)),
+            Span::styled("Fuzzy search (inline)", Style::default().fg(Color::White)),
         ]),
         Line::from(vec![
             Span::styled("  x                ", Style::default().fg(Color::Blue)),
@@ -90,7 +138,9 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(vec![Span::styled(
             "FORM EDITING",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
             Span::styled("  Tab              ", Style::default().fg(Color::Cyan)),
@@ -104,15 +154,17 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
             Span::styled("  Esc              ", Style::default().fg(Color::Red)),
             Span::styled("Cancel", Style::default().fg(Color::White)),
         ]),
-        Line::from(vec![
-            Span::styled("  Space            ", Style::default().fg(Color::Cyan)),
-            Span::styled("Toggle checkbox", Style::default().fg(Color::White)),
-        ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "STATUS INDICATORS",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
         )]),
+        Line::from(vec![
+            Span::styled("  ● (green)        ", Style::default().fg(Color::Green)),
+            Span::styled("Selected for batch", Style::default().fg(Color::White)),
+        ]),
         Line::from(vec![
             Span::styled("  LOCKED           ", Style::default().fg(Color::Cyan)),
             Span::styled("Password protected", Style::default().fg(Color::White)),

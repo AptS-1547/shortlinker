@@ -35,7 +35,7 @@ pub fn draw_export_filename_screen(frame: &mut Frame, app: &App, area: Rect) {
 
     // Instructions
     let instructions = Paragraph::new(vec![Line::from(vec![Span::styled(
-        "Enter filename for export (will add .json if missing)",
+        "Enter filename for export (will add .csv if missing)",
         Style::default().fg(Color::Gray),
     )])]);
     frame.render_widget(instructions, chunks[0]);
@@ -53,10 +53,10 @@ pub fn draw_export_filename_screen(frame: &mut Frame, app: &App, area: Rect) {
     // Preview
     let preview_text = if app.export_filename_input.is_empty() {
         "No filename entered".to_string()
-    } else if app.export_filename_input.ends_with(".json") {
+    } else if app.export_filename_input.ends_with(".csv") {
         format!("Will save as: {}", app.export_filename_input)
     } else {
-        format!("Will save as: {}.json", app.export_filename_input)
+        format!("Will save as: {}.csv", app.export_filename_input)
     };
 
     let preview = Paragraph::new(vec![Line::from(vec![Span::styled(

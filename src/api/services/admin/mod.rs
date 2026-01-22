@@ -52,45 +52,42 @@ impl AdminService {
     pub async fn get_all_links(
         req: actix_web::HttpRequest,
         query: actix_web::web::Query<GetLinksQuery>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::get_all_links(req, query, storage).await
+        link_crud::get_all_links(req, query, service).await
     }
 
     pub async fn post_link(
         req: actix_web::HttpRequest,
         link: actix_web::web::Json<PostNewLink>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::post_link(req, link, cache, storage).await
+        link_crud::post_link(req, link, service).await
     }
 
     pub async fn get_link(
         req: actix_web::HttpRequest,
         code: actix_web::web::Path<String>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::get_link(req, code, storage).await
+        link_crud::get_link(req, code, service).await
     }
 
     pub async fn delete_link(
         req: actix_web::HttpRequest,
         code: actix_web::web::Path<String>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::delete_link(req, code, cache, storage).await
+        link_crud::delete_link(req, code, service).await
     }
 
     pub async fn update_link(
         req: actix_web::HttpRequest,
         code: actix_web::web::Path<String>,
         link: actix_web::web::Json<PostNewLink>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::update_link(req, code, link, cache, storage).await
+        link_crud::update_link(req, code, link, service).await
     }
 
     pub async fn check_admin_token(
@@ -147,9 +144,9 @@ impl AdminService {
 
     pub async fn get_stats(
         req: actix_web::HttpRequest,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        link_crud::get_stats(req, storage).await
+        link_crud::get_stats(req, service).await
     }
 
     pub async fn export_links(

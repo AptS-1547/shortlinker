@@ -15,7 +15,7 @@ pub async fn handle_export_import_screen(
         KeyCode::Char('e') | KeyCode::Char('E') => {
             app.current_screen = CurrentScreen::ExportFileName;
             app.export_filename_input = format!(
-                "shortlinks_export_{}.json",
+                "shortlinks_export_{}.csv",
                 chrono::Local::now().format("%Y%m%d_%H%M%S")
             );
         }
@@ -84,11 +84,11 @@ pub async fn handle_export_filename_screen(
             if app.export_filename_input.is_empty() {
                 app.set_error("Filename cannot be empty".to_string());
             } else {
-                // Ensure filename ends with .json
-                let filename = if app.export_filename_input.ends_with(".json") {
+                // Ensure filename ends with .csv
+                let filename = if app.export_filename_input.ends_with(".csv") {
                     app.export_filename_input.clone()
                 } else {
-                    format!("{}.json", app.export_filename_input)
+                    format!("{}.csv", app.export_filename_input)
                 };
 
                 app.export_path = filename;

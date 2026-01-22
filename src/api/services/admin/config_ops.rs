@@ -7,9 +7,10 @@ use tracing::{info, warn};
 use ts_rs::TS;
 
 use crate::config::{get_all_schemas, try_get_runtime_config};
+use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 
 use super::helpers::{error_response, success_response};
-use super::types::{TS_EXPORT_PATH, ValueType};
+use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
 
 /// 配置项响应
 #[derive(Debug, Serialize, TS)]
@@ -263,22 +264,24 @@ pub async fn get_config_history(
 
 /// 重新加载配置
 pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
+    // 使用 ReloadCoordinator 统一入口，确保与 CLI 走同一条路径
+    let coordinator = match get_reload_coordinator() {
+        Some(c) => c,
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "Runtime config not initialized",
+                "ReloadCoordinator not initialized",
             ));
         }
     };
 
-    match rc.reload().await {
-        Ok(_) => {
-            info!("Config reloaded successfully");
-            Ok(success_response(serde_json::json!({
-                "message": "Config reloaded successfully"
-            })))
+    match coordinator.reload(ReloadTarget::Config).await {
+        Ok(result) => {
+            info!("Config reloaded successfully in {}ms", result.duration_ms);
+            Ok(success_response(ReloadResponse {
+                message: "Config reloaded successfully".to_string(),
+                duration_ms: result.duration_ms,
+            }))
         }
         Err(e) => {
             warn!("Failed to reload config: {}", e);

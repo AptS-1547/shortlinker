@@ -33,8 +33,8 @@
 
 **示例**:
 ```bash
-./shortlinker export  # 默认文件名
-./shortlinker export backup.json
+./shortlinker export  # 默认文件名（shortlinks_export_YYYYMMDD_HHMMSS.csv）
+./shortlinker export backup.csv
 ```
 
 ### import - 导入短链接
@@ -48,9 +48,11 @@
 
 **示例**:
 ```bash
-./shortlinker import backup.json
-./shortlinker import backup.json --force
+./shortlinker import backup.csv
+./shortlinker import backup.csv --force
 ```
+
+> 默认使用 CSV 格式；`.json` 仅为兼容旧格式（将于 v0.5.0 移除）。
 
 ### remove - 删除短链接
 
@@ -87,7 +89,7 @@
 ### reset-password - 重置管理员密码
 
 ```bash
-./shortlinker reset-password <新密码>
+./shortlinker reset-password [选项]
 ```
 
 重置管理员 API 密码。新密码会使用 Argon2id 算法哈希后存储到数据库。
@@ -96,7 +98,14 @@
 
 **示例**:
 ```bash
-./shortlinker reset-password "my_new_secure_password"
+# 交互式输入（推荐）
+./shortlinker reset-password
+
+# 从 stdin 读取（脚本）
+echo "my_new_secure_password" | ./shortlinker reset-password --stdin
+
+# 通过参数传入（不推荐：会出现在 shell history）
+./shortlinker reset-password --password "my_new_secure_password"
 ```
 
 ### config - 运行时配置管理（数据库）
@@ -181,7 +190,21 @@
 2024-12-31T23:59:59Z  # RFC3339 格式
 ```
 
-## JSON 格式
+## 文件格式
+
+### CSV（默认）
+
+导出文件包含 header，字段：
+`code,target,created_at,expires_at,password,click_count`
+
+```csv
+code,target,created_at,expires_at,password,click_count
+github,https://github.com,2024-12-15T14:30:22Z,,,
+```
+
+### JSON（兼容旧格式，已废弃）
+
+> `.json` 仅为兼容旧格式（将于 v0.5.0 移除）。
 
 ```json
 [
@@ -208,7 +231,7 @@ DATABASE_URL=sqlite://links.db  # 数据库连接 URL
 
 ```bash
 # 备份脚本
-./shortlinker export "backup_$(date +%Y%m%d).json"
+./shortlinker export "backup_$(date +%Y%m%d).csv"
 
 # 批量导入
 while IFS=',' read -r code url; do

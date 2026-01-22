@@ -10,7 +10,14 @@
 
 ### 方式一：使用 TOML 配置文件（推荐）
 
-创建 `config.toml` 文件：
+推荐使用 `generate-config` 命令生成配置文件：
+
+```bash
+./shortlinker generate-config
+# 生成 config.toml，包含所有可配置项及默认值
+```
+
+然后根据需要修改 `config.toml`：
 
 ```toml
 [server]
@@ -26,17 +33,9 @@ default_url = "https://example.com"
 # admin_token = "your_admin_token"
 ```
 
-或者使用自定义路径：
-
-```bash
-# 使用 -c 或 --config 指定配置文件路径
-./shortlinker -c /etc/shortlinker/myconfig.toml
-
-# 如果文件不存在，会自动创建默认配置
-./shortlinker -c ./custom.toml
-# [INFO] Configuration file not found: ./custom.toml
-# [INFO] Creating default configuration file...
-```
+::: tip
+如果不创建配置文件，程序会使用内置的默认配置运行。
+:::
 
 ### 方式二：使用环境变量
 

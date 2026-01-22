@@ -5,10 +5,43 @@ use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::try_ipc_or_fallback;
 use crate::utils::TimeParser;
+use crate::utils::password::process_update_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn update_link(
+    storage: Arc<SeaOrmStorage>,
+    short_code: String,
+    target_url: String,
+    expire_time: Option<String>,
+    password: Option<String>,
+) -> Result<(), CliError> {
+    try_ipc_or_fallback!(
+        crate::system::ipc::update_link(
+            short_code.clone(),
+            target_url.clone(),
+            expire_time.clone(),
+            password.clone(),
+        ),
+        IpcResponse::LinkUpdated { link } => {
+            println!(
+                "{} Short link updated: {} -> {}",
+                "✓".bold().green(),
+                link.code.cyan(),
+                link.target.blue().underline()
+            );
+            if let Some(expires_at) = &link.expires_at {
+                println!("{} Expiration: {}", "ℹ".bold().blue(), expires_at.yellow());
+            }
+            return Ok(());
+        },
+        @fallback update_link_direct(storage, short_code, target_url, expire_time, password).await
+    )
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn update_link_direct(
     storage: Arc<SeaOrmStorage>,
     short_code: String,
     target_url: String,
@@ -38,32 +71,29 @@ pub async fn update_link(
     };
 
     let expires_at = if let Some(expire) = expire_time {
-        match TimeParser::parse_expire_time(&expire) {
-            Ok(dt) => {
-                println!(
-                    "{} Expiration parsed as: {}",
-                    "ℹ".bold().blue(),
-                    dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
-                );
-                Some(dt)
-            }
-            Err(e) => {
-                return Err(CliError::CommandError(format!(
-                    "Invalid expiration time format: {}. Supported formats:\n  - RFC3339: 2023-10-01T12:00:00Z\n  - Relative time: 1d, 2w, 1y, 1d2h30m",
-                    e
-                )));
-            }
-        }
+        let dt =
+            TimeParser::parse_expire_time_with_help(&expire).map_err(CliError::CommandError)?;
+        println!(
+            "{} Expiration parsed as: {}",
+            "ℹ".bold().blue(),
+            dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
+        );
+        Some(dt)
     } else {
         old_link.expires_at // Keep original expiration time
     };
+
+    // Process password (hash if needed)
+    let hashed_password = process_update_password(password.as_deref(), old_link.password.clone())
+        .map_err(|e| CliError::CommandError(e.to_string()))?;
+
     let updated_link = ShortLink {
         code: short_code.clone(),
         target: target_url.clone(),
         created_at: old_link.created_at, // Keep original creation time
         expires_at,
-        password: password.or(old_link.password), // Update password if provided, otherwise keep original
-        click: old_link.click,                    // Keep original click count
+        password: hashed_password,
+        click: old_link.click, // Keep original click count
     };
 
     storage
@@ -84,11 +114,6 @@ pub async fn update_link(
             "ℹ".bold().blue(),
             expire.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
         );
-    }
-
-    // Notify server to reload
-    if let Err(e) = crate::system::platform::notify_server() {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
     }
 
     Ok(())

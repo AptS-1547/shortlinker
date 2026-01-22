@@ -10,10 +10,6 @@ use clap::{Parser, Subcommand};
 #[command(version)]
 #[command(about = "A high-performance URL shortener service", long_about = None)]
 pub struct Cli {
-    /// Configuration file path
-    #[arg(short, long, global = true)]
-    pub config: Option<String>,
-
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -96,10 +92,18 @@ pub enum Commands {
         output_path: Option<String>,
     },
 
+    /// Show server status (via IPC)
+    Status,
+
     /// Reset admin password
     ResetPassword {
-        /// New password
-        new_password: String,
+        /// New password (if not provided, will prompt interactively)
+        #[arg(long)]
+        password: Option<String>,
+
+        /// Read password from stdin (for scripting)
+        #[arg(long)]
+        stdin: bool,
     },
 
     /// Manage configuration

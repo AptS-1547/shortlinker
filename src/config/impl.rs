@@ -8,17 +8,14 @@ use arc_swap::ArcSwap;
 use super::AppConfig;
 
 static CONFIG: OnceLock<ArcSwap<AppConfig>> = OnceLock::new();
-static CONFIG_PATH: OnceLock<String> = OnceLock::new();
 
 impl AppConfig {
     /// Load configuration from TOML file with environment variable fallback
     ///
-    /// # Arguments
-    /// * `config_path` - Optional path to configuration file
-    ///   - `Some(path)`: Use specified file (create if doesn't exist)
-    ///   - `None`: Use default "config.toml" (warn if doesn't exist)
-    pub fn load(config_path: Option<&str>) -> Self {
-        let mut config = Self::load_from_file(config_path);
+    /// Uses default "config.toml" file (warns if doesn't exist)
+    pub fn load() -> Self {
+        let mut config = Self::load_from_file();
+        #[allow(deprecated)]
         config.override_with_env();
         config
     }
@@ -26,31 +23,14 @@ impl AppConfig {
     /// Load configuration from TOML file
     ///
     /// # Behavior
-    /// - If `config_path` is provided and file doesn't exist: create default config file
-    /// - If `config_path` is None (default) and file doesn't exist: warn and use in-memory defaults
-    fn load_from_file(config_path: Option<&str>) -> Self {
-        let path = config_path.unwrap_or("config.toml");
-        let is_custom_path = config_path.is_some();
+    /// - Uses "config.toml" in current directory
+    /// - If file doesn't exist: silently uses in-memory defaults
+    fn load_from_file() -> Self {
+        let path = "config.toml";
 
-        // Check if file exists
+        // Check if file exists - silently use defaults if not
         if !Path::new(path).exists() {
-            if is_custom_path {
-                // User specified a custom path: create the file
-                eprintln!("[WARN] Configuration file not found: {}", path);
-                eprintln!("[WARN] Creating default configuration file...");
-                if let Err(e) = Self::ensure_config_file(path) {
-                    eprintln!("[ERROR] Failed to create config file {}: {}", path, e);
-                    eprintln!("[WARN] Using in-memory default configuration");
-                    return Self::default();
-                }
-                eprintln!("[INFO] Configuration file created: {}", path);
-            } else {
-                // Default path: just warn
-                eprintln!("[WARN] No configuration file found at: {}", path);
-                eprintln!("[WARN] Using in-memory default configuration");
-                eprintln!("[HINT] Use -c/--config to specify a custom configuration file");
-                return Self::default();
-            }
+            return Self::default();
         }
 
         // Load the file
@@ -62,35 +42,22 @@ impl AppConfig {
                 }
                 Err(e) => {
                     eprintln!("[ERROR] Failed to parse config file {}: {}", path, e);
-                    eprintln!("[WARN] Using in-memory default configuration");
                     Self::default()
                 }
             },
             Err(e) => {
                 eprintln!("[ERROR] Failed to read config file {}: {}", path, e);
-                eprintln!("[WARN] Using in-memory default configuration");
                 Self::default()
             }
         }
     }
 
-    /// Ensure configuration file exists, create with defaults if not
-    fn ensure_config_file(path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let default_config = Self::default();
-        let content = toml::to_string_pretty(&default_config)?;
-
-        // Create parent directories if needed
-        if let Some(parent) = Path::new(path).parent()
-            && !parent.exists()
-        {
-            fs::create_dir_all(parent)?;
-        }
-
-        fs::write(path, content)?;
-        Ok(())
-    }
-
     /// Override configuration with environment variables
+    ///
+    /// # Deprecated
+    ///
+    /// 此方法将在 0.5.0 版本中移除。环境变量配置覆盖逻辑已不再需要。
+    #[deprecated(since = "0.4.0", note = "将在 0.5.0 版本中移除")]
     fn override_with_env(&mut self) {
         // Server config
         if let Ok(host) = env::var("SERVER_HOST") {
@@ -239,34 +206,17 @@ pub fn get_config() -> Arc<AppConfig> {
 
 /// Initialize the global configuration
 ///
-/// # Arguments
-/// * `config_path` - Optional path to configuration file
-///   - `Some(path)`: Load from specified file (create if doesn't exist)
-///   - `None`: Load from default "config.toml" (warn if doesn't exist)
+/// Loads configuration from "config.toml" in the current directory.
+/// If the file doesn't exist, uses in-memory defaults.
 ///
 /// # Examples
 /// ```no_run
 /// use shortlinker::config::init_config;
-/// // Use default config.toml
-/// init_config(None);
-///
-/// // Use custom configuration file
-/// init_config(Some("custom.toml".to_string()));
+/// init_config();
 /// ```
-pub fn init_config(config_path: Option<String>) {
-    // Store the config path for potential later use
-    if let Some(path) = &config_path {
-        CONFIG_PATH.set(path.clone()).ok();
-    }
-
+pub fn init_config() {
     // Initialize the configuration
-    CONFIG.get_or_init(|| ArcSwap::from_pointee(AppConfig::load(config_path.as_deref())));
-}
-
-/// Get the configuration file path that was used
-#[allow(dead_code)]
-pub fn get_config_path() -> Option<&'static str> {
-    CONFIG_PATH.get().map(|s| s.as_str())
+    CONFIG.get_or_init(|| ArcSwap::from_pointee(AppConfig::load()));
 }
 
 /// Update configuration with a closure (for runtime updates)

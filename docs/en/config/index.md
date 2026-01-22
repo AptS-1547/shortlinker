@@ -150,6 +150,10 @@ These settings are stored in the database and can be changed at runtime via the 
 | `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
 
+> Notes:
+> - `api.admin_token` is stored as an Argon2 hash in the database. Use `./shortlinker reset-password` to rotate the admin password.
+> - If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and write it to `admin_token.txt` (save it and delete the file).
+
 ### Routes
 
 | Key | Type | Default | Restart | Description |

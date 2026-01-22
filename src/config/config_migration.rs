@@ -74,6 +74,11 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
 ///
 /// 遍历 ALL_CONFIGS 中的所有配置定义，对每个配置项检查是否已存在，
 /// 如果不存在则从 config.toml 中读取并写入数据库。
+///
+/// # Deprecated
+///
+/// 此函数将在 0.5.0 版本中移除。配置迁移逻辑已不再需要。
+#[deprecated(since = "0.4.0", note = "将在 0.5.0 版本中移除")]
 pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) -> Result<()> {
     debug!("Checking configuration migration to database");
 
@@ -152,6 +157,11 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
 ///
 /// 检测数据库中的 admin_token，如果是明文则自动哈希并保存。
 /// 变更会自动记录到 config_history 表。
+///
+/// # Deprecated
+///
+/// 此函数将在 0.5.0 版本中移除。密码迁移逻辑已不再需要。
+#[deprecated(since = "0.4.0", note = "将在 0.5.0 版本中移除")]
 pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
     let admin_token = match store.get(keys::API_ADMIN_TOKEN).await? {
         Some(value) => value,
@@ -196,6 +206,11 @@ pub async fn migrate_plaintext_passwords(store: &ConfigStore) -> Result<()> {
 /// 检查数据库中的 enum 类型配置项：
 /// 1. 如果 value_type 不是 Enum，则更新为 Enum
 /// 2. 如果值不合法，则自动修正为默认值
+///
+/// # Deprecated
+///
+/// 此函数将在 0.5.0 版本中移除。Enum 配置迁移逻辑已不再需要。
+#[deprecated(since = "0.4.0", note = "将在 0.5.0 版本中移除")]
 pub async fn migrate_enum_configs(store: &ConfigStore) -> Result<()> {
     debug!("Checking enum configuration values for migration");
 

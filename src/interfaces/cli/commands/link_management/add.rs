@@ -5,11 +5,71 @@ use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::try_ipc_or_fallback;
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
+use crate::utils::password::process_new_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn add_link(
+    storage: Arc<SeaOrmStorage>,
+    short_code: Option<String>,
+    target_url: String,
+    force_overwrite: bool,
+    expire_time: Option<String>,
+    password: Option<String>,
+) -> Result<(), CliError> {
+    try_ipc_or_fallback!(
+        crate::system::ipc::add_link(
+            short_code.clone(),
+            target_url.clone(),
+            force_overwrite,
+            expire_time.clone(),
+            password.clone(),
+        ),
+        IpcResponse::LinkCreated { link, generated_code } => {
+            // Show generated code info
+            if generated_code {
+                println!(
+                    "{} Generated random code: {}",
+                    "ℹ".bold().blue(),
+                    link.code.magenta()
+                );
+            }
+
+            // Show result
+            if let Some(expires_at) = &link.expires_at {
+                println!(
+                    "{} Added short link: {} -> {} (expires: {})",
+                    "✓".bold().green(),
+                    link.code.cyan(),
+                    link.target.blue().underline(),
+                    expires_at.yellow()
+                );
+            } else {
+                println!(
+                    "{} Added short link: {} -> {}",
+                    "✓".bold().green(),
+                    link.code.cyan(),
+                    link.target.blue().underline()
+                );
+            }
+            return Ok(());
+        },
+        @fallback add_link_direct(
+            storage,
+            short_code,
+            target_url,
+            force_overwrite,
+            expire_time,
+            password,
+        )
+        .await
+    )
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn add_link_direct(
     storage: Arc<SeaOrmStorage>,
     short_code: Option<String>,
     target_url: String,
@@ -62,31 +122,28 @@ pub async fn add_link(
     }
 
     let expires_at = if let Some(expire) = expire_time {
-        match TimeParser::parse_expire_time(&expire) {
-            Ok(dt) => {
-                println!(
-                    "{} Expiration parsed as: {}",
-                    "ℹ".bold().blue(),
-                    dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
-                );
-                Some(dt)
-            }
-            Err(e) => {
-                return Err(CliError::CommandError(format!(
-                    "Invalid expiration time format: {}. Supported formats:\n  - RFC3339: 2023-10-01T12:00:00Z\n  - Relative time: 1d, 2w, 1y, 1d2h30m",
-                    e
-                )));
-            }
-        }
+        let dt =
+            TimeParser::parse_expire_time_with_help(&expire).map_err(CliError::CommandError)?;
+        println!(
+            "{} Expiration parsed as: {}",
+            "ℹ".bold().blue(),
+            dt.format("%Y-%m-%d %H:%M:%S UTC").to_string().yellow()
+        );
+        Some(dt)
     } else {
         None
     };
+
+    // Process password (hash if needed)
+    let hashed_password = process_new_password(password.as_deref())
+        .map_err(|e| CliError::CommandError(e.to_string()))?;
+
     let link = ShortLink {
         code: final_short_code.clone(),
         target: target_url.clone(),
         created_at: chrono::Utc::now(),
         expires_at,
-        password,
+        password: hashed_password,
         click: 0,
     };
 
@@ -112,10 +169,8 @@ pub async fn add_link(
         );
     }
 
-    // Notify server to reload
-    if let Err(e) = crate::system::platform::notify_server() {
-        println!("{} Failed to notify server: {}", "⚠".bold().yellow(), e);
-    }
+    // Note: No reload notification needed when server is not running
+    // The server will load data from database when it starts
 
     Ok(())
 }

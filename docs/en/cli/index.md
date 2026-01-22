@@ -8,7 +8,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 - 🔄 **Real-time Sync** - Commands take effect immediately  
 - ⚡ **Fast Response** - Supports SQLite, PostgreSQL, MySQL, MariaDB storage backends
 - 🛡️ **Error Handling** - Detailed error messages and suggestions
-- 📦 **Import/Export** - JSON format backup and migration support
+- 📦 **Import/Export** - CSV format backup and migration support (JSON is legacy/deprecated)
 
 ## Basic Syntax
 
@@ -28,10 +28,10 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 | `remove` | Delete short link | `./shortlinker remove github` |
 | `update` | Update short link | `./shortlinker update github https://new-url.com` |
 | `list` | List all links | `./shortlinker list` |
-| `export` | Export data | `./shortlinker export backup.json` |
-| `import` | Import data | `./shortlinker import backup.json --force` |
+| `export` | Export data | `./shortlinker export backup.csv` |
+| `import` | Import data | `./shortlinker import backup.csv --force` |
 | `generate-config` | Generate config template | `./shortlinker generate-config` |
-| `reset-password` | Reset admin password | `./shortlinker reset-password "new_password"` |
+| `reset-password` | Reset admin password | `./shortlinker reset-password` |
 | `config` | Runtime config management (DB) | `./shortlinker config list` |
 | `tui` | Launch TUI interface (requires build feature) | `./shortlinker tui` |
 
@@ -54,10 +54,10 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 
 ```bash
 # Export data
-./shortlinker export backup.json
+./shortlinker export backup.csv
 
 # Import data
-./shortlinker import backup.json --force
+./shortlinker import backup.csv --force
 ```
 
 ### Advanced Features

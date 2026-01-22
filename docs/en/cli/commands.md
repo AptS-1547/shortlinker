@@ -50,7 +50,7 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker export
 
 # Specify filename
-./shortlinker export backup.json
+./shortlinker export backup.csv
 ```
 
 ### import - Import Short Links
@@ -65,11 +65,13 @@ Detailed command line tool usage instructions and parameter options.
 **Examples**:
 ```bash
 # Import with default options
-./shortlinker import backup.json
+./shortlinker import backup.csv
 
 # Force overwrite existing codes
-./shortlinker import backup.json --force
+./shortlinker import backup.csv --force
 ```
+
+> CSV is the default format. `.json` is supported only for legacy compatibility (will be removed in v0.5.0).
 
 ### remove - Delete Short Link
 
@@ -106,7 +108,7 @@ Generate a default configuration file template with all configurable options.
 ### reset-password - Reset Admin Password
 
 ```bash
-./shortlinker reset-password <new_password>
+./shortlinker reset-password [options]
 ```
 
 Reset the admin API password. The new password will be hashed with Argon2id and stored in the database.
@@ -115,7 +117,14 @@ Reset the admin API password. The new password will be hashed with Argon2id and 
 
 **Examples**:
 ```bash
-./shortlinker reset-password "my_new_secure_password"
+# Interactive (recommended)
+./shortlinker reset-password
+
+# From stdin (scripting)
+echo "my_new_secure_password" | ./shortlinker reset-password --stdin
+
+# From CLI arg (not recommended: visible in shell history)
+./shortlinker reset-password --password "my_new_secure_password"
 ```
 
 ### config - Runtime config management (DB)
