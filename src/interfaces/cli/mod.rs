@@ -12,6 +12,55 @@ use commands::{
 };
 use std::fmt;
 
+/// IPC fallback 宏，用于消除 CLI 命令中的 IPC 错误处理重复代码
+///
+/// 用法:
+/// ```ignore
+/// try_ipc_or_fallback!(
+///     ipc::remove_link(short_code.clone()),
+///     IpcResponse::LinkDeleted { code } => {
+///         println!("Deleted: {}", code);
+///         return Ok(());
+///     },
+///     @fallback remove_link_direct(storage, short_code).await
+/// )
+/// ```
+#[macro_export]
+macro_rules! try_ipc_or_fallback {
+    (
+        $ipc_call:expr,
+        $($pattern:pat => $success_block:block),+ $(,)?,
+        @fallback $fallback:expr
+    ) => {{
+        use $crate::system::ipc::{self, IpcError, IpcResponse};
+        use $crate::interfaces::cli::CliError;
+
+        if ipc::is_server_running() {
+            match $ipc_call.await {
+                $(
+                    Ok($pattern) => $success_block
+                )+
+                Ok(IpcResponse::Error { code, message }) => {
+                    return Err(CliError::CommandError(format!("{}: {}", code, message)));
+                }
+                Err(IpcError::ServerNotRunning) => {
+                    // Fall through to fallback
+                }
+                Err(e) => {
+                    return Err(CliError::CommandError(format!("IPC error: {}", e)));
+                }
+                _ => {
+                    return Err(CliError::CommandError(
+                        "Unexpected response from server".to_string(),
+                    ));
+                }
+            }
+        }
+
+        $fallback
+    }};
+}
+
 #[derive(Debug)]
 pub enum CliError {
     StorageError(String),

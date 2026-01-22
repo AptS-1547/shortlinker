@@ -51,6 +51,47 @@ pub fn is_argon2_hash(s: &str) -> bool {
     s.starts_with("$argon2")
 }
 
+/// 处理新建链接的密码输入
+///
+/// - 如果输入为空或 None，返回 None
+/// - 如果输入已经是 Argon2 哈希，直接返回
+/// - 否则对明文密码进行哈希
+pub fn process_new_password(password: Option<&str>) -> Result<Option<String>, PasswordError> {
+    match password {
+        Some(pwd) if !pwd.is_empty() => {
+            if is_argon2_hash(pwd) {
+                Ok(Some(pwd.to_string()))
+            } else {
+                hash_password(pwd).map(Some)
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+/// 处理更新链接的密码输入
+///
+/// - 如果 `new_password` 为 None，保留 `existing_password`
+/// - 如果 `new_password` 为空字符串，返回 None（移除密码）
+/// - 如果 `new_password` 已经是 Argon2 哈希，直接返回
+/// - 否则对明文密码进行哈希
+pub fn process_update_password(
+    new_password: Option<&str>,
+    existing_password: Option<String>,
+) -> Result<Option<String>, PasswordError> {
+    match new_password {
+        Some(pwd) if !pwd.is_empty() => {
+            if is_argon2_hash(pwd) {
+                Ok(Some(pwd.to_string()))
+            } else {
+                hash_password(pwd).map(Some)
+            }
+        }
+        Some(_) => Ok(None),           // 空字符串 = 移除密码
+        None => Ok(existing_password), // 未提供 = 保留原密码
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -81,62 +81,62 @@ impl CookieBuilder {
         }
     }
 
-    pub fn build_access_cookie(&self, token: String) -> Cookie<'static> {
-        let mut cookie = Cookie::new(self.access_cookie_name.clone(), token);
-        cookie.set_path("/".to_string());
+    /// 基础 cookie 构建方法，消除重复代码
+    fn build_cookie_base(
+        &self,
+        name: String,
+        value: String,
+        path: String,
+        max_age: actix_web::cookie::time::Duration,
+    ) -> Cookie<'static> {
+        let mut cookie = Cookie::new(name, value);
+        cookie.set_path(path);
         cookie.set_http_only(true);
         cookie.set_secure(self.secure);
         cookie.set_same_site(self.same_site);
-        cookie.set_max_age(actix_web::cookie::time::Duration::minutes(
-            self.access_token_minutes as i64,
-        ));
+        cookie.set_max_age(max_age);
         if let Some(ref domain) = self.domain {
             cookie.set_domain(domain.clone());
         }
         cookie
+    }
+
+    pub fn build_access_cookie(&self, token: String) -> Cookie<'static> {
+        self.build_cookie_base(
+            self.access_cookie_name.clone(),
+            token,
+            "/".to_string(),
+            actix_web::cookie::time::Duration::minutes(self.access_token_minutes as i64),
+        )
     }
 
     pub fn build_refresh_cookie(&self, token: String) -> Cookie<'static> {
         let refresh_path = format!("{}/v1/auth", self.admin_prefix);
-        let mut cookie = Cookie::new(self.refresh_cookie_name.clone(), token);
-        cookie.set_path(refresh_path);
-        cookie.set_http_only(true);
-        cookie.set_secure(self.secure);
-        cookie.set_same_site(self.same_site);
-        cookie.set_max_age(actix_web::cookie::time::Duration::days(
-            self.refresh_token_days as i64,
-        ));
-        if let Some(ref domain) = self.domain {
-            cookie.set_domain(domain.clone());
-        }
-        cookie
+        self.build_cookie_base(
+            self.refresh_cookie_name.clone(),
+            token,
+            refresh_path,
+            actix_web::cookie::time::Duration::days(self.refresh_token_days as i64),
+        )
     }
 
     pub fn build_expired_access_cookie(&self) -> Cookie<'static> {
-        let mut cookie = Cookie::new(self.access_cookie_name.clone(), "");
-        cookie.set_path("/".to_string());
-        cookie.set_http_only(true);
-        cookie.set_secure(self.secure);
-        cookie.set_same_site(self.same_site);
-        cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
-        if let Some(ref domain) = self.domain {
-            cookie.set_domain(domain.clone());
-        }
-        cookie
+        self.build_cookie_base(
+            self.access_cookie_name.clone(),
+            String::new(),
+            "/".to_string(),
+            actix_web::cookie::time::Duration::ZERO,
+        )
     }
 
     pub fn build_expired_refresh_cookie(&self) -> Cookie<'static> {
         let refresh_path = format!("{}/v1/auth", self.admin_prefix);
-        let mut cookie = Cookie::new(self.refresh_cookie_name.clone(), "");
-        cookie.set_path(refresh_path);
-        cookie.set_http_only(true);
-        cookie.set_secure(self.secure);
-        cookie.set_same_site(self.same_site);
-        cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
-        if let Some(ref domain) = self.domain {
-            cookie.set_domain(domain.clone());
-        }
-        cookie
+        self.build_cookie_base(
+            self.refresh_cookie_name.clone(),
+            String::new(),
+            refresh_path,
+            actix_web::cookie::time::Duration::ZERO,
+        )
     }
 
     pub fn refresh_cookie_name(&self) -> &str {

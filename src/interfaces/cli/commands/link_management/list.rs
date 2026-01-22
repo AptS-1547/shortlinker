@@ -5,36 +5,18 @@ use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::SeaOrmStorage;
-use crate::system::ipc::{self, IpcError, IpcResponse, ShortLinkData};
+use crate::system::ipc::ShortLinkData;
+use crate::try_ipc_or_fallback;
 
 pub async fn list_links(storage: Arc<SeaOrmStorage>) -> Result<(), CliError> {
-    // Try IPC first if server is running
-    if ipc::is_server_running() {
-        // Get all links via IPC (use large page size for CLI listing)
-        match ipc::list_links(1, 1000, None).await {
-            Ok(IpcResponse::LinkList { links, total, .. }) => {
-                print_links_ipc(&links, total);
-                return Ok(());
-            }
-            Ok(IpcResponse::Error { code, message }) => {
-                return Err(CliError::CommandError(format!("{}: {}", code, message)));
-            }
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct database operation
-            }
-            Err(e) => {
-                return Err(CliError::CommandError(format!("IPC error: {}", e)));
-            }
-            _ => {
-                return Err(CliError::CommandError(
-                    "Unexpected response from server".to_string(),
-                ));
-            }
-        }
-    }
-
-    // Fallback: Direct database operation when server is not running
-    list_links_direct(storage).await
+    try_ipc_or_fallback!(
+        crate::system::ipc::list_links(1, 1000, None),
+        IpcResponse::LinkList { links, total, .. } => {
+            print_links_ipc(&links, total);
+            return Ok(());
+        },
+        @fallback list_links_direct(storage).await
+    )
 }
 
 /// Print links from IPC response

@@ -7,7 +7,7 @@ use tracing::info;
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::generate_random_code;
-use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::password::{process_new_password, process_update_password};
 use crate::utils::url_validator::validate_url;
 
 use super::get_random_code_length;
@@ -114,24 +114,15 @@ pub async fn batch_create_links(
         };
 
         // 处理密码哈希
-        let hashed_password = match &req.password {
-            Some(pwd) if !pwd.is_empty() => {
-                if is_argon2_hash(pwd) {
-                    Some(pwd.clone())
-                } else {
-                    match hash_password(pwd) {
-                        Ok(hash) => Some(hash),
-                        Err(e) => {
-                            failed.push(BatchFailedItem {
-                                code: req.code,
-                                error: format!("Failed to hash password: {}", e),
-                            });
-                            continue;
-                        }
-                    }
-                }
+        let hashed_password = match process_new_password(req.password.as_deref()) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                failed.push(BatchFailedItem {
+                    code: req.code,
+                    error: format!("Failed to hash password: {}", e),
+                });
+                continue;
             }
-            _ => None,
         };
 
         let new_link = ShortLink {
@@ -264,25 +255,18 @@ pub async fn batch_update_links(
         };
 
         // 处理密码
-        let updated_password = match update.password {
-            Some(pwd) if !pwd.is_empty() => {
-                if is_argon2_hash(pwd) {
-                    Some(pwd.clone())
-                } else {
-                    match hash_password(pwd) {
-                        Ok(hash) => Some(hash),
-                        Err(e) => {
-                            failed.push(BatchFailedItem {
-                                code: update.code,
-                                error: format!("Failed to hash password: {}", e),
-                            });
-                            continue;
-                        }
-                    }
-                }
+        let updated_password = match process_update_password(
+            update.password.map(|s| s.as_str()),
+            existing.password.clone(),
+        ) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                failed.push(BatchFailedItem {
+                    code: update.code,
+                    error: format!("Failed to hash password: {}", e),
+                });
+                continue;
             }
-            Some(_) => None,                   // 空字符串表示移除密码
-            None => existing.password.clone(), // 未提供则保留原密码
         };
 
         let updated_link = ShortLink {

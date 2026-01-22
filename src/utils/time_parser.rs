@@ -22,6 +22,20 @@ impl TimeParser {
         Self::parse_relative_time(input)
     }
 
+    /// 解析过期时间，带有详细的格式帮助信息
+    ///
+    /// 适用于 CLI 等需要友好错误提示的场景
+    pub fn parse_expire_time_with_help(input: &str) -> Result<DateTime<Utc>, String> {
+        Self::parse_expire_time(input).map_err(|e| {
+            format!(
+                "Invalid expiration time format: {}. Supported formats:\n  \
+                - RFC3339: 2023-10-01T12:00:00Z\n  \
+                - Relative time: 1d, 2w, 1y, 1d2h30m",
+                e
+            )
+        })
+    }
+
     fn parse_relative_time(input: &str) -> Result<DateTime<Utc>, String> {
         let mut total_duration = Duration::zero();
         let mut remaining = input;
