@@ -6,7 +6,7 @@
 
 use crate::system::ipc::platform::{IpcPlatform, PlatformIpc};
 use std::fs;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use super::PlatformOps;
 
@@ -45,13 +45,15 @@ impl PlatformOps for UnixPlatform {
                             info!("Container restart detected, removing old PID file");
                             let _ = fs::remove_file(pid_file);
                         } else if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
-                            // Process is still running but IPC check failed
-                            // This could mean the process is starting up or shutting down
-                            warn!(
-                                "PID {} exists but IPC not responding, assuming stale",
+                            // Process is still running but IPC is not responding.
+                            // This is safer than assuming stale and continuing.
+                            error!(
+                                "Server already running (PID: {}), but IPC is not responding.",
                                 old_pid
                             );
-                            let _ = fs::remove_file(pid_file);
+                            error!("The server might be hung or in the process of starting up.");
+                            error!("Please stop it manually before restarting: kill {}", old_pid);
+                            std::process::exit(1);
                         } else {
                             // Process is dead, clean up stale PID file
                             info!("Stale PID file detected, cleaning up...");
