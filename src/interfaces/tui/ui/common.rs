@@ -82,7 +82,9 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
             ("Enter", "Save", Color::Green),
             ("Esc", "Cancel", Color::Red),
         ],
-        CurrentScreen::DeleteConfirm | CurrentScreen::Exiting => {
+        CurrentScreen::DeleteConfirm
+        | CurrentScreen::BatchDeleteConfirm
+        | CurrentScreen::Exiting => {
             vec![("y", "Yes", Color::Green), ("n", "No", Color::Red)]
         }
         CurrentScreen::ExportImport => vec![

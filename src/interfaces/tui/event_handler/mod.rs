@@ -3,7 +3,7 @@
 //! Handles keyboard events and delegates to appropriate handlers
 //!
 //! This module is organized by screen type:
-//! - link_screens: Main, AddLink, EditLink, DeleteConfirm, ViewDetails
+//! - link_screens: Main, AddLink, EditLink, DeleteConfirm, BatchDeleteConfirm, ViewDetails
 //! - file_screens: ExportImport, FileBrowser, ExportFileName
 //! - misc_screens: Search, Help, Exiting
 
@@ -21,11 +21,19 @@ use misc_screens::*;
 
 /// Handle keyboard input based on current screen
 pub async fn handle_key_event(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
+    // Handle inline search mode first
+    if app.inline_search_mode && app.current_screen == CurrentScreen::Main {
+        return handle_inline_search(app, key_code);
+    }
+
     match app.current_screen {
         CurrentScreen::Main => handle_main_screen(app, key_code),
         CurrentScreen::AddLink => handle_add_link_screen(app, key_code).await,
         CurrentScreen::EditLink => handle_edit_link_screen(app, key_code).await,
         CurrentScreen::DeleteConfirm => handle_delete_confirm_screen(app, key_code).await,
+        CurrentScreen::BatchDeleteConfirm => {
+            handle_batch_delete_confirm_screen(app, key_code).await
+        }
         CurrentScreen::ViewDetails => handle_view_details_screen(app, key_code),
         CurrentScreen::ExportImport => handle_export_import_screen(app, key_code).await,
         CurrentScreen::FileBrowser => handle_file_browser_screen(app, key_code).await,
