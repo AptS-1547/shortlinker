@@ -401,8 +401,19 @@ impl LinkService {
     ) -> Result<ImportResult, ServiceError> {
         let mut result = ImportResult::default();
 
+        // Step 1: Validate URLs and collect codes
+        struct ValidatedItem {
+            code: String,
+            target: String,
+            expires_at: Option<String>,
+            password: Option<String>,
+        }
+
+        let mut codes_to_check: Vec<String> = Vec::new();
+        let mut valid_items: Vec<ValidatedItem> = Vec::new();
+
         for item in links {
-            // Validate URL
+            // Validate URL first
             if let Err(e) = validate_url(&item.target) {
                 result.failed += 1;
                 result.errors.push(ImportError {
@@ -412,19 +423,26 @@ impl LinkService {
                 continue;
             }
 
-            // Check if exists
-            let existing = match self.storage.get(&item.code).await {
-                Ok(link) => link,
-                Err(e) => {
-                    result.failed += 1;
-                    result.errors.push(ImportError {
-                        code: item.code,
-                        message: format!("Database error: {}", e),
-                    });
-                    continue;
-                }
-            };
+            codes_to_check.push(item.code.clone());
+            valid_items.push(ValidatedItem {
+                code: item.code,
+                target: item.target,
+                expires_at: item.expires_at,
+                password: item.password,
+            });
+        }
 
+        // Step 2: Batch fetch existing links (1 query instead of N)
+        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+        let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
+            ServiceError::DatabaseError(format!("Failed to batch check existing links: {}", e))
+        })?;
+
+        // Step 3: Process each item with in-memory existence check
+        for item in valid_items {
+            let existing = existing_map.get(&item.code);
+
+            // Handle existence based on mode
             if existing.is_some() {
                 match mode {
                     ImportMode::Skip => {
@@ -472,7 +490,7 @@ impl LinkService {
             };
 
             // Preserve created_at and click if overwriting
-            let (created_at, click) = if let Some(ref existing_link) = existing {
+            let (created_at, click) = if let Some(existing_link) = existing {
                 (existing_link.created_at, existing_link.click)
             } else {
                 (Utc::now(), 0)

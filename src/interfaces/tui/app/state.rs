@@ -103,15 +103,18 @@ impl App {
         use crate::system::ipc::{self, IpcResponse};
         use crate::system::reload::ReloadTarget;
         if ipc::is_server_running() {
-            if let Err(e) = ipc::reload(ReloadTarget::Data).await {
-                tracing::warn!("Failed to notify server via IPC: {}", e);
-            } else if let Ok(IpcResponse::ReloadResult {
-                success: false,
-                message,
-                ..
-            }) = ipc::reload(ReloadTarget::Data).await
-            {
-                tracing::warn!("Server reload failed: {:?}", message);
+            match ipc::reload(ReloadTarget::Data).await {
+                Ok(IpcResponse::ReloadResult {
+                    success: false,
+                    message,
+                    ..
+                }) => {
+                    tracing::warn!("Server reload failed: {:?}", message);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to notify server via IPC: {}", e);
+                }
+                _ => {} // Success or other responses
             }
         }
         Ok(())
