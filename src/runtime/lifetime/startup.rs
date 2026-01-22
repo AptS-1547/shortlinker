@@ -5,6 +5,7 @@ use crate::config::{
     get_config, init_runtime_config, migrate_config_to_db, migrate_enum_configs,
     migrate_plaintext_passwords,
 };
+use crate::services::LinkService;
 use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use tracing::{debug, info, warn};
 pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
     pub cache: Arc<dyn CompositeCacheTrait>,
+    pub link_service: Arc<LinkService>,
     pub route_config: RouteConfig,
 }
 
@@ -135,8 +137,23 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     cache.load_bloom(&codes).await;
     debug!("Bloom filter initialized with {} codes", codes_count);
 
+    // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)
+    crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
+    debug!("ReloadCoordinator initialized");
+
+    // Create LinkService for unified link management
+    let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
+
+    // Initialize IPC handler with LinkService
+    crate::system::ipc::handler::init_link_service(link_service.clone());
+
+    // Initialize IPC start time and start IPC server
+    crate::system::ipc::handler::init_start_time();
     #[cfg(any(feature = "cli", feature = "tui"))]
-    crate::system::platform::setup_reload_mechanism(cache.clone(), storage.clone()).await;
+    {
+        crate::system::ipc::server::start_ipc_server().await;
+        debug!("IPC server started");
+    }
 
     // 提取路由配置（配置已从数据库加载到 AppConfig）
     let config = get_config();
@@ -157,6 +174,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     Ok(StartupContext {
         storage,
         cache,
+        link_service,
         route_config,
     })
 }

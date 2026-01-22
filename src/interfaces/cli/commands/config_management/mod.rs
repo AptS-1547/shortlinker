@@ -4,6 +4,7 @@
 //! when the web admin panel is unavailable.
 
 mod get;
+mod helpers;
 mod import_export;
 mod list;
 mod reset;

@@ -12,7 +12,7 @@ use crate::config::get_config;
 use crate::utils::password::verify_password;
 
 use super::helpers::{CookieBuilder, error_response, success_response};
-use super::types::{ApiResponse, LoginCredentials};
+use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageResponse};
 
 /// 基于 IP 地址的限流 key 提取器
 ///
@@ -115,10 +115,10 @@ pub async fn check_admin_token(
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
-            data: serde_json::json!({
-                "message": "Login successful",
-                "expires_in": cookie_builder.access_token_minutes() * 60
-            }),
+            data: AuthSuccessResponse {
+                message: "Login successful".to_string(),
+                expires_in: cookie_builder.access_token_minutes() * 60,
+            },
         }))
 }
 
@@ -183,10 +183,10 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
-            data: serde_json::json!({
-                "message": "Token refreshed",
-                "expires_in": cookie_builder.access_token_minutes() * 60
-            }),
+            data: AuthSuccessResponse {
+                message: "Token refreshed".to_string(),
+                expires_in: cookie_builder.access_token_minutes() * 60,
+            },
         }))
 }
 
@@ -204,15 +204,15 @@ pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
-            data: serde_json::json!({
-                "message": "Logout successful"
-            }),
+            data: MessageResponse {
+                message: "Logout successful".to_string(),
+            },
         }))
 }
 
 /// 验证 token - 如果中间件通过，则 token 有效
 pub async fn verify_token(_req: HttpRequest) -> ActixResult<impl Responder> {
-    Ok(success_response(serde_json::json!({
-        "message": "Token is valid"
-    })))
+    Ok(success_response(MessageResponse {
+        message: "Token is valid".to_string(),
+    }))
 }

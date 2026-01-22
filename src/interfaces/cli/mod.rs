@@ -8,9 +8,58 @@ use crate::cli::Commands;
 use crate::storage::StorageFactory;
 use commands::{
     add_link, config_management, export_links, generate_config, import_links, list_links,
-    remove_link, run_reset_password, update_link,
+    remove_link, run_reset_password, server_status, update_link,
 };
 use std::fmt;
+
+/// IPC fallback 宏，用于消除 CLI 命令中的 IPC 错误处理重复代码
+///
+/// 用法:
+/// ```ignore
+/// try_ipc_or_fallback!(
+///     ipc::remove_link(short_code.clone()),
+///     IpcResponse::LinkDeleted { code } => {
+///         println!("Deleted: {}", code);
+///         return Ok(());
+///     },
+///     @fallback remove_link_direct(storage, short_code).await
+/// )
+/// ```
+#[macro_export]
+macro_rules! try_ipc_or_fallback {
+    (
+        $ipc_call:expr,
+        $($pattern:pat => $success_block:block),+ $(,)?,
+        @fallback $fallback:expr
+    ) => {{
+        use $crate::system::ipc::{self, IpcError, IpcResponse};
+        use $crate::interfaces::cli::CliError;
+
+        if ipc::is_server_running() {
+            match $ipc_call.await {
+                $(
+                    Ok($pattern) => $success_block
+                )+
+                Ok(IpcResponse::Error { code, message }) => {
+                    return Err(CliError::CommandError(format!("{}: {}", code, message)));
+                }
+                Err(IpcError::ServerNotRunning) => {
+                    // Fall through to fallback
+                }
+                Err(e) => {
+                    return Err(CliError::CommandError(format!("IPC error: {}", e)));
+                }
+                _ => {
+                    return Err(CliError::CommandError(
+                        "Unexpected response from server".to_string(),
+                    ));
+                }
+            }
+        }
+
+        $fallback
+    }};
+}
 
 #[derive(Debug)]
 pub enum CliError {
@@ -68,6 +117,11 @@ impl From<crate::errors::ShortlinkerError> for CliError {
 
 /// Run a CLI command from clap-parsed input
 pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
+    // Handle status command separately (uses IPC, no storage needed)
+    if let Commands::Status = cmd {
+        return server_status().await;
+    }
+
     // Handle reset-password command separately (needs DB connection)
     if let Commands::ResetPassword { new_password } = cmd {
         let storage = StorageFactory::create()
@@ -117,6 +171,8 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
 
         Commands::GenerateConfig { output_path } => generate_config(output_path).await,
+
+        Commands::Status => unreachable!("handled above"),
 
         Commands::ResetPassword { .. } => unreachable!("handled above"),
 
