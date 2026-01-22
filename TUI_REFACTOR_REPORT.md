@@ -113,7 +113,7 @@ pub trait Component {
 **旧代码**（每加字段要改 4 处）：
 ```rust
 pub fn toggle_editing(&mut self) {
-    match edit_mode {
+    match self.edit_mode {
         ShortCode => TargetUrl,
         TargetUrl => ExpireTime,
         ExpireTime => Password,

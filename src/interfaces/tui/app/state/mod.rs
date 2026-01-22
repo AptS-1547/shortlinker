@@ -51,7 +51,7 @@ pub enum CurrentScreen {
     ExportFileName,
 }
 
-/// 当前编辑的字段（兼容旧代码，后续迁移到 EditingField）
+/// 当前编辑的字段（保留以兼容现有代码，可通过 From trait 与 EditingField 互转）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CurrentlyEditing {
     ShortCode,
