@@ -80,11 +80,16 @@ impl IpcPlatform for WindowsIpc {
     }
 
     fn is_server_running() -> bool {
-        // Try to connect synchronously
-        // Use raw Windows API to check if pipe exists
+        // ERROR_PIPE_BUSY (231): All pipe instances are busy
+        // ERROR_FILE_NOT_FOUND (2): Pipe does not exist
+        const ERROR_PIPE_BUSY: i32 = 231;
+
         match ClientOptions::new().open(PIPE_NAME_WINDOWS) {
             Ok(_) => true,
-            Err(_) => false,
+            Err(e) => {
+                // PIPE_BUSY means server is running (just busy)
+                e.raw_os_error() == Some(ERROR_PIPE_BUSY)
+            }
         }
     }
 
@@ -98,32 +103,64 @@ impl IpcPlatform for WindowsIpc {
         })
     }
 
-    async fn accept(listener: &Self::Listener) -> io::Result<Self::Stream> {
-        // Windows named pipes work differently - each connection requires
-        // creating a new pipe instance after accepting
-        //
-        // For now, we need to handle this specially in the server loop
-        // The listener's server instance is used for the first connection
+    async fn accept(listener: &mut Self::Listener) -> io::Result<Self::Stream> {
+        // Take the current server instance
+        let server = listener.server.take().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "Listener has no server instance")
+        })?;
 
-        // This is a simplified implementation that won't work for multiple
-        // connections. A proper implementation would need to manage multiple
-        // pipe instances.
+        // Wait for a client to connect
+        server.connect().await?;
 
-        // Note: This implementation is incomplete for production use.
-        // Windows Named Pipe handling requires more complex logic for
-        // multiple concurrent connections.
+        // Create a new server instance for the next connection
+        let next_server = ServerOptions::new()
+            .first_pipe_instance(false)
+            .create(PIPE_NAME_WINDOWS)?;
+        listener.server = Some(next_server);
 
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "Windows named pipe accept not fully implemented - use Unix socket on WSL",
-        ))
+        // Return the connected stream
+        Ok(PipeStream {
+            inner: PipeStreamInner::Server(server),
+        })
     }
 
     async fn connect() -> io::Result<Self::Stream> {
-        let client = ClientOptions::new().open(PIPE_NAME_WINDOWS)?;
-        Ok(PipeStream {
-            inner: PipeStreamInner::Client(client),
-        })
+        use std::time::Duration;
+        use tokio::time::sleep;
+
+        // ERROR_PIPE_BUSY (231): All pipe instances are busy
+        const ERROR_PIPE_BUSY: i32 = 231;
+        // Retry configuration
+        const MAX_RETRIES: u32 = 100;
+        const RETRY_DELAY_MS: u64 = 50;
+
+        for attempt in 0..MAX_RETRIES {
+            match ClientOptions::new().open(PIPE_NAME_WINDOWS) {
+                Ok(client) => {
+                    return Ok(PipeStream {
+                        inner: PipeStreamInner::Client(client),
+                    });
+                }
+                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) => {
+                    // Pipe is busy, wait and retry
+                    if attempt < MAX_RETRIES - 1 {
+                        sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
+                        continue;
+                    }
+                    // Max retries reached
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "All pipe instances are busy after retries",
+                    ));
+                }
+                Err(e) => {
+                    // Other errors (e.g., pipe not found)
+                    return Err(e);
+                }
+            }
+        }
+
+        unreachable!()
     }
 
     fn cleanup() {

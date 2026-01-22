@@ -106,7 +106,7 @@ signal-hook = { version = "0.4", default-features = false, features = ["iterator
 nix = { version = "0.30", default-features = false, features = ["signal", "process"] }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["fileapi", "handleapi", "namedpipeapi", "winbase", "winnt", "winerror", "errhandlingapi"] }
+winapi = { version = "0.3", features = ["fileapi", "handleapi", "namedpipeapi", "winbase", "winnt", "winerror", "errhandlingapi", "consoleapi"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

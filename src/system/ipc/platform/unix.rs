@@ -43,7 +43,7 @@ impl IpcPlatform for UnixIpc {
         UnixListener::bind(SOCKET_PATH_UNIX)
     }
 
-    async fn accept(listener: &Self::Listener) -> io::Result<Self::Stream> {
+    async fn accept(listener: &mut Self::Listener) -> io::Result<Self::Stream> {
         let (stream, _addr) = listener.accept().await?;
         Ok(stream)
     }

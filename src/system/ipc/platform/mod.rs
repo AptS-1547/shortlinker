@@ -5,13 +5,14 @@
 //! - Windows: Named Pipe
 
 use std::io;
-use std::path::Path;
 use tokio::io::{AsyncRead, AsyncWrite};
-
-use super::types::SOCKET_PATH_UNIX;
 
 #[cfg(windows)]
 use super::types::PIPE_NAME_WINDOWS;
+#[cfg(unix)]
+use super::types::SOCKET_PATH_UNIX;
+#[cfg(unix)]
+use std::path::Path;
 
 /// Platform-specific IPC operations trait
 ///
@@ -42,7 +43,7 @@ pub trait IpcPlatform: Send + Sync + 'static {
     ///
     /// Waits for and accepts a client connection.
     fn accept(
-        listener: &Self::Listener,
+        listener: &mut Self::Listener,
     ) -> impl std::future::Future<Output = io::Result<Self::Stream>> + Send;
 
     /// Connect to the server (client side)

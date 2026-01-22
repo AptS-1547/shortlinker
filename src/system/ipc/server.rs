@@ -20,10 +20,9 @@ use super::types::{IpcCommand, IpcResponse};
 /// # Panics
 ///
 /// Does not panic, but logs errors if the server cannot start.
-#[cfg(unix)]
 pub async fn start_ipc_server() -> Option<tokio::task::JoinHandle<()>> {
     let handle = tokio::spawn(async move {
-        let listener = match PlatformIpc::bind().await {
+        let mut listener = match PlatformIpc::bind().await {
             Ok(l) => {
                 info!("IPC server listening on {}", PlatformIpc::socket_path());
                 l
@@ -35,7 +34,7 @@ pub async fn start_ipc_server() -> Option<tokio::task::JoinHandle<()>> {
         };
 
         loop {
-            match PlatformIpc::accept(&listener).await {
+            match PlatformIpc::accept(&mut listener).await {
                 Ok(stream) => {
                     // Handle each connection in a separate task
                     tokio::spawn(handle_connection(stream));
@@ -48,17 +47,6 @@ pub async fn start_ipc_server() -> Option<tokio::task::JoinHandle<()>> {
     });
 
     Some(handle)
-}
-
-/// Start the IPC server (Windows version - placeholder)
-///
-/// Windows Named Pipe support is not fully implemented.
-/// On Windows, the IPC server will not start.
-#[cfg(windows)]
-pub async fn start_ipc_server() -> Option<tokio::task::JoinHandle<()>> {
-    warn!("IPC server not fully implemented on Windows");
-    warn!("Consider using WSL or the HTTP API for reload operations");
-    None
 }
 
 /// Handle a single IPC connection
