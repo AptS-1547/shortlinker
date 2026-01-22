@@ -1,6 +1,7 @@
 //! Navigation and selection logic
 
 use super::state::App;
+use crate::interfaces::tui::constants::PAGE_SCROLL_STEP;
 
 impl App {
     pub fn move_selection_up(&mut self) {
@@ -26,8 +27,8 @@ impl App {
     }
 
     pub fn page_up(&mut self) {
-        if self.selected_index >= 10 {
-            self.selected_index -= 10;
+        if self.selected_index >= PAGE_SCROLL_STEP {
+            self.selected_index -= PAGE_SCROLL_STEP;
         } else {
             self.selected_index = 0;
         }
@@ -35,8 +36,8 @@ impl App {
 
     pub fn page_down(&mut self) {
         let max_index = self.links.len().saturating_sub(1);
-        if self.selected_index + 10 <= max_index {
-            self.selected_index += 10;
+        if self.selected_index + PAGE_SCROLL_STEP <= max_index {
+            self.selected_index += PAGE_SCROLL_STEP;
         } else {
             self.selected_index = max_index;
         }

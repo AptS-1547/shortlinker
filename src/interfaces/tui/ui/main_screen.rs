@@ -1,4 +1,3 @@
-use chrono::Utc;
 use ratatui::{
     Frame,
     layout::Rect,
@@ -8,6 +7,8 @@ use ratatui::{
 };
 
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::URL_TRUNCATE_LENGTH;
+use crate::interfaces::tui::ui::widgets::StatusIndicator;
 
 pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     let display_links = app.get_display_links();
@@ -83,35 +84,15 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut rows = Vec::new();
     for (i, (code, link)) in display_links.iter().enumerate() {
         // Truncate URL if too long
-        let display_url = if link.target.len() > 50 {
-            format!("{}...", &link.target[..50])
+        let display_url = if link.target.len() > URL_TRUNCATE_LENGTH {
+            format!("{}...", &link.target[..URL_TRUNCATE_LENGTH])
         } else {
             link.target.clone()
         };
 
-        // Status indicators (text-based)
-        let mut status_parts = Vec::new();
-
-        // Password protection indicator
-        if link.password.is_some() {
-            status_parts.push("LOCKED");
-        }
-
-        // Expiration status
-        if let Some(expires_at) = link.expires_at {
-            let now = Utc::now();
-            if expires_at <= now {
-                status_parts.push("EXPIRED");
-            } else if (expires_at - now).num_hours() < 24 {
-                status_parts.push("EXPIRING");
-            } else {
-                status_parts.push("ACTIVE");
-            }
-        } else {
-            status_parts.push("ACTIVE");
-        }
-
-        let status_text = status_parts.join(" ");
+        // Use StatusIndicator to generate status text
+        let indicator = StatusIndicator::new(link.password.is_some(), link.expires_at);
+        let status_text = indicator.text();
 
         let row_style = if i == app.selected_index {
             Style::default().bg(Color::DarkGray).fg(Color::White)

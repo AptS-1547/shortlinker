@@ -10,8 +10,10 @@
 mod file_operations;
 mod link_operations;
 mod navigation;
-mod state;
+pub mod state;
 mod validation;
 
 // Re-export main types
 pub use state::{App, CurrentScreen, CurrentlyEditing};
+
+// Re-export new state types

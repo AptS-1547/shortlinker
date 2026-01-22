@@ -11,6 +11,7 @@ mod help;
 mod main_screen;
 mod search;
 mod view_details;
+pub mod widgets;
 
 // Re-export common utilities
 pub use common::{draw_footer, draw_status_bar, draw_title_bar};

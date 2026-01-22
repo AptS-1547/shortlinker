@@ -1,4 +1,10 @@
 //! App state definition and basic state management
+//!
+//! 包含核心 App 结构和基础状态管理，以及拆分后的子状态模块
+
+mod form_state;
+
+pub use form_state::EditingField;
 
 use crate::errors::ShortlinkerError;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
@@ -6,6 +12,8 @@ use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// 当前屏幕
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CurrentScreen {
     Main,
     AddLink,
@@ -20,11 +28,35 @@ pub enum CurrentScreen {
     ExportFileName,
 }
 
+/// 当前编辑的字段（兼容旧代码，后续迁移到 EditingField）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CurrentlyEditing {
     ShortCode,
     TargetUrl,
     ExpireTime,
     Password,
+}
+
+impl From<EditingField> for CurrentlyEditing {
+    fn from(field: EditingField) -> Self {
+        match field {
+            EditingField::ShortCode => Self::ShortCode,
+            EditingField::TargetUrl => Self::TargetUrl,
+            EditingField::ExpireTime => Self::ExpireTime,
+            EditingField::Password => Self::Password,
+        }
+    }
+}
+
+impl From<CurrentlyEditing> for EditingField {
+    fn from(field: CurrentlyEditing) -> Self {
+        match field {
+            CurrentlyEditing::ShortCode => Self::ShortCode,
+            CurrentlyEditing::TargetUrl => Self::TargetUrl,
+            CurrentlyEditing::ExpireTime => Self::ExpireTime,
+            CurrentlyEditing::Password => Self::Password,
+        }
+    }
 }
 
 pub struct App {

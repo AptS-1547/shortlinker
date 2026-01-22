@@ -52,7 +52,10 @@ impl PlatformOps for UnixPlatform {
                                 old_pid
                             );
                             error!("The server might be hung or in the process of starting up.");
-                            error!("Please stop it manually before restarting: kill {}", old_pid);
+                            error!(
+                                "Please stop it manually before restarting: kill {}",
+                                old_pid
+                            );
                             std::process::exit(1);
                         } else {
                             // Process is dead, clean up stale PID file
