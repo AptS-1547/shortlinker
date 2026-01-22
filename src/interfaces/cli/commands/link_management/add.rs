@@ -8,6 +8,7 @@ use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::try_ipc_or_fallback;
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
+use crate::utils::password::process_new_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn add_link(
@@ -132,12 +133,17 @@ async fn add_link_direct(
     } else {
         None
     };
+
+    // Process password (hash if needed)
+    let hashed_password = process_new_password(password.as_deref())
+        .map_err(|e| CliError::CommandError(e.to_string()))?;
+
     let link = ShortLink {
         code: final_short_code.clone(),
         target: target_url.clone(),
         created_at: chrono::Utc::now(),
         expires_at,
-        password,
+        password: hashed_password,
         click: 0,
     };
 

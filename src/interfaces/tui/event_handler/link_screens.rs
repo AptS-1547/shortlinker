@@ -96,27 +96,27 @@ pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<b
             }
         }
         // Copy to clipboard
-        KeyCode::Char('y') =>
-        {
+        KeyCode::Char('y') => {
             #[cfg(feature = "tui")]
             if let Some(link) = app.get_selected_link()
-                && let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let code = link.code.clone();
-                    if clipboard.set_text(&code).is_ok() {
-                        app.set_status(format!("Copied: {}", code));
-                    }
+                && let Ok(mut clipboard) = arboard::Clipboard::new()
+            {
+                let code = link.code.clone();
+                if clipboard.set_text(&code).is_ok() {
+                    app.set_status(format!("Copied: {}", code));
                 }
+            }
         }
-        KeyCode::Char('Y') =>
-        {
+        KeyCode::Char('Y') => {
             #[cfg(feature = "tui")]
             if let Some(link) = app.get_selected_link()
-                && let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let url = link.target.clone();
-                    if clipboard.set_text(&url).is_ok() {
-                        app.set_status("Copied URL".to_string());
-                    }
+                && let Ok(mut clipboard) = arboard::Clipboard::new()
+            {
+                let url = link.target.clone();
+                if clipboard.set_text(&url).is_ok() {
+                    app.set_status("Copied URL".to_string());
                 }
+            }
         }
         // Batch selection
         KeyCode::Char(' ') => {

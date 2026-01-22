@@ -3,19 +3,16 @@
 use super::state::App;
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
+use crate::utils::password::{process_new_password, process_update_password};
+use crate::utils::url_validator::validate_url;
 use crate::utils::{TimeParser, generate_random_code};
 use chrono::Utc;
 
 impl App {
     pub async fn save_new_link(&mut self) -> Result<(), ShortlinkerError> {
         // Validate URL format
-        if !self.target_url_input.starts_with("http://")
-            && !self.target_url_input.starts_with("https://")
-        {
-            return Err(ShortlinkerError::validation(
-                "URL must start with http:// or https://",
-            ));
-        }
+        validate_url(&self.target_url_input)
+            .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
 
         let config = crate::config::get_config();
         let random_code_length = config.features.random_code_length;
@@ -45,16 +42,20 @@ impl App {
             None
         };
 
+        // Process password (hash if needed)
+        let password = process_new_password(if self.password_input.is_empty() {
+            None
+        } else {
+            Some(&self.password_input)
+        })
+        .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
+
         let link = ShortLink {
             code: final_short_code.clone(),
             target: self.target_url_input.clone(),
             created_at: Utc::now(),
             expires_at,
-            password: if self.password_input.is_empty() {
-                None
-            } else {
-                Some(self.password_input.clone())
-            },
+            password,
             click: 0,
         };
 
@@ -73,13 +74,8 @@ impl App {
         let target_url = if self.target_url_input.is_empty() {
             link.target.clone()
         } else {
-            if !self.target_url_input.starts_with("http://")
-                && !self.target_url_input.starts_with("https://")
-            {
-                return Err(ShortlinkerError::validation(
-                    "URL must start with http:// or https://",
-                ));
-            }
+            validate_url(&self.target_url_input)
+                .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
             self.target_url_input.clone()
         };
 
@@ -92,11 +88,16 @@ impl App {
             link.expires_at
         };
 
-        let password = if self.password_input.is_empty() {
-            link.password.clone()
-        } else {
-            Some(self.password_input.clone())
-        };
+        // Process password (hash if needed)
+        let password = process_update_password(
+            if self.password_input.is_empty() {
+                None
+            } else {
+                Some(&self.password_input)
+            },
+            link.password.clone(),
+        )
+        .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
 
         let updated_link = ShortLink {
             code: link.code.clone(),

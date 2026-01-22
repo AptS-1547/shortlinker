@@ -7,6 +7,7 @@ use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::try_ipc_or_fallback;
 use crate::utils::TimeParser;
+use crate::utils::password::process_update_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn update_link(
@@ -81,13 +82,18 @@ async fn update_link_direct(
     } else {
         old_link.expires_at // Keep original expiration time
     };
+
+    // Process password (hash if needed)
+    let hashed_password = process_update_password(password.as_deref(), old_link.password.clone())
+        .map_err(|e| CliError::CommandError(e.to_string()))?;
+
     let updated_link = ShortLink {
         code: short_code.clone(),
         target: target_url.clone(),
         created_at: old_link.created_at, // Keep original creation time
         expires_at,
-        password: password.or(old_link.password), // Update password if provided, otherwise keep original
-        click: old_link.click,                    // Keep original click count
+        password: hashed_password,
+        click: old_link.click, // Keep original click count
     };
 
     storage
