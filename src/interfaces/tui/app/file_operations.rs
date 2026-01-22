@@ -3,6 +3,8 @@
 use super::state::App;
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
+use crate::utils::password::process_new_password;
+use crate::utils::url_validator::validate_url;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 
@@ -23,8 +25,23 @@ impl App {
         let file = File::open(&self.import_path)
             .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
         let reader = BufReader::new(file);
-        let imported_links: Vec<ShortLink> = serde_json::from_reader(reader)
+        let mut imported_links: Vec<ShortLink> = serde_json::from_reader(reader)
             .map_err(|e| ShortlinkerError::serialization(e.to_string()))?;
+
+        for link in &mut imported_links {
+            // Validate URL
+            validate_url(&link.target).map_err(|e| {
+                ShortlinkerError::validation(format!("Invalid URL for code '{}': {}", link.code, e))
+            })?;
+
+            // Process password (hash if plaintext, keep if already hashed)
+            link.password = process_new_password(link.password.as_deref()).map_err(|e| {
+                ShortlinkerError::validation(format!(
+                    "Failed to process password for code '{}': {}",
+                    link.code, e
+                ))
+            })?;
+        }
 
         for link in imported_links {
             self.storage.set(link).await?;

@@ -9,6 +9,8 @@ use std::sync::Arc;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
+use crate::utils::password::process_new_password;
+use crate::utils::url_validator::validate_url;
 
 pub async fn export_links(
     storage: Arc<SeaOrmStorage>,
@@ -223,7 +225,7 @@ async fn import_links_direct(
     let mut skipped_count = 0;
     let mut error_count = 0;
 
-    for imported_link in imported_links {
+    for mut imported_link in imported_links {
         // Check if short code already exists
         if !force_overwrite && existing_links.contains_key(&imported_link.code) {
             println!(
@@ -235,19 +237,35 @@ async fn import_links_direct(
             continue;
         }
 
-        // Validate URL format
-        if !imported_link.target.starts_with("http://")
-            && !imported_link.target.starts_with("https://")
-        {
+        // Validate URL using proper validator
+        if let Err(e) = validate_url(&imported_link.target) {
             println!(
-                "{} Skipping code '{}': invalid URL - {}",
+                "{} Skipping code '{}': {}",
                 "✗".bold().red(),
                 imported_link.code.cyan(),
-                imported_link.target
+                e
             );
             error_count += 1;
             continue;
         }
+
+        // Process password (hash if plaintext, keep if already hashed)
+        let processed_password = match process_new_password(imported_link.password.as_deref()) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                println!(
+                    "{} Skipping code '{}': failed to process password - {}",
+                    "✗".bold().red(),
+                    imported_link.code.cyan(),
+                    e
+                );
+                error_count += 1;
+                continue;
+            }
+        };
+
+        // Update the link with processed password
+        imported_link.password = processed_password;
 
         // Use the imported link directly since it's already a complete ShortLink structure
         match storage.set(imported_link.clone()).await {
