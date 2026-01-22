@@ -101,8 +101,13 @@ pub enum Commands {
 
     /// Reset admin password
     ResetPassword {
-        /// New password
-        new_password: String,
+        /// New password (if not provided, will prompt interactively)
+        #[arg(long)]
+        password: Option<String>,
+
+        /// Read password from stdin (for scripting)
+        #[arg(long)]
+        stdin: bool,
     },
 
     /// Manage configuration

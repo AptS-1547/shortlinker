@@ -1,6 +1,7 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
+#[allow(deprecated)]
 use crate::config::{
     get_config, init_runtime_config, migrate_config_to_db, migrate_enum_configs,
     migrate_plaintext_passwords,
@@ -54,6 +55,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     );
 
     // 初始化运行时配置系统
+    #[allow(deprecated)]
     {
         let db = storage.get_db().clone();
         let file_config = get_config();

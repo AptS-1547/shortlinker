@@ -47,7 +47,7 @@ use std::sync::Arc;
 ///
 /// This function is kept for backward compatibility with existing code.
 #[deprecated(
-    since = "0.5.0",
+    since = "0.4.0",
     note = "Use ReloadCoordinator::reload(ReloadTarget::Data) instead"
 )]
 pub async fn reload_all(

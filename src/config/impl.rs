@@ -19,6 +19,7 @@ impl AppConfig {
     ///   - `None`: Use default "config.toml" (warn if doesn't exist)
     pub fn load(config_path: Option<&str>) -> Self {
         let mut config = Self::load_from_file(config_path);
+        #[allow(deprecated)]
         config.override_with_env();
         config
     }
@@ -91,6 +92,11 @@ impl AppConfig {
     }
 
     /// Override configuration with environment variables
+    ///
+    /// # Deprecated
+    ///
+    /// 此方法将在 0.5.0 版本中移除。环境变量配置覆盖逻辑已不再需要。
+    #[deprecated(since = "0.4.0", note = "将在 0.5.0 版本中移除")]
     fn override_with_env(&mut self) {
         // Server config
         if let Ok(host) = env::var("SERVER_HOST") {

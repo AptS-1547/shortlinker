@@ -7,6 +7,7 @@ mod structs;
 pub mod types;
 pub mod validators;
 
+#[allow(deprecated)]
 pub use config_migration::{
     migrate_config_to_db, migrate_enum_configs, migrate_plaintext_passwords,
 };

@@ -123,11 +123,11 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
     }
 
     // Handle reset-password command separately (needs DB connection)
-    if let Commands::ResetPassword { new_password } = cmd {
+    if let Commands::ResetPassword { password, stdin } = cmd {
         let storage = StorageFactory::create()
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
-        run_reset_password(storage.get_db().clone(), &new_password).await;
+        run_reset_password(storage.get_db().clone(), password, stdin).await;
         return Ok(());
     }
 
