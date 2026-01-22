@@ -263,4 +263,89 @@ mod tests {
         assert!(form.currently_editing.is_none());
         assert!(!form.has_errors());
     }
+
+    #[test]
+    fn test_editing_field_field_name() {
+        assert_eq!(EditingField::ShortCode.field_name(), "short_code");
+        assert_eq!(EditingField::TargetUrl.field_name(), "target_url");
+        assert_eq!(EditingField::ExpireTime.field_name(), "expire_time");
+        assert_eq!(EditingField::Password.field_name(), "password");
+    }
+
+    #[test]
+    fn test_editing_field_display_title() {
+        assert_eq!(EditingField::ShortCode.display_title(), "Short Code");
+        assert_eq!(EditingField::TargetUrl.display_title(), "Target URL");
+        assert_eq!(EditingField::ExpireTime.display_title(), "Expire Time");
+        assert_eq!(EditingField::Password.display_title(), "Password");
+    }
+
+    #[test]
+    fn test_editing_field_default() {
+        let field = EditingField::default();
+        assert_eq!(field, EditingField::ShortCode);
+    }
+
+    #[test]
+    fn test_form_state_current_input_none() {
+        let form = FormState::new();
+        assert!(form.current_input().is_none());
+    }
+
+    #[test]
+    fn test_form_state_current_input_all_fields() {
+        let mut form = FormState::new();
+        form.short_code = "code".to_string();
+        form.target_url = "url".to_string();
+        form.expire_time = "1d".to_string();
+        form.password = "pass".to_string();
+
+        form.currently_editing = Some(EditingField::ShortCode);
+        assert_eq!(form.current_input(), Some(&"code".to_string()));
+
+        form.currently_editing = Some(EditingField::TargetUrl);
+        assert_eq!(form.current_input(), Some(&"url".to_string()));
+
+        form.currently_editing = Some(EditingField::ExpireTime);
+        assert_eq!(form.current_input(), Some(&"1d".to_string()));
+
+        form.currently_editing = Some(EditingField::Password);
+        assert_eq!(form.current_input(), Some(&"pass".to_string()));
+    }
+
+    #[test]
+    fn test_form_state_validation_errors() {
+        let mut form = FormState::new();
+        assert!(!form.has_errors());
+
+        form.set_error(EditingField::TargetUrl, "Invalid URL".to_string());
+        assert!(form.has_errors());
+        assert_eq!(
+            form.get_error(EditingField::TargetUrl),
+            Some(&"Invalid URL".to_string())
+        );
+        assert!(form.get_error(EditingField::ShortCode).is_none());
+
+        form.clear_errors();
+        assert!(!form.has_errors());
+    }
+
+    #[test]
+    fn test_form_state_push_pop_no_editing() {
+        let mut form = FormState::new();
+        // 没有编辑字段时，push/pop 应该是空操作
+        form.push_char('x');
+        form.pop_char();
+        assert!(form.short_code.is_empty());
+        assert!(form.target_url.is_empty());
+    }
+
+    #[test]
+    fn test_form_state_pop_empty() {
+        let mut form = FormState::new();
+        form.currently_editing = Some(EditingField::ShortCode);
+        // 空字符串 pop 应该是安全的
+        form.pop_char();
+        assert!(form.short_code.is_empty());
+    }
 }

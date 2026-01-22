@@ -85,3 +85,93 @@ impl ObjectCache for MokaCacheWrapper {
         self.inner.invalidate_all();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+
+    fn create_test_link(expires_at: Option<chrono::DateTime<chrono::Utc>>) -> ShortLink {
+        ShortLink {
+            code: "test".to_string(),
+            target: "https://example.com".to_string(),
+            created_at: Utc::now(),
+            expires_at,
+            password: None,
+            click: 0,
+        }
+    }
+
+    #[test]
+    fn test_expiry_no_expiration_uses_default() {
+        let expiry = ShortLinkExpiry {
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+        let link = create_test_link(None);
+
+        let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
+
+        assert_eq!(result, Some(std::time::Duration::from_secs(3600)));
+    }
+
+    #[test]
+    fn test_expiry_already_expired_returns_short_ttl() {
+        let expiry = ShortLinkExpiry {
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+        let past = Utc::now() - Duration::hours(1);
+        let link = create_test_link(Some(past));
+
+        let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
+
+        // 已过期应该返回 1 秒的极短 TTL
+        assert_eq!(result, Some(std::time::Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn test_expiry_future_uses_remaining_time() {
+        let expiry = ShortLinkExpiry {
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+        let future = Utc::now() + Duration::seconds(100);
+        let link = create_test_link(Some(future));
+
+        let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
+
+        // 剩余时间约 100 秒
+        assert!(result.is_some());
+        let ttl = result.unwrap();
+        assert!(ttl.as_secs() <= 100);
+        assert!(ttl.as_secs() >= 98); // 允许少量时间误差
+    }
+
+    #[test]
+    fn test_expiry_caps_at_default_ttl() {
+        let expiry = ShortLinkExpiry {
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+        // 过期时间远在未来（1年后）
+        let future = Utc::now() + Duration::days(365);
+        let link = create_test_link(Some(future));
+
+        let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
+
+        // 应该被限制在默认 TTL
+        assert_eq!(result, Some(std::time::Duration::from_secs(3600)));
+    }
+
+    #[test]
+    fn test_expiry_exact_boundary() {
+        let expiry = ShortLinkExpiry {
+            default_ttl: std::time::Duration::from_secs(3600),
+        };
+        // 刚好等于当前时间
+        let now = Utc::now();
+        let link = create_test_link(Some(now));
+
+        let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
+
+        // 刚好过期，应该返回 1 秒
+        assert_eq!(result, Some(std::time::Duration::from_secs(1)));
+    }
+}

@@ -116,6 +116,30 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 name = "click_manager"
 harness = false
 
+[[bench]]
+name = "cache_layer"
+harness = false
+
+[[bench]]
+name = "object_cache"
+harness = false
+
+[[bench]]
+name = "password"
+harness = false
+
+[[bench]]
+name = "utils"
+harness = false
+
+[[bench]]
+name = "converters"
+harness = false
+
+[[bench]]
+name = "ipc_protocol"
+harness = false
+
 # cargo-binstall 配置
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_{ target }{ binary-ext }"
