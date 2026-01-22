@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
+use crate::utils::csv_handler::{self, CsvLinkRow, FileFormat};
 use crate::utils::password::process_new_password;
 use crate::utils::url_validator::validate_url;
 
@@ -53,13 +54,9 @@ fn export_links_to_file(
         return Ok(());
     }
 
-    let output_path = file_path.unwrap_or_else(|| {
-        format!(
-            "shortlinks_export_{}.json",
-            chrono::Utc::now().format("%Y%m%d_%H%M%S")
-        )
-    });
+    let output_path = file_path.unwrap_or_else(csv_handler::generate_export_filename);
 
+    // Convert ShortLinkData to CsvLinkRow and write CSV
     let file = File::create(&output_path).map_err(|e| {
         CliError::CommandError(format!(
             "Failed to create export file '{}': {}",
@@ -67,8 +64,25 @@ fn export_links_to_file(
         ))
     })?;
     let writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &links)
-        .map_err(|e| CliError::CommandError(format!("Failed to export JSON data: {}", e)))?;
+    let mut csv_writer = csv::WriterBuilder::new().from_writer(writer);
+
+    for link in links {
+        let row = CsvLinkRow {
+            code: link.code.clone(),
+            target: link.target.clone(),
+            created_at: link.created_at.clone(),
+            expires_at: link.expires_at.clone(),
+            password: link.password.clone(),
+            click_count: link.click as usize,
+        };
+        csv_writer
+            .serialize(&row)
+            .map_err(|e| CliError::CommandError(format!("Failed to write CSV row: {}", e)))?;
+    }
+
+    csv_writer
+        .flush()
+        .map_err(|e| CliError::CommandError(format!("Failed to flush CSV: {}", e)))?;
 
     println!(
         "{} Exported {} short links to: {}",
@@ -98,22 +112,11 @@ async fn export_links_direct(
     // Collect all links
     let links_vec: Vec<&ShortLink> = links.values().collect();
 
-    let output_path = file_path.unwrap_or_else(|| {
-        format!(
-            "shortlinks_export_{}.json",
-            chrono::Utc::now().format("%Y%m%d_%H%M%S")
-        )
-    });
+    let output_path = file_path.unwrap_or_else(csv_handler::generate_export_filename);
 
-    let file = File::create(&output_path).map_err(|e| {
-        CliError::CommandError(format!(
-            "Failed to create export file '{}': {}",
-            output_path, e
-        ))
-    })?;
-    let writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &links_vec)
-        .map_err(|e| CliError::CommandError(format!("Failed to export JSON data: {}", e)))?;
+    // Use csv_handler to export
+    csv_handler::export_to_csv(&links_vec, &output_path)
+        .map_err(|e| CliError::CommandError(format!("Failed to export CSV: {}", e)))?;
 
     println!(
         "{} Exported {} short links to: {}",
@@ -138,13 +141,30 @@ pub async fn import_links(
         )));
     }
 
-    // Read and parse the import file
-    let file = File::open(&file_path).map_err(|e| {
-        CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
-    })?;
-    let reader = BufReader::new(file);
-    let imported_links: Vec<ShortLink> = serde_json::from_reader(reader)
-        .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?;
+    // Detect file format
+    let format = csv_handler::detect_format(&file_path);
+
+    // Read and parse the import file based on format
+    let imported_links: Vec<ShortLink> = match format {
+        FileFormat::Csv => {
+            // CSV format (new)
+            csv_handler::import_from_csv(&file_path)
+                .map_err(|e| CliError::CommandError(format!("Failed to import CSV: {}", e)))?
+        }
+        FileFormat::Json => {
+            // JSON format (deprecated, for backward compatibility)
+            println!(
+                "{} JSON format is deprecated and will be removed in v0.5.0, please use CSV format",
+                "⚠".bold().yellow()
+            );
+            let file = File::open(&file_path).map_err(|e| {
+                CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
+            })?;
+            let reader = BufReader::new(file);
+            serde_json::from_reader(reader)
+                .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?
+        }
+    };
 
     if imported_links.is_empty() {
         println!("{} Import file is empty", "ℹ".bold().blue());

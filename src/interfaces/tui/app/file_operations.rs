@@ -3,45 +3,38 @@
 use super::state::App;
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
-use crate::utils::password::process_new_password;
-use crate::utils::url_validator::validate_url;
+use crate::utils::csv_handler::{self, FileFormat};
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufReader;
 
 impl App {
     pub async fn export_links(&mut self) -> Result<(), ShortlinkerError> {
         let links_vec: Vec<&ShortLink> = self.links.values().collect();
 
-        let file = File::create(&self.export_path)
-            .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &links_vec)
-            .map_err(|e| ShortlinkerError::serialization(e.to_string()))?;
+        // Use csv_handler to export
+        csv_handler::export_to_csv(&links_vec, &self.export_path)?;
 
         Ok(())
     }
 
     pub async fn import_links(&mut self) -> Result<(), ShortlinkerError> {
-        let file = File::open(&self.import_path)
-            .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
-        let reader = BufReader::new(file);
-        let mut imported_links: Vec<ShortLink> = serde_json::from_reader(reader)
-            .map_err(|e| ShortlinkerError::serialization(e.to_string()))?;
+        // Detect file format
+        let format = csv_handler::detect_format(&self.import_path);
 
-        for link in &mut imported_links {
-            // Validate URL
-            validate_url(&link.target).map_err(|e| {
-                ShortlinkerError::validation(format!("Invalid URL for code '{}': {}", link.code, e))
-            })?;
-
-            // Process password (hash if plaintext, keep if already hashed)
-            link.password = process_new_password(link.password.as_deref()).map_err(|e| {
-                ShortlinkerError::validation(format!(
-                    "Failed to process password for code '{}': {}",
-                    link.code, e
-                ))
-            })?;
-        }
+        let imported_links: Vec<ShortLink> = match format {
+            FileFormat::Csv => {
+                // CSV format (new)
+                csv_handler::import_from_csv(&self.import_path)?
+            }
+            FileFormat::Json => {
+                // JSON format (deprecated, for backward compatibility)
+                let file = File::open(&self.import_path)
+                    .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
+                let reader = BufReader::new(file);
+                serde_json::from_reader(reader)
+                    .map_err(|e| ShortlinkerError::serialization(e.to_string()))?
+            }
+        };
 
         for link in imported_links {
             self.storage.set(link).await?;
@@ -75,9 +68,11 @@ impl App {
             let path = entry.path();
             if path.is_dir() {
                 dirs.push(path);
-            } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                // Only show JSON files for import
-                files.push(path);
+            } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                // Show CSV files (primary) and JSON files (backward compatibility)
+                if ext.eq_ignore_ascii_case("csv") || ext.eq_ignore_ascii_case("json") {
+                    files.push(path);
+                }
             }
         }
 

@@ -295,19 +295,8 @@ pub struct ImportResponse {
     pub failed_items: Vec<ImportFailedItem>,
 }
 
-/// CSV 行数据结构（用于序列化/反序列化）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CsvLinkRow {
-    pub code: String,
-    pub target: String,
-    pub created_at: String,
-    #[serde(default)]
-    pub expires_at: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
-    #[serde(default)]
-    pub click_count: usize,
-}
+// Re-export CsvLinkRow from shared csv_handler module
+pub use crate::utils::csv_handler::CsvLinkRow;
 
 #[cfg(test)]
 mod tests {
