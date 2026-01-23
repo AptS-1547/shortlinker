@@ -1,7 +1,7 @@
 # 前端构建阶段
 FROM node:24-alpine AS frontend-builder
 
-RUN apk add git
+RUN apk add git --no-cache
 RUN npm install -g bun@latest
 
 COPY ./.git /app/.git
