@@ -84,6 +84,7 @@ fn bench_concurrent_increment(c: &mut Criterion) {
 
 /// 测试 drain 性能（预填充后 drain）
 fn bench_drain(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("drain");
 
     for num_entries in [100, 1000, 10000] {
@@ -101,11 +102,7 @@ fn bench_drain(c: &mut Criterion) {
                         }
                         manager
                     },
-                    |manager| {
-                        // 同步调用 flush（内部会 drain）
-                        let rt = tokio::runtime::Runtime::new().unwrap();
-                        rt.block_on(manager.flush());
-                    },
+                    |manager| rt.block_on(manager.flush()),
                     criterion::BatchSize::SmallInput,
                 );
             },
