@@ -520,7 +520,7 @@ impl Default for ApiConfig {
             refresh_token_days: default_refresh_token_days(),
             access_cookie_name: default_access_cookie_name(),
             refresh_cookie_name: default_refresh_cookie_name(),
-            cookie_secure: false,
+            cookie_secure: true,
             cookie_same_site: SameSitePolicy::default(),
             cookie_domain: None,
         }

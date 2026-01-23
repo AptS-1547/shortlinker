@@ -186,6 +186,21 @@ pub async fn import_links(
         csv_data.len()
     );
 
+    // 预扫描 CSV 提取所有 short_code（用于按需查询冲突，避免全量加载）
+    let pre_scan_cursor = Cursor::new(&csv_data);
+    let mut pre_scan_reader = ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_reader(pre_scan_cursor);
+
+    let csv_codes: Vec<String> = pre_scan_reader
+        .deserialize::<CsvLinkRow>()
+        .filter_map(|r| r.ok())
+        .map(|row| row.code)
+        .filter(|code| !code.is_empty())
+        .collect();
+
     // 解析 CSV
     let cursor = Cursor::new(&csv_data);
     let mut csv_reader = ReaderBuilder::new()
@@ -201,16 +216,14 @@ pub async fn import_links(
     // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
     let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
 
-    // 预加载所有现有链接代码（用于检查冲突）- 只查 short_code 列
+    // 只查询 CSV 中涉及的 codes 是否已存在（避免全量加载所有短码）
     let existing_codes: HashSet<String> = storage
-        .load_all_codes()
+        .batch_check_codes_exist(&csv_codes)
         .await
         .map_err(|e| {
-            error!("Failed to load existing codes for import: {}", e);
+            error!("Failed to check existing codes for import: {}", e);
             actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-        })?
-        .into_iter()
-        .collect();
+        })?;
 
     // 已处理的代码（用于 overwrite 模式下检测重复）
     let mut processed_codes: HashSet<String> = HashSet::new();

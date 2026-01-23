@@ -2,7 +2,7 @@
 //!
 //! This module contains all read-only database operations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::Utc;
 use sea_orm::{
@@ -120,6 +120,47 @@ impl SeaOrmStorage {
 
         info!("Loaded {} short codes for Bloom filter", codes.len());
         Ok(codes)
+    }
+
+    /// 批量检查短码是否已存在（只返回已存在的短码）
+    /// 用于 CSV 导入冲突检测，避免全量加载所有短码
+    pub async fn batch_check_codes_exist(&self, codes: &[String]) -> Result<HashSet<String>> {
+        if codes.is_empty() {
+            return Ok(HashSet::new());
+        }
+
+        let mut existing = HashSet::new();
+        let db = &self.db;
+
+        // 分批查询，每批 500 个，避免 SQL IN 子句过长
+        for chunk in codes.chunks(500) {
+            let chunk_owned: Vec<String> = chunk.to_vec();
+            let result = retry::with_retry(
+                "batch_check_codes_exist",
+                self.retry_config,
+                || async {
+                    short_link::Entity::find()
+                        .select_only()
+                        .column(short_link::Column::ShortCode)
+                        .filter(short_link::Column::ShortCode.is_in(chunk_owned.clone()))
+                        .into_tuple::<String>()
+                        .all(db)
+                        .await
+                },
+            )
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "批量检查短码存在性失败: {}",
+                    e
+                ))
+            })?;
+
+            existing.extend(result);
+        }
+
+        debug!("Checked {} codes, {} already exist", codes.len(), existing.len());
+        Ok(existing)
     }
 
     /// 获取链接总数（轻量查询，用于健康检查）

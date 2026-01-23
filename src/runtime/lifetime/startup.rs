@@ -187,6 +187,15 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     // 检查 JWT Secret 安全性
     check_jwt_secret_security(&config);
 
+    // 检查 Cookie Secure 标志
+    if !config.api.cookie_secure {
+        warn!(
+            "WARNING: Cookie Secure flag is disabled. \
+            Cookies will be sent over unencrypted HTTP connections. \
+            Enable cookie_secure=true for production environments."
+        );
+    }
+
     // 检查 Admin API 是否启用
     let admin_token = &config.api.admin_token;
     if admin_token.is_empty() {

@@ -124,7 +124,7 @@ fn default_refresh_cookie_name() -> String {
 }
 
 fn default_cookie_secure() -> String {
-    "false".to_string()
+    "true".to_string()
 }
 
 fn default_cookie_same_site() -> String {

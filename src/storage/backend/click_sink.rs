@@ -4,15 +4,13 @@
 //!
 //! # Security Note
 //!
-//! This module uses `execute_unprepared()` with inline SQL values for batch performance.
-//! All `short_code` values are validated via `utils::is_valid_short_code()` before being
-//! used in SQL. This validation acts as defense-in-depth against SQL injection.
+//! This module uses parameterized queries via `DatabaseBackend::build()` for SQL safety.
+//! All `short_code` values are additionally validated via `utils::is_valid_short_code()`
+//! as defense-in-depth against SQL injection.
 
 use async_trait::async_trait;
-use sea_orm::sea_query::{
-    CaseStatement, Expr, MysqlQueryBuilder, PostgresQueryBuilder, Query, SqliteQueryBuilder,
-};
-use sea_orm::{ConnectionTrait, DatabaseBackend, ExprTrait};
+use sea_orm::sea_query::{CaseStatement, Expr, Query};
+use sea_orm::{ConnectionTrait, ExprTrait};
 use tracing::debug;
 
 use super::SeaOrmStorage;
@@ -62,17 +60,11 @@ impl ClickSink for SeaOrmStorage {
             .and_where(Expr::col(short_link::Column::ShortCode).is_in(codes))
             .to_owned();
 
-        // 使用 to_string 生成内联值的 SQL（根据数据库类型选择对应的 QueryBuilder）
-        let sql = match self.db.get_database_backend() {
-            DatabaseBackend::Sqlite => stmt.to_string(SqliteQueryBuilder),
-            DatabaseBackend::MySql => stmt.to_string(MysqlQueryBuilder),
-            DatabaseBackend::Postgres => stmt.to_string(PostgresQueryBuilder),
-            _ => stmt.to_string(SqliteQueryBuilder), // fallback to SQLite
-        };
-
+        // 使用参数化查询执行（SeaORM 内部自动 build 为带绑定参数的 Statement）
         let db = &self.db;
+        let stmt_ref = &stmt;
         retry::with_retry("flush_clicks", self.retry_config, || async {
-            db.execute_unprepared(&sql).await
+            db.execute(stmt_ref).await
         })
         .await
         .map_err(|e| anyhow::anyhow!("批量更新点击数失败（重试后仍失败）: {}", e))?;
