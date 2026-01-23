@@ -52,6 +52,7 @@ pub async fn export_links(
 
     // 构建 CSV
     let mut csv_writer = WriterBuilder::new().from_writer(vec![]);
+    let mut serialize_errors = 0usize;
 
     for link in &links {
         let row = CsvLinkRow {
@@ -63,11 +64,15 @@ pub async fn export_links(
             click_count: link.click,
         };
         if let Err(e) = csv_writer.serialize(&row) {
-            error!("Failed to serialize CSV row: {}", e);
+            error!("Failed to serialize CSV row for code '{}': {}", link.code, e);
+            serialize_errors += 1;
         }
     }
 
-    let csv_data = csv_writer.into_inner().unwrap_or_default();
+    let csv_data = csv_writer.into_inner().map_err(|e| {
+        error!("Failed to finalize CSV writer: {}", e.error());
+        actix_web::error::ErrorInternalServerError("Failed to generate CSV")
+    })?;
 
     // 生成文件名
     let filename = format!(
@@ -76,19 +81,25 @@ pub async fn export_links(
     );
 
     info!(
-        "Admin API: exported {} links ({} bytes) to {}",
+        "Admin API: exported {} links ({} bytes, {} serialize errors) to {}",
         links.len(),
         csv_data.len(),
+        serialize_errors,
         filename
     );
 
-    Ok(HttpResponse::Ok()
-        .content_type("text/csv; charset=utf-8")
-        .insert_header((
-            "Content-Disposition",
-            format!("attachment; filename=\"{}\"", filename),
-        ))
-        .body(csv_data))
+    let mut response = HttpResponse::Ok();
+    response.content_type("text/csv; charset=utf-8");
+    response.insert_header((
+        "Content-Disposition",
+        format!("attachment; filename=\"{}\"", filename),
+    ));
+    // 在响应头中标记序列化错误数
+    if serialize_errors > 0 {
+        response.insert_header(("X-Export-Errors", serialize_errors.to_string()));
+    }
+
+    Ok(response.body(csv_data))
 }
 
 /// 导入链接从 CSV

@@ -138,7 +138,7 @@ impl ConfigStore {
         };
 
         // 如果值没变，直接返回
-        if old_value.as_ref() == Some(&value.to_string()) {
+        if old_value.as_deref() == Some(value) {
             return Ok(ConfigUpdateResult {
                 key: key.to_string(),
                 value: value.to_string(),
