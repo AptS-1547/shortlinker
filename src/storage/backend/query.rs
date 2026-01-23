@@ -135,10 +135,8 @@ impl SeaOrmStorage {
         // 分批查询，每批 500 个，避免 SQL IN 子句过长
         for chunk in codes.chunks(500) {
             let chunk_owned: Vec<String> = chunk.to_vec();
-            let result = retry::with_retry(
-                "batch_check_codes_exist",
-                self.retry_config,
-                || async {
+            let result =
+                retry::with_retry("batch_check_codes_exist", self.retry_config, || async {
                     short_link::Entity::find()
                         .select_only()
                         .column(short_link::Column::ShortCode)
@@ -146,20 +144,20 @@ impl SeaOrmStorage {
                         .into_tuple::<String>()
                         .all(db)
                         .await
-                },
-            )
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "批量检查短码存在性失败: {}",
-                    e
-                ))
-            })?;
+                })
+                .await
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("批量检查短码存在性失败: {}", e))
+                })?;
 
             existing.extend(result);
         }
 
-        debug!("Checked {} codes, {} already exist", codes.len(), existing.len());
+        debug!(
+            "Checked {} codes, {} already exist",
+            codes.len(),
+            existing.len()
+        );
         Ok(existing)
     }
 

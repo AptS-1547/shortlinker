@@ -7,8 +7,8 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use csv::{ReaderBuilder, WriterBuilder};
-use shortlinker::cache::existence_filter::bloom::BloomExistenceFilterPlugin;
 use shortlinker::cache::ExistenceFilter;
+use shortlinker::cache::existence_filter::bloom::BloomExistenceFilterPlugin;
 use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -16,8 +16,15 @@ use std::sync::Arc;
 /// 生成测试用 CSV 数据
 fn generate_csv_data(num_rows: usize) -> Vec<u8> {
     let mut wtr = WriterBuilder::new().from_writer(Vec::new());
-    wtr.write_record(["code", "target", "created_at", "expires_at", "password", "click_count"])
-        .unwrap();
+    wtr.write_record([
+        "code",
+        "target",
+        "created_at",
+        "expires_at",
+        "password",
+        "click_count",
+    ])
+    .unwrap();
     for i in 0..num_rows {
         wtr.write_record([
             &format!("code_{}", i),
@@ -57,13 +64,9 @@ fn bench_csv_prescan(c: &mut Criterion) {
     for csv_size in [100, 1000, 10000] {
         let csv_data = generate_csv_data(csv_size);
         group.throughput(Throughput::Elements(csv_size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("rows", csv_size),
-            &csv_data,
-            |b, data| {
-                b.iter(|| extract_codes_from_csv(data));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rows", csv_size), &csv_data, |b, data| {
+            b.iter(|| extract_codes_from_csv(data));
+        });
     }
     group.finish();
 }
@@ -93,45 +96,37 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
         // 方案 A：Bloom 预筛选
         let f = Arc::clone(&filter);
         let codes = csv_codes.clone();
-        group.bench_with_input(
-            BenchmarkId::new("bloom_filter", &label),
-            &(),
-            |b, _| {
-                b.to_async(&rt).iter(|| {
-                    let f = Arc::clone(&f);
-                    let codes = codes.clone();
-                    async move {
-                        let mut maybe_exist = Vec::new();
-                        for code in &codes {
-                            if f.check(code).await {
-                                maybe_exist.push(code.clone());
-                            }
+        group.bench_with_input(BenchmarkId::new("bloom_filter", &label), &(), |b, _| {
+            b.to_async(&rt).iter(|| {
+                let f = Arc::clone(&f);
+                let codes = codes.clone();
+                async move {
+                    let mut maybe_exist = Vec::new();
+                    for code in &codes {
+                        if f.check(code).await {
+                            maybe_exist.push(code.clone());
                         }
-                        maybe_exist
                     }
-                });
-            },
-        );
+                    maybe_exist
+                }
+            });
+        });
 
         // 方案 B：直接 HashSet lookup（模拟 batch_check 的结果）
         let existing_set: HashSet<String> =
             (0..db_size).map(|i| format!("existing_{}", i)).collect();
         let codes = csv_codes.clone();
-        group.bench_with_input(
-            BenchmarkId::new("hashset_lookup", &label),
-            &(),
-            |b, _| {
-                b.iter(|| {
-                    let mut conflicts = Vec::new();
-                    for code in &codes {
-                        if existing_set.contains(code) {
-                            conflicts.push(code.clone());
-                        }
+        group.bench_with_input(BenchmarkId::new("hashset_lookup", &label), &(), |b, _| {
+            b.iter(|| {
+                let mut conflicts = Vec::new();
+                for code in &codes {
+                    if existing_set.contains(code) {
+                        conflicts.push(code.clone());
                     }
-                    conflicts
-                });
-            },
-        );
+                }
+                conflicts
+            });
+        });
     }
     group.finish();
 }
@@ -169,25 +164,21 @@ fn bench_bloom_with_conflicts(c: &mut Criterion) {
 
         let f = Arc::clone(&filter);
         let codes = csv_codes.clone();
-        group.bench_with_input(
-            BenchmarkId::new("bloom_prefilter", &label),
-            &(),
-            |b, _| {
-                b.to_async(&rt).iter(|| {
-                    let f = Arc::clone(&f);
-                    let codes = codes.clone();
-                    async move {
-                        let mut maybe_exist = Vec::new();
-                        for code in &codes {
-                            if f.check(code).await {
-                                maybe_exist.push(code.clone());
-                            }
+        group.bench_with_input(BenchmarkId::new("bloom_prefilter", &label), &(), |b, _| {
+            b.to_async(&rt).iter(|| {
+                let f = Arc::clone(&f);
+                let codes = codes.clone();
+                async move {
+                    let mut maybe_exist = Vec::new();
+                    for code in &codes {
+                        if f.check(code).await {
+                            maybe_exist.push(code.clone());
                         }
-                        maybe_exist.len()
                     }
-                });
-            },
-        );
+                    maybe_exist.len()
+                }
+            });
+        });
     }
     group.finish();
 }

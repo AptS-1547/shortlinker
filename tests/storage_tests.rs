@@ -4,11 +4,11 @@
 
 use chrono::{Duration, Utc};
 use shortlinker::config::init_config;
+use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::{
     LinkFilter, SeaOrmStorage, connect_sqlite, infer_backend_from_url, normalize_backend_name,
     run_migrations,
 };
-use shortlinker::storage::ShortLink;
 use std::sync::Once;
 use tempfile::TempDir;
 
@@ -207,7 +207,10 @@ mod crud_tests {
     async fn test_get_nonexistent_returns_none() {
         let (storage, _temp) = create_temp_storage().await;
 
-        let result = storage.get("nonexistent").await.expect("get should succeed");
+        let result = storage
+            .get("nonexistent")
+            .await
+            .expect("get should succeed");
         assert!(result.is_none());
     }
 
@@ -287,7 +290,10 @@ mod batch_tests {
             .map(|i| create_test_link(&format!("batch_{}", i), &format!("https://{}.com", i)))
             .collect();
 
-        storage.batch_set(links).await.expect("batch_set should succeed");
+        storage
+            .batch_set(links)
+            .await
+            .expect("batch_set should succeed");
 
         // 验证全部存在
         for i in 0..10 {
@@ -457,7 +463,10 @@ mod query_tests {
             ..Default::default()
         };
 
-        let (links, total) = storage.load_paginated_filtered(1, 10, filter).await.unwrap();
+        let (links, total) = storage
+            .load_paginated_filtered(1, 10, filter)
+            .await
+            .unwrap();
 
         // github_1, github_2 的 code 包含 github
         // other 的 target 包含 github
@@ -489,7 +498,10 @@ mod query_tests {
             ..Default::default()
         };
 
-        let (links, total) = storage.load_paginated_filtered(1, 10, filter).await.unwrap();
+        let (links, total) = storage
+            .load_paginated_filtered(1, 10, filter)
+            .await
+            .unwrap();
 
         assert_eq!(total, 2);
         let codes: Vec<&str> = links.iter().map(|l| l.code.as_str()).collect();
@@ -507,11 +519,17 @@ mod query_tests {
             .await
             .unwrap();
         storage
-            .set(create_test_link_with_expiry("expired_1", Duration::hours(-1)))
+            .set(create_test_link_with_expiry(
+                "expired_1",
+                Duration::hours(-1),
+            ))
             .await
             .unwrap();
         storage
-            .set(create_test_link_with_expiry("expired_2", Duration::days(-1)))
+            .set(create_test_link_with_expiry(
+                "expired_2",
+                Duration::days(-1),
+            ))
             .await
             .unwrap();
 
@@ -520,7 +538,10 @@ mod query_tests {
             ..Default::default()
         };
 
-        let (links, total) = storage.load_paginated_filtered(1, 10, filter).await.unwrap();
+        let (links, total) = storage
+            .load_paginated_filtered(1, 10, filter)
+            .await
+            .unwrap();
 
         assert_eq!(total, 2);
         let codes: Vec<&str> = links.iter().map(|l| l.code.as_str()).collect();
@@ -555,14 +576,20 @@ mod stats_tests {
         // 创建 3 个活跃链接
         for i in 0..3 {
             storage
-                .set(create_test_link(&format!("stat_{}", i), "https://example.com"))
+                .set(create_test_link(
+                    &format!("stat_{}", i),
+                    "https://example.com",
+                ))
                 .await
                 .unwrap();
         }
 
         // 创建 1 个过期链接
         storage
-            .set(create_test_link_with_expiry("stat_expired", Duration::hours(-1)))
+            .set(create_test_link_with_expiry(
+                "stat_expired",
+                Duration::hours(-1),
+            ))
             .await
             .unwrap();
 
@@ -650,7 +677,10 @@ mod edge_case_tests {
 
         for i in 0..5 {
             storage
-                .set(create_test_link(&format!("export_{}", i), "https://example.com"))
+                .set(create_test_link(
+                    &format!("export_{}", i),
+                    "https://example.com",
+                ))
                 .await
                 .unwrap();
         }

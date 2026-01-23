@@ -90,7 +90,6 @@ impl CompositeCacheTrait for MockCache {
         Ok(())
     }
 
-    
     async fn bloom_check(&self, key: &str) -> bool {
         self.data.read().await.contains_key(key)
     }
@@ -446,7 +445,10 @@ mod update_link_tests {
             expires_at: None,
             password: None,
         };
-        let updated = service.update_link("preserve_time", update_req).await.unwrap();
+        let updated = service
+            .update_link("preserve_time", update_req)
+            .await
+            .unwrap();
 
         // created_at should be preserved
         assert_eq!(updated.created_at, original_created_at);
@@ -680,7 +682,10 @@ mod import_export_tests {
             },
         ];
 
-        let result = service.import_links(items, ImportMode::Error).await.unwrap();
+        let result = service
+            .import_links(items, ImportMode::Error)
+            .await
+            .unwrap();
 
         assert_eq!(result.success, 1);
         assert_eq!(result.failed, 1);
@@ -823,7 +828,10 @@ mod edge_cases {
     async fn test_import_empty_list() {
         let (service, _temp) = create_test_service().await;
 
-        let result = service.import_links(vec![], ImportMode::Skip).await.unwrap();
+        let result = service
+            .import_links(vec![], ImportMode::Skip)
+            .await
+            .unwrap();
 
         assert_eq!(result.success, 0);
         assert_eq!(result.skipped, 0);
@@ -855,10 +863,10 @@ mod edge_cases {
         let (service, _temp) = create_test_service().await;
 
         let test_cases = vec![
-            ("1h", 1),    // 1 hour
-            ("24h", 24),  // 24 hours
-            ("1d", 24),   // 1 day
-            ("7d", 168),  // 7 days
+            ("1h", 1),   // 1 hour
+            ("24h", 24), // 24 hours
+            ("1d", 24),  // 1 day
+            ("7d", 168), // 7 days
         ];
 
         for (i, (time_str, expected_hours)) in test_cases.iter().enumerate() {

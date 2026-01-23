@@ -64,7 +64,10 @@ pub async fn export_links(
             click_count: link.click,
         };
         if let Err(e) = csv_writer.serialize(&row) {
-            error!("Failed to serialize CSV row for code '{}': {}", link.code, e);
+            error!(
+                "Failed to serialize CSV row for code '{}': {}",
+                link.code, e
+            );
             serialize_errors += 1;
         }
     }

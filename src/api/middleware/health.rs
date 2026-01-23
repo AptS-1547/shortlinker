@@ -144,7 +144,7 @@ where
                 HttpResponse::Unauthorized()
                     .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
                     .json(ApiResponse {
-                        code: 1,  // 使用业务码，与 Admin 中间件保持一致
+                        code: 1, // 使用业务码，与 Admin 中间件保持一致
                         data: ErrorData {
                             error: "Unauthorized: Invalid or missing token".to_string(),
                         },
