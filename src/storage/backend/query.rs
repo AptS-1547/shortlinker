@@ -25,12 +25,12 @@ fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Co
     let mut condition = Condition::all();
 
     // search: 模糊匹配 code 或 target
+    // 注意：SeaORM 的 contains() 会自动添加 %，不要手动拼接
     if let Some(ref search) = filter.search {
-        let pattern = format!("%{}%", search);
         condition = condition.add(
             Condition::any()
-                .add(short_link::Column::ShortCode.contains(&pattern))
-                .add(short_link::Column::TargetUrl.contains(&pattern)),
+                .add(short_link::Column::ShortCode.contains(search))
+                .add(short_link::Column::TargetUrl.contains(search)),
         );
     }
 
