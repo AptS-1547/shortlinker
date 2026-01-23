@@ -165,7 +165,8 @@ fn bench_batch_roundtrip(c: &mut Criterion) {
     let mut group = c.benchmark_group("ipc/batch");
 
     // 模拟批量 link list 响应
-    for num_links in [10, 100, 500] {
+    // 注意：MAX_MESSAGE_SIZE = 64KB，500 links (~80KB) 会超限
+    for num_links in [10, 100, 200] {
         let response = IpcResponse::LinkList {
             links: (0..num_links)
                 .map(|i| ShortLinkData {

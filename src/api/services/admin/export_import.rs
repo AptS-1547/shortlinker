@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
@@ -186,7 +186,7 @@ pub async fn import_links(
         csv_data.len()
     );
 
-    // 解析 CSV
+    // 解析 CSV（单次解析，收集所有行）
     let cursor = Cursor::new(&csv_data);
     let mut csv_reader = ReaderBuilder::new()
         .has_headers(true)
@@ -198,31 +198,39 @@ pub async fn import_links(
     let mut success_count = 0;
     let mut skipped_count = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
-    // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
-    let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
 
-    // 冲突检测：Overwrite 模式不需要（batch_set 自带 UPSERT），Skip/Error 用 Bloom 预筛选
+    // 单次解析：收集所有行和 codes
+    let mut parsed_rows: Vec<(usize, CsvLinkRow)> = Vec::new();
+    let mut all_codes: Vec<String> = Vec::new();
+
+    for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
+        let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
+        total_rows += 1;
+
+        match result {
+            Ok(row) => {
+                if !row.code.is_empty() {
+                    all_codes.push(row.code.clone());
+                }
+                parsed_rows.push((row_num, row));
+            }
+            Err(e) => {
+                failed_items.push(ImportFailedItem {
+                    row: row_num,
+                    code: String::new(),
+                    error: format!("CSV parse error: {}", e),
+                });
+            }
+        }
+    }
+
+    // 冲突检测：Overwrite 模式不需要，Skip/Error 用 Bloom 预筛选
     let existing_codes: HashSet<String> = match mode {
         ImportMode::Overwrite => HashSet::new(),
         ImportMode::Skip | ImportMode::Error => {
-            // 预扫描 CSV 提取所有 code
-            let pre_scan_cursor = Cursor::new(&csv_data);
-            let mut pre_scan_reader = ReaderBuilder::new()
-                .has_headers(true)
-                .flexible(true)
-                .trim(csv::Trim::All)
-                .from_reader(pre_scan_cursor);
-
-            let csv_codes: Vec<String> = pre_scan_reader
-                .deserialize::<CsvLinkRow>()
-                .filter_map(|r| r.ok())
-                .map(|row| row.code)
-                .filter(|code| !code.is_empty())
-                .collect();
-
             // Bloom Filter 预筛选：false = 一定不存在，跳过 DB 查询
             let mut maybe_exist = Vec::new();
-            for code in &csv_codes {
+            for code in &all_codes {
                 if cache.bloom_check(code).await {
                     maybe_exist.push(code.clone());
                 }
@@ -243,25 +251,13 @@ pub async fn import_links(
         }
     };
 
-    // 已处理的代码（用于 overwrite 模式下检测重复）
+    // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
+    let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
+    // 已处理的代码（用于检测 CSV 内重复）
     let mut processed_codes: HashSet<String> = HashSet::new();
 
-    for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
-        let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
-        total_rows += 1;
-
-        let row: CsvLinkRow = match result {
-            Ok(r) => r,
-            Err(e) => {
-                failed_items.push(ImportFailedItem {
-                    row: row_num,
-                    code: String::new(),
-                    error: format!("CSV parse error: {}", e),
-                });
-                continue;
-            }
-        };
-
+    // 处理收集的行数据
+    for (row_num, row) in parsed_rows {
         // 验证 code
         if row.code.is_empty() {
             failed_items.push(ImportFailedItem {
@@ -307,7 +303,13 @@ pub async fn import_links(
         // 解析 created_at
         let created_at = chrono::DateTime::parse_from_rfc3339(&row.created_at)
             .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| Utc::now());
+            .unwrap_or_else(|_| {
+                warn!(
+                    "Row {}: Invalid created_at '{}', using current time",
+                    row_num, row.created_at
+                );
+                Utc::now()
+            });
 
         // 解析 expires_at
         let expires_at = row.expires_at.as_ref().and_then(|s| {

@@ -126,6 +126,8 @@ impl SeaOrmStorage {
                         short_link::Column::TargetUrl,
                         short_link::Column::ExpiresAt,
                         short_link::Column::Password,
+                        short_link::Column::CreatedAt,
+                        short_link::Column::ClickCount,
                     ])
                     .to_owned(),
             )
