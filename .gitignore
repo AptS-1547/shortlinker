@@ -32,3 +32,4 @@ links.json
 shortlinker.pid
 cargo-flamegraph.trace/
 flamegraph.svg
+coverage/
