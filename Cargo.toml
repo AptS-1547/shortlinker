@@ -140,6 +140,10 @@ harness = false
 name = "ipc_protocol"
 harness = false
 
+[[bench]]
+name = "import_conflict"
+harness = false
+
 # cargo-binstall 配置
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/{ version }/shortlinker_{ version }_{ target }{ binary-ext }"

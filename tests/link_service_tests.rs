@@ -89,6 +89,11 @@ impl CompositeCacheTrait for MockCache {
     async fn reconfigure(&self, _config: BloomConfig) -> shortlinker::errors::Result<()> {
         Ok(())
     }
+
+    
+    async fn bloom_check(&self, key: &str) -> bool {
+        self.data.read().await.contains_key(key)
+    }
 }
 
 /// Create a test service with temporary storage

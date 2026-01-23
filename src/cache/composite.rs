@@ -115,6 +115,10 @@ impl CompositeCacheTrait for CompositeCache {
             .clear(config.capacity, config.fp_rate)
             .await
     }
+
+    async fn bloom_check(&self, key: &str) -> bool {
+        self.filter_plugin.check(key).await
+    }
 }
 
 #[cfg(test)]

@@ -38,6 +38,11 @@ pub trait CompositeCacheTrait: Send + Sync {
 
     /// 重新初始化 Filter
     async fn reconfigure(&self, config: BloomConfig) -> Result<()>;
+
+    /// 直接检查 Bloom Filter（不查 Object Cache / Negative Cache）
+    /// - `false` = 一定不存在
+    /// - `true` = 可能存在（有误报可能）
+    async fn bloom_check(&self, key: &str) -> bool;
 }
 
 #[async_trait]
