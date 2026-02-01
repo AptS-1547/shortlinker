@@ -45,7 +45,8 @@ impl JwtService {
         let rt = crate::config::get_runtime_config();
 
         // 获取 JWT secret，如果为空则生成一个安全的随机值
-        let jwt_secret = rt.get(crate::config::keys::API_JWT_SECRET)
+        let jwt_secret = rt
+            .get(crate::config::keys::API_JWT_SECRET)
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| {
                 use tracing::warn;

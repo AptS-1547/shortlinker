@@ -235,7 +235,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         requires_restart: false,
         is_sensitive: false,
         editable: true,
-        category: categories::COOKIE,
+        category: categories::AUTH,
         description: "Access token expiration time in minutes",
     },
     ConfigDef {
@@ -246,7 +246,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         requires_restart: false,
         is_sensitive: false,
         editable: true,
-        category: categories::COOKIE,
+        category: categories::AUTH,
         description: "Refresh token expiration time in days",
     },
     // ========== Cookie 配置 (cookie) ==========

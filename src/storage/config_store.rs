@@ -157,15 +157,10 @@ impl ConfigStore {
             ShortlinkerError::database_operation(format!("更新配置 '{}' 失败: {}", key, e))
         })?;
 
-        // 硬编码的敏感 key 兜底列表，防止初次迁移时因 is_sensitive=false 导致明文泄露
-        const ALWAYS_SENSITIVE_KEYS: &[&str] =
-            &["api.admin_token", "api.jwt_secret", "api.health_token"];
-
-        // 检查是否为敏感配置（优先使用定义，回退到数据库标记，最后使用兜底列表）
+        // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
         let is_sensitive_config = get_def(key)
             .map(|def| def.is_sensitive)
-            .unwrap_or(is_sensitive)
-            || ALWAYS_SENSITIVE_KEYS.contains(&key);
+            .unwrap_or(is_sensitive);
 
         // 记录变更历史（敏感配置的值脱敏为 [REDACTED]）
         let (history_old_value, history_new_value) = if is_sensitive_config {
@@ -489,10 +484,7 @@ impl ConfigStore {
         }
 
         if inserted_count > 0 {
-            info!(
-                "Initialized {} default configuration items",
-                inserted_count
-            );
+            info!("Initialized {} default configuration items", inserted_count);
         }
 
         Ok(inserted_count)

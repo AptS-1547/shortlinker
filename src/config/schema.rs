@@ -6,6 +6,8 @@
 //! 2. 后端验证配置值
 //! 3. 保持前后端同步
 
+use std::sync::OnceLock;
+
 use serde::Serialize;
 use strum::IntoEnumIterator;
 use ts_rs::TS;
@@ -13,6 +15,9 @@ use ts_rs::TS;
 use super::definitions::{ALL_CONFIGS, keys};
 use super::types::TS_EXPORT_PATH;
 use super::{HttpMethod, SameSitePolicy, ValueType};
+
+/// Schema 缓存
+static SCHEMA_CACHE: OnceLock<Vec<ConfigSchema>> = OnceLock::new();
 
 /// 单个 enum 选项
 #[derive(Debug, Clone, Serialize, TS)]
@@ -47,25 +52,28 @@ pub struct ConfigSchema {
 /// 获取所有配置的 schema
 ///
 /// 从 ALL_CONFIGS 生成，保证与配置定义同步。
-pub fn get_all_schemas() -> Vec<ConfigSchema> {
-    ALL_CONFIGS
-        .iter()
-        .map(|def| ConfigSchema {
-            key: def.key.to_string(),
-            value_type: def.value_type,
-            default_value: (def.default_fn)(),
-            description: def.description.to_string(),
-            category: Some(def.category.to_string()),
-            enum_options: get_enum_options(def.key),
-            requires_restart: def.requires_restart,
-            editable: def.editable,
-        })
-        .collect()
+/// 首次调用会计算并缓存，后续调用直接返回缓存。
+pub fn get_all_schemas() -> &'static Vec<ConfigSchema> {
+    SCHEMA_CACHE.get_or_init(|| {
+        ALL_CONFIGS
+            .iter()
+            .map(|def| ConfigSchema {
+                key: def.key.to_string(),
+                value_type: def.value_type,
+                default_value: (def.default_fn)(),
+                description: def.description.to_string(),
+                category: Some(def.category.to_string()),
+                enum_options: get_enum_options(def.key),
+                requires_restart: def.requires_restart,
+                editable: def.editable,
+            })
+            .collect()
+    })
 }
 
 /// 根据 key 获取 schema
 pub fn get_schema(key: &str) -> Option<ConfigSchema> {
-    get_all_schemas().into_iter().find(|s| s.key == key)
+    get_all_schemas().iter().find(|s| s.key == key).cloned()
 }
 
 /// 根据 key 获取 enum 选项

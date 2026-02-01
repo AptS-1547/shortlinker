@@ -40,9 +40,7 @@ impl RuntimeConfig {
         // 更新内部缓存
         {
             let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::database_operation(
-                    "Cannot acquire runtime config cache write lock".to_string(),
-                )
+                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
             })?;
             *cache = configs;
         }
@@ -59,9 +57,7 @@ impl RuntimeConfig {
         // 更新内部缓存
         {
             let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::database_operation(
-                    "Cannot acquire runtime config cache write lock".to_string(),
-                )
+                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
             })?;
             *cache = configs;
         }
@@ -72,13 +68,19 @@ impl RuntimeConfig {
 
     /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
-        let cache = self.cache.read().ok()?;
+        let cache = self
+            .cache
+            .read()
+            .expect("Runtime config cache lock poisoned - this is a fatal error");
         cache.get(key).map(|item| (*item.value).clone())
     }
 
     /// 获取配置的完整信息
     pub fn get_full(&self, key: &str) -> Option<ConfigItem> {
-        let cache = self.cache.read().ok()?;
+        let cache = self
+            .cache
+            .read()
+            .expect("Runtime config cache lock poisoned - this is a fatal error");
         cache.get(key).cloned()
     }
 
@@ -86,8 +88,8 @@ impl RuntimeConfig {
     pub fn get_all(&self) -> HashMap<String, ConfigItem> {
         self.cache
             .read()
-            .map(|cache| cache.clone())
-            .unwrap_or_default()
+            .expect("Runtime config cache lock poisoned - this is a fatal error")
+            .clone()
     }
 
     /// 获取 bool 类型配置
@@ -164,9 +166,7 @@ impl RuntimeConfig {
 
         // 更新内部缓存（必须成功，保证一致性）
         let mut cache = self.cache.write().map_err(|_| {
-            ShortlinkerError::database_operation(
-                "Cannot acquire runtime config cache write lock".to_string(),
-            )
+            ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
         })?;
 
         if let Some(item) = cache.get_mut(key) {

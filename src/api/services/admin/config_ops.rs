@@ -294,7 +294,7 @@ pub struct HistoryQuery {
 /// 返回配置项的元信息，包括类型、默认值、枚举选项等。
 /// 前端用这个动态渲染配置表单。
 pub async fn get_config_schema(_req: HttpRequest) -> ActixResult<impl Responder> {
-    let schemas = get_all_schemas();
+    let schemas = get_all_schemas().clone();
     Ok(success_response(schemas))
 }
 
