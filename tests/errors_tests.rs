@@ -58,15 +58,6 @@ mod error_creation_tests {
         assert!(error.to_string().contains("Serialization Error"));
         assert!(error.to_string().contains("serialization failed"));
     }
-
-    #[test]
-    fn test_signal_operation_error() {
-        let error = ShortlinkerError::signal_operation("signal handling failed");
-
-        assert!(matches!(error, ShortlinkerError::SignalOperation(_)));
-        assert!(error.to_string().contains("Signal Operation Error"));
-        assert!(error.to_string().contains("signal handling failed"));
-    }
 }
 
 #[cfg(test)]
@@ -106,16 +97,6 @@ mod error_conversion_tests {
                 .to_string()
                 .contains("Serialization Error")
         );
-    }
-
-    #[test]
-    fn test_chrono_parse_error_conversion() {
-        let invalid_date = "not a date";
-        let parse_error = chrono::DateTime::parse_from_rfc3339(invalid_date).unwrap_err();
-        let shortlinker_error: ShortlinkerError = parse_error.into();
-
-        assert!(matches!(shortlinker_error, ShortlinkerError::DateParse(_)));
-        assert!(shortlinker_error.to_string().contains("Date Parse Error"));
     }
 }
 
@@ -251,8 +232,8 @@ mod error_message_tests {
                 "Serialization Error: JSON error",
             ),
             (
-                ShortlinkerError::signal_operation("signal interrupted"),
-                "Signal Operation Error: signal interrupted",
+                ShortlinkerError::notify_server("notify server failed"),
+                "Notify Server Error: notify server failed",
             ),
         ];
 

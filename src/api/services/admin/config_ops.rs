@@ -1,16 +1,15 @@
 //! 配置管理 API 端点
 
-use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ts_rs::TS;
 
 use crate::config::{get_all_schemas, try_get_runtime_config};
+use crate::errors::ShortlinkerError;
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 
-use super::error_code::ErrorCode;
-use super::helpers::{error_response, success_response};
+use super::helpers::{error_from_shortlinker, success_response};
 use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
 
 /// 配置项响应
@@ -73,10 +72,8 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
     let rc = match try_get_runtime_config() {
         Some(rc) => rc,
         None => {
-            return Ok(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                ErrorCode::ServiceUnavailable,
-                "Runtime config not initialized",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
             ));
         }
     };
@@ -112,10 +109,8 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
     let rc = match try_get_runtime_config() {
         Some(rc) => rc,
         None => {
-            return Ok(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                ErrorCode::ServiceUnavailable,
-                "Runtime config not initialized",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
             ));
         }
     };
@@ -137,11 +132,9 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
                 updated_at: item.updated_at.to_rfc3339(),
             }))
         }
-        None => Ok(error_response(
-            StatusCode::NOT_FOUND,
-            ErrorCode::ConfigNotFound,
-            &format!("Config key '{}' not found", key),
-        )),
+        None => Ok(error_from_shortlinker(&ShortlinkerError::config_not_found(
+            format!("Config key '{}' not found", key),
+        ))),
     }
 }
 
@@ -156,10 +149,8 @@ pub async fn update_config(
     let rc = match try_get_runtime_config() {
         Some(rc) => rc,
         None => {
-            return Ok(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                ErrorCode::ServiceUnavailable,
-                "Runtime config not initialized",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
             ));
         }
     };
@@ -196,10 +187,8 @@ pub async fn update_config(
         }
         Err(e) => {
             warn!("Failed to update config {}: {}", key, e);
-            Ok(error_response(
-                StatusCode::BAD_REQUEST,
-                ErrorCode::ConfigUpdateFailed,
-                &format!("Failed to update config: {}", e),
+            Ok(error_from_shortlinker(
+                &ShortlinkerError::config_update_failed(format!("Failed to update config: {}", e)),
             ))
         }
     }
@@ -216,10 +205,8 @@ pub async fn get_config_history(
     let rc = match try_get_runtime_config() {
         Some(rc) => rc,
         None => {
-            return Ok(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                ErrorCode::ServiceUnavailable,
-                "Runtime config not initialized",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
             ));
         }
     };
@@ -261,11 +248,9 @@ pub async fn get_config_history(
         }
         Err(e) => {
             warn!("Failed to get config history for {}: {}", key, e);
-            Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
-                &format!("Failed to get config history: {}", e),
-            ))
+            Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
+                format!("Failed to get config history: {}", e),
+            )))
         }
     }
 }
@@ -276,10 +261,8 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
     let coordinator = match get_reload_coordinator() {
         Some(c) => c,
         None => {
-            return Ok(error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                ErrorCode::ServiceUnavailable,
-                "ReloadCoordinator not initialized",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::service_unavailable("ReloadCoordinator not initialized"),
             ));
         }
     };
@@ -294,10 +277,8 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
         }
         Err(e) => {
             warn!("Failed to reload config: {}", e);
-            Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::ConfigReloadFailed,
-                &format!("Failed to reload config: {}", e),
+            Ok(error_from_shortlinker(
+                &ShortlinkerError::config_reload_failed(format!("Failed to reload config: {}", e)),
             ))
         }
     }

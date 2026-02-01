@@ -2,7 +2,6 @@
 //!
 //! Uses LinkService for unified business logic.
 
-use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use std::sync::Arc;
 use tracing::{info, trace};
@@ -11,7 +10,7 @@ use crate::services::{CreateLinkRequest, LinkService, UpdateLinkRequest};
 use crate::storage::LinkFilter;
 
 use super::error_code::ErrorCode;
-use super::helpers::{error_from_shortlinker, error_response, success_response};
+use super::helpers::{error_from_shortlinker, success_response};
 use super::types::{
     ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
     PostNewLink, StatsResponse,
@@ -142,10 +141,8 @@ pub async fn get_link(
         Ok(Some(link)) => Ok(success_response(LinkResponse::from(link))),
         Ok(None) => {
             info!("Admin API: link not found - {}", code);
-            Ok(error_response(
-                StatusCode::NOT_FOUND,
-                ErrorCode::LinkNotFound,
-                "Link not found",
+            Ok(error_from_shortlinker(
+                &crate::errors::ShortlinkerError::not_found("Link not found"),
             ))
         }
         Err(e) => Ok(error_from_shortlinker(&e)),

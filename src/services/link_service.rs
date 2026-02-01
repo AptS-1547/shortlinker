@@ -199,7 +199,7 @@ impl LinkService {
 
         // Check if code already exists
         let existing = self.storage.get(&code).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to check existing link: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to check existing link: {}", e))
         })?;
 
         if existing.is_some() && !req.force {
@@ -233,7 +233,7 @@ impl LinkService {
 
         // Save to storage
         self.storage.set(new_link.clone()).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to save link: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to save link: {}", e))
         })?;
 
         // Update cache
@@ -270,11 +270,9 @@ impl LinkService {
             .get(code)
             .await
             .map_err(|e| {
-                ShortlinkerError::link_database_error(format!("Failed to get link: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to get link: {}", e))
             })?
-            .ok_or_else(|| {
-                ShortlinkerError::link_not_found(format!("Link '{}' not found", code))
-            })?;
+            .ok_or_else(|| ShortlinkerError::not_found(format!("Link '{}' not found", code)))?;
 
         // Parse expiration time (None = keep existing)
         let expires_at = if req.expires_at.is_some() {
@@ -304,7 +302,7 @@ impl LinkService {
 
         // Save to storage
         self.storage.set(updated_link.clone()).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to update link: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to update link: {}", e))
         })?;
 
         // Update cache
@@ -317,7 +315,7 @@ impl LinkService {
     /// Delete a link
     pub async fn delete_link(&self, code: &str) -> Result<(), ShortlinkerError> {
         self.storage.remove(code).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to remove link: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to remove link: {}", e))
         })?;
 
         self.cache.remove(code).await;
@@ -328,9 +326,10 @@ impl LinkService {
 
     /// Get a single link
     pub async fn get_link(&self, code: &str) -> Result<Option<ShortLink>, ShortlinkerError> {
-        self.storage.get(code).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to get link: {}", e))
-        })
+        self.storage
+            .get(code)
+            .await
+            .map_err(|e| ShortlinkerError::database_operation(format!("Failed to get link: {}", e)))
     }
 
     /// List links with pagination and filtering
@@ -347,14 +346,14 @@ impl LinkService {
             .load_paginated_filtered(page, page_size, filter)
             .await
             .map_err(|e| {
-                ShortlinkerError::link_database_error(format!("Failed to list links: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to list links: {}", e))
             })
     }
 
     /// Get link statistics
     pub async fn get_stats(&self) -> Result<crate::storage::LinkStats, ShortlinkerError> {
         self.storage.get_stats().await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to get stats: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to get stats: {}", e))
         })
     }
 
@@ -402,7 +401,7 @@ impl LinkService {
         // Step 2: Batch fetch existing links (1 query instead of N)
         let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
         let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!(
+            ShortlinkerError::database_operation(format!(
                 "Failed to batch check existing links: {}",
                 e
             ))
@@ -501,7 +500,7 @@ impl LinkService {
     /// Export all links
     pub async fn export_links(&self) -> Result<Vec<ShortLink>, ShortlinkerError> {
         let links_map = self.storage.load_all().await.map_err(|e| {
-            ShortlinkerError::link_database_error(format!("Failed to load links: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to load links: {}", e))
         })?;
 
         let links: Vec<ShortLink> = links_map.into_values().collect();

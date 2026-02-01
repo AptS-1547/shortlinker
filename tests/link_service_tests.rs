@@ -361,10 +361,7 @@ mod update_link_tests {
         let result = service.update_link("nonexistent", update_req).await;
 
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            ShortlinkerError::LinkNotFound(_)
-        ));
+        assert!(matches!(result.unwrap_err(), ShortlinkerError::NotFound(_)));
     }
 
     #[tokio::test]

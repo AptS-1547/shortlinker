@@ -2,7 +2,6 @@
 
 use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExtractionError};
 use actix_web::dev::ServiceRequest;
-use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use base64::Engine;
 use governor::middleware::NoOpMiddleware;
@@ -14,8 +13,10 @@ use crate::api::jwt::JwtService;
 use crate::config::get_config;
 use crate::utils::password::verify_password;
 
+use crate::errors::ShortlinkerError;
+
 use super::error_code::ErrorCode;
-use super::helpers::{CookieBuilder, error_response, success_response};
+use super::helpers::{CookieBuilder, error_from_shortlinker, success_response};
 use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageResponse};
 
 /// 生成 CSRF Token（32 bytes = 256 bits，Base64 编码）
@@ -216,20 +217,16 @@ pub async fn check_admin_token(
         Ok(valid) => valid,
         Err(e) => {
             error!("Admin API: password verification error: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
+            return Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
                 "Authentication error",
-            ));
+            )));
         }
     };
 
     if !password_valid {
         error!("Admin API: login failed - invalid token");
-        return Ok(error_response(
-            StatusCode::UNAUTHORIZED,
-            ErrorCode::AuthFailed,
-            "Invalid admin token",
+        return Ok(error_from_shortlinker(
+            &ShortlinkerError::auth_password_invalid("Invalid admin token"),
         ));
     }
 
@@ -241,11 +238,9 @@ pub async fn check_admin_token(
         Ok(token) => token,
         Err(e) => {
             error!("Admin API: failed to generate access token: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
+            return Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
                 "Failed to generate token",
-            ));
+            )));
         }
     };
 
@@ -253,11 +248,9 @@ pub async fn check_admin_token(
         Ok(token) => token,
         Err(e) => {
             error!("Admin API: failed to generate refresh token: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
+            return Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
                 "Failed to generate token",
-            ));
+            )));
         }
     };
 
@@ -294,10 +287,8 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         Some(cookie) => cookie.value().to_string(),
         None => {
             warn!("Admin API: refresh token not found in cookie");
-            return Ok(error_response(
-                StatusCode::UNAUTHORIZED,
-                ErrorCode::TokenInvalid,
-                "Refresh token not found",
+            return Ok(error_from_shortlinker(
+                &ShortlinkerError::auth_token_invalid("Refresh token not found"),
             ));
         }
     };
@@ -306,10 +297,8 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let jwt_service = JwtService::from_config();
     if let Err(e) = jwt_service.validate_refresh_token(&refresh_token) {
         warn!("Admin API: invalid refresh token: {}", e);
-        return Ok(error_response(
-            StatusCode::UNAUTHORIZED,
-            ErrorCode::TokenInvalid,
-            "Invalid refresh token",
+        return Ok(error_from_shortlinker(
+            &ShortlinkerError::auth_token_invalid("Invalid refresh token"),
         ));
     }
 
@@ -320,11 +309,9 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         Ok(token) => token,
         Err(e) => {
             error!("Admin API: failed to generate access token: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
+            return Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
                 "Failed to generate token",
-            ));
+            )));
         }
     };
 
@@ -332,11 +319,9 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         Ok(token) => token,
         Err(e) => {
             error!("Admin API: failed to generate refresh token: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ErrorCode::InternalServerError,
+            return Ok(error_from_shortlinker(&ShortlinkerError::internal_error(
                 "Failed to generate token",
-            ));
+            )));
         }
     };
 

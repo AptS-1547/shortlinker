@@ -27,11 +27,8 @@ pub enum ErrorCode {
     // 通用错误 1000-1099
     BadRequest = 1000,
     Unauthorized = 1001,
-    Forbidden = 1003,
     NotFound = 1004,
     InternalServerError = 1005,
-    Conflict = 1009,
-    RateLimitExceeded = 1029,
     ServiceUnavailable = 1030,
 
     // 认证错误 2000-2099
@@ -39,6 +36,7 @@ pub enum ErrorCode {
     TokenExpired = 2001,
     TokenInvalid = 2002,
     CsrfInvalid = 2003,
+    RateLimitExceeded = 2004,
 
     // 链接错误 3000-3099
     LinkNotFound = 3000,

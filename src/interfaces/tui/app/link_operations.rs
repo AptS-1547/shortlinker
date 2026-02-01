@@ -36,7 +36,7 @@ impl App {
         let expires_at = if !self.expire_time_input.is_empty() {
             Some(
                 TimeParser::parse_expire_time(&self.expire_time_input)
-                    .map_err(ShortlinkerError::date_parse)?,
+                    .map_err(ShortlinkerError::validation)?,
             )
         } else {
             None
@@ -82,7 +82,7 @@ impl App {
         let expires_at = if !self.expire_time_input.is_empty() {
             Some(
                 TimeParser::parse_expire_time(&self.expire_time_input)
-                    .map_err(ShortlinkerError::date_parse)?,
+                    .map_err(ShortlinkerError::validation)?,
             )
         } else {
             link.expires_at
