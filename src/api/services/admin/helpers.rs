@@ -140,7 +140,7 @@ impl CookieBuilder {
     pub fn build_csrf_cookie(&self, token: String) -> Cookie<'static> {
         let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), token);
         // CSRF cookie path 设置为 /，确保前端无论在哪个路由都能读取
-        cookie.set_path("/".to_string());
+        cookie.set_path("/");
         // CSRF cookie 不能是 HttpOnly，因为前端 JS 需要读取它
         cookie.set_http_only(false);
         cookie.set_secure(self.secure);
@@ -160,7 +160,7 @@ impl CookieBuilder {
     pub fn build_expired_csrf_cookie(&self) -> Cookie<'static> {
         let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), String::new());
         // CSRF cookie path 设置为 /，确保前端无论在哪个路由都能读取
-        cookie.set_path("/".to_string());
+        cookie.set_path("/");
         cookie.set_http_only(false);
         cookie.set_secure(self.secure);
         cookie.set_same_site(SameSite::Lax);
