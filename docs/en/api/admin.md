@@ -13,14 +13,16 @@ Admin API settings can come from `config.toml`, environment variables, or runtim
 
 ## Authentication (Important)
 
-The current implementation **does not** use `Authorization: Bearer ...` headers.
+Admin API supports two authentication methods:
 
-Admin API uses **JWT Cookies**:
+1. **JWT cookies (recommended for browser/admin panel)**
+   - Access cookie: `shortlinker_access` (`Path=/`)
+   - Refresh cookie: `shortlinker_refresh` (`Path={ADMIN_ROUTE_PREFIX}/v1/auth`)
+   - CSRF cookie: `csrf_token` (`Path={ADMIN_ROUTE_PREFIX}`, not HttpOnly so the frontend can read it)
+2. **Bearer token (for API clients; CSRF-free)**
+   - `Authorization: Bearer <ACCESS_TOKEN>` (where `<ACCESS_TOKEN>` is the same JWT access token as the `shortlinker_access` cookie value)
 
-- Access Token Cookie: default name `shortlinker_access`, `Path=/`
-- Refresh Token Cookie: default name `shortlinker_refresh`, `Path={ADMIN_ROUTE_PREFIX}/v1/auth`
-
-Cookie names, TTL, SameSite/Secure/Domain are configurable via `api.*` (see [Configuration](/en/config/)).
+> Note: cookie names are currently fixed (not configurable). Cookie TTL / SameSite / Secure / Domain can be adjusted via `api.*` (see [Configuration](/en/config/)).
 
 ### 1) Login to get cookies
 
@@ -40,7 +42,23 @@ curl -sS -X POST \
   http://localhost:8080/admin/v1/auth/login
 ```
 
-> Tokens are returned via `Set-Cookie`. The response body does not include raw token strings.
+> Tokens are returned via `Set-Cookie` (access/refresh/csrf). The response body does not include raw token strings.
+
+### CSRF protection (Important)
+
+When you use **JWT cookie auth** for write operations (`POST`/`PUT`/`DELETE`), you must provide:
+
+- Cookie: `csrf_token`
+- Header: `X-CSRF-Token: <value of csrf_token cookie>`
+
+> Exceptions: `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` do not require CSRF; `GET/HEAD/OPTIONS` also do not.  
+> If you use `Authorization: Bearer <ACCESS_TOKEN>` for write operations, CSRF is not required.
+
+Example (extract CSRF token from `cookies.txt`):
+
+```bash
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+```
 
 ### 2) Call other endpoints with cookies
 
@@ -137,6 +155,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X POST \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"code":"github","target":"https://github.com"}' \
   http://localhost:8080/admin/v1/links
@@ -174,6 +193,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
   http://localhost:8080/admin/v1/links/github
@@ -201,6 +221,7 @@ Notes:
 
 ```bash
 curl -sS -X DELETE -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/links/github
 ```
 
@@ -220,6 +241,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X POST \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"links":[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -232,6 +254,7 @@ curl -sS -X POST \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"updates":[{"code":"link1","payload":{"target":"https://new-example1.com"}},{"code":"link2","payload":{"target":"https://new-example2.com"}}]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -244,6 +267,7 @@ curl -sS -X PUT \
 ```bash
 curl -sS -X DELETE \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"codes":["link1","link2","link3"]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -271,6 +295,7 @@ Multipart form fields:
 ```bash
 curl -sS -X POST \
   -b cookies.txt -c cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -F "mode=overwrite" \
   -F "file=@./shortlinks_export.csv" \
   http://localhost:8080/admin/v1/links/import
@@ -305,6 +330,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"value":"8"}' \
   http://localhost:8080/admin/v1/config/features.random_code_length
@@ -319,6 +345,7 @@ curl -sS -b cookies.txt \
 ### POST /config/reload
 ```bash
 curl -sS -X POST -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload
 ```
 

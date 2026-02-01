@@ -120,7 +120,7 @@ Returns HTTP 204 when alive.
 | 401 | Unauthorized (missing/invalid auth) |
 | 503 | Unhealthy |
 
-> Unauthorized body example: `{"code":401,"data":{"error":"Unauthorized: Invalid or missing token"}}`
+> Unauthorized body example (HTTP 401): `{"code":1,"data":{"error":"Unauthorized: Invalid or missing token"}}`
 
 ## Monitoring integration notes
 

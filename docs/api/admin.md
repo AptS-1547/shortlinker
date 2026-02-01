@@ -13,14 +13,16 @@ Admin API 相关配置可来自 `config.toml`、环境变量或运行时配置�
 
 ## 鉴权方式（重要）
 
-当前实现 **不使用** `Authorization: Bearer ...` 头。
+Admin API 支持两种鉴权方式：
 
-Admin API 使用 **JWT Cookie** 进行鉴权：
+1. **JWT Cookie（推荐用于浏览器/管理面板）**
+   - Access Cookie：`shortlinker_access`（`Path=/`）
+   - Refresh Cookie：`shortlinker_refresh`（`Path={ADMIN_ROUTE_PREFIX}/v1/auth`）
+   - CSRF Cookie：`csrf_token`（`Path={ADMIN_ROUTE_PREFIX}`，非 HttpOnly，用于前端读取）
+2. **Bearer Token（用于 API 客户端，免 CSRF）**
+   - `Authorization: Bearer <ACCESS_TOKEN>`（其中 `<ACCESS_TOKEN>` 是与 `shortlinker_access` Cookie 同一个 JWT Access Token）
 
-- Access Token Cookie：默认名 `shortlinker_access`，`Path=/`（用于访问大部分 Admin/Health 接口）
-- Refresh Token Cookie：默认名 `shortlinker_refresh`，`Path={ADMIN_ROUTE_PREFIX}/v1/auth`（仅用于刷新 Token）
-
-Cookie 名称、有效期、SameSite、Secure、Domain 等可通过配置项 `api.*` 调整，见 [配置指南](/config/)。
+> 说明：Cookie 名称当前为固定值（不可配置）；Cookie 有效期/SameSite/Secure/Domain 等可通过配置项 `api.*` 调整，见 [配置指南](/config/)。
 
 ### 1) 登录获取 Cookie
 
@@ -40,7 +42,23 @@ curl -sS -X POST \
   http://localhost:8080/admin/v1/auth/login
 ```
 
-> 该接口会通过 `Set-Cookie` 返回 access/refresh cookie；响应体不返回 token 字符串，只返回提示信息与过期时间。
+> 该接口会通过 `Set-Cookie` 返回 access/refresh/csrf cookie；响应体不返回 token 字符串，只返回提示信息与过期时间。
+
+### CSRF 防护（重要）
+
+当你使用 **JWT Cookie** 鉴权访问写操作（`POST`/`PUT`/`DELETE`）时，需要同时提供：
+
+- Cookie：`csrf_token`
+- Header：`X-CSRF-Token: <csrf_token 的值>`
+
+> 例外：`POST /auth/login`、`POST /auth/refresh`、`POST /auth/logout` 不需要 CSRF；`GET/HEAD/OPTIONS` 也不需要。  
+> 如果你改用 `Authorization: Bearer <ACCESS_TOKEN>` 访问写操作，则不需要 CSRF。
+
+示例（从 `cookies.txt` 中取出 CSRF Token）：
+
+```bash
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+```
 
 ### 2) 携带 Cookie 调用其它接口
 
@@ -140,6 +158,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X POST \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"code":"github","target":"https://github.com"}' \
   http://localhost:8080/admin/v1/links
@@ -177,6 +196,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"target":"https://github.com/new-repo","expires_at":"30d"}' \
   http://localhost:8080/admin/v1/links/github
@@ -204,6 +224,7 @@ curl -sS -X PUT \
 
 ```bash
 curl -sS -X DELETE -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/links/github
 ```
 
@@ -235,6 +256,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X POST \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"links":[{"code":"link1","target":"https://example1.com"},{"code":"link2","target":"https://example2.com"}]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -247,6 +269,7 @@ curl -sS -X POST \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"updates":[{"code":"link1","payload":{"target":"https://new-example1.com"}},{"code":"link2","payload":{"target":"https://new-example2.com"}}]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -259,6 +282,7 @@ curl -sS -X PUT \
 ```bash
 curl -sS -X DELETE \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"codes":["link1","link2","link3"]}' \
   http://localhost:8080/admin/v1/links/batch
@@ -286,6 +310,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X POST \
   -b cookies.txt -c cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -F "mode=overwrite" \
   -F "file=@./shortlinks_export.csv" \
   http://localhost:8080/admin/v1/links/import
@@ -337,6 +362,7 @@ curl -sS -b cookies.txt \
 ```bash
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"value":"8"}' \
   http://localhost:8080/admin/v1/config/features.random_code_length
@@ -353,6 +379,7 @@ curl -sS -b cookies.txt \
 
 ```bash
 curl -sS -X POST -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload
 ```
 
@@ -372,6 +399,7 @@ class ShortlinkerAdmin:
     def __init__(self, base_url: str, admin_token: str):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
+        self.csrf_token = None
 
         # 登录：Set-Cookie 会被 requests.Session 自动保存
         resp = self.session.post(
@@ -380,6 +408,7 @@ class ShortlinkerAdmin:
             timeout=10,
         )
         resp.raise_for_status()
+        self.csrf_token = self.session.cookies.get("csrf_token")
 
     def get_all_links(self, page=1, page_size=20):
         resp = self.session.get(
@@ -396,6 +425,7 @@ class ShortlinkerAdmin:
             payload["expires_at"] = expires_at
         resp = self.session.post(
             f"{self.base_url}/admin/v1/links",
+            headers={"X-CSRF-Token": self.csrf_token or ""},
             json=payload,
             timeout=10,
         )

@@ -133,7 +133,7 @@ curl -sS -b cookies.txt -I \
 | 401 | 鉴权失败（缺少/无效 Cookie 或 Bearer Token） |
 | 503 | 服务不健康 |
 
-> 鉴权失败时，响应体示例：`{"code":401,"data":{"error":"Unauthorized: Invalid or missing token"}}`
+> 鉴权失败时（HTTP 401），响应体示例：`{"code":1,"data":{"error":"Unauthorized: Invalid or missing token"}}`
 
 ## 监控集成（注意事项）
 
