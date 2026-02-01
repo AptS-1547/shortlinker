@@ -40,7 +40,24 @@ impl IpcPlatform for UnixIpc {
     async fn bind() -> io::Result<Self::Listener> {
         // Clean up any existing stale socket file first
         Self::cleanup();
-        UnixListener::bind(SOCKET_PATH_UNIX)
+
+        let listener = UnixListener::bind(SOCKET_PATH_UNIX)?;
+
+        // 设置 socket 文件权限为 0600（仅属主可读写）
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let socket_path = Path::new(SOCKET_PATH_UNIX);
+            if let Ok(metadata) = std::fs::metadata(socket_path) {
+                let mut permissions = metadata.permissions();
+                permissions.set_mode(0o600);
+                std::fs::set_permissions(socket_path, permissions)?;
+                tracing::debug!("IPC socket permissions set to 0600 (owner only)");
+            }
+        }
+
+        Ok(listener)
     }
 
     async fn accept(listener: &mut Self::Listener) -> io::Result<Self::Stream> {

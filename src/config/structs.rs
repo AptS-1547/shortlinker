@@ -219,6 +219,9 @@ pub struct ApiConfig {
     pub cookie_same_site: SameSitePolicy,
     #[serde(default)]
     pub cookie_domain: Option<String>,
+    /// 可信代理 IP 或 CIDR 列表（用于登录限流 IP 提取）
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -510,6 +513,7 @@ impl Default for ApiConfig {
             cookie_secure: true,
             cookie_same_site: SameSitePolicy::default(),
             cookie_domain: None,
+            trusted_proxies: Vec::new(),
         }
     }
 }

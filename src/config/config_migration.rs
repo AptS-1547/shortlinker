@@ -23,6 +23,9 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
         keys::API_JWT_SECRET => config.api.jwt_secret.clone(),
         keys::API_ACCESS_TOKEN_MINUTES => config.api.access_token_minutes.to_string(),
         keys::API_REFRESH_TOKEN_DAYS => config.api.refresh_token_days.to_string(),
+        keys::API_TRUSTED_PROXIES => {
+            serde_json::to_string(&config.api.trusted_proxies).unwrap_or_else(|_| "[]".to_string())
+        }
 
         // Cookie 配置
         keys::API_COOKIE_SECURE => config.api.cookie_secure.to_string(),

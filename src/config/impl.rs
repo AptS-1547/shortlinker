@@ -332,6 +332,10 @@ fn apply_config_key(
             Ok(v) => config.api.refresh_token_days = v,
             Err(_) => error.set(Some(format!("Invalid number for {}: '{}'", key, value))),
         },
+        keys::API_TRUSTED_PROXIES => match serde_json::from_str(value) {
+            Ok(v) => config.api.trusted_proxies = v,
+            Err(e) => error.set(Some(format!("Invalid JSON array: {}", e))),
+        },
 
         // Cookie 配置
         keys::API_COOKIE_SECURE => {

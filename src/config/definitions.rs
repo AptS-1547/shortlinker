@@ -62,6 +62,7 @@ pub mod keys {
     pub const API_JWT_SECRET: &str = "api.jwt_secret";
     pub const API_ACCESS_TOKEN_MINUTES: &str = "api.access_token_minutes";
     pub const API_REFRESH_TOKEN_DAYS: &str = "api.refresh_token_days";
+    pub const API_TRUSTED_PROXIES: &str = "api.trusted_proxies";
 
     // Cookie 配置
     pub const API_COOKIE_SECURE: &str = "api.cookie_secure";
@@ -119,6 +120,10 @@ fn default_cookie_secure() -> String {
 
 fn default_cookie_same_site() -> String {
     "Lax".to_string()
+}
+
+fn default_trusted_proxies() -> String {
+    "[]".to_string()
 }
 
 fn default_random_code_length() -> String {
@@ -219,6 +224,18 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::AUTH,
         description: "JWT token signing secret key",
+    },
+    ConfigDef {
+        key: keys::API_TRUSTED_PROXIES,
+        env_var: None,
+        value_type: ValueType::Json,
+        rust_type: RustType::VecString,
+        default_fn: default_trusted_proxies,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::AUTH,
+        description: "Trusted proxy IPs or CIDRs (e.g., [\"10.0.0.1\", \"192.168.1.0/24\"]). Empty = trust no proxies, use connection IP only.",
     },
     ConfigDef {
         key: keys::API_ACCESS_TOKEN_MINUTES,
