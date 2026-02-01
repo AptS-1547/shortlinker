@@ -5,11 +5,38 @@
 use super::ValueType;
 use super::schema::get_schema;
 
+/// 验证 JSON 数组中的每个元素是否在允许的选项中
+fn validate_enum_array(value: &str, valid_values: &[&str]) -> Result<(), String> {
+    let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+        format!(
+            "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
+            e
+        )
+    })?;
+
+    let invalid_items: Vec<_> = items
+        .iter()
+        .filter(|item| !valid_values.iter().any(|v| v.eq_ignore_ascii_case(item)))
+        .cloned()
+        .collect();
+
+    if !invalid_items.is_empty() {
+        return Err(format!(
+            "Invalid items: {:?}. Valid options: {:?}",
+            invalid_items, valid_values
+        ));
+    }
+
+    Ok(())
+}
+
 /// 根据配置 key 验证值是否合法
 ///
 /// 基于 schema 进行验证：
-/// - 如果配置有 `enum_options` 且 value_type 是 Json，验证 JSON 数组中的每个元素
-/// - 如果配置有 `enum_options` 且 value_type 是 Enum，验证值是否在选项列表中
+/// - StringArray: 验证是否为有效的 JSON 字符串数组
+/// - EnumArray: 验证 JSON 数组中的每个元素是否在 enum_options 中
+/// - Enum: 验证值是否在 enum_options 中
+/// - Json + enum_options: 同 EnumArray（向后兼容）
 /// - 没有 schema 的配置不做验证
 pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
     let schema = match get_schema(key) {
@@ -17,41 +44,43 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
         None => return Ok(()), // 没有 schema 的配置不验证
     };
 
-    // 有 enum_options 时进行验证
+    // StringArray: 只验证是否为有效的字符串数组
+    if schema.value_type == ValueType::StringArray {
+        let _items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+            format!(
+                "Invalid JSON format: {}. Expected array like [\"item1\", \"item2\", ...]",
+                e
+            )
+        })?;
+        return Ok(());
+    }
+
+    // EnumArray 或 Json + enum_options（向后兼容）：验证数组元素
+    if schema.value_type == ValueType::EnumArray
+        || (schema.value_type == ValueType::Json && schema.enum_options.is_some())
+    {
+        if let Some(ref options) = schema.enum_options {
+            let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
+            return validate_enum_array(value, &valid_values);
+        }
+        // EnumArray 类型必须有 enum_options，如果没有说明配置定义有误
+        // 注意：由于 schema.rs 现在根据 RustType 自动推断 enum_options，
+        // 这个分支理论上不应该被触发（除非配置定义本身有问题）
+        return Err(format!(
+            "Internal error: EnumArray config '{}' is missing enum_options definition. \
+             Please check ConfigDef in definitions.rs",
+            key
+        ));
+    }
+
+    // Enum: 单值验证
     if let Some(ref options) = schema.enum_options {
         let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
-
-        // 根据 value_type 决定验证方式
-        if schema.value_type == ValueType::Json {
-            // JSON 数组类型：验证数组中的每个元素
-            let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
-                format!(
-                    "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
-                    e
-                )
-            })?;
-
-            let mut invalid_items = Vec::new();
-            for item in &items {
-                if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(item)) {
-                    invalid_items.push(item.clone());
-                }
-            }
-
-            if !invalid_items.is_empty() {
-                return Err(format!(
-                    "Invalid items: {:?}. Valid options: {:?}",
-                    invalid_items, valid_values
-                ));
-            }
-        } else {
-            // 单值类型（Enum）：验证值是否在选项列表中
-            if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(value)) {
-                return Err(format!(
-                    "Invalid value '{}'. Valid options: {:?}",
-                    value, valid_values
-                ));
-            }
+        if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(value)) {
+            return Err(format!(
+                "Invalid value '{}'. Valid options: {:?}",
+                value, valid_values
+            ));
         }
     }
 
@@ -107,6 +136,42 @@ mod tests {
         // 非法 JSON 格式
         assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, "GET,POST").is_err());
         assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, "not json").is_err());
+    }
+
+    #[test]
+    fn test_validate_string_array() {
+        // StringArray 类型：只验证是否为有效的 JSON 字符串数组，不验证内容
+        // trusted_proxies
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["192.168.1.1"]"#).is_ok());
+        assert!(
+            validate_config_value(
+                keys::API_TRUSTED_PROXIES,
+                r#"["10.0.0.1", "192.168.1.0/24"]"#
+            )
+            .is_ok()
+        );
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"[]"#).is_ok());
+        // 任意字符串都合法（格式验证由前端负责）
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["any", "string"]"#).is_ok());
+
+        // 非法 JSON 格式
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, "not json").is_err());
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"{"key": "value"}"#).is_err());
+
+        // allowed_origins
+        assert!(
+            validate_config_value(keys::CORS_ALLOWED_ORIGINS, r#"["https://example.com"]"#).is_ok()
+        );
+        assert!(validate_config_value(keys::CORS_ALLOWED_ORIGINS, r#"["*"]"#).is_ok());
+
+        // allowed_headers
+        assert!(
+            validate_config_value(
+                keys::CORS_ALLOWED_HEADERS,
+                r#"["Content-Type", "Authorization"]"#
+            )
+            .is_ok()
+        );
     }
 
     #[test]

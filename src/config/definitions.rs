@@ -218,7 +218,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_TRUSTED_PROXIES,
-        value_type: ValueType::Json,
+        value_type: ValueType::StringArray,
         rust_type: RustType::VecString,
         default_fn: default_trusted_proxies,
         requires_restart: false,
@@ -399,7 +399,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_ORIGINS,
-        value_type: ValueType::Json,
+        value_type: ValueType::StringArray,
         rust_type: RustType::VecString,
         default_fn: default_cors_allowed_origins,
         requires_restart: true,
@@ -410,7 +410,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_METHODS,
-        value_type: ValueType::Json,
+        value_type: ValueType::EnumArray,
         rust_type: RustType::VecHttpMethod,
         default_fn: default_cors_allowed_methods,
         requires_restart: true,
@@ -421,7 +421,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_HEADERS,
-        value_type: ValueType::Json,
+        value_type: ValueType::StringArray,
         rust_type: RustType::VecString,
         default_fn: default_cors_allowed_headers,
         requires_restart: true,
