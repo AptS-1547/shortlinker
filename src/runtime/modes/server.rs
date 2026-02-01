@@ -34,66 +34,19 @@ impl CorsSettings {
     fn from_runtime_config() -> Self {
         let rt = get_runtime_config();
 
-        // 解析 allowed_origins
-        let allowed_origins_json = rt.get(keys::CORS_ALLOWED_ORIGINS).unwrap_or_default();
-        let allowed_origins: Vec<String> = if !allowed_origins_json.is_empty() {
-            match serde_json::from_str(&allowed_origins_json) {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!(
-                        "Invalid JSON for cors.allowed_origins '{}': {}, using empty list",
-                        allowed_origins_json, e
-                    );
-                    Vec::new()
-                }
-            }
-        } else {
-            Vec::new()
-        };
-
-        // 解析 allowed_methods
-        let allowed_methods_json = rt.get(keys::CORS_ALLOWED_METHODS).unwrap_or_default();
-        let allowed_methods: Vec<HttpMethod> = if !allowed_methods_json.is_empty() {
-            match serde_json::from_str(&allowed_methods_json) {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!(
-                        "Invalid JSON for cors.allowed_methods '{}': {}, using empty list",
-                        allowed_methods_json, e
-                    );
-                    Vec::new()
-                }
-            }
-        } else {
-            Vec::new()
-        };
-
-        // 解析 allowed_headers
-        let allowed_headers_json = rt.get(keys::CORS_ALLOWED_HEADERS).unwrap_or_default();
-        let allowed_headers: Vec<String> = if !allowed_headers_json.is_empty() {
-            match serde_json::from_str(&allowed_headers_json) {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!(
-                        "Invalid JSON for cors.allowed_headers '{}': {}, using default",
-                        allowed_headers_json, e
-                    );
-                    vec![
-                        "Content-Type".to_string(),
-                        "Authorization".to_string(),
-                        "Accept".to_string(),
-                        "X-CSRF-Token".to_string(),
-                    ]
-                }
-            }
-        } else {
+        // 解析 JSON 配置
+        let allowed_origins: Vec<String> = rt.get_json_or(keys::CORS_ALLOWED_ORIGINS, Vec::new());
+        let allowed_methods: Vec<HttpMethod> =
+            rt.get_json_or(keys::CORS_ALLOWED_METHODS, Vec::new());
+        let allowed_headers: Vec<String> = rt.get_json_or(
+            keys::CORS_ALLOWED_HEADERS,
             vec![
                 "Content-Type".to_string(),
                 "Authorization".to_string(),
                 "Accept".to_string(),
                 "X-CSRF-Token".to_string(),
-            ]
-        };
+            ],
+        );
 
         Self {
             enabled: rt.get_bool_or(keys::CORS_ENABLED, false),

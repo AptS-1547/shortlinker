@@ -142,6 +142,27 @@ impl RuntimeConfig {
         self.get_u64(key).unwrap_or(default)
     }
 
+    /// 获取 JSON 类型配置并反序列化，解析失败时返回默认值
+    ///
+    /// 用于解析存储为 JSON 字符串的配置（如数组、对象等）
+    pub fn get_json_or<T: serde::de::DeserializeOwned>(&self, key: &str, default: T) -> T {
+        self.get(key)
+            .filter(|s| !s.is_empty())
+            .and_then(|s| match serde_json::from_str::<T>(&s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(
+                        "Invalid JSON for config key '{}' (value: '{}'): {}. Using default.",
+                        key,
+                        s,
+                        e
+                    );
+                    None
+                }
+            })
+            .unwrap_or(default)
+    }
+
     /// 设置配置值（同时更新数据库和内部缓存）
     ///
     /// 对于 `requires_restart=true` 的配置，只更新数据库，不更新内存缓存。
@@ -172,6 +193,12 @@ impl RuntimeConfig {
         if let Some(item) = cache.get_mut(key) {
             item.value = std::sync::Arc::new(value.to_string());
             item.updated_at = chrono::Utc::now();
+        } else {
+            // 不应该发生：如果 load() 正确初始化了缓存
+            tracing::warn!(
+                "Config key '{}' not found in cache after database update",
+                key
+            );
         }
 
         Ok(result)

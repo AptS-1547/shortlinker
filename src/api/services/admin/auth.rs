@@ -72,17 +72,7 @@ impl KeyExtractor for LoginKeyExtractor {
         })?;
 
         // 步骤 3: 检查是否显式配置了可信代理（优先级最高）
-        let trusted_proxies_json = rt.get_or(keys::API_TRUSTED_PROXIES, "[]");
-        let trusted_proxies: Vec<String> = match serde_json::from_str(&trusted_proxies_json) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!(
-                    "Invalid JSON for trusted_proxies '{}': {}, using empty list",
-                    trusted_proxies_json, e
-                );
-                Vec::new()
-            }
-        };
+        let trusted_proxies: Vec<String> = rt.get_json_or(keys::API_TRUSTED_PROXIES, Vec::new());
         if !trusted_proxies.is_empty() {
             if is_trusted_proxy(peer_ip, &trusted_proxies) {
                 let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
