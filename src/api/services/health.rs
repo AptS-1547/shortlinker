@@ -89,8 +89,16 @@ impl HealthService {
         };
 
         let health_response = ApiResponse {
-            code: if is_healthy { ErrorCode::Success as i32 } else { ErrorCode::ServiceUnavailable as i32 },
-            message: if is_healthy { "OK".to_string() } else { "Service Unavailable".to_string() },
+            code: if is_healthy {
+                ErrorCode::Success as i32
+            } else {
+                ErrorCode::ServiceUnavailable as i32
+            },
+            message: if is_healthy {
+                "OK".to_string()
+            } else {
+                "Service Unavailable".to_string()
+            },
             data: Some(health_data),
         };
 

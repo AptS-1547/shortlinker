@@ -7,29 +7,15 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use std::sync::Arc;
 use tracing::{info, trace};
 
-use crate::services::{CreateLinkRequest, LinkService, ServiceError, UpdateLinkRequest};
+use crate::services::{CreateLinkRequest, LinkService, UpdateLinkRequest};
 use crate::storage::LinkFilter;
 
 use super::error_code::ErrorCode;
-use super::helpers::{error_response, success_response};
+use super::helpers::{error_from_shortlinker, error_response, success_response};
 use super::types::{
     ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
     PostNewLink, StatsResponse,
 };
-
-/// Convert ServiceError to HTTP response
-fn service_error_response(err: ServiceError) -> HttpResponse {
-    let (status, error_code) = match &err {
-        ServiceError::InvalidUrl(_) => (StatusCode::BAD_REQUEST, ErrorCode::LinkInvalidUrl),
-        ServiceError::InvalidExpireTime(_) => (StatusCode::BAD_REQUEST, ErrorCode::LinkInvalidExpireTime),
-        ServiceError::PasswordHashError => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::LinkPasswordHashError),
-        ServiceError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::LinkDatabaseError),
-        ServiceError::NotFound(_) => (StatusCode::NOT_FOUND, ErrorCode::LinkNotFound),
-        ServiceError::Conflict(_) => (StatusCode::CONFLICT, ErrorCode::LinkAlreadyExists),
-        ServiceError::NotInitialized => (StatusCode::SERVICE_UNAVAILABLE, ErrorCode::ServiceUnavailable),
-    };
-    error_response(status, error_code, &err.to_string())
-}
 
 /// 获取所有链接（支持分页和过滤）
 pub async fn get_all_links(
@@ -94,7 +80,7 @@ pub async fn get_all_links(
                     },
                 }))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }
 
@@ -140,7 +126,7 @@ pub async fn post_link(
                     }),
                 }))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }
 
@@ -156,9 +142,13 @@ pub async fn get_link(
         Ok(Some(link)) => Ok(success_response(LinkResponse::from(link))),
         Ok(None) => {
             info!("Admin API: link not found - {}", code);
-            Ok(error_response(StatusCode::NOT_FOUND, ErrorCode::LinkNotFound, "Link not found"))
+            Ok(error_response(
+                StatusCode::NOT_FOUND,
+                ErrorCode::LinkNotFound,
+                "Link not found",
+            ))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }
 
@@ -177,7 +167,7 @@ pub async fn delete_link(
                 message: "Link deleted successfully".to_string(),
             }))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }
 
@@ -210,7 +200,7 @@ pub async fn update_link(
                 force: None,
             }))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }
 
@@ -240,6 +230,6 @@ pub async fn get_stats(
                     }),
                 }))
         }
-        Err(e) => Ok(service_error_response(e)),
+        Err(e) => Ok(error_from_shortlinker(&e)),
     }
 }

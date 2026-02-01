@@ -20,7 +20,9 @@ mod types;
 pub use types::*;
 
 // 重新导出帮助函数
-pub use helpers::{error_response, parse_expires_at, success_response};
+pub use helpers::{
+    api_result, error_from_shortlinker, error_response, parse_expires_at, success_response,
+};
 
 // 重新导出错误码
 pub use error_code::ErrorCode;

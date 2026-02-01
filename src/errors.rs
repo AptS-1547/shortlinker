@@ -42,6 +42,7 @@ macro_rules! define_shortlinker_errors {
 }
 
 define_shortlinker_errors! {
+    // 基础设施错误 E001-E013
     CacheConnection("E001", "Cache Connection Error"),
     CachePluginNotFound("E002", "Cache Plugin Not Found"),
     DatabaseConfig("E003", "Database Configuration Error"),
@@ -55,6 +56,45 @@ define_shortlinker_errors! {
     StoragePluginNotFound("E011", "Storage Plugin Not Found"),
     DateParse("E012", "Date Parse Error"),
     NotifyServer("E013", "Notify Server Error"),
+
+    // 认证错误 E014-E019
+    AuthPasswordInvalid("E014", "Authentication Failed"),
+    AuthTokenExpired("E015", "Token Expired"),
+    AuthTokenInvalid("E016", "Token Invalid"),
+    CsrfTokenInvalid("E017", "CSRF Token Invalid"),
+    AuthUnauthorized("E018", "Unauthorized"),
+    AuthRateLimitExceeded("E019", "Rate Limit Exceeded"),
+
+    // 链接业务错误 E020-E029
+    LinkInvalidUrl("E020", "Invalid URL"),
+    LinkAlreadyExists("E021", "Link Already Exists"),
+    LinkInvalidExpireTime("E022", "Invalid Expire Time"),
+    LinkPasswordHashError("E023", "Password Hash Error"),
+    LinkEmptyCode("E024", "Empty Link Code"),
+    LinkNotFound("E025", "Link Not Found"),
+    LinkDatabaseError("E026", "Link Database Error"),
+
+    // 导入导出错误 E030-E039
+    CsvParseFailed("E030", "CSV Parse Error"),
+    CsvGenerationFailed("E031", "CSV Generation Error"),
+    CsvFileMissing("E032", "CSV File Missing"),
+    ImportFailed("E033", "Import Failed"),
+    ExportFailed("E034", "Export Failed"),
+    InvalidMultipartData("E035", "Invalid Multipart Data"),
+    FileReadError("E036", "File Read Error"),
+
+    // 配置错误 E040-E049
+    ConfigNotFound("E040", "Config Not Found"),
+    ConfigUpdateFailed("E041", "Config Update Failed"),
+    ConfigReloadFailed("E042", "Config Reload Failed"),
+    ConfigValidationFailed("E043", "Config Validation Failed"),
+
+    // 通用 HTTP 错误 E050-E059
+    BadRequest("E050", "Bad Request"),
+    Conflict("E051", "Conflict"),
+    ServiceUnavailable("E052", "Service Unavailable"),
+    InternalError("E053", "Internal Server Error"),
+    Forbidden("E054", "Forbidden"),
 }
 
 impl ShortlinkerError {
@@ -75,6 +115,51 @@ impl ShortlinkerError {
     pub fn format_simple(&self) -> String {
         format!("{}: {}", self.error_type(), self.message())
     }
+
+    /// 获取对应的 HTTP 状态码
+    #[cfg(feature = "server")]
+    pub fn http_status(&self) -> actix_web::http::StatusCode {
+        use actix_web::http::StatusCode;
+        match self {
+            // 400 Bad Request
+            Self::Validation(_)
+            | Self::BadRequest(_)
+            | Self::LinkInvalidUrl(_)
+            | Self::LinkInvalidExpireTime(_)
+            | Self::LinkEmptyCode(_)
+            | Self::DateParse(_)
+            | Self::InvalidMultipartData(_)
+            | Self::CsvFileMissing(_)
+            | Self::CsvParseFailed(_)
+            | Self::ConfigValidationFailed(_) => StatusCode::BAD_REQUEST,
+
+            // 401 Unauthorized
+            Self::AuthPasswordInvalid(_)
+            | Self::AuthTokenExpired(_)
+            | Self::AuthTokenInvalid(_)
+            | Self::AuthUnauthorized(_) => StatusCode::UNAUTHORIZED,
+
+            // 403 Forbidden
+            Self::CsrfTokenInvalid(_) | Self::Forbidden(_) => StatusCode::FORBIDDEN,
+
+            // 404 Not Found
+            Self::NotFound(_) | Self::LinkNotFound(_) | Self::ConfigNotFound(_) => {
+                StatusCode::NOT_FOUND
+            }
+
+            // 409 Conflict
+            Self::LinkAlreadyExists(_) | Self::Conflict(_) => StatusCode::CONFLICT,
+
+            // 429 Too Many Requests
+            Self::AuthRateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
+
+            // 503 Service Unavailable
+            Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+
+            // 500 Internal Server Error (default)
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
 }
 
 impl fmt::Display for ShortlinkerError {
@@ -88,6 +173,7 @@ impl std::error::Error for ShortlinkerError {}
 
 // 便捷的构造函数
 impl ShortlinkerError {
+    // 基础设施错误
     pub fn cache_connection<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CacheConnection(msg.into())
     }
@@ -139,6 +225,127 @@ impl ShortlinkerError {
     pub fn notify_server<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::NotifyServer(msg.into())
     }
+
+    // 认证错误
+    pub fn auth_password_invalid<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AuthPasswordInvalid(msg.into())
+    }
+
+    pub fn auth_token_expired<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AuthTokenExpired(msg.into())
+    }
+
+    pub fn auth_token_invalid<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AuthTokenInvalid(msg.into())
+    }
+
+    pub fn csrf_token_invalid<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::CsrfTokenInvalid(msg.into())
+    }
+
+    pub fn auth_unauthorized<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AuthUnauthorized(msg.into())
+    }
+
+    pub fn auth_rate_limit_exceeded<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AuthRateLimitExceeded(msg.into())
+    }
+
+    // 链接业务错误
+    pub fn link_invalid_url<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkInvalidUrl(msg.into())
+    }
+
+    pub fn link_already_exists<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkAlreadyExists(msg.into())
+    }
+
+    pub fn link_invalid_expire_time<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkInvalidExpireTime(msg.into())
+    }
+
+    pub fn link_password_hash_error<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkPasswordHashError(msg.into())
+    }
+
+    pub fn link_empty_code<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkEmptyCode(msg.into())
+    }
+
+    pub fn link_not_found<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkNotFound(msg.into())
+    }
+
+    pub fn link_database_error<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkDatabaseError(msg.into())
+    }
+
+    // 导入导出错误
+    pub fn csv_parse_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::CsvParseFailed(msg.into())
+    }
+
+    pub fn csv_generation_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::CsvGenerationFailed(msg.into())
+    }
+
+    pub fn csv_file_missing<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::CsvFileMissing(msg.into())
+    }
+
+    pub fn import_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ImportFailed(msg.into())
+    }
+
+    pub fn export_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ExportFailed(msg.into())
+    }
+
+    pub fn invalid_multipart_data<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::InvalidMultipartData(msg.into())
+    }
+
+    pub fn file_read_error<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::FileReadError(msg.into())
+    }
+
+    // 配置错误
+    pub fn config_not_found<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ConfigNotFound(msg.into())
+    }
+
+    pub fn config_update_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ConfigUpdateFailed(msg.into())
+    }
+
+    pub fn config_reload_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ConfigReloadFailed(msg.into())
+    }
+
+    pub fn config_validation_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ConfigValidationFailed(msg.into())
+    }
+
+    // 通用 HTTP 错误
+    pub fn bad_request<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::BadRequest(msg.into())
+    }
+
+    pub fn conflict<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::Conflict(msg.into())
+    }
+
+    pub fn service_unavailable<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::ServiceUnavailable(msg.into())
+    }
+
+    pub fn internal_error<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::InternalError(msg.into())
+    }
+
+    pub fn forbidden<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::Forbidden(msg.into())
+    }
 }
 
 // 为常见的错误类型实现 From trait
@@ -168,12 +375,69 @@ impl From<chrono::ParseError> for ShortlinkerError {
 
 pub type Result<T> = std::result::Result<T, ShortlinkerError>;
 
+/// ShortlinkerError → ErrorCode 自动转换
+///
+/// 仅在 server feature 下可用（ErrorCode 定义在 api 模块中）
+#[cfg(feature = "server")]
+impl From<ShortlinkerError> for crate::api::services::admin::error_code::ErrorCode {
+    fn from(err: ShortlinkerError) -> Self {
+        use crate::api::services::admin::error_code::ErrorCode;
+        match err {
+            // 认证错误
+            ShortlinkerError::AuthPasswordInvalid(_) => ErrorCode::AuthFailed,
+            ShortlinkerError::AuthTokenExpired(_) => ErrorCode::TokenExpired,
+            ShortlinkerError::AuthTokenInvalid(_) => ErrorCode::TokenInvalid,
+            ShortlinkerError::CsrfTokenInvalid(_) => ErrorCode::CsrfInvalid,
+            ShortlinkerError::AuthUnauthorized(_) => ErrorCode::Unauthorized,
+            ShortlinkerError::AuthRateLimitExceeded(_) => ErrorCode::RateLimitExceeded,
+
+            // 链接错误
+            ShortlinkerError::LinkInvalidUrl(_) => ErrorCode::LinkInvalidUrl,
+            ShortlinkerError::LinkAlreadyExists(_) => ErrorCode::LinkAlreadyExists,
+            ShortlinkerError::LinkInvalidExpireTime(_) => ErrorCode::LinkInvalidExpireTime,
+            ShortlinkerError::LinkPasswordHashError(_) => ErrorCode::LinkPasswordHashError,
+            ShortlinkerError::LinkEmptyCode(_) => ErrorCode::LinkEmptyCode,
+            ShortlinkerError::LinkNotFound(_) => ErrorCode::LinkNotFound,
+            ShortlinkerError::LinkDatabaseError(_) => ErrorCode::LinkDatabaseError,
+
+            // 导入导出错误
+            ShortlinkerError::CsvParseFailed(_) => ErrorCode::CsvParseError,
+            ShortlinkerError::CsvGenerationFailed(_) => ErrorCode::CsvGenerationError,
+            ShortlinkerError::CsvFileMissing(_) => ErrorCode::CsvFileMissing,
+            ShortlinkerError::ImportFailed(_) => ErrorCode::ImportFailed,
+            ShortlinkerError::ExportFailed(_) => ErrorCode::ExportFailed,
+            ShortlinkerError::InvalidMultipartData(_) => ErrorCode::InvalidMultipartData,
+            ShortlinkerError::FileReadError(_) => ErrorCode::FileReadError,
+
+            // 配置错误
+            ShortlinkerError::ConfigNotFound(_) => ErrorCode::ConfigNotFound,
+            ShortlinkerError::ConfigUpdateFailed(_) => ErrorCode::ConfigUpdateFailed,
+            ShortlinkerError::ConfigReloadFailed(_) => ErrorCode::ConfigReloadFailed,
+            ShortlinkerError::ConfigValidationFailed(_) => ErrorCode::ConfigUpdateFailed,
+
+            // 通用错误
+            ShortlinkerError::BadRequest(_) | ShortlinkerError::Validation(_) => {
+                ErrorCode::BadRequest
+            }
+            ShortlinkerError::Conflict(_) => ErrorCode::Conflict,
+            ShortlinkerError::ServiceUnavailable(_) => ErrorCode::ServiceUnavailable,
+            ShortlinkerError::Forbidden(_) => ErrorCode::Forbidden,
+            ShortlinkerError::NotFound(_) => ErrorCode::NotFound,
+            ShortlinkerError::DateParse(_) => ErrorCode::BadRequest,
+
+            // 其他基础设施错误 → InternalServerError
+            _ => ErrorCode::InternalServerError,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_error_codes() {
+        // 基础设施错误
         assert_eq!(ShortlinkerError::cache_connection("test").code(), "E001");
         assert_eq!(
             ShortlinkerError::cache_plugin_not_found("test").code(),
@@ -193,6 +457,72 @@ mod tests {
         );
         assert_eq!(ShortlinkerError::date_parse("test").code(), "E012");
         assert_eq!(ShortlinkerError::notify_server("test").code(), "E013");
+
+        // 认证错误
+        assert_eq!(
+            ShortlinkerError::auth_password_invalid("test").code(),
+            "E014"
+        );
+        assert_eq!(ShortlinkerError::auth_token_expired("test").code(), "E015");
+        assert_eq!(ShortlinkerError::auth_token_invalid("test").code(), "E016");
+        assert_eq!(ShortlinkerError::csrf_token_invalid("test").code(), "E017");
+        assert_eq!(ShortlinkerError::auth_unauthorized("test").code(), "E018");
+        assert_eq!(
+            ShortlinkerError::auth_rate_limit_exceeded("test").code(),
+            "E019"
+        );
+
+        // 链接业务错误
+        assert_eq!(ShortlinkerError::link_invalid_url("test").code(), "E020");
+        assert_eq!(ShortlinkerError::link_already_exists("test").code(), "E021");
+        assert_eq!(
+            ShortlinkerError::link_invalid_expire_time("test").code(),
+            "E022"
+        );
+        assert_eq!(
+            ShortlinkerError::link_password_hash_error("test").code(),
+            "E023"
+        );
+        assert_eq!(ShortlinkerError::link_empty_code("test").code(), "E024");
+        assert_eq!(ShortlinkerError::link_not_found("test").code(), "E025");
+        assert_eq!(ShortlinkerError::link_database_error("test").code(), "E026");
+
+        // 导入导出错误
+        assert_eq!(ShortlinkerError::csv_parse_failed("test").code(), "E030");
+        assert_eq!(
+            ShortlinkerError::csv_generation_failed("test").code(),
+            "E031"
+        );
+        assert_eq!(ShortlinkerError::csv_file_missing("test").code(), "E032");
+        assert_eq!(ShortlinkerError::import_failed("test").code(), "E033");
+        assert_eq!(ShortlinkerError::export_failed("test").code(), "E034");
+        assert_eq!(
+            ShortlinkerError::invalid_multipart_data("test").code(),
+            "E035"
+        );
+        assert_eq!(ShortlinkerError::file_read_error("test").code(), "E036");
+
+        // 配置错误
+        assert_eq!(ShortlinkerError::config_not_found("test").code(), "E040");
+        assert_eq!(
+            ShortlinkerError::config_update_failed("test").code(),
+            "E041"
+        );
+        assert_eq!(
+            ShortlinkerError::config_reload_failed("test").code(),
+            "E042"
+        );
+        assert_eq!(
+            ShortlinkerError::config_validation_failed("test").code(),
+            "E043"
+        );
+
+        // 通用 HTTP 错误
+        assert_eq!(ShortlinkerError::bad_request("test").code(), "E050");
+        assert_eq!(ShortlinkerError::conflict("test").code(), "E051");
+        assert_eq!(ShortlinkerError::service_unavailable("test").code(), "E052");
+        assert_eq!(ShortlinkerError::internal_error("test").code(), "E053");
+        assert_eq!(ShortlinkerError::forbidden("test").code(), "E054");
     }
 
     #[test]
@@ -213,6 +543,14 @@ mod tests {
             ShortlinkerError::validation("test").error_type(),
             "Validation Error"
         );
+        assert_eq!(
+            ShortlinkerError::auth_password_invalid("test").error_type(),
+            "Authentication Failed"
+        );
+        assert_eq!(
+            ShortlinkerError::link_invalid_url("test").error_type(),
+            "Invalid URL"
+        );
     }
 
     #[test]
@@ -222,6 +560,9 @@ mod tests {
 
         let err = ShortlinkerError::not_found("Link not found");
         assert_eq!(err.message(), "Link not found");
+
+        let err = ShortlinkerError::link_invalid_url("bad url");
+        assert_eq!(err.message(), "bad url");
     }
 
     #[test]
