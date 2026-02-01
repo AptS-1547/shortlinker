@@ -3,7 +3,10 @@
 # 其他配置（API、路由、功能等）已迁移到数据库，可通过管理面板动态修改
 #
 # 安全配置说明：
-# - 登录限流默认使用连接 IP（无法伪造），如果部署在反向代理后需要在管理面板配置 `api.trusted_proxies`
+# - 登录限流智能检测：未配置 api.trusted_proxies 时，连接来自私有 IP（Docker/nginx）
+#   将自动信任 X-Forwarded-For header，适合绝大多数反向代理部署
+# - 显式配置：如需精确控制，可在管理面板配置 api.trusted_proxies（支持 IP 和 CIDR）
+#   示例：Docker 部署可配置为 ["172.16.0.0/12"]，nginx 反向代理可配置为代理服务器 IP
 # - IPC socket 权限已限制为 0600（仅属主可访问）
 
 [server]

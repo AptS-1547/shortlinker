@@ -24,11 +24,13 @@ fn generate_csrf_token() -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 
-/// 基于 IP 地址的限流 key 提取器（安全版）
+/// 基于 IP 地址的限流 key 提取器（智能版 v2）
 ///
-/// 策略：
-/// - 默认使用连接 IP（peer_addr），无法被伪造
-/// - 如果连接来自配置的可信代理，则使用 X-Forwarded-For
+/// 策略（按优先级）：
+/// 1. Unix Socket 模式（检查配置）→ 强制要求 X-Forwarded-For
+/// 2. 显式配置 trusted_proxies 且匹配 → 使用 X-Forwarded-For
+/// 3. 未配置 trusted_proxies 且连接来自私有 IP/localhost → 自动检测代理，使用 X-Forwarded-For
+/// 4. 默认 → 使用连接 IP（公网直连场景）
 #[derive(Clone, Copy)]
 pub struct LoginKeyExtractor;
 
@@ -38,25 +40,74 @@ impl KeyExtractor for LoginKeyExtractor {
 
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
         let conn_info = req.connection_info();
-
-        // 获取连接 IP（TCP peer address，无法伪造）
-        let peer_ip = conn_info
-            .peer_addr()
-            .ok_or_else(|| SimpleKeyExtractionError::new("Unable to extract peer IP"))?;
-
-        // 检查是否启用了可信代理
         let config = get_config();
-        let trusted_proxies = &config.api.trusted_proxies;
 
-        if !trusted_proxies.is_empty() && is_trusted_proxy(peer_ip, trusted_proxies) {
-            // 来自可信代理，使用 X-Forwarded-For
-            let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
-            debug!("Login rate limit key from trusted proxy: {}", real_ip);
-            Ok(real_ip.to_string())
-        } else {
-            // 默认：使用连接 IP
-            Ok(peer_ip.to_string())
+        // 步骤 1: 检查是否配置了 Unix Socket 模式
+        #[cfg(unix)]
+        if config.server.unix_socket.is_some() {
+            // Unix Socket 模式：强制要求 X-Forwarded-For
+            if let Some(real_ip) = conn_info.realip_remote_addr() {
+                debug!("Unix Socket mode: using X-Forwarded-For: {}", real_ip);
+                return Ok(real_ip.to_string());
+            } else {
+                // Unix Socket 模式下没有 X-Forwarded-For 是配置错误
+                error!(
+                    "Unix Socket mode enabled but X-Forwarded-For header missing. \
+                     Ensure nginx/proxy sets: proxy_set_header X-Forwarded-For $remote_addr;"
+                );
+                return Err(SimpleKeyExtractionError::new(
+                    "Unix Socket mode requires X-Forwarded-For header"
+                ));
+            }
         }
+
+        // 步骤 2: TCP 连接模式 - 获取 peer_addr
+        let peer_ip = conn_info.peer_addr().ok_or_else(|| {
+            // 这不应该发生（非 Unix Socket 模式下 peer_addr 为 None）
+            warn!("Unable to extract peer IP in TCP mode - this should not happen");
+            SimpleKeyExtractionError::new("Unable to extract peer IP")
+        })?;
+
+        // 步骤 3: 检查是否显式配置了可信代理（优先级最高）
+        let trusted_proxies = &config.api.trusted_proxies;
+        if !trusted_proxies.is_empty() {
+            if is_trusted_proxy(peer_ip, trusted_proxies) {
+                let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
+                debug!("Trusted proxy (explicit): {} -> {}", peer_ip, real_ip);
+                return Ok(real_ip.to_string());
+            }
+            // 显式配置了但不匹配 → 使用连接 IP（不信任 X-Forwarded-For）
+            debug!("Connection from {}, not in trusted_proxies", peer_ip);
+            return Ok(peer_ip.to_string());
+        }
+
+        // 步骤 4: 未配置 trusted_proxies → 智能检测
+        if let Ok(ip_addr) = peer_ip.parse::<IpAddr>() {
+            // 检查是否为私有 IP 或 localhost
+            let is_private_or_local = match ip_addr {
+                IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
+                IpAddr::V6(v6) => {
+                    // IPv6 私有地址：fc00::/7（唯一本地地址）或 loopback（::1）
+                    v6.is_loopback() || (v6.segments()[0] & 0xfe00) == 0xfc00
+                }
+            };
+
+            if is_private_or_local {
+                // 连接来自私有 IP/localhost → 假设有反向代理
+                if let Some(real_ip) = conn_info.realip_remote_addr() {
+                    debug!(
+                        "Auto-detect proxy (private IP {}): using X-Forwarded-For: {}",
+                        peer_ip, real_ip
+                    );
+                    return Ok(real_ip.to_string());
+                }
+                // 私有 IP 但无 X-Forwarded-For（可能是内网直连）
+                debug!("Private IP {} without X-Forwarded-For", peer_ip);
+            }
+        }
+
+        // 步骤 5: 默认使用连接 IP（公网直连或内网直连无 X-Forwarded-For）
+        Ok(peer_ip.to_string())
     }
 }
 

@@ -152,7 +152,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `api.cookie_secure` | Boolean | `true` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
 | `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
-| `api.trusted_proxies` | Json | `[]` | No | Trusted proxy IPs or CIDRs (for login rate-limit IP extraction). Empty = trust no proxies (use connection IP only). Example: `["10.0.0.1", "192.168.1.0/24"]` |
+| `api.trusted_proxies` | Json | `[]` | No | Trusted proxy IPs or CIDRs for login rate-limit IP extraction.<br>**Auto-detect** (default): When empty, connections from private IPs (RFC1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) or localhost automatically trust X-Forwarded-For, suitable for Docker/nginx reverse proxy.<br>**Explicit config**: When set, only trust IPs in the list, e.g., `["10.0.0.1", "172.17.0.0/16"]`.<br>**Security**: Public IPs never trust X-Forwarded-For by default to prevent spoofing. |
 
 > Notes:
 > - Cookie names are fixed: `shortlinker_access` / `shortlinker_refresh` / `csrf_token` (not configurable).
