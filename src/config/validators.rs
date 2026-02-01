@@ -63,7 +63,14 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
             let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
             return validate_enum_array(value, &valid_values);
         }
-        return Ok(());
+        // EnumArray 类型必须有 enum_options，如果没有说明配置定义有误
+        // 注意：由于 schema.rs 现在根据 RustType 自动推断 enum_options，
+        // 这个分支理论上不应该被触发（除非配置定义本身有问题）
+        return Err(format!(
+            "Internal error: EnumArray config '{}' is missing enum_options definition. \
+             Please check ConfigDef in definitions.rs",
+            key
+        ));
     }
 
     // Enum: 单值验证
