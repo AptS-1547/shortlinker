@@ -82,8 +82,8 @@ async fn add_link_direct(
         return Err(CliError::CommandError(e.to_string()));
     }
 
-    let config = crate::config::get_config();
-    let random_code_length = config.features.random_code_length;
+    let rt = crate::config::get_runtime_config();
+    let random_code_length = rt.get_usize_or(crate::config::keys::FEATURES_RANDOM_CODE_LENGTH, 6);
 
     let final_short_code = match short_code {
         Some(code) => code,

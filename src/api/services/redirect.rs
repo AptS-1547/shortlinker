@@ -8,7 +8,7 @@ use tracing::{debug, error, trace};
 use crate::analytics::global::get_click_manager;
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
-use crate::config::get_config;
+use crate::config::{get_config, get_runtime_config, keys};
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::is_valid_short_code;
 
@@ -23,7 +23,8 @@ impl RedirectService {
         let captured_path = path.into_inner();
 
         if captured_path.is_empty() {
-            let default_url = get_config().features.default_url.clone();
+            let rt = get_runtime_config();
+            let default_url = rt.get_or(keys::FEATURES_DEFAULT_URL, "https://esap.cc/repo");
             HttpResponse::TemporaryRedirect()
                 .insert_header(("Location", default_url))
                 .finish()

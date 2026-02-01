@@ -22,7 +22,7 @@ pub enum ReloadTarget {
     /// - CLI link management commands
     Data,
 
-    /// Config reload: RuntimeConfig (database -> AppConfig)
+    /// Config reload: RuntimeConfig (database -> cache)
     ///
     /// Triggered by:
     /// - HTTP POST /admin/v1/config/reload
