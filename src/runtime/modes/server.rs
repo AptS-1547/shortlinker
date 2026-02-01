@@ -159,6 +159,34 @@ pub async fn run_server() -> Result<()> {
     // Validate CORS configuration at startup (runs once, not per worker)
     validate_cors_config(&cors_config);
 
+    // Check and log proxy detection mode + Unix Socket mode
+    let mut is_tcp_mode = true;
+    #[cfg(unix)]
+    if let Some(ref socket_path) = config.server.unix_socket {
+        warn!(
+            "Unix Socket mode enabled: {}. \
+             Rate limiting requires nginx to set X-Forwarded-For header.",
+            socket_path
+        );
+        is_tcp_mode = false;
+    }
+
+    if is_tcp_mode {
+        let trusted_proxies = &config.api.trusted_proxies;
+        if trusted_proxies.is_empty() {
+            warn!(
+                "Login rate limiting: Auto-detect mode enabled. \
+                 Connections from private IPs will use X-Forwarded-For. \
+                 To disable, configure api.trusted_proxies explicitly."
+            );
+        } else {
+            warn!(
+                "Login rate limiting: Explicit trusted proxies configured: {:?}",
+                trusted_proxies
+            );
+        }
+    }
+
     // Configure HTTP server
     let server = HttpServer::new(move || {
         // Build CORS middleware

@@ -165,7 +165,7 @@ curl -sS -b cookies.txt \
 | `api.cookie_secure` | Boolean | `true` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
 | `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
-| `api.trusted_proxies` | Json | `[]` | 否 | 可信代理 IP 或 CIDR 列表（用于登录限流 IP 提取）。为空 = 不信任任何代理，使用连接 IP；设置后仅来自可信代理的请求使用 X-Forwarded-For。示例：`["10.0.0.1", "192.168.1.0/24"]` |
+| `api.trusted_proxies` | Json | `[]` | 否 | 可信代理 IP 或 CIDR 列表。<br>**智能检测**（默认）：留空时，连接来自私有 IP（RFC1918：10.0.0.0/8、172.16.0.0/12、192.168.0.0/16）或 localhost 将自动信任 X-Forwarded-For，适合 Docker/nginx 反向代理。<br>**显式配置**：设置后仅信任列表中的 IP，如 `["10.0.0.1", "172.17.0.0/16"]`。<br>**安全提示**：公网 IP 默认不信任 X-Forwarded-For，防止伪造。 |
 
 > 提示：
 > - Cookie 名称当前为固定值：`shortlinker_access` / `shortlinker_refresh` / `csrf_token`（不可配置）。
@@ -220,16 +220,20 @@ curl -sS -b cookies.txt \
 
 ### 登录限流配置
 
-Shortlinker 默认使用连接 IP（`peer_addr`）进行登录限流，防止通过伪造 `X-Forwarded-For` 头部绕过限流。
+Shortlinker 使用智能代理检测进行登录限流 IP 提取，兼顾安全性和易用性。
 
 **直连部署**（无反向代理）：
-- 无需额外配置，默认行为已足够安全
+- 无需额外配置，公网 IP 不会信任 `X-Forwarded-For`，安全且自动
 
-**反向代理部署**（Nginx/Caddy/Cloudflare）：
-- 需要在管理面板配置 `api.trusted_proxies`，列出可信代理的 IP 或 CIDR
-- 只有来自可信代理的请求才会使用 `X-Forwarded-For`
+**反向代理部署**（Nginx/Caddy/Docker）：
+- **自动检测**（推荐）：无需配置 `api.trusted_proxies`，连接来自私有 IP（10.x、172.16-31.x、192.168.x）或 localhost 时自动信任 `X-Forwarded-For`
+- **显式配置**：如需精确控制，可在管理面板配置 `api.trusted_proxies`，列出可信代理的 IP 或 CIDR
 
-示例配置：
+**Unix Socket 连接**（nginx 同机器）：
+- 自动使用 `X-Forwarded-For` 提取客户端真实 IP
+- 确保 nginx 配置了 `proxy_set_header X-Forwarded-For $remote_addr;`
+
+示例配置（可选）：
 
 ```bash
 CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
@@ -249,7 +253,10 @@ curl -X PUT -b cookies.txt \
      http://localhost:8080/admin/v1/config/api.trusted_proxies
 ```
 
-> **注意**：错误配置可信代理会导致所有用户共享同一限流桶（如果代理 IP 不在列表中）或重新引入绕过风险（如果信任了不安全的代理）。
+> **注意**：
+> - **智能检测模式**（默认）：适合绝大多数场景，但如果 shortlinker 直接绑定在 VPC 内网 IP 且无代理，建议显式配置 `trusted_proxies` 防止伪造攻击
+> - **显式配置模式**：错误配置可能导致所有用户共享同一限流桶（代理 IP 未匹配）或重新引入绕过风险（信任了不安全的代理）
+> - 查看启动日志确认当前检测模式：`Login rate limiting: Auto-detect mode enabled` 或 `Explicit trusted proxies configured`
 
 ### IPC Socket 权限
 
