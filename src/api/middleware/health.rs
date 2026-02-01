@@ -9,6 +9,7 @@ use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use tracing::{trace, warn};
 
+use crate::api::constants;
 use crate::api::jwt::JwtService;
 use crate::api::services::admin::{ApiResponse, ErrorData};
 use crate::config::get_config;
@@ -28,17 +29,14 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = get_config();
         ready(Ok(HealthAuthMiddleware {
             service: Rc::new(service),
-            access_cookie_name: config.api.access_cookie_name.clone(),
         }))
     }
 }
 
 pub struct HealthAuthMiddleware<S> {
     service: Rc<S>,
-    access_cookie_name: String,
 }
 
 impl<S, B> HealthAuthMiddleware<S>
@@ -95,7 +93,6 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
-        let access_cookie_name = self.access_cookie_name.clone();
 
         Box::pin(async move {
             // 每次请求都读取最新配置
@@ -132,7 +129,7 @@ where
             }
 
             // 再尝试 JWT Cookie 认证（给前端用户用）
-            if Self::validate_jwt_cookie(&req, &access_cookie_name) {
+            if Self::validate_jwt_cookie(&req, constants::ACCESS_COOKIE_NAME) {
                 trace!("Health authentication successful via JWT Cookie");
                 let response = srv.call(req).await?.map_into_left_body();
                 return Ok(response);

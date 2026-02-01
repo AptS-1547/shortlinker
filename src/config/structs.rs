@@ -213,10 +213,6 @@ pub struct ApiConfig {
     #[serde(default = "default_refresh_token_days")]
     pub refresh_token_days: u64,
     // Cookie 配置
-    #[serde(default = "default_access_cookie_name")]
-    pub access_cookie_name: String,
-    #[serde(default = "default_refresh_cookie_name")]
-    pub refresh_cookie_name: String,
     #[serde(default)]
     pub cookie_secure: bool,
     #[serde(default)]
@@ -418,14 +414,6 @@ fn default_refresh_token_days() -> u64 {
     7
 }
 
-fn default_access_cookie_name() -> String {
-    "shortlinker_access".to_string()
-}
-
-fn default_refresh_cookie_name() -> String {
-    "shortlinker_refresh".to_string()
-}
-
 // CORS 默认值
 fn default_cors_enabled() -> bool {
     false
@@ -447,6 +435,7 @@ fn default_cors_headers() -> Vec<String> {
         "Content-Type".to_string(),
         "Authorization".to_string(),
         "Accept".to_string(),
+        "X-CSRF-Token".to_string(),
     ]
 }
 
@@ -518,8 +507,6 @@ impl Default for ApiConfig {
             jwt_secret: default_jwt_secret(),
             access_token_minutes: default_access_token_minutes(),
             refresh_token_days: default_refresh_token_days(),
-            access_cookie_name: default_access_cookie_name(),
-            refresh_cookie_name: default_refresh_cookie_name(),
             cookie_secure: true,
             cookie_same_site: SameSitePolicy::default(),
             cookie_domain: None,

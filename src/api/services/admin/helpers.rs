@@ -5,6 +5,7 @@ use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
 use serde::Serialize;
 
+use crate::api::constants;
 use crate::config::SameSitePolicy;
 use crate::utils::TimeParser;
 
@@ -52,8 +53,6 @@ pub struct CookieBuilder {
     same_site: SameSite,
     secure: bool,
     domain: Option<String>,
-    access_cookie_name: String,
-    refresh_cookie_name: String,
     access_token_minutes: u64,
     refresh_token_days: u64,
     admin_prefix: String,
@@ -73,8 +72,6 @@ impl CookieBuilder {
             same_site,
             secure: config.api.cookie_secure,
             domain: config.api.cookie_domain.clone(),
-            access_cookie_name: config.api.access_cookie_name.clone(),
-            refresh_cookie_name: config.api.refresh_cookie_name.clone(),
             access_token_minutes: config.api.access_token_minutes,
             refresh_token_days: config.api.refresh_token_days,
             admin_prefix: config.routes.admin_prefix.clone(),
@@ -103,7 +100,7 @@ impl CookieBuilder {
 
     pub fn build_access_cookie(&self, token: String) -> Cookie<'static> {
         self.build_cookie_base(
-            self.access_cookie_name.clone(),
+            constants::ACCESS_COOKIE_NAME.to_string(),
             token,
             "/".to_string(),
             actix_web::cookie::time::Duration::minutes(self.access_token_minutes as i64),
@@ -113,7 +110,7 @@ impl CookieBuilder {
     pub fn build_refresh_cookie(&self, token: String) -> Cookie<'static> {
         let refresh_path = format!("{}/v1/auth", self.admin_prefix);
         self.build_cookie_base(
-            self.refresh_cookie_name.clone(),
+            constants::REFRESH_COOKIE_NAME.to_string(),
             token,
             refresh_path,
             actix_web::cookie::time::Duration::days(self.refresh_token_days as i64),
@@ -122,7 +119,7 @@ impl CookieBuilder {
 
     pub fn build_expired_access_cookie(&self) -> Cookie<'static> {
         self.build_cookie_base(
-            self.access_cookie_name.clone(),
+            constants::ACCESS_COOKIE_NAME.to_string(),
             String::new(),
             "/".to_string(),
             actix_web::cookie::time::Duration::ZERO,
@@ -132,15 +129,50 @@ impl CookieBuilder {
     pub fn build_expired_refresh_cookie(&self) -> Cookie<'static> {
         let refresh_path = format!("{}/v1/auth", self.admin_prefix);
         self.build_cookie_base(
-            self.refresh_cookie_name.clone(),
+            constants::REFRESH_COOKIE_NAME.to_string(),
             String::new(),
             refresh_path,
             actix_web::cookie::time::Duration::ZERO,
         )
     }
 
+    /// 构建 CSRF Cookie（非 HttpOnly，前端需要读取）
+    pub fn build_csrf_cookie(&self, token: String) -> Cookie<'static> {
+        let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), token);
+        // CSRF cookie path 与 admin_prefix 保持一致
+        cookie.set_path(self.admin_prefix.clone());
+        // CSRF cookie 不能是 HttpOnly，因为前端 JS 需要读取它
+        cookie.set_http_only(false);
+        cookie.set_secure(self.secure);
+        // CSRF cookie 使用 Lax，允许顶级导航携带但防止跨站请求
+        cookie.set_same_site(SameSite::Lax);
+        // 与 access token 同步过期
+        cookie.set_max_age(actix_web::cookie::time::Duration::minutes(
+            self.access_token_minutes as i64,
+        ));
+        if let Some(ref domain) = self.domain {
+            cookie.set_domain(domain.clone());
+        }
+        cookie
+    }
+
+    /// 构建过期的 CSRF Cookie（登出时清除）
+    pub fn build_expired_csrf_cookie(&self) -> Cookie<'static> {
+        let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), String::new());
+        // CSRF cookie path 与 admin_prefix 保持一致
+        cookie.set_path(self.admin_prefix.clone());
+        cookie.set_http_only(false);
+        cookie.set_secure(self.secure);
+        cookie.set_same_site(SameSite::Lax);
+        cookie.set_max_age(actix_web::cookie::time::Duration::ZERO);
+        if let Some(ref domain) = self.domain {
+            cookie.set_domain(domain.clone());
+        }
+        cookie
+    }
+
     pub fn refresh_cookie_name(&self) -> &str {
-        &self.refresh_cookie_name
+        constants::REFRESH_COOKIE_NAME
     }
 
     pub fn access_token_minutes(&self) -> u64 {

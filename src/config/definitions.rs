@@ -64,8 +64,6 @@ pub mod keys {
     pub const API_REFRESH_TOKEN_DAYS: &str = "api.refresh_token_days";
 
     // Cookie 配置
-    pub const API_ACCESS_COOKIE_NAME: &str = "api.access_cookie_name";
-    pub const API_REFRESH_COOKIE_NAME: &str = "api.refresh_cookie_name";
     pub const API_COOKIE_SECURE: &str = "api.cookie_secure";
     pub const API_COOKIE_SAME_SITE: &str = "api.cookie_same_site";
     pub const API_COOKIE_DOMAIN: &str = "api.cookie_domain";
@@ -113,14 +111,6 @@ fn default_access_token_minutes() -> String {
 
 fn default_refresh_token_days() -> String {
     "7".to_string()
-}
-
-fn default_access_cookie_name() -> String {
-    "shortlinker_access".to_string()
-}
-
-fn default_refresh_cookie_name() -> String {
-    "shortlinker_refresh".to_string()
 }
 
 fn default_cookie_secure() -> String {
@@ -255,30 +245,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         description: "Refresh token expiration time in days",
     },
     // ========== Cookie 配置 (cookie) ==========
-    ConfigDef {
-        key: keys::API_ACCESS_COOKIE_NAME,
-        env_var: None,
-        value_type: ValueType::String,
-        rust_type: RustType::String,
-        default_fn: default_access_cookie_name,
-        requires_restart: true,
-        is_sensitive: false,
-        editable: true,
-        category: categories::COOKIE,
-        description: "Access token cookie name",
-    },
-    ConfigDef {
-        key: keys::API_REFRESH_COOKIE_NAME,
-        env_var: None,
-        value_type: ValueType::String,
-        rust_type: RustType::String,
-        default_fn: default_refresh_cookie_name,
-        requires_restart: true,
-        is_sensitive: false,
-        editable: true,
-        category: categories::COOKIE,
-        description: "Refresh token cookie name",
-    },
     ConfigDef {
         key: keys::API_COOKIE_SECURE,
         env_var: None,

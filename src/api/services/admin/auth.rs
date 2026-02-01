@@ -4,7 +4,9 @@ use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExt
 use actix_web::dev::ServiceRequest;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
+use base64::Engine;
 use governor::middleware::NoOpMiddleware;
+use rand::Rng;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
@@ -13,6 +15,13 @@ use crate::utils::password::verify_password;
 
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageResponse};
+
+/// 生成 CSRF Token（32 bytes = 256 bits，Base64 编码）
+fn generate_csrf_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::rng().fill(&mut bytes);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
 
 /// 基于 IP 地址的限流 key 提取器
 ///
@@ -109,9 +118,14 @@ pub async fn check_admin_token(
     let access_cookie = cookie_builder.build_access_cookie(access_token);
     let refresh_cookie = cookie_builder.build_refresh_cookie(refresh_token);
 
+    // Generate and build CSRF cookie
+    let csrf_token = generate_csrf_token();
+    let csrf_cookie = cookie_builder.build_csrf_cookie(csrf_token);
+
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
@@ -177,9 +191,14 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let access_cookie = cookie_builder.build_access_cookie(new_access_token);
     let refresh_cookie = cookie_builder.build_refresh_cookie(new_refresh_token);
 
+    // Generate and build CSRF cookie (refresh on token refresh)
+    let csrf_token = generate_csrf_token();
+    let csrf_cookie = cookie_builder.build_csrf_cookie(csrf_token);
+
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
@@ -197,10 +216,12 @@ pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
     let cookie_builder = CookieBuilder::from_config();
     let access_cookie = cookie_builder.build_expired_access_cookie();
     let refresh_cookie = cookie_builder.build_expired_refresh_cookie();
+    let csrf_cookie = cookie_builder.build_expired_csrf_cookie();
 
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,

@@ -334,8 +334,6 @@ fn apply_config_key(
         },
 
         // Cookie 配置
-        keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name = value.to_string(),
-        keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name = value.to_string(),
         keys::API_COOKIE_SECURE => {
             config.api.cookie_secure = value == "true" || value == "1" || value == "yes";
         }

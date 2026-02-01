@@ -25,8 +25,6 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
         keys::API_REFRESH_TOKEN_DAYS => config.api.refresh_token_days.to_string(),
 
         // Cookie 配置
-        keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name.clone(),
-        keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name.clone(),
         keys::API_COOKIE_SECURE => config.api.cookie_secure.to_string(),
         keys::API_COOKIE_SAME_SITE => config.api.cookie_same_site.to_string(),
         keys::API_COOKIE_DOMAIN => config.api.cookie_domain.clone().unwrap_or_default(),
@@ -131,10 +129,9 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
                 debug!("admin_token.txt already exists, skipping");
             }
             Err(e) => {
-                return Err(crate::errors::ShortlinkerError::database_operation(format!(
-                    "Failed to create admin_token.txt: {}",
-                    e
-                )));
+                return Err(crate::errors::ShortlinkerError::database_operation(
+                    format!("Failed to create admin_token.txt: {}", e),
+                ));
             }
         }
     }
