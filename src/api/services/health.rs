@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use tracing::{error, info, trace};
 
 use crate::api::services::admin::{
-    ApiResponse, HealthChecks, HealthResponse, HealthStorageBackend, HealthStorageCheck,
+    ApiResponse, ErrorCode, HealthChecks, HealthResponse, HealthStorageBackend, HealthStorageCheck,
 };
 use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
@@ -89,8 +89,17 @@ impl HealthService {
         };
 
         let health_response = ApiResponse {
-            code: if is_healthy { 0 } else { 1 },
-            data: health_data,
+            code: if is_healthy {
+                ErrorCode::Success as i32
+            } else {
+                ErrorCode::ServiceUnavailable as i32
+            },
+            message: if is_healthy {
+                "OK".to_string()
+            } else {
+                "Service Unavailable".to_string()
+            },
+            data: Some(health_data),
         };
 
         let response_status = if is_healthy {

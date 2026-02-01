@@ -116,9 +116,18 @@ impl std::str::FromStr for HttpMethod {
     }
 }
 
-/// 应用程序配置
+/// 静态配置（从 TOML 加载，启动时使用）
+///
+/// 包含基础设施配置：
+/// - server: 服务器地址、端口、CPU 数量
+/// - database: 数据库连接配置
+/// - cache: 缓存系统配置
+/// - logging: 日志配置
+///
+/// 运行时配置（api, routes, features, click_manager, cors）存储在数据库中，
+/// 通过 Admin Panel 或 API 进行管理，使用 RuntimeConfig 读取。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AppConfig {
+pub struct StaticConfig {
     #[serde(default)]
     pub server: ServerConfig,
     #[serde(default)]
@@ -126,17 +135,65 @@ pub struct AppConfig {
     #[serde(default)]
     pub cache: CacheConfig,
     #[serde(default)]
-    pub api: ApiConfig,
-    #[serde(default)]
-    pub routes: RouteConfig,
-    #[serde(default)]
-    pub features: FeatureConfig,
-    #[serde(default)]
-    pub click_manager: ClickManagerConfig,
-    #[serde(default)]
     pub logging: LoggingConfig,
-    #[serde(default)]
-    pub cors: CorsConfig,
+}
+
+impl StaticConfig {
+    /// 从 TOML 文件加载配置
+    pub fn load() -> Self {
+        Self::load_from_file()
+    }
+
+    /// 从 TOML 文件加载配置
+    fn load_from_file() -> Self {
+        let path = "config.toml";
+
+        if !std::path::Path::new(path).exists() {
+            return Self::default();
+        }
+
+        match std::fs::read_to_string(path) {
+            Ok(content) => match toml::from_str::<StaticConfig>(&content) {
+                Ok(config) => {
+                    eprintln!("[INFO] Configuration loaded from: {}", path);
+                    config
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to parse config file {}: {}", path, e);
+                    Self::default()
+                }
+            },
+            Err(e) => {
+                eprintln!("[ERROR] Failed to read config file {}: {}", path, e);
+                Self::default()
+            }
+        }
+    }
+
+    /// 生成示例 TOML 配置文件
+    pub fn generate_sample_config() -> String {
+        let sample_config = Self::default();
+        toml::to_string_pretty(&sample_config)
+            .unwrap_or_else(|e| format!("Error generating sample config: {}", e))
+    }
+
+    /// 保存配置到 TOML 文件
+    pub fn save_to_file<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let content = toml::to_string_pretty(self)?;
+
+        // Create parent directories if needed
+        if let Some(parent) = path.as_ref().parent()
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        std::fs::write(path, content)?;
+        Ok(())
+    }
 }
 
 /// 服务器配置
@@ -199,61 +256,7 @@ pub struct MemoryConfig {
     pub max_capacity: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiConfig {
-    #[serde(default = "default_admin_token")]
-    pub admin_token: String,
-    #[serde(default)]
-    pub health_token: String,
-    // JWT 配置
-    #[serde(default = "default_jwt_secret")]
-    pub jwt_secret: String,
-    #[serde(default = "default_access_token_minutes")]
-    pub access_token_minutes: u64,
-    #[serde(default = "default_refresh_token_days")]
-    pub refresh_token_days: u64,
-    // Cookie 配置
-    #[serde(default)]
-    pub cookie_secure: bool,
-    #[serde(default)]
-    pub cookie_same_site: SameSitePolicy,
-    #[serde(default)]
-    pub cookie_domain: Option<String>,
-    /// 可信代理 IP 或 CIDR 列表（用于登录限流 IP 提取）
-    #[serde(default)]
-    pub trusted_proxies: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RouteConfig {
-    #[serde(default = "default_admin_prefix")]
-    pub admin_prefix: String,
-    #[serde(default = "default_health_prefix")]
-    pub health_prefix: String,
-    #[serde(default = "default_frontend_prefix")]
-    pub frontend_prefix: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeatureConfig {
-    #[serde(default)]
-    pub enable_admin_panel: bool,
-    #[serde(default = "default_random_code_length")]
-    pub random_code_length: usize,
-    #[serde(default = "default_default_url")]
-    pub default_url: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClickManagerConfig {
-    #[serde(default = "default_enable_click_tracking")]
-    pub enable_click_tracking: bool,
-    #[serde(default = "default_flush_interval")]
-    pub flush_interval: u64,
-    #[serde(default = "default_max_clicks_before_flush")]
-    pub max_clicks_before_flush: u64,
-}
-
+/// 日志配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
     #[serde(default = "default_log_level")]
@@ -270,24 +273,10 @@ pub struct LoggingConfig {
     pub enable_rotation: bool,
 }
 
-/// CORS 跨域配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CorsConfig {
-    #[serde(default = "default_cors_enabled")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub allowed_origins: Vec<String>,
-    #[serde(default = "default_cors_methods")]
-    pub allowed_methods: Vec<HttpMethod>,
-    #[serde(default = "default_cors_headers")]
-    pub allowed_headers: Vec<String>,
-    #[serde(default = "default_cors_max_age")]
-    pub max_age: u64,
-    #[serde(default = "default_cors_credentials")]
-    pub allow_credentials: bool,
-}
+// ============================================================
+// Default value functions for static config
+// ============================================================
 
-// Default value functions
 fn default_server_host() -> String {
     "127.0.0.1".to_string()
 }
@@ -344,38 +333,6 @@ fn default_memory_capacity() -> u64 {
     10000
 }
 
-fn default_admin_prefix() -> String {
-    "/admin".to_string()
-}
-
-fn default_health_prefix() -> String {
-    "/health".to_string()
-}
-
-fn default_frontend_prefix() -> String {
-    "/panel".to_string()
-}
-
-fn default_random_code_length() -> usize {
-    6
-}
-
-fn default_default_url() -> String {
-    "https://esap.cc/repo".to_string()
-}
-
-fn default_enable_click_tracking() -> bool {
-    true
-}
-
-fn default_flush_interval() -> u64 {
-    30
-}
-
-fn default_max_clicks_before_flush() -> u64 {
-    100
-}
-
 fn default_log_level() -> String {
     "info".to_string()
 }
@@ -400,55 +357,9 @@ fn default_enable_rotation() -> bool {
     true
 }
 
-// JWT 默认值
-fn default_jwt_secret() -> String {
-    crate::utils::generate_secure_token(32) // 64 字符 hex 字符串
-}
-
-fn default_admin_token() -> String {
-    crate::utils::generate_random_code(16) // 16 字符随机字符串
-}
-
-fn default_access_token_minutes() -> u64 {
-    15
-}
-
-fn default_refresh_token_days() -> u64 {
-    7
-}
-
-// CORS 默认值
-fn default_cors_enabled() -> bool {
-    false
-}
-
-fn default_cors_methods() -> Vec<HttpMethod> {
-    vec![
-        HttpMethod::Get,
-        HttpMethod::Post,
-        HttpMethod::Put,
-        HttpMethod::Delete,
-        HttpMethod::Options,
-        HttpMethod::Head,
-    ]
-}
-
-fn default_cors_headers() -> Vec<String> {
-    vec![
-        "Content-Type".to_string(),
-        "Authorization".to_string(),
-        "Accept".to_string(),
-        "X-CSRF-Token".to_string(),
-    ]
-}
-
-fn default_cors_max_age() -> u64 {
-    3600
-}
-
-fn default_cors_credentials() -> bool {
-    false
-}
+// ============================================================
+// Default implementations
+// ============================================================
 
 impl Default for ServerConfig {
     fn default() -> Self {
@@ -502,52 +413,6 @@ impl Default for MemoryConfig {
     }
 }
 
-impl Default for ApiConfig {
-    fn default() -> Self {
-        Self {
-            admin_token: default_admin_token(),
-            health_token: String::new(),
-            jwt_secret: default_jwt_secret(),
-            access_token_minutes: default_access_token_minutes(),
-            refresh_token_days: default_refresh_token_days(),
-            cookie_secure: true,
-            cookie_same_site: SameSitePolicy::default(),
-            cookie_domain: None,
-            trusted_proxies: Vec::new(),
-        }
-    }
-}
-
-impl Default for RouteConfig {
-    fn default() -> Self {
-        Self {
-            admin_prefix: default_admin_prefix(),
-            health_prefix: default_health_prefix(),
-            frontend_prefix: default_frontend_prefix(),
-        }
-    }
-}
-
-impl Default for FeatureConfig {
-    fn default() -> Self {
-        Self {
-            enable_admin_panel: false,
-            random_code_length: default_random_code_length(),
-            default_url: default_default_url(),
-        }
-    }
-}
-
-impl Default for ClickManagerConfig {
-    fn default() -> Self {
-        Self {
-            enable_click_tracking: default_enable_click_tracking(),
-            flush_interval: default_flush_interval(),
-            max_clicks_before_flush: default_max_clicks_before_flush(),
-        }
-    }
-}
-
 impl Default for LoggingConfig {
     fn default() -> Self {
         Self {
@@ -557,19 +422,6 @@ impl Default for LoggingConfig {
             max_size: default_max_size(),
             max_backups: default_max_backups(),
             enable_rotation: default_enable_rotation(),
-        }
-    }
-}
-
-impl Default for CorsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_cors_enabled(),
-            allowed_origins: vec![],
-            allowed_methods: default_cors_methods(),
-            allowed_headers: default_cors_headers(),
-            max_age: default_cors_max_age(),
-            allow_credentials: default_cors_credentials(),
         }
     }
 }
@@ -584,7 +436,7 @@ mod tests {
         // cargo test export_typescript_types -- --nocapture
 
         // Export enums
-        SameSitePolicy::export_all().expect("Failed to export LoginCredentials");
+        SameSitePolicy::export_all().expect("Failed to export SameSitePolicy");
         HttpMethod::export_all().expect("Failed to export HttpMethod");
 
         println!("TypeScript types exported to {}", TS_EXPORT_PATH);

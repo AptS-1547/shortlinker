@@ -1,13 +1,9 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
-#[allow(deprecated)]
-use crate::config::{
-    get_config, init_runtime_config, migrate_config_to_db, migrate_enum_configs,
-    migrate_plaintext_passwords,
-};
+use crate::config::{get_runtime_config, init_runtime_config, keys};
 use crate::services::LinkService;
-use crate::storage::{ConfigStore, SeaOrmStorage, StorageFactory};
+use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use std::time::Duration;
@@ -55,42 +51,17 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     );
 
     // 初始化运行时配置系统
-    #[allow(deprecated)]
-    {
-        let db = storage.get_db().clone();
-        let file_config = get_config();
+    let db = storage.get_db().clone();
+    init_runtime_config(db)
+        .await
+        .context("Failed to initialize runtime config")?;
+    debug!("Runtime config system initialized");
 
-        // 创建配置存储
-        let config_store = ConfigStore::new(db.clone());
-
-        // 从文件配置迁移到数据库（首次启动时）
-        migrate_config_to_db(&file_config, &config_store)
-            .await
-            .context("Failed to migrate config to database")?;
-
-        // 初始化运行时配置缓存
-        init_runtime_config(db)
-            .await
-            .context("Failed to initialize runtime config")?;
-
-        // 自动迁移明文密码到 argon2 哈希
-        migrate_plaintext_passwords(&config_store)
-            .await
-            .context("Failed to migrate plaintext passwords")?;
-
-        // 自动迁移不合法的 enum 配置值
-        migrate_enum_configs(&config_store)
-            .await
-            .context("Failed to migrate enum configs")?;
-
-        debug!("Runtime config system initialized");
-    }
-
-    // 初始化点击计数器（配置已从数据库加载到 AppConfig）
-    let config = get_config();
-    let enable_click_tracking = config.click_manager.enable_click_tracking;
-    let flush_interval = config.click_manager.flush_interval;
-    let max_clicks_before_flush = config.click_manager.max_clicks_before_flush;
+    // 初始化点击计数器（从 RuntimeConfig 读取配置）
+    let rt = get_runtime_config();
+    let enable_click_tracking = rt.get_bool_or(keys::CLICK_ENABLE_TRACKING, true);
+    let flush_interval = rt.get_u64_or(keys::CLICK_FLUSH_INTERVAL, 30);
+    let max_clicks_before_flush = rt.get_u64_or(keys::CLICK_MAX_CLICKS_BEFORE_FLUSH, 100);
 
     if enable_click_tracking {
         if let Some(sink) = storage.as_click_sink() {
@@ -157,13 +128,13 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         debug!("IPC server started");
     }
 
-    // 提取路由配置（配置已从数据库加载到 AppConfig）
-    let config = get_config();
+    // 提取路由配置（从 RuntimeConfig 读取）
+    let rt = get_runtime_config();
     let route_config = RouteConfig {
-        admin_prefix: config.routes.admin_prefix.clone(),
-        health_prefix: config.routes.health_prefix.clone(),
-        frontend_prefix: config.routes.frontend_prefix.clone(),
-        enable_frontend: config.features.enable_admin_panel,
+        admin_prefix: rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin"),
+        health_prefix: rt.get_or(keys::ROUTES_HEALTH_PREFIX, "/health"),
+        frontend_prefix: rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel"),
+        enable_frontend: rt.get_bool_or(keys::FEATURES_ENABLE_ADMIN_PANEL, false),
     };
 
     check_compoment_enabled(&route_config);
@@ -182,13 +153,13 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 }
 
 fn check_compoment_enabled(route_config: &RouteConfig) {
-    let config = get_config();
+    let rt = get_runtime_config();
 
     // 检查 JWT Secret 安全性
-    check_jwt_secret_security(&config);
+    check_jwt_secret_security(rt);
 
     // 检查 Cookie Secure 标志
-    if !config.api.cookie_secure {
+    if !rt.get_bool_or(keys::API_COOKIE_SECURE, true) {
         warn!(
             "WARNING: Cookie Secure flag is disabled. \
             Cookies will be sent over unencrypted HTTP connections. \
@@ -197,7 +168,7 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     }
 
     // 检查 Admin API 是否启用
-    let admin_token = &config.api.admin_token;
+    let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
     if admin_token.is_empty() {
         warn!("Admin API is disabled (ADMIN_TOKEN not set)");
     } else {
@@ -205,7 +176,7 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     }
 
     // 检查 Health API 是否启用
-    let health_token = &config.api.health_token;
+    let health_token = rt.get_or(keys::API_HEALTH_TOKEN, "");
     if health_token.is_empty() && admin_token.is_empty() {
         warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
     } else {
@@ -230,18 +201,20 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
 }
 
 /// 检查 JWT Secret 安全性
-fn check_jwt_secret_security(config: &crate::config::AppConfig) {
+fn check_jwt_secret_security(rt: &crate::config::RuntimeConfig) {
+    let jwt_secret = rt.get_or(keys::API_JWT_SECRET, "");
     // 检查 JWT Secret 长度
-    if config.api.jwt_secret.len() < 32 {
+    if jwt_secret.len() < 32 {
         warn!(
             "WARNING: JWT Secret is too short ({} bytes). \
             Recommended minimum is 32 bytes for security.",
-            config.api.jwt_secret.len()
+            jwt_secret.len()
         );
     }
 
     // 检查 Admin Token 长度
-    if !config.api.admin_token.is_empty() && config.api.admin_token.len() < 8 {
+    let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
+    if !admin_token.is_empty() && admin_token.len() < 8 {
         warn!("WARNING: Admin Token is very short. Consider using a stronger token.");
     }
 }

@@ -6,10 +6,12 @@ use actix_web::http::StatusCode;
 use serde::Serialize;
 
 use crate::api::constants;
-use crate::config::SameSitePolicy;
+use crate::config::{get_runtime_config, keys};
+use crate::errors::ShortlinkerError;
 use crate::utils::TimeParser;
 
-use super::types::{ApiResponse, ErrorData};
+use super::error_code::ErrorCode;
+use super::types::ApiResponse;
 
 /// 解析过期时间字符串，支持相对格式（如 '1h', '30m'）和 RFC3339 格式
 pub fn parse_expires_at(expire_str: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
@@ -26,26 +28,53 @@ pub fn parse_expires_at(expire_str: &str) -> Result<chrono::DateTime<chrono::Utc
 }
 
 /// 构建 JSON 响应
-pub fn json_response<T: Serialize>(status: StatusCode, code: i32, data: T) -> HttpResponse {
+pub fn json_response<T: Serialize>(
+    status: StatusCode,
+    code: ErrorCode,
+    message: impl Into<String>,
+    data: Option<T>,
+) -> HttpResponse {
     HttpResponse::build(status)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
-        .json(ApiResponse { code, data })
+        .json(ApiResponse {
+            code: code as i32,
+            message: message.into(),
+            data,
+        })
 }
 
 /// 构建成功响应
 pub fn success_response<T: Serialize>(data: T) -> HttpResponse {
-    json_response(StatusCode::OK, 0, data)
+    json_response(StatusCode::OK, ErrorCode::Success, "OK", Some(data))
 }
 
 /// 构建错误响应
-pub fn error_response(status: StatusCode, message: &str) -> HttpResponse {
-    json_response(
-        status,
-        1,
-        ErrorData {
-            error: message.to_string(),
-        },
-    )
+pub fn error_response(status: StatusCode, error_code: ErrorCode, message: &str) -> HttpResponse {
+    json_response::<()>(status, error_code, message, None)
+}
+
+/// 从 ShortlinkerError 构建错误响应（自动映射 HTTP 状态码和 ErrorCode）
+pub fn error_from_shortlinker(err: &ShortlinkerError) -> HttpResponse {
+    let status = err.http_status();
+    let error_code = ErrorCode::from(err.clone());
+    error_response(status, error_code, err.message())
+}
+
+/// 统一 Result → HttpResponse 转换
+///
+/// 成功时返回 200 OK + JSON 数据，失败时自动映射 ShortlinkerError。
+pub fn api_result<T, E>(result: Result<T, E>) -> HttpResponse
+where
+    T: Serialize,
+    E: Into<ShortlinkerError>,
+{
+    match result {
+        Ok(data) => success_response(data),
+        Err(e) => {
+            let err: ShortlinkerError = e.into();
+            error_from_shortlinker(&err)
+        }
+    }
 }
 
 /// Cookie 构建器，消除重复的 cookie 创建代码
@@ -60,21 +89,22 @@ pub struct CookieBuilder {
 
 impl CookieBuilder {
     pub fn from_config() -> Self {
-        let config = crate::config::get_config();
+        let rt = get_runtime_config();
 
-        let same_site = match config.api.cookie_same_site {
-            SameSitePolicy::Strict => SameSite::Strict,
-            SameSitePolicy::None => SameSite::None,
-            SameSitePolicy::Lax => SameSite::Lax,
+        let same_site_str = rt.get_or(keys::API_COOKIE_SAME_SITE, "Lax");
+        let same_site = match same_site_str.to_lowercase().as_str() {
+            "strict" => SameSite::Strict,
+            "none" => SameSite::None,
+            _ => SameSite::Lax,
         };
 
         Self {
             same_site,
-            secure: config.api.cookie_secure,
-            domain: config.api.cookie_domain.clone(),
-            access_token_minutes: config.api.access_token_minutes,
-            refresh_token_days: config.api.refresh_token_days,
-            admin_prefix: config.routes.admin_prefix.clone(),
+            secure: rt.get_bool_or(keys::API_COOKIE_SECURE, true),
+            domain: rt.get(keys::API_COOKIE_DOMAIN).filter(|s| !s.is_empty()),
+            access_token_minutes: rt.get_u64_or(keys::API_ACCESS_TOKEN_MINUTES, 15),
+            refresh_token_days: rt.get_u64_or(keys::API_REFRESH_TOKEN_DAYS, 7),
+            admin_prefix: rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin"),
         }
     }
 
@@ -244,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_json_response_structure() {
-        let response = json_response(StatusCode::OK, 0, "test_data");
+        let response = json_response(StatusCode::OK, ErrorCode::Success, "OK", Some("test_data"));
         assert_eq!(response.status(), StatusCode::OK);
     }
 
@@ -256,19 +286,31 @@ mod tests {
 
     #[test]
     fn test_error_response() {
-        let response = error_response(StatusCode::BAD_REQUEST, "Something went wrong");
+        let response = error_response(
+            StatusCode::BAD_REQUEST,
+            ErrorCode::BadRequest,
+            "Something went wrong",
+        );
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]
     fn test_error_response_not_found() {
-        let response = error_response(StatusCode::NOT_FOUND, "Resource not found");
+        let response = error_response(
+            StatusCode::NOT_FOUND,
+            ErrorCode::NotFound,
+            "Resource not found",
+        );
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[test]
     fn test_error_response_internal_error() {
-        let response = error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal error");
+        let response = error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorCode::InternalServerError,
+            "Internal error",
+        );
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

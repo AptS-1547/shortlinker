@@ -14,7 +14,8 @@ pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError
         path.blue()
     );
 
-    let config = crate::config::AppConfig::default();
+    // 使用 StaticConfig 生成配置，只包含静态配置项
+    let config = crate::config::StaticConfig::default();
     match config.save_to_file(&path) {
         Ok(()) => {
             println!(
@@ -26,6 +27,12 @@ pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError
                 "  {} {}",
                 "Please edit the configuration file and restart the service".yellow(),
                 "🔧".blue()
+            );
+            println!(
+                "  {} {}",
+                "Note: Runtime settings (API, routes, features, CORS) are managed via Admin Panel"
+                    .dimmed(),
+                "".blue()
             );
             Ok(())
         }

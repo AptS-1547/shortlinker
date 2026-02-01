@@ -157,15 +157,10 @@ impl ConfigStore {
             ShortlinkerError::database_operation(format!("更新配置 '{}' 失败: {}", key, e))
         })?;
 
-        // 硬编码的敏感 key 兜底列表，防止初次迁移时因 is_sensitive=false 导致明文泄露
-        const ALWAYS_SENSITIVE_KEYS: &[&str] =
-            &["api.admin_token", "api.jwt_secret", "api.health_token"];
-
-        // 检查是否为敏感配置（优先使用定义，回退到数据库标记，最后使用兜底列表）
+        // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
         let is_sensitive_config = get_def(key)
             .map(|def| def.is_sensitive)
-            .unwrap_or(is_sensitive)
-            || ALWAYS_SENSITIVE_KEYS.contains(&key);
+            .unwrap_or(is_sensitive);
 
         // 记录变更历史（敏感配置的值脱敏为 [REDACTED]）
         let (history_old_value, history_new_value) = if is_sensitive_config {
@@ -365,5 +360,133 @@ impl ConfigStore {
             })?;
 
         Ok(count)
+    }
+
+    /// 确保所有配置项存在,不存在则使用默认值初始化
+    ///
+    /// 遍历 `definitions::ALL_CONFIGS` 中定义的所有配置项，
+    /// 对于数据库中不存在的配置，调用其 `default_fn` 生成默认值并插入。
+    /// 同时同步配置的元数据（value_type, requires_restart, is_sensitive）。
+    ///
+    /// 特殊处理：
+    /// - `api.admin_token`: 如果是新生成的明文密码，会写入 `admin_token.txt` 让用户保存，
+    ///   然后哈希后再存入数据库。
+    ///
+    /// 应在服务启动时调用，确保首次启动时配置表不为空。
+    pub async fn ensure_defaults(&self) -> Result<usize> {
+        use crate::config::definitions::{ALL_CONFIGS, keys};
+        use crate::utils::password::{hash_password, is_argon2_hash};
+        use tracing::{debug, info, warn};
+
+        let mut inserted_count = 0;
+
+        for def in ALL_CONFIGS {
+            // 调用默认值函数生成值
+            let default_value = (def.default_fn)();
+
+            // 特殊处理：api.admin_token 需要哈希
+            let is_new_admin_token = def.key == keys::API_ADMIN_TOKEN
+                && !default_value.is_empty()
+                && !is_argon2_hash(&default_value);
+
+            // 如果是新生成的 admin_token，先哈希（在插入数据库前）
+            let value_to_insert = if is_new_admin_token {
+                hash_password(&default_value).map_err(|e| {
+                    ShortlinkerError::database_operation(format!(
+                        "Failed to hash admin_token: {}",
+                        e
+                    ))
+                })?
+            } else {
+                default_value.clone()
+            };
+
+            // 尝试插入（如果不存在）
+            let inserted = self
+                .insert_if_not_exists(
+                    def.key,
+                    &value_to_insert,
+                    def.value_type,
+                    def.requires_restart,
+                    def.is_sensitive,
+                )
+                .await?;
+
+            if inserted {
+                debug!("Initialized config '{}' with default value", def.key);
+                inserted_count += 1;
+
+                // 如果是新生成的 admin_token，写入明文到文件（可选操作，失败不影响安全性）
+                if is_new_admin_token {
+                    let token_file = std::path::Path::new("admin_token.txt");
+
+                    // 安全修复：使用 create_new 防止 symlink 攻击
+                    use std::fs::OpenOptions;
+                    use std::io::Write;
+
+                    match OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(token_file)
+                    {
+                        Ok(mut file) => {
+                            // 设置文件权限 0600 (仅 Unix)
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::PermissionsExt;
+                                let perms = std::fs::Permissions::from_mode(0o600);
+                                if let Err(e) = std::fs::set_permissions(token_file, perms) {
+                                    warn!("Failed to set permissions on admin_token.txt: {}", e);
+                                }
+                            }
+
+                            if let Err(e) = writeln!(
+                                file,
+                                "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}",
+                                default_value
+                            ) {
+                                warn!(
+                                    "Failed to write admin_token.txt: {}, but token is already hashed in database",
+                                    e
+                                );
+                            } else {
+                                info!(
+                                    "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
+                                );
+                            }
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                            // 文件已存在，跳过
+                            debug!("admin_token.txt already exists, skipping");
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to create admin_token.txt: {}, but token is already hashed in database",
+                                e
+                            );
+                        }
+                    }
+                }
+            } else {
+                // 配置已存在，同步元数据
+                if self
+                    .sync_metadata(
+                        def.key,
+                        def.value_type,
+                        def.requires_restart,
+                        def.is_sensitive,
+                    )
+                    .await?
+                {
+                    debug!("Synced metadata for config '{}'", def.key);
+                }
+            }
+        }
+
+        if inserted_count > 0 {
+            info!("Initialized {} default configuration items", inserted_count);
+        }
+
+        Ok(inserted_count)
     }
 }

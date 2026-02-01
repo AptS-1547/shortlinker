@@ -10,6 +10,7 @@ use crate::utils::generate_random_code;
 use crate::utils::password::{process_new_password, process_update_password};
 use crate::utils::url_validator::validate_url;
 
+use super::error_code::ErrorCode;
 use super::get_random_code_length;
 use super::helpers::{parse_expires_at, success_response};
 use super::types::{
@@ -55,6 +56,7 @@ pub async fn batch_create_links(
             failed.push(BatchFailedItem {
                 code,
                 error: e.to_string(),
+                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
             });
             continue;
         }
@@ -87,6 +89,7 @@ pub async fn batch_create_links(
             failed.push(BatchFailedItem {
                 code: req.code,
                 error: "Link already exists".to_string(),
+                error_code: Some(ErrorCode::LinkAlreadyExists as i32),
             });
             continue;
         }
@@ -99,6 +102,7 @@ pub async fn batch_create_links(
                     failed.push(BatchFailedItem {
                         code: req.code,
                         error: error_msg,
+                        error_code: Some(ErrorCode::LinkInvalidExpireTime as i32),
                     });
                     continue;
                 }
@@ -120,6 +124,7 @@ pub async fn batch_create_links(
                 failed.push(BatchFailedItem {
                     code: req.code,
                     error: format!("Failed to hash password: {}", e),
+                    error_code: Some(ErrorCode::LinkPasswordHashError as i32),
                 });
                 continue;
             }
@@ -147,6 +152,7 @@ pub async fn batch_create_links(
             failed.push(BatchFailedItem {
                 code,
                 error: format!("Database error: {}", e),
+                error_code: Some(ErrorCode::LinkDatabaseError as i32),
             });
         }
     }
@@ -203,6 +209,7 @@ pub async fn batch_update_links(
             failed.push(BatchFailedItem {
                 code: code.clone(),
                 error: e.to_string(),
+                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
             });
             continue;
         }
@@ -234,6 +241,7 @@ pub async fn batch_update_links(
                 failed.push(BatchFailedItem {
                     code: update.code,
                     error: "Link not found".to_string(),
+                    error_code: Some(ErrorCode::LinkNotFound as i32),
                 });
                 continue;
             }
@@ -247,6 +255,7 @@ pub async fn batch_update_links(
                     failed.push(BatchFailedItem {
                         code: update.code,
                         error: error_msg,
+                        error_code: Some(ErrorCode::LinkInvalidExpireTime as i32),
                     });
                     continue;
                 }
@@ -264,6 +273,7 @@ pub async fn batch_update_links(
                 failed.push(BatchFailedItem {
                     code: update.code,
                     error: format!("Failed to hash password: {}", e),
+                    error_code: Some(ErrorCode::LinkPasswordHashError as i32),
                 });
                 continue;
             }
@@ -291,6 +301,7 @@ pub async fn batch_update_links(
             failed.push(BatchFailedItem {
                 code,
                 error: format!("Database error: {}", e),
+                error_code: Some(ErrorCode::LinkDatabaseError as i32),
             });
         }
     }
@@ -333,7 +344,8 @@ pub async fn batch_delete_links(
         .into_iter()
         .map(|code| BatchFailedItem {
             code,
-            error: "短链接不存在".to_string(),
+            error: "Link not found".to_string(),
+            error_code: Some(ErrorCode::LinkNotFound as i32),
         })
         .collect();
 

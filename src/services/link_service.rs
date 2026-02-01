@@ -3,72 +3,19 @@
 //! Provides unified business logic for link operations, shared between
 //! IPC handlers and HTTP handlers.
 
-use std::fmt;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use tracing::{error, info};
 
 use crate::cache::traits::CompositeCacheTrait;
-use crate::config::get_config;
+use crate::config::{get_config, keys, try_get_runtime_config};
+use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
 use crate::utils::password::{hash_password, is_argon2_hash};
 use crate::utils::url_validator::validate_url;
-
-// ============ Error Types ============
-
-/// Service layer errors
-#[derive(Debug)]
-pub enum ServiceError {
-    /// Invalid URL format
-    InvalidUrl(String),
-    /// Invalid expiration time format
-    InvalidExpireTime(String),
-    /// Password hashing failed
-    PasswordHashError,
-    /// Resource not found
-    NotFound(String),
-    /// Resource already exists (conflict)
-    Conflict(String),
-    /// Database operation failed
-    DatabaseError(String),
-    /// Storage not initialized
-    NotInitialized,
-}
-
-impl fmt::Display for ServiceError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ServiceError::InvalidUrl(msg) => write!(f, "Invalid URL: {}", msg),
-            ServiceError::InvalidExpireTime(msg) => write!(f, "Invalid expiration time: {}", msg),
-            ServiceError::PasswordHashError => write!(f, "Failed to process password"),
-            ServiceError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            ServiceError::Conflict(msg) => write!(f, "Conflict: {}", msg),
-            ServiceError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            ServiceError::NotInitialized => write!(f, "Service not initialized"),
-        }
-    }
-}
-
-impl std::error::Error for ServiceError {}
-
-/// Service error codes for protocol conversion
-impl ServiceError {
-    /// Get error code string for IPC/HTTP responses
-    pub fn code(&self) -> &'static str {
-        match self {
-            ServiceError::InvalidUrl(_) => "INVALID_URL",
-            ServiceError::InvalidExpireTime(_) => "INVALID_EXPIRE_TIME",
-            ServiceError::PasswordHashError => "HASH_ERROR",
-            ServiceError::NotFound(_) => "NOT_FOUND",
-            ServiceError::Conflict(_) => "CONFLICT",
-            ServiceError::DatabaseError(_) => "DATABASE_ERROR",
-            ServiceError::NotInitialized => "NOT_INITIALIZED",
-        }
-    }
-}
 
 // ============ Request/Response DTOs ============
 
@@ -140,49 +87,8 @@ impl ImportMode {
 }
 
 #[cfg(test)]
-mod service_error_tests {
+mod import_mode_tests {
     use super::*;
-
-    #[test]
-    fn test_service_error_codes() {
-        assert_eq!(
-            ServiceError::InvalidUrl("test".into()).code(),
-            "INVALID_URL"
-        );
-        assert_eq!(
-            ServiceError::InvalidExpireTime("test".into()).code(),
-            "INVALID_EXPIRE_TIME"
-        );
-        assert_eq!(ServiceError::PasswordHashError.code(), "HASH_ERROR");
-        assert_eq!(ServiceError::NotFound("test".into()).code(), "NOT_FOUND");
-        assert_eq!(ServiceError::Conflict("test".into()).code(), "CONFLICT");
-        assert_eq!(
-            ServiceError::DatabaseError("test".into()).code(),
-            "DATABASE_ERROR"
-        );
-        assert_eq!(ServiceError::NotInitialized.code(), "NOT_INITIALIZED");
-    }
-
-    #[test]
-    fn test_service_error_display() {
-        let err = ServiceError::InvalidUrl("bad url".into());
-        let display = format!("{}", err);
-        assert!(display.contains("Invalid URL"));
-        assert!(display.contains("bad url"));
-
-        let err = ServiceError::NotFound("link xyz".into());
-        let display = format!("{}", err);
-        assert!(display.contains("Not found"));
-        assert!(display.contains("link xyz"));
-
-        let err = ServiceError::PasswordHashError;
-        let display = format!("{}", err);
-        assert!(display.contains("password"));
-
-        let err = ServiceError::NotInitialized;
-        let display = format!("{}", err);
-        assert!(display.contains("not initialized"));
-    }
 
     #[test]
     fn test_import_mode_from_overwrite_flag() {
@@ -193,12 +99,6 @@ mod service_error_tests {
     #[test]
     fn test_import_mode_default() {
         assert_eq!(ImportMode::default(), ImportMode::Skip);
-    }
-
-    #[test]
-    fn test_service_error_is_std_error() {
-        let err: Box<dyn std::error::Error> = Box::new(ServiceError::NotFound("test".into()));
-        assert!(err.to_string().contains("Not found"));
     }
 }
 
@@ -237,7 +137,9 @@ impl LinkService {
 
     /// Get the configured random code length
     fn random_code_length(&self) -> usize {
-        get_config().features.random_code_length
+        try_get_runtime_config()
+            .and_then(|rt| rt.get_usize(keys::FEATURES_RANDOM_CODE_LENGTH))
+            .unwrap_or(6)
     }
 
     /// Get the default cache TTL
@@ -246,7 +148,7 @@ impl LinkService {
     }
 
     /// Process password field - hash if needed
-    fn process_password(&self, password: Option<&str>) -> Result<Option<String>, ServiceError> {
+    fn process_password(&self, password: Option<&str>) -> Result<Option<String>, ShortlinkerError> {
         match password {
             Some(pwd) if !pwd.is_empty() => {
                 if is_argon2_hash(pwd) {
@@ -254,7 +156,7 @@ impl LinkService {
                 } else {
                     hash_password(pwd).map(Some).map_err(|e| {
                         error!("Failed to hash password: {}", e);
-                        ServiceError::PasswordHashError
+                        ShortlinkerError::link_password_hash_error(e.to_string())
                     })
                 }
             }
@@ -266,11 +168,11 @@ impl LinkService {
     fn parse_expires_at(
         &self,
         expires_at: Option<&str>,
-    ) -> Result<Option<DateTime<Utc>>, ServiceError> {
+    ) -> Result<Option<DateTime<Utc>>, ShortlinkerError> {
         match expires_at {
             Some(s) if !s.is_empty() => TimeParser::parse_expire_time(s)
                 .map(Some)
-                .map_err(|e| ServiceError::InvalidExpireTime(e.to_string())),
+                .map_err(|e| ShortlinkerError::link_invalid_expire_time(e.to_string())),
             _ => Ok(None),
         }
     }
@@ -287,9 +189,9 @@ impl LinkService {
     pub async fn create_link(
         &self,
         req: CreateLinkRequest,
-    ) -> Result<LinkCreateResult, ServiceError> {
+    ) -> Result<LinkCreateResult, ShortlinkerError> {
         // Validate URL
-        validate_url(&req.target).map_err(|e| ServiceError::InvalidUrl(e.to_string()))?;
+        validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
 
         // Generate code if not provided
         let (code, generated) = match req.code.filter(|c| !c.is_empty()) {
@@ -299,11 +201,11 @@ impl LinkService {
 
         // Check if code already exists
         let existing = self.storage.get(&code).await.map_err(|e| {
-            ServiceError::DatabaseError(format!("Failed to check existing link: {}", e))
+            ShortlinkerError::database_operation(format!("Failed to check existing link: {}", e))
         })?;
 
         if existing.is_some() && !req.force {
-            return Err(ServiceError::Conflict(format!(
+            return Err(ShortlinkerError::link_already_exists(format!(
                 "Code '{}' already exists. Use force=true to overwrite.",
                 code
             )));
@@ -332,10 +234,9 @@ impl LinkService {
         };
 
         // Save to storage
-        self.storage
-            .set(new_link.clone())
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to save link: {}", e)))?;
+        self.storage.set(new_link.clone()).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to save link: {}", e))
+        })?;
 
         // Update cache
         self.update_cache(&new_link).await;
@@ -361,17 +262,19 @@ impl LinkService {
         &self,
         code: &str,
         req: UpdateLinkRequest,
-    ) -> Result<ShortLink, ServiceError> {
+    ) -> Result<ShortLink, ShortlinkerError> {
         // Validate URL
-        validate_url(&req.target).map_err(|e| ServiceError::InvalidUrl(e.to_string()))?;
+        validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
 
         // Get existing link
         let existing = self
             .storage
             .get(code)
             .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to get link: {}", e)))?
-            .ok_or_else(|| ServiceError::NotFound(format!("Link '{}' not found", code)))?;
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Failed to get link: {}", e))
+            })?
+            .ok_or_else(|| ShortlinkerError::not_found(format!("Link '{}' not found", code)))?;
 
         // Parse expiration time (None = keep existing)
         let expires_at = if req.expires_at.is_some() {
@@ -387,7 +290,7 @@ impl LinkService {
         )
         .map_err(|e| {
             error!("Failed to hash password: {}", e);
-            ServiceError::PasswordHashError
+            ShortlinkerError::link_password_hash_error(e.to_string())
         })?;
 
         let updated_link = ShortLink {
@@ -400,10 +303,9 @@ impl LinkService {
         };
 
         // Save to storage
-        self.storage
-            .set(updated_link.clone())
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to update link: {}", e)))?;
+        self.storage.set(updated_link.clone()).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to update link: {}", e))
+        })?;
 
         // Update cache
         self.update_cache(&updated_link).await;
@@ -413,11 +315,10 @@ impl LinkService {
     }
 
     /// Delete a link
-    pub async fn delete_link(&self, code: &str) -> Result<(), ServiceError> {
-        self.storage
-            .remove(code)
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to remove link: {}", e)))?;
+    pub async fn delete_link(&self, code: &str) -> Result<(), ShortlinkerError> {
+        self.storage.remove(code).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to remove link: {}", e))
+        })?;
 
         self.cache.remove(code).await;
 
@@ -426,11 +327,11 @@ impl LinkService {
     }
 
     /// Get a single link
-    pub async fn get_link(&self, code: &str) -> Result<Option<ShortLink>, ServiceError> {
+    pub async fn get_link(&self, code: &str) -> Result<Option<ShortLink>, ShortlinkerError> {
         self.storage
             .get(code)
             .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to get link: {}", e)))
+            .map_err(|e| ShortlinkerError::database_operation(format!("Failed to get link: {}", e)))
     }
 
     /// List links with pagination and filtering
@@ -439,22 +340,23 @@ impl LinkService {
         filter: LinkFilter,
         page: u64,
         page_size: u64,
-    ) -> Result<(Vec<ShortLink>, u64), ServiceError> {
+    ) -> Result<(Vec<ShortLink>, u64), ShortlinkerError> {
         let page = page.max(1);
         let page_size = page_size.clamp(1, 100);
 
         self.storage
             .load_paginated_filtered(page, page_size, filter)
             .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to list links: {}", e)))
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Failed to list links: {}", e))
+            })
     }
 
     /// Get link statistics
-    pub async fn get_stats(&self) -> Result<crate::storage::LinkStats, ServiceError> {
-        self.storage
-            .get_stats()
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to get stats: {}", e)))
+    pub async fn get_stats(&self) -> Result<crate::storage::LinkStats, ShortlinkerError> {
+        self.storage.get_stats().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to get stats: {}", e))
+        })
     }
 
     // ============ Batch Operations ============
@@ -464,7 +366,7 @@ impl LinkService {
         &self,
         links: Vec<ImportLinkItem>,
         mode: ImportMode,
-    ) -> Result<ImportResult, ServiceError> {
+    ) -> Result<ImportResult, ShortlinkerError> {
         let mut result = ImportResult::default();
 
         // Step 1: Validate URLs and collect codes
@@ -501,7 +403,10 @@ impl LinkService {
         // Step 2: Batch fetch existing links (1 query instead of N)
         let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
         let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
-            ServiceError::DatabaseError(format!("Failed to batch check existing links: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to batch check existing links: {}",
+                e
+            ))
         })?;
 
         // Step 3: Process each item with in-memory existence check
@@ -595,12 +500,10 @@ impl LinkService {
     }
 
     /// Export all links
-    pub async fn export_links(&self) -> Result<Vec<ShortLink>, ServiceError> {
-        let links_map = self
-            .storage
-            .load_all()
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to load links: {}", e)))?;
+    pub async fn export_links(&self) -> Result<Vec<ShortLink>, ShortlinkerError> {
+        let links_map = self.storage.load_all().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to load links: {}", e))
+        })?;
 
         let links: Vec<ShortLink> = links_map.into_values().collect();
         info!("LinkService: exported {} links", links.len());

@@ -20,6 +20,10 @@ pub enum ValueType {
     Bool,
     Json,
     Enum,
+    /// 字符串数组类型，前端渲染为 Tag Input
+    StringArray,
+    /// 枚举数组类型，前端渲染为多选 Checkbox（需配合 enum_options）
+    EnumArray,
 }
 
 impl std::fmt::Display for ValueType {
@@ -30,6 +34,8 @@ impl std::fmt::Display for ValueType {
             Self::Bool => write!(f, "bool"),
             Self::Json => write!(f, "json"),
             Self::Enum => write!(f, "enum"),
+            Self::StringArray => write!(f, "stringarray"),
+            Self::EnumArray => write!(f, "enumarray"),
         }
     }
 }
@@ -43,6 +49,8 @@ impl std::str::FromStr for ValueType {
             "bool" => Ok(Self::Bool),
             "json" => Ok(Self::Json),
             "enum" => Ok(Self::Enum),
+            "stringarray" => Ok(Self::StringArray),
+            "enumarray" => Ok(Self::EnumArray),
             _ => Err(format!("Unknown value type: {}", s)),
         }
     }
@@ -82,6 +90,8 @@ mod tests {
         assert_eq!(ValueType::Bool.to_string(), "bool");
         assert_eq!(ValueType::Json.to_string(), "json");
         assert_eq!(ValueType::Enum.to_string(), "enum");
+        assert_eq!(ValueType::StringArray.to_string(), "stringarray");
+        assert_eq!(ValueType::EnumArray.to_string(), "enumarray");
     }
 
     #[test]
@@ -91,6 +101,14 @@ mod tests {
         assert_eq!("bool".parse::<ValueType>().unwrap(), ValueType::Bool);
         assert_eq!("json".parse::<ValueType>().unwrap(), ValueType::Json);
         assert_eq!("enum".parse::<ValueType>().unwrap(), ValueType::Enum);
+        assert_eq!(
+            "stringarray".parse::<ValueType>().unwrap(),
+            ValueType::StringArray
+        );
+        assert_eq!(
+            "enumarray".parse::<ValueType>().unwrap(),
+            ValueType::EnumArray
+        );
         assert!("invalid".parse::<ValueType>().is_err());
     }
 

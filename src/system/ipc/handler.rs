@@ -8,8 +8,9 @@ use std::time::Instant;
 use tracing::{debug, info, warn};
 
 use super::types::{ImportLinkData, IpcCommand, IpcResponse, ShortLinkData};
+use crate::errors::ShortlinkerError;
 use crate::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, ServiceError, UpdateLinkRequest,
+    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, ShortLink};
 use crate::system::reload::get_reload_coordinator;
@@ -52,8 +53,8 @@ fn to_link_data(link: &ShortLink) -> ShortLinkData {
     }
 }
 
-/// Convert ServiceError to IpcResponse::Error
-fn error_response(err: ServiceError) -> IpcResponse {
+/// Convert ShortlinkerError to IpcResponse::Error
+fn error_response(err: ShortlinkerError) -> IpcResponse {
     IpcResponse::Error {
         code: err.code().to_string(),
         message: err.to_string(),
@@ -188,7 +189,9 @@ async fn handle_add_link(
     password: Option<String>,
 ) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     let req = CreateLinkRequest {
@@ -210,7 +213,9 @@ async fn handle_add_link(
 
 async fn handle_remove_link(code: String) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     match service.delete_link(&code).await {
@@ -226,7 +231,9 @@ async fn handle_update_link(
     password: Option<String>,
 ) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     let req = UpdateLinkRequest {
@@ -245,7 +252,9 @@ async fn handle_update_link(
 
 async fn handle_get_link(code: String) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     match service.get_link(&code).await {
@@ -258,7 +267,9 @@ async fn handle_get_link(code: String) -> IpcResponse {
 
 async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     let filter = LinkFilter {
@@ -285,7 +296,9 @@ async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) ->
 
 async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     // Convert IPC ImportLinkData to service ImportLinkItem
@@ -321,7 +334,9 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
 
 async fn handle_export_links() -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     match service.export_links().await {
@@ -335,7 +350,9 @@ async fn handle_export_links() -> IpcResponse {
 
 async fn handle_get_stats() -> IpcResponse {
     let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ServiceError::NotInitialized);
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
     };
 
     match service.get_stats().await {

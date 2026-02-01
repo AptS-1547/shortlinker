@@ -2,8 +2,9 @@ use actix_web::{HttpRequest, HttpResponse, Result};
 use rust_embed::Embed;
 use std::env;
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use tracing::{debug, trace};
+
+use crate::config::{get_runtime_config, keys};
 
 // 使用 RustEmbed 自动嵌入静态文件
 #[derive(Embed)]
@@ -11,10 +12,6 @@ use tracing::{debug, trace};
 struct FrontendAssets;
 
 pub struct FrontendService;
-
-static FRONTEND_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
-static ADMIN_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
-static HEALTH_ROUTE_PREFIX: OnceLock<String> = OnceLock::new();
 
 /// 自定义前端目录路径
 const CUSTOM_FRONTEND_DIR: &str = "./frontend-panel";
@@ -46,11 +43,10 @@ impl FrontendService {
     pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
         trace!("Serving frontend index page from dist");
 
-        let config = crate::config::get_config();
-        let frontend_prefix =
-            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
-        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| config.routes.admin_prefix.clone());
-        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| config.routes.health_prefix.clone());
+        let rt = get_runtime_config();
+        let frontend_prefix = rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel");
+        let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
+        let health_prefix = rt.get_or(keys::ROUTES_HEALTH_PREFIX, "/health");
 
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();
@@ -69,9 +65,9 @@ impl FrontendService {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(&data);
                 let processed_html = html_content
-                    .replace("%BASE_PATH%", frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%BASE_PATH%", &frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
                     .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
 
                 Ok(HttpResponse::Ok()
@@ -85,9 +81,9 @@ impl FrontendService {
                     "/admin-panel/dist/index.html"
                 ));
                 let processed_html = fallback_html
-                    .replace("%BASE_PATH%", frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%BASE_PATH%", &frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
                     .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
@@ -148,11 +144,10 @@ impl FrontendService {
     pub async fn handle_spa_fallback(req: HttpRequest) -> Result<HttpResponse> {
         trace!("SPA fallback - serving index.html");
 
-        let config = crate::config::get_config();
-        let frontend_prefix =
-            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
-        let admin_prefix = ADMIN_ROUTE_PREFIX.get_or_init(|| config.routes.admin_prefix.clone());
-        let health_prefix = HEALTH_ROUTE_PREFIX.get_or_init(|| config.routes.health_prefix.clone());
+        let rt = get_runtime_config();
+        let frontend_prefix = rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel");
+        let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
+        let health_prefix = rt.get_or(keys::ROUTES_HEALTH_PREFIX, "/health");
 
         // 检查路径是否需要规范化（添加尾部斜杠）
         let path = req.path();
@@ -171,9 +166,9 @@ impl FrontendService {
                 // 将字节数组转换为字符串并替换占位符
                 let html_content = String::from_utf8_lossy(&data);
                 let processed_html = html_content
-                    .replace("%BASE_PATH%", frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%BASE_PATH%", &frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
                     .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
 
                 Ok(HttpResponse::Ok()
@@ -187,9 +182,9 @@ impl FrontendService {
                     "/admin-panel/dist/index.html"
                 ));
                 let processed_html = html
-                    .replace("%BASE_PATH%", frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", health_prefix)
+                    .replace("%BASE_PATH%", &frontend_prefix)
+                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
+                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
                     .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
                 Ok(HttpResponse::Ok()
                     .content_type("text/html; charset=utf-8")
@@ -202,11 +197,10 @@ impl FrontendService {
     pub async fn handle_pwa_assets(req: HttpRequest) -> Result<HttpResponse> {
         let path = req.path();
         // 去掉 frontend_prefix，获取文件名
-        let config = crate::config::get_config();
-        let frontend_prefix =
-            FRONTEND_ROUTE_PREFIX.get_or_init(|| config.routes.frontend_prefix.clone());
+        let rt = get_runtime_config();
+        let frontend_prefix = rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel");
         let file_name = path
-            .strip_prefix(frontend_prefix)
+            .strip_prefix(&frontend_prefix)
             .unwrap_or(path)
             .trim_start_matches('/');
 
@@ -222,7 +216,7 @@ impl FrontendService {
                 // 对 manifest.webmanifest 做配置注入
                 if file_name == "manifest.webmanifest" {
                     let manifest_content = String::from_utf8_lossy(&data);
-                    let processed = manifest_content.replace("%BASE_PATH%", frontend_prefix);
+                    let processed = manifest_content.replace("%BASE_PATH%", &frontend_prefix);
                     Ok(HttpResponse::Ok()
                         .content_type(content_type)
                         .body(processed))

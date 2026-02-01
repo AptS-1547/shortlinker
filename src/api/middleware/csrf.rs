@@ -20,8 +20,8 @@ use subtle::ConstantTimeEq;
 use tracing::{trace, warn};
 
 use crate::api::constants;
-use crate::api::services::admin::{ApiResponse, ErrorData};
-use crate::config::get_config;
+use crate::api::services::admin::{ApiResponse, ErrorCode};
+use crate::config::{get_runtime_config, keys};
 
 use super::auth::AuthMethod;
 
@@ -41,8 +41,8 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = get_config();
-        let admin_prefix = config.routes.admin_prefix.clone();
+        let rt = get_runtime_config();
+        let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
 
         // 预计算认证端点路径（只在初始化时计算一次）
         let auth_endpoints = vec![
@@ -74,11 +74,10 @@ where
         req.into_response(
             HttpResponse::Forbidden()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: ErrorData {
-                        error: "CSRF token missing or invalid".to_string(),
-                    },
+                .json(ApiResponse::<()> {
+                    code: ErrorCode::CsrfInvalid as i32,
+                    message: "CSRF token missing or invalid".to_string(),
+                    data: None,
                 })
                 .map_into_right_body(),
         )

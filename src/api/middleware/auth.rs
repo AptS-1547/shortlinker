@@ -11,8 +11,8 @@ use tracing::{trace, warn};
 
 use crate::api::constants;
 use crate::api::jwt::JwtService;
-use crate::api::services::admin::{ApiResponse, ErrorData};
-use crate::config::get_config;
+use crate::api::services::admin::{ApiResponse, ErrorCode};
+use crate::config::{get_runtime_config, keys};
 
 /// 认证方式标记，用于 CSRF 中间件判断是否跳过验证
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,10 +39,10 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = get_config();
+        let rt = get_runtime_config();
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
-            admin_prefix: config.routes.admin_prefix.clone(),
+            admin_prefix: rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin"),
         }))
     }
 }
@@ -84,11 +84,10 @@ where
         req.into_response(
             HttpResponse::Unauthorized()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: ErrorData {
-                        error: "Unauthorized: Invalid or missing token".to_string(),
-                    },
+                .json(ApiResponse::<()> {
+                    code: ErrorCode::Unauthorized as i32,
+                    message: "Unauthorized: Invalid or missing token".to_string(),
+                    data: None,
                 })
                 .map_into_right_body(),
         )
@@ -185,8 +184,8 @@ where
 
         Box::pin(async move {
             // 每次请求都读取最新配置
-            let config = get_config();
-            let admin_token = &config.api.admin_token;
+            let rt = get_runtime_config();
+            let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
 
             // Check if admin token is configured
             if admin_token.is_empty() {
