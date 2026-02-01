@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.3] - 2026-02-01
+
+### 🎉 Release Highlights
+
+v0.4.3 是一次紧急修复版本：
+
+- **CSRF Cookie 路径修复** - 修复前端无法读取 CSRF cookie 导致所有变更操作（创建、修改、删除）返回 403 的问题
+
+### Fixed
+- **CSRF Cookie 路径问题** - 将 CSRF cookie 的 path 从 `admin_prefix` 改为 `/`
+  - 修复前端页面路径与 cookie path 不匹配时，所有 POST/PUT/DELETE 请求返回 403 Forbidden 的问题
+  - 确保任意 `admin_prefix` 配置下前端都能正常工作
+  - 安全性不受影响（`SameSite=Lax` 仍然生效）
+
 ## [v0.4.2] - 2026-02-01
 
 ### 🎉 Release Highlights
@@ -1034,7 +1048,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...HEAD
+[v0.4.3]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...v0.4.3
 [v0.4.2]: https://github.com/AptS-1547/shortlinker/compare/v0.4.1...v0.4.2
 [v0.4.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.0...v0.4.1
 [v0.4.0]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0...v0.4.0
