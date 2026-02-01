@@ -8,8 +8,10 @@ use super::schema::get_schema;
 /// 根据配置 key 验证值是否合法
 ///
 /// 基于 schema 进行验证：
-/// - 如果配置有 `enum_options` 且 value_type 是 Json，验证 JSON 数组中的每个元素
-/// - 如果配置有 `enum_options` 且 value_type 是 Enum，验证值是否在选项列表中
+/// - StringArray: 验证是否为有效的 JSON 字符串数组
+/// - EnumArray: 验证 JSON 数组中的每个元素是否在 enum_options 中
+/// - Enum: 验证值是否在 enum_options 中
+/// - Json + enum_options: 同 EnumArray（向后兼容）
 /// - 没有 schema 的配置不做验证
 pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
     let schema = match get_schema(key) {
@@ -17,13 +19,51 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
         None => return Ok(()), // 没有 schema 的配置不验证
     };
 
-    // 有 enum_options 时进行验证
+    // StringArray: 只验证是否为有效的字符串数组
+    if schema.value_type == ValueType::StringArray {
+        let _items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+            format!(
+                "Invalid JSON format: {}. Expected array like [\"item1\", \"item2\", ...]",
+                e
+            )
+        })?;
+        return Ok(());
+    }
+
+    // EnumArray: 验证数组中的每个元素是否在选项中
+    if schema.value_type == ValueType::EnumArray {
+        let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+            format!(
+                "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
+                e
+            )
+        })?;
+
+        if let Some(ref options) = schema.enum_options {
+            let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
+            let mut invalid_items = Vec::new();
+            for item in &items {
+                if !valid_values.iter().any(|v| v.eq_ignore_ascii_case(item)) {
+                    invalid_items.push(item.clone());
+                }
+            }
+            if !invalid_items.is_empty() {
+                return Err(format!(
+                    "Invalid items: {:?}. Valid options: {:?}",
+                    invalid_items, valid_values
+                ));
+            }
+        }
+        return Ok(());
+    }
+
+    // 有 enum_options 时进行验证（Enum 或 Json + enum_options 向后兼容）
     if let Some(ref options) = schema.enum_options {
         let valid_values: Vec<&str> = options.iter().map(|o| o.value.as_str()).collect();
 
         // 根据 value_type 决定验证方式
         if schema.value_type == ValueType::Json {
-            // JSON 数组类型：验证数组中的每个元素
+            // JSON 数组类型：验证数组中的每个元素（向后兼容）
             let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
                 format!(
                     "Invalid JSON format: {}. Expected array like [\"GET\", \"POST\", ...]",
@@ -107,6 +147,42 @@ mod tests {
         // 非法 JSON 格式
         assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, "GET,POST").is_err());
         assert!(validate_config_value(keys::CORS_ALLOWED_METHODS, "not json").is_err());
+    }
+
+    #[test]
+    fn test_validate_string_array() {
+        // StringArray 类型：只验证是否为有效的 JSON 字符串数组，不验证内容
+        // trusted_proxies
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["192.168.1.1"]"#).is_ok());
+        assert!(
+            validate_config_value(
+                keys::API_TRUSTED_PROXIES,
+                r#"["10.0.0.1", "192.168.1.0/24"]"#
+            )
+            .is_ok()
+        );
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"[]"#).is_ok());
+        // 任意字符串都合法（格式验证由前端负责）
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["any", "string"]"#).is_ok());
+
+        // 非法 JSON 格式
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, "not json").is_err());
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"{"key": "value"}"#).is_err());
+
+        // allowed_origins
+        assert!(
+            validate_config_value(keys::CORS_ALLOWED_ORIGINS, r#"["https://example.com"]"#).is_ok()
+        );
+        assert!(validate_config_value(keys::CORS_ALLOWED_ORIGINS, r#"["*"]"#).is_ok());
+
+        // allowed_headers
+        assert!(
+            validate_config_value(
+                keys::CORS_ALLOWED_HEADERS,
+                r#"["Content-Type", "Authorization"]"#
+            )
+            .is_ok()
+        );
     }
 
     #[test]
