@@ -3,13 +3,15 @@
 use actix_multipart::Multipart;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
+use bytes::Bytes;
 use chrono::Utc;
 use csv::{ReaderBuilder, WriterBuilder};
-use futures_util::StreamExt;
+use futures_util::stream::{Stream, StreamExt};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
+use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
@@ -19,13 +21,132 @@ use crate::utils::url_validator::validate_url;
 use super::helpers::{error_response, success_response};
 use super::types::{CsvLinkRow, ExportQuery, ImportFailedItem, ImportMode, ImportResponse};
 
-/// 导出链接为 CSV
+/// 每批次序列化的链接数量
+const EXPORT_BATCH_SIZE: usize = 10000;
+
+/// 创建流式 CSV 响应体
+///
+/// 接收一个分批的 ShortLink 流，返回一个 Bytes 流，每个 chunk 包含序列化的 CSV 行。
+/// 第一个 chunk 包含 CSV header。
+fn create_csv_stream(
+    batch_stream: Pin<
+        Box<dyn Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send + 'static>,
+    >,
+) -> impl Stream<Item = Result<Bytes, actix_web::Error>> {
+    use futures_util::stream;
+
+    let batch_stream = batch_stream;
+    let is_first_chunk = true;
+    let processed_count = 0usize;
+
+    stream::unfold(
+        (batch_stream, is_first_chunk, processed_count),
+        |(mut stream, mut first, mut count)| async move {
+            // 获取下一批数据
+            match stream.next().await {
+                Some(Ok(batch)) if batch.is_empty() => None, // 空批次，流结束
+                Some(Ok(batch)) => {
+                    let batch_len = batch.len();
+                    let is_first = first;
+
+                    // 将 CSV 序列化移到 blocking 线程池，避免阻塞 worker 线程
+                    let csv_result = tokio::task::spawn_blocking(move || {
+                        let mut csv_writer = WriterBuilder::new()
+                            .has_headers(is_first)
+                            .from_writer(vec![]);
+
+                        let mut serialize_errors = 0usize;
+
+                        for link in batch {
+                            let row = CsvLinkRow {
+                                code: link.code,
+                                target: link.target,
+                                created_at: link.created_at.to_rfc3339(),
+                                expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+                                password: link.password,
+                                click_count: link.click,
+                            };
+                            if let Err(e) = csv_writer.serialize(&row) {
+                                error!("Failed to serialize CSV row: {}", e);
+                                serialize_errors += 1;
+                            }
+                        }
+
+                        (csv_writer.into_inner(), serialize_errors)
+                    })
+                    .await;
+
+                    // 处理 spawn_blocking 的结果
+                    match csv_result {
+                        Ok((Ok(chunk), serialize_errors)) => {
+                            count += batch_len;
+
+                            // 记录批次进度
+                            if first {
+                                info!("Export stream: sent CSV header + {} links", batch_len);
+                                first = false;
+                            } else {
+                                debug!(
+                                    "Export stream: sent batch of {} links (total: {})",
+                                    batch_len, count
+                                );
+                            }
+
+                            if serialize_errors > 0 {
+                                warn!(
+                                    "Export stream: {} serialize errors in this batch",
+                                    serialize_errors
+                                );
+                            }
+
+                            Some((Ok(Bytes::from(chunk)), (stream, first, count)))
+                        }
+                        Ok((Err(e), _)) => {
+                            error!("Failed to finalize CSV writer: {}", e.error());
+                            Some((
+                                Err(actix_web::error::ErrorInternalServerError(
+                                    "CSV generation error",
+                                )),
+                                (stream, first, count),
+                            ))
+                        }
+                        Err(e) => {
+                            error!("Blocking task panicked: {}", e);
+                            Some((
+                                Err(actix_web::error::ErrorInternalServerError(
+                                    "CSV task failed",
+                                )),
+                                (stream, first, count),
+                            ))
+                        }
+                    }
+                }
+                Some(Err(e)) => {
+                    // 数据库错误：返回错误注释行
+                    error!("Export stream database error at ~{} links: {}", count, e);
+                    let error_msg = format!("# ERROR: Database error: {}\n", e);
+                    Some((Ok(Bytes::from(error_msg)), (stream, first, count)))
+                }
+                None => {
+                    // 流结束，记录统计
+                    info!("Export stream completed: {} total links exported", count);
+                    None
+                }
+            }
+        },
+    )
+}
+
+/// 导出链接为 CSV（流式响应）
 pub async fn export_links(
     _req: HttpRequest,
     query: web::Query<ExportQuery>,
     storage: web::Data<Arc<SeaOrmStorage>>,
 ) -> ActixResult<impl Responder> {
-    info!("Admin API: export links request with filters: {:?}", query);
+    info!(
+        "Admin API: export links (streaming) with filters: {:?}",
+        query
+    );
 
     // 构建过滤条件
     let filter = LinkFilter {
@@ -44,38 +165,11 @@ pub async fn export_links(
         only_active: query.only_active.unwrap_or(false),
     };
 
-    // 加载符合条件的所有链接
-    let links = storage.load_all_filtered(filter).await.map_err(|e| {
-        error!("Failed to load links for export: {}", e);
-        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-    })?;
+    // 获取分页流式数据（每批1000条）
+    let batch_stream = storage.stream_all_filtered_paginated(filter, EXPORT_BATCH_SIZE as u64);
 
-    // 构建 CSV
-    let mut csv_writer = WriterBuilder::new().from_writer(vec![]);
-    let mut serialize_errors = 0usize;
-
-    for link in &links {
-        let row = CsvLinkRow {
-            code: link.code.clone(),
-            target: link.target.clone(),
-            created_at: link.created_at.to_rfc3339(),
-            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-            password: link.password.clone(),
-            click_count: link.click,
-        };
-        if let Err(e) = csv_writer.serialize(&row) {
-            error!(
-                "Failed to serialize CSV row for code '{}': {}",
-                link.code, e
-            );
-            serialize_errors += 1;
-        }
-    }
-
-    let csv_data = csv_writer.into_inner().map_err(|e| {
-        error!("Failed to finalize CSV writer: {}", e.error());
-        actix_web::error::ErrorInternalServerError("Failed to generate CSV")
-    })?;
+    // 创建 CSV 流
+    let csv_stream = create_csv_stream(batch_stream);
 
     // 生成文件名
     let filename = format!(
@@ -83,26 +177,17 @@ pub async fn export_links(
         Utc::now().format("%Y%m%d_%H%M%S")
     );
 
-    info!(
-        "Admin API: exported {} links ({} bytes, {} serialize errors) to {}",
-        links.len(),
-        csv_data.len(),
-        serialize_errors,
-        filename
-    );
+    info!("Admin API: starting streaming export to {}", filename);
 
-    let mut response = HttpResponse::Ok();
-    response.content_type("text/csv; charset=utf-8");
-    response.insert_header((
-        "Content-Disposition",
-        format!("attachment; filename=\"{}\"", filename),
-    ));
-    // 在响应头中标记序列化错误数
-    if serialize_errors > 0 {
-        response.insert_header(("X-Export-Errors", serialize_errors.to_string()));
-    }
-
-    Ok(response.body(csv_data))
+    // 返回流式响应
+    Ok(HttpResponse::Ok()
+        .content_type("text/csv; charset=utf-8")
+        .insert_header((
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename),
+        ))
+        .insert_header(("Transfer-Encoding", "chunked"))
+        .streaming(csv_stream))
 }
 
 /// 导入链接从 CSV

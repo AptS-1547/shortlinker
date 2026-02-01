@@ -606,14 +606,4 @@ impl LinkService {
         info!("LinkService: exported {} links", links.len());
         Ok(links)
     }
-
-    /// Export links with filter
-    pub async fn export_links_filtered(
-        &self,
-        filter: LinkFilter,
-    ) -> Result<Vec<ShortLink>, ServiceError> {
-        self.storage.load_all_filtered(filter).await.map_err(|e| {
-            ServiceError::DatabaseError(format!("Failed to load filtered links: {}", e))
-        })
-    }
 }

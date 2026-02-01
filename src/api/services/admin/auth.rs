@@ -77,9 +77,10 @@ fn is_trusted_proxy(ip: &str, trusted_proxies: &[String]) -> bool {
         } else {
             // 单 IP
             if let Ok(proxy_addr) = proxy.parse::<IpAddr>()
-                && ip_addr == proxy_addr {
-                    return true;
-                }
+                && ip_addr == proxy_addr
+            {
+                return true;
+            }
         }
     }
     false

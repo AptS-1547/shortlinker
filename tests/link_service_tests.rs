@@ -731,36 +731,6 @@ mod import_export_tests {
         let exported = service.export_links().await.unwrap();
         assert_eq!(exported.len(), 3);
     }
-
-    #[tokio::test]
-    async fn test_export_links_filtered() {
-        let (service, _temp) = create_test_service().await;
-
-        // Create active link
-        let req = create_request(Some("active_export"), "https://example.com");
-        service.create_link(req).await.unwrap();
-
-        // Create expired link using past RFC3339 time
-        let past_time = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
-        let req = CreateLinkRequest {
-            code: Some("expired_export".to_string()),
-            target: "https://example.com".to_string(),
-            force: false,
-            expires_at: Some(past_time),
-            password: None,
-        };
-        service.create_link(req).await.unwrap();
-
-        // Export only active
-        let filter = LinkFilter {
-            only_active: true,
-            ..Default::default()
-        };
-
-        let exported = service.export_links_filtered(filter).await.unwrap();
-        assert_eq!(exported.len(), 1);
-        assert_eq!(exported[0].code, "active_export");
-    }
 }
 
 // =============================================================================

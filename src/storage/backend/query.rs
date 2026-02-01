@@ -3,8 +3,10 @@
 //! This module contains all read-only database operations.
 
 use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
 
 use chrono::Utc;
+use futures_util::stream::Stream;
 use sea_orm::{
     ColumnTrait, Condition, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, sea_query::Expr,
@@ -271,21 +273,51 @@ impl SeaOrmStorage {
             .collect())
     }
 
-    /// 带过滤条件加载所有链接（不分页，用于导出）
-    pub async fn load_all_filtered(&self, filter: LinkFilter) -> Result<Vec<ShortLink>> {
+    /// 分页流式加载所有符合条件的链接（用于导出等大数据量场景）
+    ///
+    /// 使用 SeaORM paginate API 分批查询，避免一次性加载全部数据到内存。
+    /// 返回 boxed stream 产生分批数据。
+    pub fn stream_all_filtered_paginated(
+        &self,
+        filter: LinkFilter,
+        page_size: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
         let now = Utc::now();
         let condition = build_filter_condition(&filter, now);
+        let db = self.db.clone();
 
-        let models = short_link::Entity::find()
-            .filter(condition)
-            .order_by_desc(short_link::Column::CreatedAt)
-            .all(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("加载过滤链接失败: {}", e))
-            })?;
+        use futures_util::stream;
 
-        Ok(models.into_iter().map(model_to_shortlink).collect())
+        // 手动实现分页流
+        Box::pin(stream::unfold(
+            (0u64, db, condition, page_size),
+            |(page, db, condition, page_size)| async move {
+                // 构建查询
+                let models = short_link::Entity::find()
+                    .filter(condition.clone())
+                    .order_by_desc(short_link::Column::CreatedAt)
+                    .limit(page_size)
+                    .offset(page * page_size)
+                    .all(&db)
+                    .await;
+
+                match models {
+                    Ok(models) if models.is_empty() => None, // 没有更多数据
+                    Ok(models) => {
+                        let links: Vec<ShortLink> =
+                            models.into_iter().map(model_to_shortlink).collect();
+                        Some((Ok(links), (page + 1, db, condition, page_size)))
+                    }
+                    Err(e) => Some((
+                        Err(ShortlinkerError::database_operation(format!(
+                            "分页查询失败 (page={}): {}",
+                            page, e
+                        ))),
+                        (page + 1, db, condition, page_size),
+                    )),
+                }
+            },
+        ))
     }
 
     /// 获取链接统计信息（SeaORM DSL 聚合查询）

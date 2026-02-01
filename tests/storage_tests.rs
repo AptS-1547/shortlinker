@@ -686,7 +686,10 @@ mod edge_case_tests {
         }
 
         let filter = LinkFilter::default();
-        let all = storage.load_all_filtered(filter).await.unwrap();
+        let (all, _total) = storage
+            .load_paginated_filtered(1, 100, filter)
+            .await
+            .unwrap();
         assert_eq!(all.len(), 5);
     }
 }
