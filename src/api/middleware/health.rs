@@ -11,7 +11,7 @@ use tracing::{trace, warn};
 
 use crate::api::constants;
 use crate::api::jwt::JwtService;
-use crate::api::services::admin::{ApiResponse, ErrorData};
+use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::get_config;
 
 #[derive(Clone)]
@@ -140,11 +140,10 @@ where
             Ok(req.into_response(
                 HttpResponse::Unauthorized()
                     .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                    .json(ApiResponse {
-                        code: 1, // 使用业务码，与 Admin 中间件保持一致
-                        data: ErrorData {
-                            error: "Unauthorized: Invalid or missing token".to_string(),
-                        },
+                    .json(ApiResponse::<()> {
+                        code: ErrorCode::Unauthorized as i32,
+                        message: "Unauthorized: Invalid or missing token".to_string(),
+                        data: None,
                     })
                     .map_into_right_body(),
             ))

@@ -14,6 +14,7 @@ use crate::api::jwt::JwtService;
 use crate::config::get_config;
 use crate::utils::password::verify_password;
 
+use super::error_code::ErrorCode;
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageResponse};
 
@@ -217,6 +218,7 @@ pub async fn check_admin_token(
             error!("Admin API: password verification error: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 "Authentication error",
             ));
         }
@@ -226,6 +228,7 @@ pub async fn check_admin_token(
         error!("Admin API: login failed - invalid token");
         return Ok(error_response(
             StatusCode::UNAUTHORIZED,
+            ErrorCode::AuthFailed,
             "Invalid admin token",
         ));
     }
@@ -240,6 +243,7 @@ pub async fn check_admin_token(
             error!("Admin API: failed to generate access token: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 "Failed to generate token",
             ));
         }
@@ -251,6 +255,7 @@ pub async fn check_admin_token(
             error!("Admin API: failed to generate refresh token: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 "Failed to generate token",
             ));
         }
@@ -271,11 +276,12 @@ pub async fn check_admin_token(
         .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
-            code: 0,
-            data: AuthSuccessResponse {
+            code: ErrorCode::Success as i32,
+            message: "Login successful".to_string(),
+            data: Some(AuthSuccessResponse {
                 message: "Login successful".to_string(),
                 expires_in: cookie_builder.access_token_minutes() * 60,
-            },
+            }),
         }))
 }
 
@@ -290,6 +296,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
             warn!("Admin API: refresh token not found in cookie");
             return Ok(error_response(
                 StatusCode::UNAUTHORIZED,
+                ErrorCode::TokenInvalid,
                 "Refresh token not found",
             ));
         }
@@ -301,6 +308,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         warn!("Admin API: invalid refresh token: {}", e);
         return Ok(error_response(
             StatusCode::UNAUTHORIZED,
+            ErrorCode::TokenInvalid,
             "Invalid refresh token",
         ));
     }
@@ -314,6 +322,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
             error!("Admin API: failed to generate access token: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 "Failed to generate token",
             ));
         }
@@ -325,6 +334,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
             error!("Admin API: failed to generate refresh token: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 "Failed to generate token",
             ));
         }
@@ -344,11 +354,12 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
-            code: 0,
-            data: AuthSuccessResponse {
+            code: ErrorCode::Success as i32,
+            message: "Token refreshed".to_string(),
+            data: Some(AuthSuccessResponse {
                 message: "Token refreshed".to_string(),
                 expires_in: cookie_builder.access_token_minutes() * 60,
-            },
+            }),
         }))
 }
 
@@ -367,10 +378,11 @@ pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
         .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
-            code: 0,
-            data: MessageResponse {
+            code: ErrorCode::Success as i32,
+            message: "Logout successful".to_string(),
+            data: Some(MessageResponse {
                 message: "Logout successful".to_string(),
-            },
+            }),
         }))
 }
 

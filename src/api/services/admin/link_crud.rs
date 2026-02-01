@@ -10,6 +10,7 @@ use tracing::{info, trace};
 use crate::services::{CreateLinkRequest, LinkService, ServiceError, UpdateLinkRequest};
 use crate::storage::LinkFilter;
 
+use super::error_code::ErrorCode;
 use super::helpers::{error_response, success_response};
 use super::types::{
     ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
@@ -18,16 +19,16 @@ use super::types::{
 
 /// Convert ServiceError to HTTP response
 fn service_error_response(err: ServiceError) -> HttpResponse {
-    let status = match &err {
-        ServiceError::InvalidUrl(_) | ServiceError::InvalidExpireTime(_) => StatusCode::BAD_REQUEST,
-        ServiceError::PasswordHashError | ServiceError::DatabaseError(_) => {
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-        ServiceError::NotFound(_) => StatusCode::NOT_FOUND,
-        ServiceError::Conflict(_) => StatusCode::CONFLICT,
-        ServiceError::NotInitialized => StatusCode::SERVICE_UNAVAILABLE,
+    let (status, error_code) = match &err {
+        ServiceError::InvalidUrl(_) => (StatusCode::BAD_REQUEST, ErrorCode::LinkInvalidUrl),
+        ServiceError::InvalidExpireTime(_) => (StatusCode::BAD_REQUEST, ErrorCode::LinkInvalidExpireTime),
+        ServiceError::PasswordHashError => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::LinkPasswordHashError),
+        ServiceError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::LinkDatabaseError),
+        ServiceError::NotFound(_) => (StatusCode::NOT_FOUND, ErrorCode::LinkNotFound),
+        ServiceError::Conflict(_) => (StatusCode::CONFLICT, ErrorCode::LinkAlreadyExists),
+        ServiceError::NotInitialized => (StatusCode::SERVICE_UNAVAILABLE, ErrorCode::ServiceUnavailable),
     };
-    error_response(status, &err.to_string())
+    error_response(status, error_code, &err.to_string())
 }
 
 /// 获取所有链接（支持分页和过滤）
@@ -82,8 +83,9 @@ pub async fn get_all_links(
             Ok(HttpResponse::Ok()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(PaginatedResponse {
-                    code: 0,
-                    data: paginated_links,
+                    code: ErrorCode::Success as i32,
+                    message: "OK".to_string(),
+                    data: Some(paginated_links),
                     pagination: PaginationInfo {
                         page,
                         page_size,
@@ -127,14 +129,15 @@ pub async fn post_link(
             Ok(HttpResponse::Created()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(ApiResponse {
-                    code: 0,
-                    data: PostNewLink {
+                    code: ErrorCode::Success as i32,
+                    message: "Link created".to_string(),
+                    data: Some(PostNewLink {
                         code: Some(result.link.code),
                         target: result.link.target,
                         expires_at: link.expires_at.clone(),
                         password: result.link.password,
                         force: None,
-                    },
+                    }),
                 }))
         }
         Err(e) => Ok(service_error_response(e)),
@@ -153,7 +156,7 @@ pub async fn get_link(
         Ok(Some(link)) => Ok(success_response(LinkResponse::from(link))),
         Ok(None) => {
             info!("Admin API: link not found - {}", code);
-            Ok(error_response(StatusCode::NOT_FOUND, "Link not found"))
+            Ok(error_response(StatusCode::NOT_FOUND, ErrorCode::LinkNotFound, "Link not found"))
         }
         Err(e) => Ok(service_error_response(e)),
     }
@@ -228,12 +231,13 @@ pub async fn get_stats(
             Ok(HttpResponse::Ok()
                 .append_header(("Content-Type", "application/json; charset=utf-8"))
                 .json(ApiResponse {
-                    code: 0,
-                    data: StatsResponse {
+                    code: ErrorCode::Success as i32,
+                    message: "OK".to_string(),
+                    data: Some(StatsResponse {
                         total_links: stats.total_links,
                         total_clicks: stats.total_clicks,
                         active_links: stats.active_links,
-                    },
+                    }),
                 }))
         }
         Err(e) => Ok(service_error_response(e)),

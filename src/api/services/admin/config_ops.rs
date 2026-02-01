@@ -9,6 +9,7 @@ use ts_rs::TS;
 use crate::config::{get_all_schemas, try_get_runtime_config};
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 
+use super::error_code::ErrorCode;
 use super::helpers::{error_response, success_response};
 use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
 
@@ -74,6 +75,7 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceUnavailable,
                 "Runtime config not initialized",
             ));
         }
@@ -112,6 +114,7 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceUnavailable,
                 "Runtime config not initialized",
             ));
         }
@@ -136,6 +139,7 @@ pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResu
         }
         None => Ok(error_response(
             StatusCode::NOT_FOUND,
+            ErrorCode::ConfigNotFound,
             &format!("Config key '{}' not found", key),
         )),
     }
@@ -154,6 +158,7 @@ pub async fn update_config(
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceUnavailable,
                 "Runtime config not initialized",
             ));
         }
@@ -193,6 +198,7 @@ pub async fn update_config(
             warn!("Failed to update config {}: {}", key, e);
             Ok(error_response(
                 StatusCode::BAD_REQUEST,
+                ErrorCode::ConfigUpdateFailed,
                 &format!("Failed to update config: {}", e),
             ))
         }
@@ -212,6 +218,7 @@ pub async fn get_config_history(
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceUnavailable,
                 "Runtime config not initialized",
             ));
         }
@@ -256,6 +263,7 @@ pub async fn get_config_history(
             warn!("Failed to get config history for {}: {}", key, e);
             Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::InternalServerError,
                 &format!("Failed to get config history: {}", e),
             ))
         }
@@ -270,6 +278,7 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
         None => {
             return Ok(error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceUnavailable,
                 "ReloadCoordinator not initialized",
             ));
         }
@@ -287,6 +296,7 @@ pub async fn reload_config(_req: HttpRequest) -> ActixResult<impl Responder> {
             warn!("Failed to reload config: {}", e);
             Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::ConfigReloadFailed,
                 &format!("Failed to reload config: {}", e),
             ))
         }

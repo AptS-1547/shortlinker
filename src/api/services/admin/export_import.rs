@@ -18,6 +18,7 @@ use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::password::{hash_password, is_argon2_hash};
 use crate::utils::url_validator::validate_url;
 
+use super::error_code::ErrorCode;
 use super::helpers::{error_response, success_response};
 use super::types::{CsvLinkRow, ExportQuery, ImportFailedItem, ImportMode, ImportResponse};
 
@@ -210,6 +211,7 @@ pub async fn import_links(
                 error!("Failed to parse multipart field: {}", e);
                 return Ok(error_response(
                     StatusCode::BAD_REQUEST,
+                    ErrorCode::InvalidMultipartData,
                     &format!("Invalid multipart data: {}", e),
                 ));
             }
@@ -228,6 +230,7 @@ pub async fn import_links(
                             error!("Failed to read file chunk: {}", e);
                             return Ok(error_response(
                                 StatusCode::BAD_REQUEST,
+                                ErrorCode::FileReadError,
                                 &format!("Failed to read file: {}", e),
                             ));
                         }
@@ -263,6 +266,7 @@ pub async fn import_links(
         _ => {
             return Ok(error_response(
                 StatusCode::BAD_REQUEST,
+                ErrorCode::CsvFileMissing,
                 "No CSV file provided",
             ));
         }
@@ -307,6 +311,7 @@ pub async fn import_links(
                     row: row_num,
                     code: String::new(),
                     error: format!("CSV parse error: {}", e),
+                    error_code: Some(ErrorCode::CsvParseError as i32),
                 });
             }
         }
@@ -352,6 +357,7 @@ pub async fn import_links(
                 row: row_num,
                 code: row.code,
                 error: "Empty code".to_string(),
+                error_code: Some(ErrorCode::LinkEmptyCode as i32),
             });
             continue;
         }
@@ -362,6 +368,7 @@ pub async fn import_links(
                 row: row_num,
                 code: row.code,
                 error: format!("Invalid URL: {}", e),
+                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
             });
             continue;
         }
@@ -379,6 +386,7 @@ pub async fn import_links(
                         row: row_num,
                         code: row.code,
                         error: "Link already exists".to_string(),
+                        error_code: Some(ErrorCode::LinkAlreadyExists as i32),
                     });
                     continue;
                 }
@@ -424,6 +432,7 @@ pub async fn import_links(
                                 row: row_num,
                                 code: row.code,
                                 error: format!("Password hash error: {}", e),
+                                error_code: Some(ErrorCode::LinkPasswordHashError as i32),
                             });
                             continue;
                         }
@@ -454,6 +463,7 @@ pub async fn import_links(
             error!("Failed to batch insert links: {}", e);
             return Ok(error_response(
                 StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::ImportFailed,
                 &format!("Database error: {}", e),
             ));
         }
