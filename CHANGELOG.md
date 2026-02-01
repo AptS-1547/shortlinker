@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.4.2] - 2026-02-01
+
+### 🎉 Release Highlights
+
+v0.4.2 是一次针对性的安全与易用性改进版本，主要亮点：
+
+- **智能代理检测** - 默认自动信任来自私有 IP（RFC1918）或 localhost 的连接，简化 Docker/nginx 反向代理部署
+- **增强 Unix Socket 支持** - 强制要求 X-Forwarded-For 头部，防止登录限流失效
+- **完善 IPv6 支持** - 扩展 IPv6 私有地址检测范围（ULA + 链路本地地址）
+
+### Added
+- **智能代理检测模式** - 未配置 `api.trusted_proxies` 时，自动信任来自私有 IP 或 localhost 的连接
+  - 支持 RFC1918 私有地址段：`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`
+  - 适合常见的 Docker、nginx、Caddy 反向代理场景，无需手动配置
+  - 公网 IP 默认不信任 X-Forwarded-For，防止伪造攻击
+- **启动时代理检测模式日志** - 显示当前使用的代理检测策略（Unix Socket / 显式配置 / 智能检测 / 直连），便于部署调试
+
+### Improved
+- **Unix Socket 模式增强** - 强制要求 X-Forwarded-For 头部，缺失时返回明确的错误提示
+  - 防止 Unix Socket 模式下登录限流失效（所有请求来自同一 peer_addr）
+  - 错误提示包含 nginx 配置示例：`proxy_set_header X-Forwarded-For $remote_addr;`
+- **限流 key 提取器逻辑优化** - 按优先级处理（Unix Socket > 显式配置 > 智能检测 > 连接 IP）
+  - 使用 `SocketAddr` 解析替代 `IpAddr`，支持带端口的 IP 地址
+  - 优化 IP 地址解析流程：先尝试 `SocketAddr::parse()`，失败时回退到 `IpAddr::parse()`
+- **IPv6 私有地址检测** - 扩展 IPv6 私有地址范围
+  - 新增 `fc00::/7` (ULA, RFC 4193)：`fc00::/8` + `fd00::/8`
+  - 新增 `fe80::/10` (链路本地地址)
+  - 改进代码注释，明确各地址段定义及对应 RFC 标准
+
+### Fixed
+- **Unix Socket 模式警告重复** - 修复启动时代理检测警告逻辑，避免重复日志输出
+
+### Docs
+- 更新配置文档 `api.trusted_proxies` 说明
+  - 详细说明智能检测和显式配置的使用场景
+  - 添加安全提示：公网 IP 默认不信任 X-Forwarded-For
+  - 添加 Docker/nginx 部署示例
+
+### Migration Notes
+
+**⚠️ 从 v0.4.1 升级注意事项：**
+
+1. **默认行为变更** - 未配置 `api.trusted_proxies` 时，现在会自动信任来自私有 IP 的连接
+   - 大部分反向代理场景（Docker、nginx）可直接使用，无需配置
+   - 如需禁用智能检测，请显式配置 `api.trusted_proxies = []`（空数组）
+2. **Unix Socket 模式更严格** - 现在强制要求 X-Forwarded-For 头部，请检查代理配置
+
 ## [v0.4.1] - 2026-02-01
 
 ### 🎉 Release Highlights
@@ -987,7 +1034,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...HEAD
+[v0.4.2]: https://github.com/AptS-1547/shortlinker/compare/v0.4.1...v0.4.2
 [v0.4.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.0...v0.4.1
 [v0.4.0]: https://github.com/AptS-1547/shortlinker/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/AptS-1547/shortlinker/compare/v0.2.2...v0.3.0
