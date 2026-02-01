@@ -139,8 +139,8 @@ impl CookieBuilder {
     /// 构建 CSRF Cookie（非 HttpOnly，前端需要读取）
     pub fn build_csrf_cookie(&self, token: String) -> Cookie<'static> {
         let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), token);
-        // CSRF cookie path 与 admin_prefix 保持一致
-        cookie.set_path(self.admin_prefix.clone());
+        // CSRF cookie path 设置为 /，确保前端无论在哪个路由都能读取
+        cookie.set_path("/".to_string());
         // CSRF cookie 不能是 HttpOnly，因为前端 JS 需要读取它
         cookie.set_http_only(false);
         cookie.set_secure(self.secure);
@@ -159,8 +159,8 @@ impl CookieBuilder {
     /// 构建过期的 CSRF Cookie（登出时清除）
     pub fn build_expired_csrf_cookie(&self) -> Cookie<'static> {
         let mut cookie = Cookie::new(constants::CSRF_COOKIE_NAME.to_string(), String::new());
-        // CSRF cookie path 与 admin_prefix 保持一致
-        cookie.set_path(self.admin_prefix.clone());
+        // CSRF cookie path 设置为 /，确保前端无论在哪个路由都能读取
+        cookie.set_path("/".to_string());
         cookie.set_http_only(false);
         cookie.set_secure(self.secure);
         cookie.set_same_site(SameSite::Lax);

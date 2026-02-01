@@ -56,7 +56,7 @@ impl KeyExtractor for LoginKeyExtractor {
                      Ensure nginx/proxy sets: proxy_set_header X-Forwarded-For $remote_addr;"
                 );
                 return Err(SimpleKeyExtractionError::new(
-                    "Unix Socket mode requires X-Forwarded-For header"
+                    "Unix Socket mode requires X-Forwarded-For header",
                 ));
             }
         }
