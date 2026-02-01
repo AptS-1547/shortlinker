@@ -89,8 +89,13 @@ impl KeyExtractor for LoginKeyExtractor {
             let is_private_or_local = match ip_addr {
                 IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
                 IpAddr::V6(v6) => {
-                    // IPv6 私有地址：fc00::/7（唯一本地地址）或 loopback（::1）
-                    v6.is_loopback() || (v6.segments()[0] & 0xfe00) == 0xfc00
+                    // IPv6 私有地址：
+                    // - fc00::/7 (ULA, RFC 4193): fc00::/8 + fd00::/8
+                    // - fe80::/10 (Link-local)
+                    // - ::1 (Loopback)
+                    v6.is_loopback()
+                        || (v6.segments()[0] & 0xfe00) == 0xfc00 // fc00::/7 (包含 fc00 和 fd00)
+                        || (v6.segments()[0] & 0xffc0) == 0xfe80 // fe80::/10 (link-local)
                 }
             };
 
