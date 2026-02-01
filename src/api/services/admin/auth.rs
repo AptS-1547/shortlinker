@@ -7,7 +7,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use base64::Engine;
 use governor::middleware::NoOpMiddleware;
 use rand::Rng;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
@@ -82,7 +82,9 @@ impl KeyExtractor for LoginKeyExtractor {
         }
 
         // 步骤 4: 未配置 trusted_proxies → 智能检测
-        if let Ok(ip_addr) = peer_ip.parse::<IpAddr>() {
+        if let Ok(socket_addr) = peer_ip.parse::<SocketAddr>() {
+            let ip_addr = socket_addr.ip();
+
             // 检查是否为私有 IP 或 localhost
             let is_private_or_local = match ip_addr {
                 IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
@@ -113,9 +115,14 @@ impl KeyExtractor for LoginKeyExtractor {
 
 /// 检查 IP 是否在可信代理列表中
 fn is_trusted_proxy(ip: &str, trusted_proxies: &[String]) -> bool {
-    use std::net::IpAddr;
+    use std::net::{IpAddr, SocketAddr};
 
-    let Ok(ip_addr) = ip.parse::<IpAddr>() else {
+    // 先尝试解析为 SocketAddr（支持 ip:port），如果失败再尝试纯 IpAddr
+    let ip_addr = if let Ok(socket_addr) = ip.parse::<SocketAddr>() {
+        socket_addr.ip()
+    } else if let Ok(ip_addr) = ip.parse::<IpAddr>() {
+        ip_addr
+    } else {
         return false;
     };
 

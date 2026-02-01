@@ -160,6 +160,7 @@ pub async fn run_server() -> Result<()> {
     validate_cors_config(&cors_config);
 
     // Check and log proxy detection mode + Unix Socket mode
+    let mut is_tcp_mode = true;
     #[cfg(unix)]
     if let Some(ref socket_path) = config.server.unix_socket {
         warn!(
@@ -167,24 +168,10 @@ pub async fn run_server() -> Result<()> {
              Rate limiting requires nginx to set X-Forwarded-For header.",
             socket_path
         );
-    } else {
-        let trusted_proxies = &config.api.trusted_proxies;
-        if trusted_proxies.is_empty() {
-            warn!(
-                "Login rate limiting: Auto-detect mode enabled. \
-                 Connections from private IPs will use X-Forwarded-For. \
-                 To disable, configure api.trusted_proxies explicitly."
-            );
-        } else {
-            warn!(
-                "Login rate limiting: Explicit trusted proxies configured: {:?}",
-                trusted_proxies
-            );
-        }
+        is_tcp_mode = false;
     }
 
-    #[cfg(not(unix))]
-    {
+    if is_tcp_mode {
         let trusted_proxies = &config.api.trusted_proxies;
         if trusted_proxies.is_empty() {
             warn!(
