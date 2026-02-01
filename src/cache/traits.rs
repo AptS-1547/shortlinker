@@ -38,6 +38,11 @@ pub trait CompositeCacheTrait: Send + Sync {
 
     /// 重新初始化 Filter
     async fn reconfigure(&self, config: BloomConfig) -> Result<()>;
+
+    /// 直接检查 Bloom Filter（不查 Object Cache / Negative Cache）
+    /// - `false` = 一定不存在
+    /// - `true` = 可能存在（有误报可能）
+    async fn bloom_check(&self, key: &str) -> bool;
 }
 
 #[async_trait]
@@ -92,4 +97,85 @@ pub trait NegativeCache: Send + Sync {
 
     /// 清空所有
     async fn clear(&self);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_link(code: &str) -> ShortLink {
+        ShortLink {
+            code: code.to_string(),
+            target: "https://example.com".to_string(),
+            created_at: chrono::Utc::now(),
+            expires_at: None,
+            password: None,
+            click: 0,
+        }
+    }
+
+    #[test]
+    fn test_cache_result_not_found() {
+        let result = CacheResult::NotFound;
+        assert!(matches!(result, CacheResult::NotFound));
+
+        // 测试 Debug trait
+        let debug_str = format!("{:?}", result);
+        assert!(debug_str.contains("NotFound"));
+    }
+
+    #[test]
+    fn test_cache_result_miss() {
+        let result = CacheResult::Miss;
+        assert!(matches!(result, CacheResult::Miss));
+
+        let debug_str = format!("{:?}", result);
+        assert!(debug_str.contains("Miss"));
+    }
+
+    #[test]
+    fn test_cache_result_found() {
+        let link = create_test_link("test_code");
+        let result = CacheResult::Found(link.clone());
+
+        match result {
+            CacheResult::Found(found_link) => {
+                assert_eq!(found_link.code, "test_code");
+                assert_eq!(found_link.target, "https://example.com");
+            }
+            _ => panic!("Expected Found variant"),
+        }
+    }
+
+    #[test]
+    fn test_cache_result_clone() {
+        let link = create_test_link("clone_test");
+        let result = CacheResult::Found(link);
+        let cloned = result.clone();
+
+        match cloned {
+            CacheResult::Found(found_link) => {
+                assert_eq!(found_link.code, "clone_test");
+            }
+            _ => panic!("Expected Found variant after clone"),
+        }
+
+        // NotFound 和 Miss 也应该可以 clone
+        let not_found = CacheResult::NotFound;
+        let _ = not_found.clone();
+
+        let miss = CacheResult::Miss;
+        let _ = miss.clone();
+    }
+
+    #[test]
+    fn test_bloom_config() {
+        let config = BloomConfig {
+            capacity: 10000,
+            fp_rate: 0.01,
+        };
+
+        assert_eq!(config.capacity, 10000);
+        assert!((config.fp_rate - 0.01).abs() < f64::EPSILON);
+    }
 }

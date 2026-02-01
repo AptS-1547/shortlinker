@@ -231,4 +231,51 @@ mod tests {
         let field = InputField::new("Name", "test").error(Some("Error"));
         assert_eq!(field.height(), 4);
     }
+
+    #[test]
+    fn test_input_field_builder_chain() {
+        let field = InputField::new("Test", "value")
+            .active(true)
+            .error(Some("error"))
+            .placeholder("hint")
+            .char_count(false)
+            .masked()
+            .required()
+            .readonly();
+
+        assert!(field.is_active);
+        assert_eq!(field.error, Some("error"));
+        assert_eq!(field.placeholder, Some("hint"));
+        assert!(!field.show_char_count);
+        assert!(field.masked);
+        assert!(field.required);
+        assert!(field.readonly);
+    }
+
+    #[test]
+    fn test_input_field_readonly_title() {
+        let field = InputField::new("Name", "test").readonly();
+        assert!(field.display_title().contains("[readonly]"));
+    }
+
+    #[test]
+    fn test_input_field_empty_masked() {
+        let field = InputField::new("Password", "").masked();
+        assert_eq!(field.display_value(), "");
+    }
+
+    #[test]
+    fn test_input_field_required_with_value() {
+        let field = InputField::new("Name", "test").required();
+        let title = field.display_title();
+        assert!(title.contains("*"));
+        assert!(title.contains("4 chars"));
+    }
+
+    #[test]
+    fn test_input_field_placeholder_not_shown_with_value() {
+        let field = InputField::new("Name", "test").placeholder("hint");
+        // placeholder 只在值为空时显示
+        assert!(!field.display_title().contains("hint"));
+    }
 }

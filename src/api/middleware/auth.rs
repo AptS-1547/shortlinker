@@ -1,6 +1,6 @@
 use actix_service::{Service, Transform};
 use actix_web::{
-    Error, HttpResponse,
+    Error, HttpMessage, HttpResponse,
     body::EitherBody,
     dev::{ServiceRequest, ServiceResponse},
     http::{Method, header::CONTENT_TYPE},
@@ -9,9 +9,19 @@ use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use tracing::{trace, warn};
 
+use crate::api::constants;
 use crate::api::jwt::JwtService;
 use crate::api::services::admin::{ApiResponse, ErrorData};
 use crate::config::get_config;
+
+/// 认证方式标记，用于 CSRF 中间件判断是否跳过验证
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuthMethod {
+    /// Bearer Token 认证（API 用户，免 CSRF）
+    Bearer,
+    /// Cookie 认证（Web Panel，需要 CSRF 防护）
+    Cookie,
+}
 
 /// Admin authentication middleware
 #[derive(Clone)]
@@ -33,7 +43,6 @@ where
         ready(Ok(AdminAuthMiddleware {
             service: Rc::new(service),
             admin_prefix: config.routes.admin_prefix.clone(),
-            access_cookie_name: config.api.access_cookie_name.clone(),
         }))
     }
 }
@@ -41,7 +50,6 @@ where
 pub struct AdminAuthMiddleware<S> {
     service: Rc<S>,
     admin_prefix: String,
-    access_cookie_name: String,
 }
 
 impl<S, B> AdminAuthMiddleware<S>
@@ -84,6 +92,30 @@ where
                 })
                 .map_into_right_body(),
         )
+    }
+
+    /// 从 Authorization header 提取 Bearer token
+    fn extract_bearer_token(req: &ServiceRequest) -> Option<String> {
+        req.headers()
+            .get("Authorization")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.strip_prefix("Bearer "))
+            .map(|s| s.to_string())
+    }
+
+    /// 验证 Bearer token（使用 JWT）
+    fn validate_bearer_token(token: &str) -> bool {
+        let jwt_service = JwtService::from_config();
+        match jwt_service.validate_access_token(token) {
+            Ok(_claims) => {
+                trace!("Bearer token validation successful");
+                true
+            }
+            Err(e) => {
+                warn!("Bearer token validation failed: {}", e);
+                false
+            }
+        }
     }
 
     /// Validate JWT from Cookie
@@ -150,7 +182,6 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         let admin_prefix = self.admin_prefix.clone();
-        let access_cookie_name = self.access_cookie_name.clone();
 
         Box::pin(async move {
             // 每次请求都读取最新配置
@@ -188,16 +219,28 @@ where
                 return Ok(response);
             }
 
-            // Validate JWT from cookie
-            if !Self::validate_jwt_cookie(&req, &access_cookie_name) {
-                return Ok(Self::handle_unauthorized(req));
+            // 1. 先尝试 Bearer Token 认证（API 用户，免 CSRF）
+            if let Some(token) = Self::extract_bearer_token(&req)
+                && Self::validate_bearer_token(&token)
+            {
+                trace!("Admin authentication successful via Bearer token");
+                // 设置认证方式标记，CSRF 中间件会跳过验证
+                req.extensions_mut().insert(AuthMethod::Bearer);
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
             }
 
-            trace!("Admin authentication successful via JWT Cookie");
+            // 2. 再尝试 Cookie 认证（Web Panel，需要 CSRF 防护）
+            if Self::validate_jwt_cookie(&req, constants::ACCESS_COOKIE_NAME) {
+                trace!("Admin authentication successful via JWT Cookie");
+                // 设置认证方式标记，CSRF 中间件会验证
+                req.extensions_mut().insert(AuthMethod::Cookie);
+                let response = srv.call(req).await?.map_into_left_body();
+                return Ok(response);
+            }
 
-            // Process the request with the next service
-            let response = srv.call(req).await?.map_into_left_body();
-            Ok(response)
+            // 两种认证都失败
+            Ok(Self::handle_unauthorized(req))
         })
     }
 }

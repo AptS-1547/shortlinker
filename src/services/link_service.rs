@@ -139,6 +139,69 @@ impl ImportMode {
     }
 }
 
+#[cfg(test)]
+mod service_error_tests {
+    use super::*;
+
+    #[test]
+    fn test_service_error_codes() {
+        assert_eq!(
+            ServiceError::InvalidUrl("test".into()).code(),
+            "INVALID_URL"
+        );
+        assert_eq!(
+            ServiceError::InvalidExpireTime("test".into()).code(),
+            "INVALID_EXPIRE_TIME"
+        );
+        assert_eq!(ServiceError::PasswordHashError.code(), "HASH_ERROR");
+        assert_eq!(ServiceError::NotFound("test".into()).code(), "NOT_FOUND");
+        assert_eq!(ServiceError::Conflict("test".into()).code(), "CONFLICT");
+        assert_eq!(
+            ServiceError::DatabaseError("test".into()).code(),
+            "DATABASE_ERROR"
+        );
+        assert_eq!(ServiceError::NotInitialized.code(), "NOT_INITIALIZED");
+    }
+
+    #[test]
+    fn test_service_error_display() {
+        let err = ServiceError::InvalidUrl("bad url".into());
+        let display = format!("{}", err);
+        assert!(display.contains("Invalid URL"));
+        assert!(display.contains("bad url"));
+
+        let err = ServiceError::NotFound("link xyz".into());
+        let display = format!("{}", err);
+        assert!(display.contains("Not found"));
+        assert!(display.contains("link xyz"));
+
+        let err = ServiceError::PasswordHashError;
+        let display = format!("{}", err);
+        assert!(display.contains("password"));
+
+        let err = ServiceError::NotInitialized;
+        let display = format!("{}", err);
+        assert!(display.contains("not initialized"));
+    }
+
+    #[test]
+    fn test_import_mode_from_overwrite_flag() {
+        assert_eq!(ImportMode::from_overwrite_flag(true), ImportMode::Overwrite);
+        assert_eq!(ImportMode::from_overwrite_flag(false), ImportMode::Skip);
+    }
+
+    #[test]
+    fn test_import_mode_default() {
+        assert_eq!(ImportMode::default(), ImportMode::Skip);
+    }
+
+    #[test]
+    fn test_service_error_is_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(ServiceError::NotFound("test".into()));
+        assert!(err.to_string().contains("Not found"));
+    }
+}
+
 /// Result of import operation
 #[derive(Debug, Clone, Default)]
 pub struct ImportResult {
@@ -542,15 +605,5 @@ impl LinkService {
         let links: Vec<ShortLink> = links_map.into_values().collect();
         info!("LinkService: exported {} links", links.len());
         Ok(links)
-    }
-
-    /// Export links with filter
-    pub async fn export_links_filtered(
-        &self,
-        filter: LinkFilter,
-    ) -> Result<Vec<ShortLink>, ServiceError> {
-        self.storage.load_all_filtered(filter).await.map_err(|e| {
-            ServiceError::DatabaseError(format!("Failed to load filtered links: {}", e))
-        })
     }
 }

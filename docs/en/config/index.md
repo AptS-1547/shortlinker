@@ -64,6 +64,9 @@ curl -sS -X POST \
   -d '{"password":"your_admin_token"}' \
   http://localhost:8080/admin/v1/auth/login
 
+# Extract CSRF token (required for PUT/POST/DELETE write operations)
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+
 # 2) List all configs
 curl -sS -b cookies.txt \
   http://localhost:8080/admin/v1/config
@@ -75,12 +78,14 @@ curl -sS -b cookies.txt \
 # 4) Update a config
 curl -sS -X PUT \
   -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"value":"8"}' \
   http://localhost:8080/admin/v1/config/features.random_code_length
 
 # 5) Reload config
 curl -sS -X POST -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload
 
 # 6) Config history (optional limit, default 20)
@@ -144,13 +149,13 @@ These settings are stored in the database and can be changed at runtime via the 
 | `api.jwt_secret` | String | *(auto-generated)* | No | JWT signing secret |
 | `api.access_token_minutes` | Integer | `15` | No | Access token TTL (minutes) |
 | `api.refresh_token_days` | Integer | `7` | No | Refresh token TTL (days) |
-| `api.access_cookie_name` | String | `shortlinker_access` | Yes | Access cookie name |
-| `api.refresh_cookie_name` | String | `shortlinker_refresh` | Yes | Refresh cookie name |
-| `api.cookie_secure` | Boolean | `false` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
+| `api.cookie_secure` | Boolean | `true` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
 | `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
+| `api.trusted_proxies` | Json | `[]` | No | Trusted proxy IPs or CIDRs (for login rate-limit IP extraction). Empty = trust no proxies (use connection IP only). Example: `["10.0.0.1", "192.168.1.0/24"]` |
 
 > Notes:
+> - Cookie names are fixed: `shortlinker_access` / `shortlinker_refresh` / `csrf_token` (not configurable).
 > - `api.admin_token` is stored as an Argon2 hash in the database. Use `./shortlinker reset-password` to rotate the admin password.
 > - If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and write it to `admin_token.txt` (save it and delete the file).
 
@@ -185,7 +190,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `cors.enabled` | Boolean | `false` | Yes | Enable CORS (when disabled, no CORS headers are added; browser keeps same-origin policy) |
 | `cors.allowed_origins` | Json | `[]` | Yes | Allowed origins (JSON array; `["*"]` = allow any origin; empty array = same-origin only / no cross-origin) |
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | Yes | Allowed methods |
-| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | Yes | Allowed headers |
+| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept","X-CSRF-Token"]` | Yes | Allowed headers |
 | `cors.max_age` | Integer | `3600` | Yes | Preflight cache TTL (seconds) |
 | `cors.allow_credentials` | Boolean | `false` | Yes | Allow credentials (needed for cross-origin cookies; not recommended together with `["*"]` for security) |
 
@@ -285,7 +290,10 @@ curl -sS -X POST \
   -d '{"password":"your_admin_token"}' \
   http://localhost:8080/admin/v1/auth/login
 
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+
 curl -sS -X POST -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload
 ```
 

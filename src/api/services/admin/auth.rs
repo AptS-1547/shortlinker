@@ -4,7 +4,10 @@ use actix_governor::{Governor, GovernorConfigBuilder, KeyExtractor, SimpleKeyExt
 use actix_web::dev::ServiceRequest;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
+use base64::Engine;
 use governor::middleware::NoOpMiddleware;
+use rand::Rng;
+use std::net::IpAddr;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
@@ -14,10 +17,18 @@ use crate::utils::password::verify_password;
 use super::helpers::{CookieBuilder, error_response, success_response};
 use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageResponse};
 
-/// 基于 IP 地址的限流 key 提取器
+/// 生成 CSRF Token（32 bytes = 256 bits，Base64 编码）
+fn generate_csrf_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::rng().fill(&mut bytes);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// 基于 IP 地址的限流 key 提取器（安全版）
 ///
-/// 优先使用 X-Forwarded-For 头部（反向代理场景），
-/// 回退到直连 IP。
+/// 策略：
+/// - 默认使用连接 IP（peer_addr），无法被伪造
+/// - 如果连接来自配置的可信代理，则使用 X-Forwarded-For
 #[derive(Clone, Copy)]
 pub struct LoginKeyExtractor;
 
@@ -26,11 +37,89 @@ impl KeyExtractor for LoginKeyExtractor {
     type KeyExtractionError = SimpleKeyExtractionError<&'static str>;
 
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
-        // 优先使用 X-Forwarded-For（反向代理场景）
-        req.connection_info()
-            .realip_remote_addr()
-            .map(|ip| ip.to_string())
-            .ok_or_else(|| SimpleKeyExtractionError::new("Unable to extract IP"))
+        let conn_info = req.connection_info();
+
+        // 获取连接 IP（TCP peer address，无法伪造）
+        let peer_ip = conn_info
+            .peer_addr()
+            .ok_or_else(|| SimpleKeyExtractionError::new("Unable to extract peer IP"))?;
+
+        // 检查是否启用了可信代理
+        let config = get_config();
+        let trusted_proxies = &config.api.trusted_proxies;
+
+        if !trusted_proxies.is_empty() && is_trusted_proxy(peer_ip, trusted_proxies) {
+            // 来自可信代理，使用 X-Forwarded-For
+            let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
+            debug!("Login rate limit key from trusted proxy: {}", real_ip);
+            Ok(real_ip.to_string())
+        } else {
+            // 默认：使用连接 IP
+            Ok(peer_ip.to_string())
+        }
+    }
+}
+
+/// 检查 IP 是否在可信代理列表中
+fn is_trusted_proxy(ip: &str, trusted_proxies: &[String]) -> bool {
+    use std::net::IpAddr;
+
+    let Ok(ip_addr) = ip.parse::<IpAddr>() else {
+        return false;
+    };
+
+    for proxy in trusted_proxies {
+        if proxy.contains('/') {
+            // CIDR 格式（如 "192.168.1.0/24"）
+            if ip_in_cidr(&ip_addr, proxy) {
+                return true;
+            }
+        } else {
+            // 单 IP
+            if let Ok(proxy_addr) = proxy.parse::<IpAddr>()
+                && ip_addr == proxy_addr
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// CIDR 检查（简易实现）
+fn ip_in_cidr(ip: &IpAddr, cidr: &str) -> bool {
+    let Some((network, prefix_len)) = cidr.split_once('/') else {
+        return false;
+    };
+
+    let Ok(prefix_len): Result<u8, _> = prefix_len.parse() else {
+        return false;
+    };
+
+    let Ok(network_addr) = network.parse::<IpAddr>() else {
+        return false;
+    };
+
+    match (ip, network_addr) {
+        (IpAddr::V4(ip), IpAddr::V4(net)) => {
+            if prefix_len > 32 {
+                return false;
+            }
+            let mask = u32::MAX.checked_shl(32 - prefix_len as u32).unwrap_or(0);
+            let ip_bits = u32::from_be_bytes(ip.octets());
+            let net_bits = u32::from_be_bytes(net.octets());
+            (ip_bits & mask) == (net_bits & mask)
+        }
+        (IpAddr::V6(ip), IpAddr::V6(net)) => {
+            if prefix_len > 128 {
+                return false;
+            }
+            let mask = u128::MAX.checked_shl(128 - prefix_len as u32).unwrap_or(0);
+            let ip_bits = u128::from_be_bytes(ip.octets());
+            let net_bits = u128::from_be_bytes(net.octets());
+            (ip_bits & mask) == (net_bits & mask)
+        }
+        _ => false, // IPv4 vs IPv6 不匹配
     }
 }
 
@@ -109,9 +198,14 @@ pub async fn check_admin_token(
     let access_cookie = cookie_builder.build_access_cookie(access_token);
     let refresh_cookie = cookie_builder.build_refresh_cookie(refresh_token);
 
+    // Generate and build CSRF cookie
+    let csrf_token = generate_csrf_token();
+    let csrf_cookie = cookie_builder.build_csrf_cookie(csrf_token);
+
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
@@ -177,9 +271,14 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let access_cookie = cookie_builder.build_access_cookie(new_access_token);
     let refresh_cookie = cookie_builder.build_refresh_cookie(new_refresh_token);
 
+    // Generate and build CSRF cookie (refresh on token refresh)
+    let csrf_token = generate_csrf_token();
+    let csrf_cookie = cookie_builder.build_csrf_cookie(csrf_token);
+
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,
@@ -197,10 +296,12 @@ pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
     let cookie_builder = CookieBuilder::from_config();
     let access_cookie = cookie_builder.build_expired_access_cookie();
     let refresh_cookie = cookie_builder.build_expired_refresh_cookie();
+    let csrf_cookie = cookie_builder.build_expired_csrf_cookie();
 
     Ok(HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)
+        .cookie(csrf_cookie)
         .append_header(("Content-Type", "application/json; charset=utf-8"))
         .json(ApiResponse {
             code: 0,

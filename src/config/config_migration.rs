@@ -23,10 +23,11 @@ fn get_config_value(config: &AppConfig, key: &str) -> String {
         keys::API_JWT_SECRET => config.api.jwt_secret.clone(),
         keys::API_ACCESS_TOKEN_MINUTES => config.api.access_token_minutes.to_string(),
         keys::API_REFRESH_TOKEN_DAYS => config.api.refresh_token_days.to_string(),
+        keys::API_TRUSTED_PROXIES => {
+            serde_json::to_string(&config.api.trusted_proxies).unwrap_or_else(|_| "[]".to_string())
+        }
 
         // Cookie 配置
-        keys::API_ACCESS_COOKIE_NAME => config.api.access_cookie_name.clone(),
-        keys::API_REFRESH_COOKIE_NAME => config.api.refresh_cookie_name.clone(),
         keys::API_COOKIE_SECURE => config.api.cookie_secure.to_string(),
         keys::API_COOKIE_SAME_SITE => config.api.cookie_same_site.to_string(),
         keys::API_COOKIE_DOMAIN => config.api.cookie_domain.clone().unwrap_or_default(),
@@ -89,23 +90,52 @@ pub async fn migrate_config_to_db(file_config: &AppConfig, store: &ConfigStore) 
 
     if is_auto_generated && store.get(keys::API_ADMIN_TOKEN).await?.is_none() {
         let token_file = std::path::Path::new("admin_token.txt");
-        if !token_file.exists() {
-            std::fs::write(
-                token_file,
-                format!(
-                    "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}\n",
+
+        // 安全修复 (#55)：使用 create_new 防止 symlink 攻击
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true) // 原子创建，文件已存在则失败
+            .open(token_file)
+        {
+            Ok(mut file) => {
+                // 设置文件权限 0600 (仅 Unix)
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let perms = std::fs::Permissions::from_mode(0o600);
+                    if let Err(e) = std::fs::set_permissions(token_file, perms) {
+                        warn!("Failed to set permissions on admin_token.txt: {}", e);
+                    }
+                }
+
+                writeln!(
+                    file,
+                    "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}",
                     admin_token
-                ),
-            )
-            .map_err(|e| {
-                crate::errors::ShortlinkerError::database_operation(format!(
-                    "Failed to write admin_token.txt: {}",
-                    e
-                ))
-            })?;
-            info!(
-                "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
-            );
+                )
+                .map_err(|e| {
+                    crate::errors::ShortlinkerError::database_operation(format!(
+                        "Failed to write admin_token.txt: {}",
+                        e
+                    ))
+                })?;
+
+                info!(
+                    "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
+                );
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // 文件已存在，跳过（可能是之前运行过或 symlink 攻击）
+                debug!("admin_token.txt already exists, skipping");
+            }
+            Err(e) => {
+                return Err(crate::errors::ShortlinkerError::database_operation(
+                    format!("Failed to create admin_token.txt: {}", e),
+                ));
+            }
         }
     }
 

@@ -1,7 +1,7 @@
 # 前端构建阶段
 FROM node:24-alpine AS frontend-builder
 
-RUN apk add git
+RUN apk add git --no-cache
 RUN npm install -g bun@latest
 
 COPY ./.git /app/.git
@@ -14,15 +14,10 @@ RUN bun install --frozen-lockfile
 RUN bun run build
 
 # 多阶段构建 - 构建阶段
-FROM rust:1.92-slim AS builder
+FROM rust:1.93-slim AS builder
 
-# 安装构建依赖，包含完整的 OpenSSL 开发库
+# 安装 musl 工具链（项目使用 rustls，不需要 OpenSSL）
 RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    libssl3 \
-    openssl \
-    ca-certificates \
     musl-tools \
     musl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -42,10 +37,7 @@ COPY src ./src
 # 从前端构建阶段复制构建产物
 COPY --from=frontend-builder /app/admin-panel/dist ./admin-panel/dist
 
-# 设置 OpenSSL 环境变量和编译选项
-ENV PKG_CONFIG_ALLOW_CROSS=1
-ENV OPENSSL_STATIC=1
-ENV OPENSSL_DIR=/usr
+# 编译选项
 ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z -C target-feature=+crt-static"
 
 # 静态链接编译 - 使用 musl 目标
@@ -57,7 +49,7 @@ FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="0.2.3-alpha.3"
+LABEL version="0.4.1"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 

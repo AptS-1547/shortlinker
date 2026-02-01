@@ -167,3 +167,123 @@ impl From<chrono::ParseError> for ShortlinkerError {
 }
 
 pub type Result<T> = std::result::Result<T, ShortlinkerError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_codes() {
+        assert_eq!(ShortlinkerError::cache_connection("test").code(), "E001");
+        assert_eq!(
+            ShortlinkerError::cache_plugin_not_found("test").code(),
+            "E002"
+        );
+        assert_eq!(ShortlinkerError::database_config("test").code(), "E003");
+        assert_eq!(ShortlinkerError::database_connection("test").code(), "E004");
+        assert_eq!(ShortlinkerError::database_operation("test").code(), "E005");
+        assert_eq!(ShortlinkerError::file_operation("test").code(), "E006");
+        assert_eq!(ShortlinkerError::validation("test").code(), "E007");
+        assert_eq!(ShortlinkerError::not_found("test").code(), "E008");
+        assert_eq!(ShortlinkerError::serialization("test").code(), "E009");
+        assert_eq!(ShortlinkerError::signal_operation("test").code(), "E010");
+        assert_eq!(
+            ShortlinkerError::storage_plugin_not_found("test").code(),
+            "E011"
+        );
+        assert_eq!(ShortlinkerError::date_parse("test").code(), "E012");
+        assert_eq!(ShortlinkerError::notify_server("test").code(), "E013");
+    }
+
+    #[test]
+    fn test_error_types() {
+        assert_eq!(
+            ShortlinkerError::cache_connection("test").error_type(),
+            "Cache Connection Error"
+        );
+        assert_eq!(
+            ShortlinkerError::database_operation("test").error_type(),
+            "Database Operation Error"
+        );
+        assert_eq!(
+            ShortlinkerError::not_found("test").error_type(),
+            "Resource Not Found"
+        );
+        assert_eq!(
+            ShortlinkerError::validation("test").error_type(),
+            "Validation Error"
+        );
+    }
+
+    #[test]
+    fn test_error_message() {
+        let err = ShortlinkerError::validation("Invalid input");
+        assert_eq!(err.message(), "Invalid input");
+
+        let err = ShortlinkerError::not_found("Link not found");
+        assert_eq!(err.message(), "Link not found");
+    }
+
+    #[test]
+    fn test_format_simple() {
+        let err = ShortlinkerError::validation("Invalid URL");
+        let formatted = err.format_simple();
+        assert!(formatted.contains("Validation Error"));
+        assert!(formatted.contains("Invalid URL"));
+    }
+
+    #[test]
+    fn test_display_trait() {
+        let err = ShortlinkerError::not_found("Resource missing");
+        let display = format!("{}", err);
+        assert!(display.contains("Resource Not Found"));
+        assert!(display.contains("Resource missing"));
+    }
+
+    #[test]
+    fn test_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let err: ShortlinkerError = io_err.into();
+        assert_eq!(err.code(), "E006");
+        assert!(err.message().contains("file not found"));
+    }
+
+    #[test]
+    fn test_from_serde_json_error() {
+        let json_err = serde_json::from_str::<String>("invalid").unwrap_err();
+        let err: ShortlinkerError = json_err.into();
+        assert_eq!(err.code(), "E009");
+    }
+
+    #[test]
+    fn test_from_chrono_parse_error() {
+        let chrono_err = "invalid"
+            .parse::<chrono::DateTime<chrono::Utc>>()
+            .unwrap_err();
+        let err: ShortlinkerError = chrono_err.into();
+        assert_eq!(err.code(), "E012");
+    }
+
+    #[test]
+    fn test_convenience_constructors() {
+        // 测试 Into<String> 泛型参数
+        let err1 = ShortlinkerError::validation("test");
+        let err2 = ShortlinkerError::validation(String::from("test"));
+        assert_eq!(err1.message(), err2.message());
+    }
+
+    #[test]
+    fn test_error_is_clone() {
+        let err = ShortlinkerError::validation("test");
+        let cloned = err.clone();
+        assert_eq!(err.message(), cloned.message());
+        assert_eq!(err.code(), cloned.code());
+    }
+
+    #[test]
+    fn test_error_is_debug() {
+        let err = ShortlinkerError::validation("test");
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("Validation"));
+    }
+}

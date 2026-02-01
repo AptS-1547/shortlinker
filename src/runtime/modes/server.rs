@@ -12,7 +12,7 @@ use actix_web::{
 use anyhow::Result;
 use tracing::warn;
 
-use crate::api::middleware::{AdminAuth, FrontendGuard, HealthAuth};
+use crate::api::middleware::{AdminAuth, CsrfGuard, FrontendGuard, HealthAuth};
 use crate::api::services::{
     AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
 };
@@ -180,6 +180,7 @@ pub async fn run_server() -> Result<()> {
             )
             .service(
                 web::scope(&admin_prefix)
+                    .wrap(CsrfGuard)
                     .wrap(AdminAuth)
                     .service(admin_v1_routes()),
             )

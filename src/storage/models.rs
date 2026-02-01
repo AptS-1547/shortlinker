@@ -50,3 +50,92 @@ pub struct LinkStats {
     pub total_clicks: usize,
     pub active_links: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+
+    fn create_test_link(expires_at: Option<chrono::DateTime<Utc>>) -> ShortLink {
+        ShortLink {
+            code: "test".to_string(),
+            target: "https://example.com".to_string(),
+            created_at: Utc::now(),
+            expires_at,
+            password: None,
+            click: 0,
+        }
+    }
+
+    #[test]
+    fn test_is_expired_no_expiration() {
+        let link = create_test_link(None);
+        assert!(!link.is_expired());
+    }
+
+    #[test]
+    fn test_is_expired_future_expiration() {
+        let future = Utc::now() + Duration::hours(1);
+        let link = create_test_link(Some(future));
+        assert!(!link.is_expired());
+    }
+
+    #[test]
+    fn test_is_expired_past_expiration() {
+        let past = Utc::now() - Duration::hours(1);
+        let link = create_test_link(Some(past));
+        assert!(link.is_expired());
+    }
+
+    #[test]
+    fn test_is_expired_exact_now() {
+        // 边界情况：刚好等于当前时间应该算过期
+        let now = Utc::now();
+        let link = create_test_link(Some(now));
+        assert!(link.is_expired());
+    }
+
+    #[test]
+    fn test_cache_ttl_no_expiration() {
+        let link = create_test_link(None);
+        let ttl = link.cache_ttl(3600);
+        assert_eq!(ttl, Some(3600));
+    }
+
+    #[test]
+    fn test_cache_ttl_expired_returns_none() {
+        let past = Utc::now() - Duration::hours(1);
+        let link = create_test_link(Some(past));
+        let ttl = link.cache_ttl(3600);
+        assert_eq!(ttl, None);
+    }
+
+    #[test]
+    fn test_cache_ttl_uses_remaining_time() {
+        let future = Utc::now() + Duration::seconds(100);
+        let link = create_test_link(Some(future));
+        let ttl = link.cache_ttl(3600);
+        // 剩余时间约 100 秒，应该小于默认 TTL
+        assert!(ttl.is_some());
+        let ttl_val = ttl.unwrap();
+        assert!(ttl_val <= 100);
+        assert!(ttl_val >= 98); // 允许少量时间误差
+    }
+
+    #[test]
+    fn test_cache_ttl_caps_at_default() {
+        // 过期时间远在未来，应该使用默认 TTL
+        let future = Utc::now() + Duration::days(365);
+        let link = create_test_link(Some(future));
+        let ttl = link.cache_ttl(3600);
+        assert_eq!(ttl, Some(3600));
+    }
+
+    #[test]
+    fn test_link_stats_default() {
+        let stats = LinkStats::default();
+        assert_eq!(stats.total_links, 0);
+        assert_eq!(stats.total_clicks, 0);
+        assert_eq!(stats.active_links, 0);
+    }
+}

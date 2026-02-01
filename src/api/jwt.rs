@@ -113,3 +113,101 @@ impl JwtService {
         Ok(token_data.claims)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_service() -> JwtService {
+        JwtService::new("test_secret_key_32_bytes_long!!", 15, 7)
+    }
+
+    #[test]
+    fn test_generate_and_validate_access_token() {
+        let service = create_test_service();
+        let token = service.generate_access_token().unwrap();
+        let claims = service.validate_access_token(&token).unwrap();
+
+        assert_eq!(claims.sub, "admin");
+        assert_eq!(claims.token_type, "access");
+        assert!(claims.exp > claims.iat);
+    }
+
+    #[test]
+    fn test_generate_and_validate_refresh_token() {
+        let service = create_test_service();
+        let token = service.generate_refresh_token().unwrap();
+        let claims = service.validate_refresh_token(&token).unwrap();
+
+        assert_eq!(claims.sub, "admin");
+        assert_eq!(claims.token_type, "refresh");
+        assert!(claims.exp > claims.iat);
+    }
+
+    #[test]
+    fn test_access_token_rejected_as_refresh() {
+        let service = create_test_service();
+        let access_token = service.generate_access_token().unwrap();
+
+        let result = service.validate_refresh_token(&access_token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_refresh_token_rejected_as_access() {
+        let service = create_test_service();
+        let refresh_token = service.generate_refresh_token().unwrap();
+
+        let result = service.validate_access_token(&refresh_token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_token_rejected() {
+        let service = create_test_service();
+
+        let result = service.validate_access_token("invalid.token.here");
+        assert!(result.is_err());
+
+        let result = service.validate_refresh_token("invalid.token.here");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_wrong_secret_rejected() {
+        let service1 = create_test_service();
+        let service2 = JwtService::new("different_secret_key_32_bytes!!", 15, 7);
+
+        let token = service1.generate_access_token().unwrap();
+        let result = service2.validate_access_token(&token);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_expired_token_rejected() {
+        // 手动创建一个已过期的 token
+        let service = create_test_service();
+
+        // 创建一个过期时间在更久之前的 claims（超过默认 leeway）
+        let now = chrono::Utc::now();
+        let claims = AccessClaims {
+            sub: "admin".to_string(),
+            iat: (now - chrono::Duration::hours(2)).timestamp(),
+            exp: (now - chrono::Duration::hours(1)).timestamp(), // 1 小时前过期
+            jti: uuid::Uuid::new_v4().to_string(),
+            token_type: "access".to_string(),
+        };
+
+        let encoding_key =
+            jsonwebtoken::EncodingKey::from_secret(b"test_secret_key_32_bytes_long!!");
+        let token =
+            jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &encoding_key).unwrap();
+
+        let result = service.validate_access_token(&token);
+        assert!(
+            result.is_err(),
+            "Expected expired token to be rejected, but got: {:?}",
+            result
+        );
+    }
+}

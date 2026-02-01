@@ -62,6 +62,9 @@ curl -sS -X POST \
      -d '{"password":"your_admin_token"}' \
      http://localhost:8080/admin/v1/auth/login
 
+# 提取 CSRF Token（用于 PUT/POST/DELETE 等写操作）
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+
 # 获取所有配置
 curl -sS -b cookies.txt http://localhost:8080/admin/v1/config
 
@@ -71,6 +74,7 @@ curl -sS -b cookies.txt http://localhost:8080/admin/v1/config/features.random_co
 # 更新配置
 curl -X PUT \
      -b cookies.txt \
+     -H "X-CSRF-Token: ${CSRF_TOKEN}" \
      -H "Content-Type: application/json" \
      -d '{"value": "8"}' \
      http://localhost:8080/admin/v1/config/features.random_code_length
@@ -78,6 +82,7 @@ curl -X PUT \
 # 重载配置
 curl -X POST \
      -b cookies.txt \
+     -H "X-CSRF-Token: ${CSRF_TOKEN}" \
      http://localhost:8080/admin/v1/config/reload
 
 # 查询配置历史（可选 limit 参数，默认 20）
@@ -157,13 +162,13 @@ curl -sS -b cookies.txt \
 | `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
 | `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
 | `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
-| `api.access_cookie_name` | String | `shortlinker_access` | 是 | Access Token Cookie 名称 |
-| `api.refresh_cookie_name` | String | `shortlinker_refresh` | 是 | Refresh Token Cookie 名称 |
-| `api.cookie_secure` | Boolean | `false` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
+| `api.cookie_secure` | Boolean | `true` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
 | `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
+| `api.trusted_proxies` | Json | `[]` | 否 | 可信代理 IP 或 CIDR 列表（用于登录限流 IP 提取）。为空 = 不信任任何代理，使用连接 IP；设置后仅来自可信代理的请求使用 X-Forwarded-For。示例：`["10.0.0.1", "192.168.1.0/24"]` |
 
 > 提示：
+> - Cookie 名称当前为固定值：`shortlinker_access` / `shortlinker_refresh` / `csrf_token`（不可配置）。
 > - `api.admin_token` 在数据库中存储为 Argon2 哈希；推荐使用 `./shortlinker reset-password` 重置管理员密码。
 > - 若未显式设置 `ADMIN_TOKEN`，首次启动会自动生成一个随机密码并写入 `admin_token.txt`（保存后请删除该文件）。
 
@@ -198,7 +203,7 @@ curl -sS -b cookies.txt \
 | `cors.enabled` | Boolean | `false` | 是 | 启用 CORS（禁用时不添加 CORS 头，浏览器维持同源策略） |
 | `cors.allowed_origins` | Json | `[]` | 是 | 允许的来源（JSON 数组；`["*"]` = 允许任意来源；空数组 = 仅同源/不允许跨域） |
 | `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | 是 | 允许的 HTTP 方法 |
-| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept"]` | 是 | 允许的请求头 |
+| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept","X-CSRF-Token"]` | 是 | 允许的请求头 |
 | `cors.max_age` | Integer | `3600` | 是 | 预检请求缓存时间（秒） |
 | `cors.allow_credentials` | Boolean | `false` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启；出于安全原因不建议与 `["*"]` 同时使用） |
 
@@ -210,6 +215,55 @@ curl -sS -b cookies.txt \
 4. **程序默认值**（最低优先级）
 
 > **注意**：动态配置只在首次启动时从环境变量/TOML 迁移到数据库。之后，数据库中的值优先。
+
+## 安全最佳实践
+
+### 登录限流配置
+
+Shortlinker 默认使用连接 IP（`peer_addr`）进行登录限流，防止通过伪造 `X-Forwarded-For` 头部绕过限流。
+
+**直连部署**（无反向代理）：
+- 无需额外配置，默认行为已足够安全
+
+**反向代理部署**（Nginx/Caddy/Cloudflare）：
+- 需要在管理面板配置 `api.trusted_proxies`，列出可信代理的 IP 或 CIDR
+- 只有来自可信代理的请求才会使用 `X-Forwarded-For`
+
+示例配置：
+
+```bash
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+
+# Nginx 在本地
+curl -X PUT -b cookies.txt \
+     -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+     -H "Content-Type: application/json" \
+     -d '{"value": "[\"127.0.0.1\"]"}' \
+     http://localhost:8080/admin/v1/config/api.trusted_proxies
+
+# Cloudflare CDN（使用 Cloudflare IP 段）
+curl -X PUT -b cookies.txt \
+     -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+     -H "Content-Type: application/json" \
+     -d '{"value": "[\"103.21.244.0/22\", \"103.22.200.0/22\"]"}' \
+     http://localhost:8080/admin/v1/config/api.trusted_proxies
+```
+
+> **注意**：错误配置可信代理会导致所有用户共享同一限流桶（如果代理 IP 不在列表中）或重新引入绕过风险（如果信任了不安全的代理）。
+
+### IPC Socket 权限
+
+Unix socket 文件（`./shortlinker.sock`）权限已自动设置为 `0600`（仅属主可访问），防止本地其他用户绕过 Admin API。
+
+如果需要允许特定用户访问 CLI：
+```bash
+# 方法 1: 使用 setfacl 添加访问权限
+setfacl -m u:username:rw ./shortlinker.sock
+
+# 方法 2: 使用用户组
+chgrp shortlinker-users ./shortlinker.sock
+chmod 660 ./shortlinker.sock
+```
 
 ## 配置示例
 
@@ -311,8 +365,11 @@ curl -sS -X POST \
      -d '{"password":"your_admin_token"}' \
      http://localhost:8080/admin/v1/auth/login
 
+CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
+
 curl -X POST \
      -b cookies.txt \
+     -H "X-CSRF-Token: ${CSRF_TOKEN}" \
      http://localhost:8080/admin/v1/config/reload
 ```
 

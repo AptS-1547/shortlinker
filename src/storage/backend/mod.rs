@@ -5,7 +5,7 @@
 
 mod click_sink;
 mod connection;
-mod converters;
+pub(crate) mod converters;
 mod mutations;
 mod operations;
 mod query;
@@ -132,6 +132,11 @@ impl SeaOrmStorage {
         Ok(())
     }
 
+    /// 获取数据库连接引用（用于需要直接访问SeaORM API的场景）
+    pub fn get_db(&self) -> &DatabaseConnection {
+        &self.db
+    }
+
     pub async fn get_backend_config(&self) -> StorageConfig {
         StorageConfig {
             storage_type: self.backend_name.clone(),
@@ -141,11 +146,6 @@ impl SeaOrmStorage {
 
     pub fn as_click_sink(&self) -> Option<Arc<dyn ClickSink>> {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
-    }
-
-    /// 获取数据库连接（用于配置系统等需要直接访问数据库的场景）
-    pub fn get_db(&self) -> &DatabaseConnection {
-        &self.db
     }
 
     /// 清除分页 COUNT 缓存（数据变更时调用）
