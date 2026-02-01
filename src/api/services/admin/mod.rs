@@ -48,7 +48,8 @@ pub use config_ops::{
 
 /// 获取随机码长度配置
 pub(crate) fn get_random_code_length() -> usize {
-    crate::config::get_config().features.random_code_length
+    crate::config::get_runtime_config()
+        .get_usize_or(crate::config::keys::FEATURES_RANDOM_CODE_LENGTH, 6)
 }
 
 /// AdminService 结构体，保持向后兼容

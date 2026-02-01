@@ -10,7 +10,7 @@ use std::net::{IpAddr, SocketAddr};
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
-use crate::config::get_config;
+use crate::config::{get_config, get_runtime_config, keys};
 use crate::utils::password::verify_password;
 
 use crate::errors::ShortlinkerError;
@@ -43,6 +43,7 @@ impl KeyExtractor for LoginKeyExtractor {
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
         let conn_info = req.connection_info();
         let config = get_config();
+        let rt = get_runtime_config();
 
         // 步骤 1: 检查是否配置了 Unix Socket 模式
         #[cfg(unix)]
@@ -71,9 +72,9 @@ impl KeyExtractor for LoginKeyExtractor {
         })?;
 
         // 步骤 3: 检查是否显式配置了可信代理（优先级最高）
-        let trusted_proxies = &config.api.trusted_proxies;
+        let trusted_proxies: Vec<String> = rt.get_json_or(keys::API_TRUSTED_PROXIES, Vec::new());
         if !trusted_proxies.is_empty() {
-            if is_trusted_proxy(peer_ip, trusted_proxies) {
+            if is_trusted_proxy(peer_ip, &trusted_proxies) {
                 let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
                 debug!("Trusted proxy (explicit): {} -> {}", peer_ip, real_ip);
                 return Ok(real_ip.to_string());
@@ -209,11 +210,11 @@ pub async fn check_admin_token(
     _req: HttpRequest,
     login_body: web::Json<LoginCredentials>,
 ) -> ActixResult<impl Responder> {
-    let config = get_config();
-    let admin_token = &config.api.admin_token;
+    let rt = get_runtime_config();
+    let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
 
     // 验证密码（启动时已自动迁移明文为哈希）
-    let password_valid = match verify_password(&login_body.password, admin_token) {
+    let password_valid = match verify_password(&login_body.password, &admin_token) {
         Ok(valid) => valid,
         Err(e) => {
             error!("Admin API: password verification error: {}", e);

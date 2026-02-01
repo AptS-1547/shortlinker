@@ -6,17 +6,13 @@
 //! - 默认值函数
 //! - 元信息（requires_restart, is_sensitive, editable, category, description）
 //!
-//! 其他模块（migration, schema, runtime_config）都从这里读取配置定义。
+//! 其他模块（schema, runtime_config）都从这里读取配置定义。
 //!
 //! # 添加新配置的步骤
 //!
 //! 1. 在 `keys` 模块中添加新的 key 常量
 //! 2. 添加默认值函数（如果需要动态默认值）
 //! 3. 在 `ALL_CONFIGS` 数组中添加 `ConfigDef` 定义
-//! 4. 在 `config_migration.rs` 的 `get_config_value()` 中添加映射
-//! 5. 在 `impl.rs` 的 `update_config_by_key()` 中添加映射
-//!
-//! 注意：步骤 4 和 5 目前仍需手动维护，编译器不会检查是否遗漏。
 
 use super::types::{RustType, ValueType};
 
@@ -34,8 +30,6 @@ pub mod categories {
 pub struct ConfigDef {
     /// 配置键，如 "api.admin_token"
     pub key: &'static str,
-    /// 对应的环境变量名，如 Some("ADMIN_TOKEN")
-    pub env_var: Option<&'static str>,
     /// 数据库/前端值类型
     pub value_type: ValueType,
     /// Rust 代码中的类型
@@ -191,7 +185,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== API 认证 (auth) ==========
     ConfigDef {
         key: keys::API_ADMIN_TOKEN,
-        env_var: Some("ADMIN_TOKEN"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_admin_token,
@@ -203,7 +196,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_HEALTH_TOKEN,
-        env_var: Some("HEALTH_TOKEN"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_empty,
@@ -215,7 +207,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_JWT_SECRET,
-        env_var: None,
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_jwt_secret,
@@ -227,7 +218,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_TRUSTED_PROXIES,
-        env_var: None,
         value_type: ValueType::Json,
         rust_type: RustType::VecString,
         default_fn: default_trusted_proxies,
@@ -239,32 +229,29 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_ACCESS_TOKEN_MINUTES,
-        env_var: None,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_access_token_minutes,
         requires_restart: false,
         is_sensitive: false,
         editable: true,
-        category: categories::COOKIE,
+        category: categories::AUTH,
         description: "Access token expiration time in minutes",
     },
     ConfigDef {
         key: keys::API_REFRESH_TOKEN_DAYS,
-        env_var: None,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_refresh_token_days,
         requires_restart: false,
         is_sensitive: false,
         editable: true,
-        category: categories::COOKIE,
+        category: categories::AUTH,
         description: "Refresh token expiration time in days",
     },
     // ========== Cookie 配置 (cookie) ==========
     ConfigDef {
         key: keys::API_COOKIE_SECURE,
-        env_var: None,
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_cookie_secure,
@@ -276,7 +263,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_COOKIE_SAME_SITE,
-        env_var: None,
         value_type: ValueType::Enum,
         rust_type: RustType::SameSitePolicy,
         default_fn: default_cookie_same_site,
@@ -288,7 +274,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::API_COOKIE_DOMAIN,
-        env_var: None,
         value_type: ValueType::String,
         rust_type: RustType::OptionString,
         default_fn: default_empty,
@@ -301,7 +286,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== 功能配置 (features) ==========
     ConfigDef {
         key: keys::FEATURES_RANDOM_CODE_LENGTH,
-        env_var: Some("RANDOM_CODE_LENGTH"),
         value_type: ValueType::Int,
         rust_type: RustType::Usize,
         default_fn: default_random_code_length,
@@ -313,7 +297,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::FEATURES_DEFAULT_URL,
-        env_var: Some("DEFAULT_URL"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_default_url,
@@ -325,7 +308,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::FEATURES_ENABLE_ADMIN_PANEL,
-        env_var: Some("ENABLE_ADMIN_PANEL"),
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_enable_admin_panel,
@@ -338,7 +320,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== 点击追踪 (tracking) ==========
     ConfigDef {
         key: keys::CLICK_ENABLE_TRACKING,
-        env_var: None,
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_enable_tracking,
@@ -350,7 +331,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CLICK_FLUSH_INTERVAL,
-        env_var: None,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_flush_interval,
@@ -362,7 +342,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CLICK_MAX_CLICKS_BEFORE_FLUSH,
-        env_var: None,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_max_clicks_before_flush,
@@ -375,7 +354,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== 路由配置 (routes) ==========
     ConfigDef {
         key: keys::ROUTES_ADMIN_PREFIX,
-        env_var: Some("ADMIN_ROUTE_PREFIX"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_admin_prefix,
@@ -387,7 +365,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::ROUTES_HEALTH_PREFIX,
-        env_var: Some("HEALTH_ROUTE_PREFIX"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_health_prefix,
@@ -399,7 +376,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::ROUTES_FRONTEND_PREFIX,
-        env_var: Some("FRONTEND_ROUTE_PREFIX"),
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_frontend_prefix,
@@ -412,7 +388,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== CORS 配置 (cors) ==========
     ConfigDef {
         key: keys::CORS_ENABLED,
-        env_var: None,
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_cors_enabled,
@@ -424,7 +399,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_ORIGINS,
-        env_var: None,
         value_type: ValueType::Json,
         rust_type: RustType::VecString,
         default_fn: default_cors_allowed_origins,
@@ -436,7 +410,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_METHODS,
-        env_var: None,
         value_type: ValueType::Json,
         rust_type: RustType::VecHttpMethod,
         default_fn: default_cors_allowed_methods,
@@ -448,7 +421,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_HEADERS,
-        env_var: None,
         value_type: ValueType::Json,
         rust_type: RustType::VecString,
         default_fn: default_cors_allowed_headers,
@@ -460,7 +432,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_MAX_AGE,
-        env_var: None,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_cors_max_age,
@@ -472,7 +443,6 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
     },
     ConfigDef {
         key: keys::CORS_ALLOW_CREDENTIALS,
-        env_var: None,
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_cors_allow_credentials,

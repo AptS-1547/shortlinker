@@ -42,11 +42,22 @@ impl JwtService {
 
     /// Create JwtService from config
     pub fn from_config() -> Self {
-        let config = crate::config::get_config();
+        let rt = crate::config::get_runtime_config();
+
+        // 获取 JWT secret，如果为空则生成一个安全的随机值
+        let jwt_secret = rt
+            .get(crate::config::keys::API_JWT_SECRET)
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                use tracing::warn;
+                warn!("JWT secret not configured or empty, generating secure random token");
+                crate::utils::generate_secure_token(32)
+            });
+
         Self::new(
-            &config.api.jwt_secret,
-            config.api.access_token_minutes,
-            config.api.refresh_token_days,
+            &jwt_secret,
+            rt.get_u64_or(crate::config::keys::API_ACCESS_TOKEN_MINUTES, 15),
+            rt.get_u64_or(crate::config::keys::API_REFRESH_TOKEN_DAYS, 7),
         )
     }
 

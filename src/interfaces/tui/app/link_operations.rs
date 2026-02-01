@@ -14,8 +14,9 @@ impl App {
         validate_url(&self.target_url_input)
             .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
 
-        let config = crate::config::get_config();
-        let random_code_length = config.features.random_code_length;
+        let rt = crate::config::get_runtime_config();
+        let random_code_length =
+            rt.get_usize_or(crate::config::keys::FEATURES_RANDOM_CODE_LENGTH, 6);
 
         let final_short_code = if self.short_code_input.is_empty() {
             let code = generate_random_code(random_code_length);

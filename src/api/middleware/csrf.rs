@@ -21,7 +21,7 @@ use tracing::{trace, warn};
 
 use crate::api::constants;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
-use crate::config::get_config;
+use crate::config::{get_runtime_config, keys};
 
 use super::auth::AuthMethod;
 
@@ -41,8 +41,8 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        let config = get_config();
-        let admin_prefix = config.routes.admin_prefix.clone();
+        let rt = get_runtime_config();
+        let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
 
         // 预计算认证端点路径（只在初始化时计算一次）
         let auth_endpoints = vec![

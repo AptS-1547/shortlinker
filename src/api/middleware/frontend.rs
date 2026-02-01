@@ -8,15 +8,9 @@ use actix_web::{
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
-use std::sync::OnceLock;
 use tracing::trace;
 
-// NOTE: These values are cached at first request and require server restart to change.
-// This is intentional - changing `enable_admin_panel` or whether `admin_token` is set
-// requires a restart to take effect for frontend routes.
-// See: config/definitions.rs where `enable_admin_panel` has `requires_restart: true`
-static ENABLE_ADMIN_PANEL: OnceLock<bool> = OnceLock::new();
-static ADMIN_TOKEN: OnceLock<String> = OnceLock::new();
+use crate::config::{get_runtime_config, keys};
 
 #[derive(Clone)]
 pub struct FrontendGuard;
@@ -62,10 +56,9 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         Box::pin(async move {
-            let config = crate::config::get_config();
-            let enable_frontend_routes =
-                ENABLE_ADMIN_PANEL.get_or_init(|| config.features.enable_admin_panel);
-            let admin_token = ADMIN_TOKEN.get_or_init(|| config.api.admin_token.clone());
+            let rt = get_runtime_config();
+            let enable_frontend_routes = rt.get_bool_or(keys::FEATURES_ENABLE_ADMIN_PANEL, false);
+            let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
 
             if !enable_frontend_routes || admin_token.is_empty() {
                 return Ok(req.into_response(

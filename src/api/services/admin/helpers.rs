@@ -6,7 +6,7 @@ use actix_web::http::StatusCode;
 use serde::Serialize;
 
 use crate::api::constants;
-use crate::config::SameSitePolicy;
+use crate::config::{get_runtime_config, keys};
 use crate::errors::ShortlinkerError;
 use crate::utils::TimeParser;
 
@@ -89,21 +89,22 @@ pub struct CookieBuilder {
 
 impl CookieBuilder {
     pub fn from_config() -> Self {
-        let config = crate::config::get_config();
+        let rt = get_runtime_config();
 
-        let same_site = match config.api.cookie_same_site {
-            SameSitePolicy::Strict => SameSite::Strict,
-            SameSitePolicy::None => SameSite::None,
-            SameSitePolicy::Lax => SameSite::Lax,
+        let same_site_str = rt.get_or(keys::API_COOKIE_SAME_SITE, "Lax");
+        let same_site = match same_site_str.to_lowercase().as_str() {
+            "strict" => SameSite::Strict,
+            "none" => SameSite::None,
+            _ => SameSite::Lax,
         };
 
         Self {
             same_site,
-            secure: config.api.cookie_secure,
-            domain: config.api.cookie_domain.clone(),
-            access_token_minutes: config.api.access_token_minutes,
-            refresh_token_days: config.api.refresh_token_days,
-            admin_prefix: config.routes.admin_prefix.clone(),
+            secure: rt.get_bool_or(keys::API_COOKIE_SECURE, true),
+            domain: rt.get(keys::API_COOKIE_DOMAIN).filter(|s| !s.is_empty()),
+            access_token_minutes: rt.get_u64_or(keys::API_ACCESS_TOKEN_MINUTES, 15),
+            refresh_token_days: rt.get_u64_or(keys::API_REFRESH_TOKEN_DAYS, 7),
+            admin_prefix: rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin"),
         }
     }
 

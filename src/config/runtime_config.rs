@@ -1,27 +1,18 @@
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, RwLock};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 
 use super::validators;
-use super::{batch_update_config_by_keys, update_config_by_key};
 
 // Re-export keys from definitions module
 pub use super::definitions::keys;
 
 /// 全局运行时配置实例
 static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
-
-/// 配置加载模式
-enum LoadMode {
-    /// 启动时加载（同步所有配置到 AppConfig）
-    Startup,
-    /// 运行时热重载（仅同步 requires_restart=false 的配置）
-    HotReload,
-}
 
 /// 运行时配置管理器
 ///
@@ -41,78 +32,55 @@ impl RuntimeConfig {
         }
     }
 
-    /// 内部加载方法
-    ///
-    /// - `Startup` 模式：同步所有配置到 AppConfig（启动时使用）
-    /// - `HotReload` 模式：仅同步 requires_restart=false 的配置（运行时热更新）
-    async fn load_internal(&self, mode: LoadMode) -> Result<()> {
+    /// 从数据库加载所有配置到缓存
+    pub async fn load(&self) -> Result<()> {
         let configs = self.store.get_all().await?;
         let count = configs.len();
 
-        // 更新内部缓存（始终全量更新）
+        // 更新内部缓存
         {
             let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::database_operation(
-                    "Cannot acquire runtime config cache write lock".to_string(),
-                )
+                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
             })?;
-            *cache = configs.clone();
+            *cache = configs;
         }
 
-        // 根据模式过滤要同步到 AppConfig 的配置
-        let updates: HashMap<String, String> = configs
-            .iter()
-            .filter(|(_, item)| match mode {
-                LoadMode::Startup => true,
-                LoadMode::HotReload => !item.requires_restart,
-            })
-            .map(|(k, item)| (k.clone(), (*item.value).clone()))
-            .collect();
-
-        let applied_count = updates.len();
-        let errors = batch_update_config_by_keys(&updates);
-        for (key, err) in &errors {
-            warn!("Failed to update config '{}': {}", key, err);
-        }
-
-        let mode_str = match mode {
-            LoadMode::Startup => "startup",
-            LoadMode::HotReload => "hot-reload",
-        };
-        info!(
-            "Loaded {} runtime configuration items ({} applied, {} errors) [{}]",
-            count,
-            applied_count - errors.len(),
-            errors.len(),
-            mode_str
-        );
+        info!("Loaded {} runtime configuration items", count);
         Ok(())
     }
 
-    /// 从数据库加载所有配置到缓存，并同步到 AppConfig
-    ///
-    /// 启动时调用，会同步所有配置（包括 requires_restart=true）
-    pub async fn load(&self) -> Result<()> {
-        self.load_internal(LoadMode::Startup).await
-    }
-
     /// 运行时热重载配置
-    ///
-    /// 仅同步 requires_restart=false 的配置到 AppConfig，
-    /// 需要重启的配置会在下次启动时生效。
     pub async fn reload(&self) -> Result<()> {
-        self.load_internal(LoadMode::HotReload).await
+        let configs = self.store.get_all().await?;
+        let count = configs.len();
+
+        // 更新内部缓存
+        {
+            let mut cache = self.cache.write().map_err(|_| {
+                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
+            })?;
+            *cache = configs;
+        }
+
+        info!("Reloaded {} runtime configuration items", count);
+        Ok(())
     }
 
     /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
-        let cache = self.cache.read().ok()?;
+        let cache = self
+            .cache
+            .read()
+            .expect("Runtime config cache lock poisoned - this is a fatal error");
         cache.get(key).map(|item| (*item.value).clone())
     }
 
     /// 获取配置的完整信息
     pub fn get_full(&self, key: &str) -> Option<ConfigItem> {
-        let cache = self.cache.read().ok()?;
+        let cache = self
+            .cache
+            .read()
+            .expect("Runtime config cache lock poisoned - this is a fatal error");
         cache.get(key).cloned()
     }
 
@@ -120,8 +88,8 @@ impl RuntimeConfig {
     pub fn get_all(&self) -> HashMap<String, ConfigItem> {
         self.cache
             .read()
-            .map(|cache| cache.clone())
-            .unwrap_or_default()
+            .expect("Runtime config cache lock poisoned - this is a fatal error")
+            .clone()
     }
 
     /// 获取 bool 类型配置
@@ -174,7 +142,31 @@ impl RuntimeConfig {
         self.get_u64(key).unwrap_or(default)
     }
 
-    /// 设置配置值（同时更新数据库、内部缓存和 AppConfig）
+    /// 获取 JSON 类型配置并反序列化，解析失败时返回默认值
+    ///
+    /// 用于解析存储为 JSON 字符串的配置（如数组、对象等）
+    pub fn get_json_or<T: serde::de::DeserializeOwned>(&self, key: &str, default: T) -> T {
+        self.get(key)
+            .filter(|s| !s.is_empty())
+            .and_then(|s| match serde_json::from_str::<T>(&s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(
+                        "Invalid JSON for config key '{}' (value: '{}'): {}. Using default.",
+                        key,
+                        s,
+                        e
+                    );
+                    None
+                }
+            })
+            .unwrap_or(default)
+    }
+
+    /// 设置配置值（同时更新数据库和内部缓存）
+    ///
+    /// 对于 `requires_restart=true` 的配置，只更新数据库，不更新内存缓存。
+    /// 这确保在重启前，所有读取该配置的代码都获得一致的旧值。
     pub async fn set(&self, key: &str, value: &str) -> Result<ConfigUpdateResult> {
         // 验证 enum 类型配置值
         if let Err(e) = validators::validate_config_value(key, value) {
@@ -187,24 +179,26 @@ impl RuntimeConfig {
         // 先更新数据库
         let result = self.store.set(key, value).await?;
 
-        // 更新内部缓存
-        if let Ok(mut cache) = self.cache.write() {
-            if let Some(item) = cache.get_mut(key) {
-                item.value = std::sync::Arc::new(value.to_string());
-                item.updated_at = chrono::Utc::now();
-            }
-        } else {
-            warn!(
-                "Cannot acquire runtime config cache write lock, skipping cache update for key: {}",
-                key
-            );
+        // 对于 requires_restart=true 的配置，不更新内存缓存
+        // 这确保在重启前，所有读取该配置的代码都获得一致的旧值
+        if result.requires_restart {
+            return Ok(result);
         }
 
-        // 如果不需要重启，同步更新 AppConfig
-        if !result.requires_restart
-            && let Err(e) = update_config_by_key(key, value)
-        {
-            warn!("Failed to update AppConfig for '{}': {}", key, e);
+        // 更新内部缓存（必须成功，保证一致性）
+        let mut cache = self.cache.write().map_err(|_| {
+            ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
+        })?;
+
+        if let Some(item) = cache.get_mut(key) {
+            item.value = std::sync::Arc::new(value.to_string());
+            item.updated_at = chrono::Utc::now();
+        } else {
+            // 不应该发生：如果 load() 正确初始化了缓存
+            tracing::warn!(
+                "Config key '{}' not found in cache after database update",
+                key
+            );
         }
 
         Ok(result)
@@ -223,9 +217,18 @@ impl RuntimeConfig {
 
 /// 初始化全局运行时配置
 ///
-/// 必须在数据库迁移完成后调用
+/// 必须在数据库迁移完成后调用。
+///
+/// 初始化流程：
+/// 1. 确保所有配置项存在（首次启动时使用默认值初始化）
+/// 2. 从数据库加载配置到内存缓存
 pub async fn init_runtime_config(db: DatabaseConnection) -> Result<()> {
     let config = RuntimeConfig::new(db);
+
+    // 确保所有配置项存在（首次启动时使用默认值初始化）
+    config.store().ensure_defaults().await?;
+
+    // 加载配置到内存缓存
     config.load().await?;
 
     RUNTIME_CONFIG.set(config).map_err(|_| {

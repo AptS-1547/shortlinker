@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use tracing::{error, info};
 
 use crate::cache::traits::CompositeCacheTrait;
-use crate::config::get_config;
+use crate::config::{get_config, keys, try_get_runtime_config};
 use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
@@ -137,7 +137,9 @@ impl LinkService {
 
     /// Get the configured random code length
     fn random_code_length(&self) -> usize {
-        get_config().features.random_code_length
+        try_get_runtime_config()
+            .and_then(|rt| rt.get_usize(keys::FEATURES_RANDOM_CODE_LENGTH))
+            .unwrap_or(6)
     }
 
     /// Get the default cache TTL

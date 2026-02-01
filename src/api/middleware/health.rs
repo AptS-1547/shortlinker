@@ -12,7 +12,7 @@ use tracing::{trace, warn};
 use crate::api::constants;
 use crate::api::jwt::JwtService;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
-use crate::config::get_config;
+use crate::config::{get_runtime_config, keys};
 
 #[derive(Clone)]
 pub struct HealthAuth;
@@ -96,9 +96,9 @@ where
 
         Box::pin(async move {
             // 每次请求都读取最新配置
-            let config = get_config();
-            let admin_token = &config.api.admin_token;
-            let health_token = &config.api.health_token;
+            let rt = get_runtime_config();
+            let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
+            let health_token = rt.get_or(keys::API_HEALTH_TOKEN, "");
 
             // 两个 token 都为空才禁用健康接口
             if admin_token.is_empty() && health_token.is_empty() {
@@ -121,14 +121,18 @@ where
                 ));
             }
 
-            // 先尝试 Bearer token 认证（给 k8s 等监控工具用）
-            if Self::validate_bearer_token(&req, health_token) {
+            // 认证策略：依次尝试 Bearer token → JWT Cookie
+            // 1. 先尝试 Bearer token 认证（给 k8s 等监控工具用）
+            //    - 如果 health_token 为空，validate_bearer_token 会返回 false
+            //    - 如果 health_token 非空但验证失败，也会返回 false
+            if Self::validate_bearer_token(&req, &health_token) {
                 trace!("Health authentication successful via Bearer token");
                 let response = srv.call(req).await?.map_into_left_body();
                 return Ok(response);
             }
 
-            // 再尝试 JWT Cookie 认证（给前端用户用）
+            // 2. 再尝试 JWT Cookie 认证（给前端用户用）
+            //    - 使用 admin_token 作为 JWT secret
             if Self::validate_jwt_cookie(&req, constants::ACCESS_COOKIE_NAME) {
                 trace!("Health authentication successful via JWT Cookie");
                 let response = srv.call(req).await?.map_into_left_body();

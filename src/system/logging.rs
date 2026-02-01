@@ -3,7 +3,7 @@
 //! This module provides functions to initialize the tracing/logging system
 //! based on application configuration.
 
-use crate::config::AppConfig;
+use crate::config::StaticConfig;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_appender::rolling;
 use tracing_subscriber;
@@ -32,7 +32,7 @@ pub struct LoggingInitResult {
 ///
 /// # Returns
 /// * `LoggingInitResult` - Contains the worker guard and optional warning
-pub fn init_logging(config: &AppConfig) -> LoggingInitResult {
+pub fn init_logging(config: &StaticConfig) -> LoggingInitResult {
     // Create writer based on config
     let (writer, warning): (Box<dyn std::io::Write + Send + Sync>, Option<String>) = if let Some(
         ref log_file,

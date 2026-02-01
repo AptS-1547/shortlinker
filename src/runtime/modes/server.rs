@@ -16,8 +16,48 @@ use crate::api::middleware::{AdminAuth, CsrfGuard, FrontendGuard, HealthAuth};
 use crate::api::services::{
     AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
 };
-use crate::config::CorsConfig;
+use crate::config::{HttpMethod, get_runtime_config, keys};
 use crate::runtime::lifetime;
+
+/// CORS configuration loaded from RuntimeConfig
+#[derive(Clone, Debug)]
+struct CorsSettings {
+    enabled: bool,
+    allowed_origins: Vec<String>,
+    allowed_methods: Vec<HttpMethod>,
+    allowed_headers: Vec<String>,
+    max_age: u64,
+    allow_credentials: bool,
+}
+
+impl CorsSettings {
+    fn from_runtime_config() -> Self {
+        let rt = get_runtime_config();
+
+        // 解析 JSON 配置
+        let allowed_origins: Vec<String> = rt.get_json_or(keys::CORS_ALLOWED_ORIGINS, Vec::new());
+        let allowed_methods: Vec<HttpMethod> =
+            rt.get_json_or(keys::CORS_ALLOWED_METHODS, Vec::new());
+        let allowed_headers: Vec<String> = rt.get_json_or(
+            keys::CORS_ALLOWED_HEADERS,
+            vec![
+                "Content-Type".to_string(),
+                "Authorization".to_string(),
+                "Accept".to_string(),
+                "X-CSRF-Token".to_string(),
+            ],
+        );
+
+        Self {
+            enabled: rt.get_bool_or(keys::CORS_ENABLED, false),
+            allowed_origins,
+            allowed_methods,
+            allowed_headers,
+            max_age: rt.get_u64_or(keys::CORS_MAX_AGE, 3600),
+            allow_credentials: rt.get_bool_or(keys::CORS_ALLOW_CREDENTIALS, false),
+        }
+    }
+}
 
 /// Server configuration
 #[derive(Clone, Debug)]
@@ -29,7 +69,7 @@ pub struct ServerConfig {
 }
 
 /// Validate CORS configuration at startup (runs once)
-fn validate_cors_config(cors_config: &CorsConfig) {
+fn validate_cors_config(cors_config: &CorsSettings) {
     if !cors_config.enabled {
         return;
     }
@@ -53,7 +93,7 @@ fn validate_cors_config(cors_config: &CorsConfig) {
 }
 
 /// Build CORS middleware from configuration
-fn build_cors_middleware(cors_config: &CorsConfig) -> Cors {
+fn build_cors_middleware(cors_config: &CorsSettings) -> Cors {
     // When CORS is disabled, use browser's default same-origin policy (restrictive)
     if !cors_config.enabled {
         return Cors::default();
@@ -122,7 +162,6 @@ pub async fn run_server() -> Result<()> {
     };
 
     // Prepare server startup (cache, storage, routes)
-    // This also syncs database config to AppConfig
     let startup = lifetime::startup::prepare_server_startup()
         .await
         .map_err(|e| {
@@ -141,6 +180,7 @@ pub async fn run_server() -> Result<()> {
 
     // Load configuration (after database sync in prepare_server_startup)
     let config = crate::config::get_config();
+    let rt = get_runtime_config();
 
     // Load server configuration
     let server_config = ServerConfig {
@@ -153,8 +193,8 @@ pub async fn run_server() -> Result<()> {
     let cpu_count = config.server.cpu_count.min(32);
     warn!("Using {} CPU cores for the server", cpu_count);
 
-    // Load CORS configuration
-    let cors_config = config.cors.clone();
+    // Load CORS configuration from RuntimeConfig
+    let cors_config = CorsSettings::from_runtime_config();
 
     // Validate CORS configuration at startup (runs once, not per worker)
     validate_cors_config(&cors_config);
@@ -172,7 +212,17 @@ pub async fn run_server() -> Result<()> {
     }
 
     if is_tcp_mode {
-        let trusted_proxies = &config.api.trusted_proxies;
+        let trusted_proxies_json = rt.get_or(keys::API_TRUSTED_PROXIES, "[]");
+        let trusted_proxies: Vec<String> = match serde_json::from_str(&trusted_proxies_json) {
+            Ok(v) => v,
+            Err(e) => {
+                warn!(
+                    "Invalid JSON for trusted_proxies '{}': {}, using empty list",
+                    trusted_proxies_json, e
+                );
+                Vec::new()
+            }
+        };
         if trusted_proxies.is_empty() {
             warn!(
                 "Login rate limiting: Auto-detect mode enabled. \
