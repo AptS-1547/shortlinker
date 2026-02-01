@@ -9,6 +9,7 @@
 pub mod auth;
 mod batch_ops;
 mod config_ops;
+pub mod error_code;
 mod export_import;
 mod helpers;
 mod link_crud;
@@ -19,7 +20,12 @@ mod types;
 pub use types::*;
 
 // 重新导出帮助函数
-pub use helpers::{error_response, parse_expires_at, success_response};
+pub use helpers::{
+    api_result, error_from_shortlinker, error_response, parse_expires_at, success_response,
+};
+
+// 重新导出错误码
+pub use error_code::ErrorCode;
 
 // 重新导出认证端点
 pub use auth::{check_admin_token, logout, refresh_token, verify_token};

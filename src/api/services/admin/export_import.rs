@@ -1,7 +1,6 @@
 //! Admin API 导出导入操作
 
 use actix_multipart::Multipart;
-use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use bytes::Bytes;
 use chrono::Utc;
@@ -14,11 +13,13 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::cache::traits::CompositeCacheTrait;
+use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::password::{hash_password, is_argon2_hash};
 use crate::utils::url_validator::validate_url;
 
-use super::helpers::{error_response, success_response};
+use super::error_code::ErrorCode;
+use super::helpers::{error_from_shortlinker, success_response};
 use super::types::{CsvLinkRow, ExportQuery, ImportFailedItem, ImportMode, ImportResponse};
 
 /// 每批次序列化的链接数量
@@ -208,9 +209,11 @@ pub async fn import_links(
             Ok(f) => f,
             Err(e) => {
                 error!("Failed to parse multipart field: {}", e);
-                return Ok(error_response(
-                    StatusCode::BAD_REQUEST,
-                    &format!("Invalid multipart data: {}", e),
+                return Ok(error_from_shortlinker(
+                    &ShortlinkerError::invalid_multipart_data(format!(
+                        "Invalid multipart data: {}",
+                        e
+                    )),
                 ));
             }
         };
@@ -226,10 +229,9 @@ pub async fn import_links(
                         Ok(bytes) => data.extend_from_slice(&bytes),
                         Err(e) => {
                             error!("Failed to read file chunk: {}", e);
-                            return Ok(error_response(
-                                StatusCode::BAD_REQUEST,
-                                &format!("Failed to read file: {}", e),
-                            ));
+                            return Ok(error_from_shortlinker(&ShortlinkerError::file_read_error(
+                                format!("Failed to read file: {}", e),
+                            )));
                         }
                     }
                 }
@@ -261,10 +263,9 @@ pub async fn import_links(
     let csv_data = match csv_data {
         Some(data) if !data.is_empty() => data,
         _ => {
-            return Ok(error_response(
-                StatusCode::BAD_REQUEST,
+            return Ok(error_from_shortlinker(&ShortlinkerError::csv_file_missing(
                 "No CSV file provided",
-            ));
+            )));
         }
     };
 
@@ -307,6 +308,7 @@ pub async fn import_links(
                     row: row_num,
                     code: String::new(),
                     error: format!("CSV parse error: {}", e),
+                    error_code: Some(ErrorCode::CsvParseError as i32),
                 });
             }
         }
@@ -352,6 +354,7 @@ pub async fn import_links(
                 row: row_num,
                 code: row.code,
                 error: "Empty code".to_string(),
+                error_code: Some(ErrorCode::LinkEmptyCode as i32),
             });
             continue;
         }
@@ -362,6 +365,7 @@ pub async fn import_links(
                 row: row_num,
                 code: row.code,
                 error: format!("Invalid URL: {}", e),
+                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
             });
             continue;
         }
@@ -379,6 +383,7 @@ pub async fn import_links(
                         row: row_num,
                         code: row.code,
                         error: "Link already exists".to_string(),
+                        error_code: Some(ErrorCode::LinkAlreadyExists as i32),
                     });
                     continue;
                 }
@@ -424,6 +429,7 @@ pub async fn import_links(
                                 row: row_num,
                                 code: row.code,
                                 error: format!("Password hash error: {}", e),
+                                error_code: Some(ErrorCode::LinkPasswordHashError as i32),
                             });
                             continue;
                         }
@@ -452,10 +458,9 @@ pub async fn import_links(
     if !links_vec.is_empty() {
         if let Err(e) = storage.batch_set(links_vec.clone()).await {
             error!("Failed to batch insert links: {}", e);
-            return Ok(error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Database error: {}", e),
-            ));
+            return Ok(error_from_shortlinker(&ShortlinkerError::import_failed(
+                format!("Database error: {}", e),
+            )));
         }
 
         // 更新缓存

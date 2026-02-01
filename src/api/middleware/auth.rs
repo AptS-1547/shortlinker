@@ -11,7 +11,7 @@ use tracing::{trace, warn};
 
 use crate::api::constants;
 use crate::api::jwt::JwtService;
-use crate::api::services::admin::{ApiResponse, ErrorData};
+use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::get_config;
 
 /// 认证方式标记，用于 CSRF 中间件判断是否跳过验证
@@ -84,11 +84,10 @@ where
         req.into_response(
             HttpResponse::Unauthorized()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: ErrorData {
-                        error: "Unauthorized: Invalid or missing token".to_string(),
-                    },
+                .json(ApiResponse::<()> {
+                    code: ErrorCode::Unauthorized as i32,
+                    message: "Unauthorized: Invalid or missing token".to_string(),
+                    data: None,
                 })
                 .map_into_right_body(),
         )

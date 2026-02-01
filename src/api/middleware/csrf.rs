@@ -20,7 +20,7 @@ use subtle::ConstantTimeEq;
 use tracing::{trace, warn};
 
 use crate::api::constants;
-use crate::api::services::admin::{ApiResponse, ErrorData};
+use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::get_config;
 
 use super::auth::AuthMethod;
@@ -74,11 +74,10 @@ where
         req.into_response(
             HttpResponse::Forbidden()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: 1,
-                    data: ErrorData {
-                        error: "CSRF token missing or invalid".to_string(),
-                    },
+                .json(ApiResponse::<()> {
+                    code: ErrorCode::CsrfInvalid as i32,
+                    message: "CSRF token missing or invalid".to_string(),
+                    data: None,
                 })
                 .map_into_right_body(),
         )

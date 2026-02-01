@@ -23,7 +23,9 @@ pub struct LoginCredentials {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApiResponse<T> {
     pub code: i32,
-    pub data: T,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<T>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]
@@ -57,7 +59,8 @@ pub struct GetLinksQuery {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PaginatedResponse<T> {
     pub code: i32,
-    pub data: T,
+    pub message: String,
+    pub data: Option<T>,
     pub pagination: PaginationInfo,
 }
 
@@ -129,6 +132,8 @@ pub struct BatchResponse {
 pub struct BatchFailedItem {
     pub code: String,
     pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]
@@ -175,13 +180,6 @@ pub struct StatsResponse {
 #[ts(export, export_to = TS_EXPORT_PATH)]
 pub struct MessageResponse {
     pub message: String,
-}
-
-/// 错误响应数据
-#[derive(Serialize, Deserialize, Clone, Debug, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
-pub struct ErrorData {
-    pub error: String,
 }
 
 /// 认证成功响应
@@ -282,6 +280,8 @@ pub struct ImportFailedItem {
     pub row: usize,
     pub code: String,
     pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<i32>,
 }
 
 /// 导入响应
@@ -304,6 +304,7 @@ mod tests {
     use crate::api::services::admin::config_ops::{
         ConfigHistoryResponse, ConfigItemResponse, ConfigUpdateRequest, ConfigUpdateResponse,
     };
+    use crate::api::services::admin::error_code::ErrorCode;
 
     #[test]
     fn export_typescript_types() {
@@ -326,9 +327,11 @@ mod tests {
 
         // Response types
         MessageResponse::export_all().expect("Failed to export MessageResponse");
-        ErrorData::export_all().expect("Failed to export ErrorData");
         AuthSuccessResponse::export_all().expect("Failed to export AuthSuccessResponse");
         ReloadResponse::export_all().expect("Failed to export ReloadResponse");
+
+        // Error code
+        ErrorCode::export_all().expect("Failed to export ErrorCode");
 
         // Health check types
         HealthStorageBackend::export_all().expect("Failed to export HealthStorageBackend");

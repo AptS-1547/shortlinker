@@ -9,8 +9,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
+use shortlinker::errors::ShortlinkerError;
 use shortlinker::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, ServiceError, UpdateLinkRequest,
+    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
 };
 use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::storage::{LinkFilter, ShortLink};
@@ -175,10 +176,10 @@ mod create_link_tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            ServiceError::Conflict(msg) => {
+            ShortlinkerError::LinkAlreadyExists(msg) => {
                 assert!(msg.contains("conflict"));
             }
-            other => panic!("Expected Conflict error, got {:?}", other),
+            other => panic!("Expected LinkAlreadyExists error, got {:?}", other),
         }
     }
 
@@ -213,7 +214,10 @@ mod create_link_tests {
         let result = service.create_link(req).await;
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ServiceError::InvalidUrl(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ShortlinkerError::LinkInvalidUrl(_)
+        ));
     }
 
     #[tokio::test]
@@ -224,7 +228,10 @@ mod create_link_tests {
         let result = service.create_link(req).await;
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ServiceError::InvalidUrl(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ShortlinkerError::LinkInvalidUrl(_)
+        ));
     }
 
     #[tokio::test]
@@ -266,7 +273,7 @@ mod create_link_tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            ServiceError::InvalidExpireTime(_)
+            ShortlinkerError::LinkInvalidExpireTime(_)
         ));
     }
 
@@ -354,7 +361,7 @@ mod update_link_tests {
         let result = service.update_link("nonexistent", update_req).await;
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ServiceError::NotFound(_)));
+        assert!(matches!(result.unwrap_err(), ShortlinkerError::NotFound(_)));
     }
 
     #[tokio::test]
@@ -374,7 +381,10 @@ mod update_link_tests {
         let result = service.update_link("update_invalid", update_req).await;
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ServiceError::InvalidUrl(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ShortlinkerError::LinkInvalidUrl(_)
+        ));
     }
 
     #[tokio::test]
