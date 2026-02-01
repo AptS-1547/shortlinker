@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.1] - 2026-02-02
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.1 是一次架构级别的重大重构版本，主要亮点：
+
+- **配置系统重构** - 移除 config.toml 和环境变量支持，所有运行时配置现在存储在数据库中
+- **错误码系统重构** - 统一 API 错误响应格式，提供更精确的错误类型
+- **新增配置类型** - 支持 StringArray 和 EnumArray 配置类型
+
+### Added
+- **StringArray 和 EnumArray 配置类型** - 新增两种配置类型用于数组值
+  - `StringArray`：用于字符串数组（如 `api.trusted_proxies`、`cors.allowed_origins`）
+  - `EnumArray`：用于枚举数组（如 `cors.allowed_methods`），验证数组元素是否在允许的选项中
+- **JSON 配置解析辅助方法** - `RuntimeConfig::get_json_or()` 方法，安全解析 JSON 配置并提供默认值
+- **Admin API 错误码模块** - 新增 `error_code.rs`，集中定义 API 错误码
+
+### Changed
+- **配置系统架构重构** - 移除 config.toml 和环境变量支持
+  - 所有运行时配置现在存储在数据库中
+  - 将 `AppConfig` 拆分为 `StaticConfig`（静态基础设施配置）和 `RuntimeConfig`（运行时配置）
+  - 启动时通过 `ConfigStore::ensure_defaults()` 初始化默认值
+  - 移除配置迁移模块，简化启动流程
+- **错误码系统重构** - 统一 API 错误响应格式
+  - 使用 `thiserror` 派生宏重构错误类型
+  - 每个错误类型关联唯一的错误码（如 `link_not_found`、`validation_error`）
+  - 中间件和服务层统一使用新的错误类型
+
+### Improved
+- **配置 Schema 静态缓存** - 避免重复计算，提升性能
+- **枚举选项生成逻辑** - 基于 `RustType` 自动推断，增加编译期安全检查
+- **CORS 配置动态加载** - 从 RuntimeConfig 动态读取，支持热更新
+
+### Fixed
+- **TUI 过期时间解析错误类型** - 从 `validation` 更改为 `link_invalid_expire_time`，提高错误信息准确性
+
+### Refactored
+- **LinkService 简化** - 移除冗余的错误处理代码，使用新的错误类型
+- **中间件错误处理** - 统一使用 `ShortlinkerError` 类型
+- **配置更新逻辑** - 移除 AppConfig 同步，仅更新数据库和内存缓存
+
+### Dependencies
+- 添加 `thiserror` 依赖用于错误派生
+
+### Migration Notes
+
+**⚠️ 从 v0.4.x 升级注意事项：**
+
+1. **配置系统变更** - `config.toml` 中的运行时配置项不再生效
+   - 所有运行时配置现在存储在数据库中
+   - 首次启动时会自动初始化默认值
+   - 后续通过管理面板或 API 修改配置
+2. **API 错误响应格式变更** - 错误响应现在包含更精确的 `code` 字段
+   - 如 `link_not_found`、`validation_error`、`unauthorized` 等
+   - 前端需要根据新的错误码处理错误
+
 ## [v0.4.3] - 2026-02-01
 
 ### 🎉 Release Highlights
@@ -1048,7 +1104,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...HEAD
+[v0.5.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...v0.5.0-alpha.1
 [v0.4.3]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...v0.4.3
 [v0.4.2]: https://github.com/AptS-1547/shortlinker/compare/v0.4.1...v0.4.2
 [v0.4.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.0...v0.4.1
