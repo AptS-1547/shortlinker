@@ -65,11 +65,28 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     if enable_click_tracking {
         if let Some(sink) = storage.as_click_sink() {
-            let mgr = Arc::new(ClickManager::new(
-                sink,
-                Duration::from_secs(flush_interval),
-                max_clicks_before_flush as usize,
-            ));
+            // 检查是否启用详细日志
+            let enable_detailed_logging =
+                rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
+
+            let mgr = if enable_detailed_logging {
+                // SeaOrmStorage 实现了 DetailedClickSink trait
+                let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
+                info!("Detailed click logging enabled, initializing with DetailedClickSink");
+                Arc::new(ClickManager::with_detailed_logging(
+                    sink,
+                    detailed_sink,
+                    Duration::from_secs(flush_interval),
+                    max_clicks_before_flush as usize,
+                ))
+            } else {
+                Arc::new(ClickManager::new(
+                    sink,
+                    Duration::from_secs(flush_interval),
+                    max_clicks_before_flush as usize,
+                ))
+            };
+
             set_global_click_manager(mgr.clone());
 
             // 启动后台任务，并保持强引用以确保任务不会被过早销毁

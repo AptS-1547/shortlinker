@@ -152,4 +152,9 @@ impl SeaOrmStorage {
     pub fn invalidate_count_cache(&self) {
         self.count_cache.invalidate_all();
     }
+
+    /// 获取数据库后端名称
+    pub fn get_backend_name(&self) -> &str {
+        &self.backend_name
+    }
 }

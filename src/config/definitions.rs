@@ -24,6 +24,7 @@ pub mod categories {
     pub const ROUTES: &str = "routes";
     pub const CORS: &str = "cors";
     pub const TRACKING: &str = "tracking";
+    pub const ANALYTICS: &str = "analytics";
 }
 
 /// 配置项完整定义
@@ -72,6 +73,12 @@ pub mod keys {
     pub const CLICK_ENABLE_TRACKING: &str = "click.enable_tracking";
     pub const CLICK_FLUSH_INTERVAL: &str = "click.flush_interval";
     pub const CLICK_MAX_CLICKS_BEFORE_FLUSH: &str = "click.max_clicks_before_flush";
+
+    // 详细分析统计
+    pub const ANALYTICS_ENABLE_DETAILED_LOGGING: &str = "analytics.enable_detailed_logging";
+    pub const ANALYTICS_LOG_RETENTION_DAYS: &str = "analytics.log_retention_days";
+    pub const ANALYTICS_ENABLE_IP_LOGGING: &str = "analytics.enable_ip_logging";
+    pub const ANALYTICS_ENABLE_GEO_LOOKUP: &str = "analytics.enable_geo_lookup";
 
     // 路由配置
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
@@ -177,6 +184,22 @@ fn default_cors_max_age() -> String {
 }
 
 fn default_cors_allow_credentials() -> String {
+    "false".to_string()
+}
+
+fn default_analytics_enable_detailed_logging() -> String {
+    "false".to_string()
+}
+
+fn default_analytics_log_retention_days() -> String {
+    "30".to_string()
+}
+
+fn default_analytics_enable_ip_logging() -> String {
+    "true".to_string()
+}
+
+fn default_analytics_enable_geo_lookup() -> String {
     "false".to_string()
 }
 
@@ -451,6 +474,51 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Allow credentials in CORS requests. Cannot be used with wildcard origins for security reasons",
+    },
+    // ========== 详细分析统计 (analytics) ==========
+    ConfigDef {
+        key: keys::ANALYTICS_ENABLE_DETAILED_LOGGING,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_analytics_enable_detailed_logging,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable detailed click logging (writes to click_logs table)",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_LOG_RETENTION_DAYS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_log_retention_days,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Number of days to retain click logs before automatic cleanup",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_ENABLE_IP_LOGGING,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_analytics_enable_ip_logging,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable IP address logging (disable for privacy compliance)",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_ENABLE_GEO_LOOKUP,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_analytics_enable_geo_lookup,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable geographic location lookup for IP addresses",
     },
 ];
 

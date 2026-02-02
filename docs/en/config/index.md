@@ -183,6 +183,17 @@ These settings are stored in the database and can be changed at runtime via the 
 | `click.flush_interval` | Integer | `30` | Yes | Flush interval (seconds) |
 | `click.max_clicks_before_flush` | Integer | `100` | Yes | Max clicks before flush |
 
+### Detailed Analytics
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `analytics.enable_detailed_logging` | Boolean | `false` | No | Enable detailed click logging (writes to click_logs table) |
+| `analytics.log_retention_days` | Integer | `30` | No | Log retention period (days) |
+| `analytics.enable_ip_logging` | Boolean | `true` | No | Whether to record IP addresses |
+| `analytics.enable_geo_lookup` | Boolean | `false` | No | Whether to enable geo-IP lookup |
+
+> **Note**: When `analytics.enable_detailed_logging` is enabled, each click is recorded with detailed information (timestamp, referrer, user-agent, IP, geo location) to the `click_logs` table, enabling the Analytics API features like trend analysis, referrer stats, and geographic distribution.
+
 ### CORS
 
 | Key | Type | Default | Restart | Description |

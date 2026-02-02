@@ -4,17 +4,18 @@
 //! - 高并发点击计数（使用 DashMap）
 //! - 定时刷盘到存储后端
 //! - 阈值触发刷盘
+//! - 详细点击日志记录（可选）
 
 use dashmap::DashMap;
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};
 
-use crate::analytics::ClickSink;
+use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -102,6 +103,56 @@ impl ClickBuffer {
     }
 }
 
+/// 详细点击日志缓冲区
+struct DetailedBuffer {
+    /// 详细点击日志缓冲区
+    data: DashMap<u64, ClickDetail>,
+    /// 下一个 ID
+    next_id: AtomicU64,
+    /// 刷盘锁
+    flush_lock: Mutex<()>,
+}
+
+impl DetailedBuffer {
+    fn new() -> Self {
+        Self {
+            data: DashMap::new(),
+            next_id: AtomicU64::new(0),
+            flush_lock: Mutex::new(()),
+        }
+    }
+
+    /// 添加详细点击日志
+    fn push(&self, detail: ClickDetail) {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        self.data.insert(id, detail);
+    }
+
+    /// 收集所有日志并清空缓冲区
+    fn drain(&self) -> Vec<ClickDetail> {
+        let keys: Vec<u64> = self.data.iter().map(|r| *r.key()).collect();
+        let mut details = Vec::with_capacity(keys.len());
+        for key in keys {
+            if let Some((_, detail)) = self.data.remove(&key) {
+                details.push(detail);
+            }
+        }
+        details
+    }
+
+    /// 恢复数据到缓冲区
+    fn restore(&self, details: Vec<ClickDetail>) {
+        for detail in details {
+            self.push(detail);
+        }
+    }
+
+    /// 获取当前缓冲区大小
+    fn len(&self) -> usize {
+        self.data.len()
+    }
+}
+
 /// 点击管理器
 ///
 /// 负责收集点击统计并定期刷盘到存储后端。
@@ -116,6 +167,10 @@ pub struct ClickManager {
     flush_interval: Duration,
     /// 触发刷盘的最大点击数
     max_clicks_before_flush: usize,
+    /// 详细日志缓冲区（可选）
+    detailed_buffer: Option<Arc<DetailedBuffer>>,
+    /// 详细日志 Sink（可选）
+    detailed_sink: Option<Arc<dyn DetailedClickSink>>,
 }
 
 impl ClickManager {
@@ -129,6 +184,47 @@ impl ClickManager {
             sink,
             flush_interval,
             max_clicks_before_flush,
+            detailed_buffer: None,
+            detailed_sink: None,
+        }
+    }
+
+    /// 创建带详细日志支持的点击管理器
+    pub fn with_detailed_logging(
+        sink: Arc<dyn ClickSink>,
+        detailed_sink: Arc<dyn DetailedClickSink>,
+        flush_interval: Duration,
+        max_clicks_before_flush: usize,
+    ) -> Self {
+        Self {
+            buffer: Arc::new(ClickBuffer::new()),
+            sink,
+            flush_interval,
+            max_clicks_before_flush,
+            detailed_buffer: Some(Arc::new(DetailedBuffer::new())),
+            detailed_sink: Some(detailed_sink),
+        }
+    }
+
+    /// 检查是否启用了详细日志
+    pub fn is_detailed_logging_enabled(&self) -> bool {
+        self.detailed_buffer.is_some() && self.detailed_sink.is_some()
+    }
+
+    /// 记录详细点击信息（如果启用）
+    ///
+    /// 同时增加 click_count 和记录详细日志
+    pub fn record_detailed(&self, detail: ClickDetail) {
+        // 1. 始终增加 click_count（现有逻辑）
+        self.increment(&detail.code);
+
+        // 2. 如果启用详细日志，写入 detailed_buffer
+        if let Some(ref buffer) = self.detailed_buffer {
+            buffer.push(detail);
+            trace!(
+                "ClickManager: Detailed log recorded, buffer size: {}",
+                buffer.len()
+            );
         }
     }
 
@@ -175,6 +271,14 @@ impl ClickManager {
             } else {
                 trace!("ClickManager: flush already in progress, skipping scheduled flush");
             }
+
+            // 刷新详细日志
+            if let (Some(detailed_buffer), Some(detailed_sink)) =
+                (&self.detailed_buffer, &self.detailed_sink)
+                && let Ok(_guard) = detailed_buffer.flush_lock.try_lock()
+            {
+                Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
+            }
         }
     }
 
@@ -183,6 +287,14 @@ impl ClickManager {
         debug!("ClickManager: Manual flush triggered");
         let _guard = self.buffer.flush_lock.lock().await;
         Self::flush_buffer(&self.buffer, &self.sink).await;
+
+        // 刷新详细日志
+        if let (Some(detailed_buffer), Some(detailed_sink)) =
+            (&self.detailed_buffer, &self.detailed_sink)
+        {
+            let _guard = detailed_buffer.flush_lock.lock().await;
+            Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
+        }
     }
 
     /// 执行实际的刷盘操作
@@ -204,6 +316,34 @@ impl ClickManager {
                 buffer.restore(updates);
                 warn!(
                     "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
+                    e, count
+                );
+            }
+        }
+    }
+
+    /// 执行详细日志刷盘操作
+    async fn flush_detailed_buffer(buffer: &DetailedBuffer, sink: &Arc<dyn DetailedClickSink>) {
+        let details = buffer.drain();
+
+        if details.is_empty() {
+            trace!("ClickManager: No detailed logs to flush");
+            return;
+        }
+
+        let count = details.len();
+        match sink.log_clicks_batch(details.clone()).await {
+            Ok(_) => {
+                debug!(
+                    "ClickManager: Successfully flushed {} detailed log entries",
+                    count
+                );
+            }
+            Err(e) => {
+                // 刷盘失败，恢复数据到 buffer
+                buffer.restore(details);
+                warn!(
+                    "ClickManager: log_clicks_batch failed: {}, {} entries restored to buffer",
                     e, count
                 );
             }
