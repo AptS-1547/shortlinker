@@ -443,3 +443,147 @@ print(admin.get_all_links())
 2. **HTTPS**：生产环境建议启用 HTTPS，并将 `api.cookie_secure=true`
 3. **网络隔离**：仅在受信任网络环境中暴露 Admin API
 4. **定期轮换**：定期更换 `ADMIN_TOKEN`（并重新登录获取新 Cookie）
+
+## Analytics API（统计分析）
+
+Analytics API 提供详细的点击统计分析功能，包括点击趋势、热门链接、来源统计、地理位置分布等。
+
+> 需要先在运行时配置中启用 `analytics.enable_detailed_logging` 才会记录详细的点击日志。
+
+### GET /analytics/trends - 获取点击趋势
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/trends?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z&group_by=day"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 | 开始日期 | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 | 结束日期 | `?end_date=2024-12-31T23:59:59Z` |
+| `group_by` | String | 分组方式：`hour`/`day`/`week`/`month` | `?group_by=day` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+    "values": [100, 150, 120]
+  }
+}
+```
+
+### GET /analytics/top - 获取热门链接
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/top?limit=10"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 | 开始日期 | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 | 结束日期 | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（最大 100） | `?limit=10` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"code": "github", "clicks": 500},
+    {"code": "google", "clicks": 300}
+  ]
+}
+```
+
+### GET /analytics/referrers - 获取来源统计
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/referrers?limit=10"
+```
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
+    {"referrer": "(direct)", "count": 150, "percentage": 30.0}
+  ]
+}
+```
+
+### GET /analytics/geo - 获取地理位置分布
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/geo?limit=20"
+```
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"country": "CN", "city": "Beijing", "count": 100},
+    {"country": "US", "city": "New York", "count": 80}
+  ]
+}
+```
+
+### GET /links/{code}/analytics - 获取单链接详细统计
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics"
+```
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "code": "github",
+    "total_clicks": 500,
+    "trend": {
+      "labels": ["2024-01-01", "2024-01-02"],
+      "values": [100, 150]
+    },
+    "top_referrers": [
+      {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
+    ],
+    "geo_distribution": [
+      {"country": "CN", "city": "Beijing", "count": 50}
+    ]
+  }
+}
+```
+
+### GET /analytics/export - 导出分析报告（CSV）
+
+```bash
+curl -sS -b cookies.txt \
+  -o analytics_report.csv \
+  "http://localhost:8080/admin/v1/analytics/export?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
+```
+
+导出的 CSV 包含以下字段：
+`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+### Analytics 相关配置
+
+在运行时配置中，可以调整以下与 Analytics 相关的配置项：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `analytics.enable_detailed_logging` | bool | false | 启用详细日志记录（写入 click_logs 表） |
+| `analytics.log_retention_days` | int | 30 | 日志保留天数 |
+| `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
+| `analytics.enable_geo_lookup` | bool | false | 是否启用地理位置解析 |

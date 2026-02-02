@@ -392,3 +392,147 @@ print(admin.list_links())
 2. Use HTTPS in production and set `api.cookie_secure=true`
 3. Expose Admin API only to trusted networks
 4. Rotate `ADMIN_TOKEN` regularly and re-login to get new cookies
+
+## Analytics API
+
+Analytics API provides detailed click statistics, including click trends, top links, referrer stats, and geographic distribution.
+
+> You need to enable `analytics.enable_detailed_logging` in runtime config to record detailed click logs.
+
+### GET /analytics/trends - Get click trends
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/trends?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z&group_by=day"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 | Start date | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 | End date | `?end_date=2024-12-31T23:59:59Z` |
+| `group_by` | String | Grouping: `hour`/`day`/`week`/`month` | `?group_by=day` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+    "values": [100, 150, 120]
+  }
+}
+```
+
+### GET /analytics/top - Get top links
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/top?limit=10"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 | Start date | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 | End date | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Number of results (max 100) | `?limit=10` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"code": "github", "clicks": 500},
+    {"code": "google", "clicks": 300}
+  ]
+}
+```
+
+### GET /analytics/referrers - Get referrer stats
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/referrers?limit=10"
+```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
+    {"referrer": "(direct)", "count": 150, "percentage": 30.0}
+  ]
+}
+```
+
+### GET /analytics/geo - Get geographic distribution
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/geo?limit=20"
+```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"country": "CN", "city": "Beijing", "count": 100},
+    {"country": "US", "city": "New York", "count": 80}
+  ]
+}
+```
+
+### GET /links/{code}/analytics - Get single link analytics
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics"
+```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "code": "github",
+    "total_clicks": 500,
+    "trend": {
+      "labels": ["2024-01-01", "2024-01-02"],
+      "values": [100, 150]
+    },
+    "top_referrers": [
+      {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
+    ],
+    "geo_distribution": [
+      {"country": "CN", "city": "Beijing", "count": 50}
+    ]
+  }
+}
+```
+
+### GET /analytics/export - Export analytics report (CSV)
+
+```bash
+curl -sS -b cookies.txt \
+  -o analytics_report.csv \
+  "http://localhost:8080/admin/v1/analytics/export?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
+```
+
+The exported CSV contains these columns:
+`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+### Analytics configuration
+
+These runtime config options control Analytics behavior:
+
+| Config key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table) |
+| `analytics.log_retention_days` | int | 30 | Log retention period in days |
+| `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
+| `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |

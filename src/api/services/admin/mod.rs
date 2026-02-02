@@ -5,7 +5,9 @@
 //! - 链接 CRUD 操作
 //! - 批量操作
 //! - 配置管理
+//! - 分析统计
 
+pub mod analytics;
 pub mod auth;
 mod batch_ops;
 mod config_ops;

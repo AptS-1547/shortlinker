@@ -123,6 +123,7 @@ impl std::str::FromStr for HttpMethod {
 /// - database: 数据库连接配置
 /// - cache: 缓存系统配置
 /// - logging: 日志配置
+/// - analytics: 分析统计配置
 ///
 /// 运行时配置（api, routes, features, click_manager, cors）存储在数据库中，
 /// 通过 Admin Panel 或 API 进行管理，使用 RuntimeConfig 读取。
@@ -136,6 +137,8 @@ pub struct StaticConfig {
     pub cache: CacheConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
 }
 
 impl StaticConfig {
@@ -422,6 +425,33 @@ impl Default for LoggingConfig {
             max_size: default_max_size(),
             max_backups: default_max_backups(),
             enable_rotation: default_enable_rotation(),
+        }
+    }
+}
+
+/// 分析统计配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyticsConfig {
+    /// MaxMindDB 文件路径 (GeoLite2-City.mmdb)
+    /// 如果配置且文件可读，使用本地解析；否则 fallback 到外部 API
+    #[serde(default)]
+    pub maxminddb_path: Option<String>,
+
+    /// 外部 GeoIP API URL (fallback)
+    /// 使用 {ip} 作为占位符，例如: http://ip-api.com/json/{ip}?fields=countryCode,city
+    #[serde(default = "default_geoip_api_url")]
+    pub geoip_api_url: String,
+}
+
+fn default_geoip_api_url() -> String {
+    "http://ip-api.com/json/{ip}?fields=countryCode,city".to_string()
+}
+
+impl Default for AnalyticsConfig {
+    fn default() -> Self {
+        Self {
+            maxminddb_path: None,
+            geoip_api_url: default_geoip_api_url(),
         }
     }
 }

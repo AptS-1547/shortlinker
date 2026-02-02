@@ -196,6 +196,17 @@ curl -sS -b cookies.txt \
 | `click.flush_interval` | Integer | `30` | 是 | 刷新间隔（秒） |
 | `click.max_clicks_before_flush` | Integer | `100` | 是 | 刷新前最大点击数 |
 
+### 详细分析配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `analytics.enable_detailed_logging` | Boolean | `false` | 否 | 启用详细点击日志（写入 click_logs 表） |
+| `analytics.log_retention_days` | Integer | `30` | 否 | 日志保留天数 |
+| `analytics.enable_ip_logging` | Boolean | `true` | 否 | 是否记录 IP 地址 |
+| `analytics.enable_geo_lookup` | Boolean | `false` | 否 | 是否启用地理位置解析 |
+
+> **注意**：启用 `analytics.enable_detailed_logging` 后，每次点击都会记录详细信息（时间、来源、User-Agent、IP、地理位置等）到 `click_logs` 表，用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
+
 ### CORS 跨域配置
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
