@@ -11,9 +11,7 @@ Shortlinker provides a health check API for monitoring service status and storag
 
 ## Configuration
 
-Route prefix can be configured via environment variables (see [Configuration](/en/config/)):
-
-- `HEALTH_ROUTE_PREFIX` - route prefix (optional, default: `/health`)
+Route prefix is controlled by runtime config `routes.health_prefix` (default: `/health`, restart required). See [Configuration](/en/config/).
 
 > Note: Health endpoints support two authentication methods:
 > - **Bearer Token**: `Authorization: Bearer <HEALTH_TOKEN>` (recommended for monitoring/probes, no cookies)
@@ -26,7 +24,7 @@ Health endpoints are treated as disabled only when **both** `api.admin_token` an
 
 ### Option A: Bearer token (recommended for monitoring/probes)
 
-If you configure `HEALTH_TOKEN` (or runtime config `api.health_token`), you can call health endpoints directly with an `Authorization` header:
+If you configure runtime config `api.health_token`, you can call health endpoints directly with an `Authorization` header:
 
 ```bash
 HEALTH_TOKEN="your_health_token"
@@ -55,7 +53,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and write it to `admin_token.txt` (save it and delete the file).
+> On first startup, the server auto-generates an admin password and writes it to `admin_token.txt` (if the file doesn't already exist; save it and delete the file).
 
 ## Endpoints
 
@@ -124,11 +122,11 @@ Returns HTTP 204 when alive.
 
 ## Monitoring integration notes
 
-If you use **Bearer token** (`HEALTH_TOKEN`), you can avoid JWT cookie expiration and make automated monitoring easier.
+If you use **Bearer token** (the value of runtime config `api.health_token`), you can avoid JWT cookie expiration and make automated monitoring easier.
 
 Recommended options:
 
-1. **Recommended: use `HEALTH_TOKEN` to probe `/health/live` or `/health/ready`**
+1. **Recommended: set `api.health_token` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`**
 2. **Fallback: probe `/`** (returns `307`, treated as success in Kubernetes) to ensure the process is up
 3. **Fallback: login + cookies + `/health`** (for monitors that already have a login step)
 
@@ -190,6 +188,6 @@ curl -sS -b "$COOKIE_JAR" "${BASE_URL}/health"
 
 ## Security notes
 
-1. Use a strong `ADMIN_TOKEN`
+1. Use a strong admin password (`api.admin_token`)
 2. Restrict access to health endpoints to trusted networks
 3. Use HTTPS in production and configure cookie security correctly

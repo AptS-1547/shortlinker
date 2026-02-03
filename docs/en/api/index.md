@@ -52,7 +52,7 @@ Not Found
 
 ### Root Path Redirect
 
-When accessing the root path `/`, it redirects to the default URL (config key `features.default_url`, can also be overridden via `DEFAULT_URL` environment variable).
+When accessing the root path `/`, it redirects to the default URL (runtime config key `features.default_url`).
 
 **Request**:
 ```http

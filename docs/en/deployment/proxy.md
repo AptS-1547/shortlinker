@@ -251,13 +251,13 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### Health Check
 
-> Note: `/health/*` endpoints require authentication by default. In production, it’s recommended to set `HEALTH_TOKEN` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`.  
+> Note: `/health/*` endpoints require authentication by default. In production, it’s recommended to set runtime config `api.health_token` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`.  
 > If adding request headers is not convenient, probing `/` (default returns `307`) can be used as a simple liveness check.
 
 ```nginx
 location = /_healthz {
     access_log off;
-    # Recommended: authenticated probe (requires HEALTH_TOKEN configured)
+    # Recommended: authenticated probe (requires api.health_token configured)
     # proxy_set_header Authorization "Bearer your_health_token";
     # proxy_pass http://127.0.0.1:8080/health/live;
 

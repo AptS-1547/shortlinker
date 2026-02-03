@@ -251,13 +251,13 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### 健康检查
 
-> 注意：`/health/*` 端点默认需要鉴权。推荐在生产环境设置 `HEALTH_TOKEN`，并使用 `Authorization: Bearer <token>` 探测 `/health/live` 或 `/health/ready`。  
+> 注意：`/health/*` 端点默认需要鉴权。推荐在生产环境配置运行时配置 `api.health_token`，并使用 `Authorization: Bearer <token>` 探测 `/health/live` 或 `/health/ready`。  
 > 如果不方便在探活请求中添加请求头，也可以探测根路径 `/`（默认返回 `307`）作为简单存活检查。
 
 ```nginx
 location = /_healthz {
     access_log off;
-    # 推荐：带 Bearer Token 的健康探测（需要你已配置 HEALTH_TOKEN）
+    # 推荐：带 Bearer Token 的健康探测（需要你已配置 api.health_token）
     # proxy_set_header Authorization "Bearer your_health_token";
     # proxy_pass http://127.0.0.1:8080/health/live;
 

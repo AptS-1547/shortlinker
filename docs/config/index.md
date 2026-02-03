@@ -10,16 +10,17 @@ Shortlinker 的配置分为两类：
 ```
 config.toml (启动时读取)
        ↓
-   数据库 (持久化存储)
+StaticConfig (启动配置，内存)
        ↓
-  RuntimeConfig (内存缓存)
+   数据库 (短链接数据 + 运行时配置)
        ↓
-   AppConfig (全局配置)
+RuntimeConfig (运行时配置缓存，内存)
        ↓
-    业务逻辑
+    业务逻辑（路由/鉴权/缓存等）
 ```
 
-首次启动时，动态配置会从 `config.toml` 或环境变量迁移到数据库。之后，数据库中的配置优先。
+首次启动时，服务会根据代码内置的配置定义把**运行时配置默认值**初始化到数据库，并加载到内存缓存；之后以数据库中的值为准。  
+当前版本不会从 `config.toml` 或环境变量“迁移/覆盖”运行时配置。
 
 ## 配置方式
 
@@ -41,14 +42,10 @@ type = "memory"
 level = "info"
 ```
 
-### 环境变量
-
-```bash
-# .env 或系统环境变量
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DATABASE_URL=shortlinks.db
-```
+> 说明：
+> - 后端只会从**当前工作目录**读取 `config.toml`（相对路径）。
+> - 可用 `./shortlinker generate-config config.toml` 生成模板（只包含启动配置）。
+> - 当前版本不支持通过环境变量覆盖启动配置（`dotenv` 仅负责加载 `.env` 文件，不会自动映射到配置结构体）。
 
 ### 管理面板（动态配置）
 
@@ -114,40 +111,55 @@ curl -sS -b cookies.txt \
 
 ### 服务器配置
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `SERVER_HOST` | String | `127.0.0.1` | 监听地址 |
-| `SERVER_PORT` | Integer | `8080` | 监听端口 |
-| `UNIX_SOCKET` | String | *(空)* | Unix 套接字路径（设置后忽略 HOST/PORT） |
-| `CPU_COUNT` | Integer | *(自动)* | 工作线程数量（默认为 CPU 核心数） |
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `server.host` | String | `127.0.0.1` | 监听地址（Docker 中通常用 `0.0.0.0`） |
+| `server.port` | Integer | `8080` | 监听端口 |
+| `server.unix_socket` | String | *(空)* | Unix 套接字路径（设置后忽略 `server.host`/`server.port`） |
+| `server.cpu_count` | Integer | *(自动)* | Worker 数量（默认 CPU 核心数，最大 32） |
 
 ### 数据库配置
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `DATABASE_URL` | String | `shortlinks.db` | 数据库连接 URL 或文件路径 |
-| `DATABASE_POOL_SIZE` | Integer | `10` | 数据库连接池大小 |
-| `DATABASE_TIMEOUT` | Integer | `30` | 数据库连接超时（秒） |
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `database.database_url` | String | `shortlinks.db` | 数据库连接 URL 或文件路径（后端会自动从该值推断数据库类型） |
+| `database.pool_size` | Integer | `10` | 连接池大小（仅 MySQL/PostgreSQL 生效；SQLite 使用内置池配置） |
+| `database.timeout` | Integer | `30` | *(当前版本暂未使用；连接超时固定为 8s)* |
+| `database.retry_count` | Integer | `3` | 部分数据库操作的重试次数 |
+| `database.retry_base_delay_ms` | Integer | `100` | 重试基础延迟（毫秒） |
+| `database.retry_max_delay_ms` | Integer | `2000` | 重试最大延迟（毫秒） |
 
 > 详细的存储后端配置请参考 [存储后端](/config/storage)
 
 ### 缓存配置
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `CACHE_TYPE` | String | `memory` | 缓存类型：memory, redis |
-| `CACHE_DEFAULT_TTL` | Integer | `3600` | 默认缓存过期时间（秒） |
-| `REDIS_URL` | String | `redis://127.0.0.1:6379/` | Redis 连接地址 |
-| `REDIS_KEY_PREFIX` | String | `shortlinker:` | Redis 键前缀 |
-| `MEMORY_MAX_CAPACITY` | Integer | `10000` | 内存缓存最大容量 |
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `cache.type` | String | `memory` | 缓存类型：`memory` / `redis` |
+| `cache.default_ttl` | Integer | `3600` | 默认缓存过期时间（秒） |
+| `cache.redis.url` | String | `redis://127.0.0.1:6379/` | Redis 连接地址 |
+| `cache.redis.key_prefix` | String | `shortlinker:` | Redis 键前缀 |
+| `cache.memory.max_capacity` | Integer | `10000` | 内存缓存最大容量 |
 
 ### 日志配置
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `RUST_LOG` | String | `info` | 日志等级：error, warn, info, debug, trace |
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `logging.level` | String | `info` | 日志等级：error / warn / info / debug / trace |
+| `logging.format` | String | `text` | 输出格式：`text` / `json` |
+| `logging.file` | String | *(空)* | 日志文件路径（为空则输出到 stdout） |
+| `logging.max_backups` | Integer | `5` | 日志轮转保留文件数 |
+| `logging.enable_rotation` | Boolean | `true` | 是否启用轮转（当前为按天轮转） |
+| `logging.max_size` | Integer | `100` | *(当前版本暂未使用；轮转按天而非按大小)* |
 
-> 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置（如 `logging.format`、`logging.file`）设置，当前版本未提供对应的环境变量覆盖。
+> 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置设置（例如 `logging.format`、`logging.file`）。
+
+### GeoIP（分析）配置
+
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `analytics.maxminddb_path` | String | *(空)* | MaxMindDB 文件路径（GeoLite2-City.mmdb，可选；可读时优先使用本地解析） |
+| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | 外部 GeoIP API URL（MaxMindDB 不可用时 fallback；`{ip}` 为占位符） |
 
 ## 动态配置参数
 
@@ -165,12 +177,12 @@ curl -sS -b cookies.txt \
 | `api.cookie_secure` | Boolean | `true` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
 | `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
-| `api.trusted_proxies` | Json | `[]` | 否 | 可信代理 IP 或 CIDR 列表。<br>**智能检测**（默认）：留空时，连接来自私有 IP（RFC1918：10.0.0.0/8、172.16.0.0/12、192.168.0.0/16）或 localhost 将自动信任 X-Forwarded-For，适合 Docker/nginx 反向代理。<br>**显式配置**：设置后仅信任列表中的 IP，如 `["10.0.0.1", "172.17.0.0/16"]`。<br>**安全提示**：公网 IP 默认不信任 X-Forwarded-For，防止伪造。 |
+| `api.trusted_proxies` | StringArray | `[]` | 否 | 可信代理 IP 或 CIDR 列表。<br>**智能检测**（默认）：留空时，连接来自私有 IP（RFC1918：10.0.0.0/8、172.16.0.0/12、192.168.0.0/16）或 localhost 将自动信任 X-Forwarded-For，适合 Docker/nginx 反向代理。<br>**显式配置**：设置后仅信任列表中的 IP，如 `["10.0.0.1", "172.17.0.0/16"]`。<br>**安全提示**：公网 IP 默认不信任 X-Forwarded-For，防止伪造。 |
 
 > 提示：
 > - Cookie 名称当前为固定值：`shortlinker_access` / `shortlinker_refresh` / `csrf_token`（不可配置）。
 > - `api.admin_token` 在数据库中存储为 Argon2 哈希；推荐使用 `./shortlinker reset-password` 重置管理员密码。
-> - 若未显式设置 `ADMIN_TOKEN`，首次启动会自动生成一个随机密码并写入 `admin_token.txt`（保存后请删除该文件）。
+> - 首次启动时会自动生成一个随机管理员密码并写入 `admin_token.txt`（若文件不存在；保存后请删除该文件）。
 
 ### 路由配置
 
@@ -200,32 +212,31 @@ curl -sS -b cookies.txt \
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
-| `analytics.enable_detailed_logging` | Boolean | `false` | 否 | 启用详细点击日志（写入 click_logs 表） |
-| `analytics.log_retention_days` | Integer | `30` | 否 | 日志保留天数 |
+| `analytics.enable_detailed_logging` | Boolean | `false` | 是 | 启用详细点击日志（写入 click_logs 表） |
+| `analytics.log_retention_days` | Integer | `30` | 否 | 日志保留天数（当前版本暂未实现自动清理） |
 | `analytics.enable_ip_logging` | Boolean | `true` | 否 | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | Boolean | `false` | 否 | 是否启用地理位置解析 |
 
-> **注意**：启用 `analytics.enable_detailed_logging` 后，每次点击都会记录详细信息（时间、来源、User-Agent、IP、地理位置等）到 `click_logs` 表，用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
+> **注意**：启用 `analytics.enable_detailed_logging` 后（需要重启生效），每次点击都会记录详细信息（时间、来源、User-Agent、IP、地理位置等）到 `click_logs` 表，用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
 
 ### CORS 跨域配置
 
 | 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
 |--------|------|--------|----------|------|
 | `cors.enabled` | Boolean | `false` | 是 | 启用 CORS（禁用时不添加 CORS 头，浏览器维持同源策略） |
-| `cors.allowed_origins` | Json | `[]` | 是 | 允许的来源（JSON 数组；`["*"]` = 允许任意来源；空数组 = 仅同源/不允许跨域） |
-| `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | 是 | 允许的 HTTP 方法 |
-| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept","X-CSRF-Token"]` | 是 | 允许的请求头 |
+| `cors.allowed_origins` | StringArray | `[]` | 是 | 允许的来源（JSON 数组；`["*"]` = 允许任意来源；空数组 = 仅同源/不允许跨域） |
+| `cors.allowed_methods` | EnumArray | `["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"]` | 是 | 允许的 HTTP 方法 |
+| `cors.allowed_headers` | StringArray | `["Content-Type","Authorization","Accept"]` | 是 | 允许的请求头（跨域 + Cookie 写操作时，通常还需要加上 `X-CSRF-Token`） |
 | `cors.max_age` | Integer | `3600` | 是 | 预检请求缓存时间（秒） |
 | `cors.allow_credentials` | Boolean | `false` | 是 | 允许携带凭证（跨域 Cookie 场景需要开启；出于安全原因不建议与 `["*"]` 同时使用） |
 
 ## 配置优先级
 
-1. **数据库配置**（动态配置，最高优先级）
-2. **环境变量**
-3. **TOML 配置文件**
-4. **程序默认值**（最低优先级）
+1. **数据库（运行时配置）**：`api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*`（点击分析相关）
+2. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]`（GeoIP provider 相关）
+3. **程序默认值**：当数据库或 `config.toml` 中未设置时使用
 
-> **注意**：动态配置只在首次启动时从环境变量/TOML 迁移到数据库。之后，数据库中的值优先。
+> 说明：当前版本不会从环境变量或 `config.toml` 自动“迁移/覆盖”运行时配置到数据库。
 
 ## 安全最佳实践
 
@@ -287,18 +298,20 @@ chmod 660 ./shortlinker.sock
 
 ### 开发环境
 
-```bash
-# 基础配置
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-RUST_LOG=debug
+```toml
+# config.toml（开发）
+[server]
+host = "127.0.0.1"
+port = 8080
 
-# 存储配置 - SQLite 便于调试
-DATABASE_URL=dev-links.db
+[database]
+database_url = "dev-links.db"
 
-# API 配置 - 开发环境使用简单 token
-ADMIN_TOKEN=dev_admin
+[logging]
+level = "debug"
 ```
+
+> 运行时配置（如 `features.enable_admin_panel`、`api.health_token`）请通过 Admin API 或 CLI 写入数据库；`api.admin_token` 请使用 `./shortlinker reset-password` 重置。
 
 ### 生产环境
 
@@ -312,7 +325,6 @@ cpu_count = 8
 [database]
 database_url = "/data/shortlinks.db"
 pool_size = 20
-timeout = 60
 
 [cache]
 type = "memory"
@@ -330,18 +342,26 @@ enable_rotation = true
 
 ### Docker 环境
 
+Docker 场景建议通过**挂载配置文件**来设置启动配置（尤其是把 `server.host` 设为 `0.0.0.0`）：
+
+```toml
+# /config.toml（容器内）
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+database_url = "sqlite:///data/links.db"
+```
+
+运行时配置（写入数据库）可在容器内用 CLI 设置；其中标记为“需要重启”的配置需要重启容器生效：
+
 ```bash
-# 服务器配置
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
-CPU_COUNT=4
+# 启用管理面板（需要重启）
+/shortlinker config set features.enable_admin_panel true
 
-# 存储配置
-DATABASE_URL=/data/links.db
-
-# 首次启动时的动态配置
-ADMIN_TOKEN=secure_admin_token_here
-ENABLE_ADMIN_PANEL=true
+# 配置 Health Bearer Token（无需重启）
+/shortlinker config set api.health_token "your_health_token"
 ```
 
 ## 热重载
@@ -355,6 +375,7 @@ Shortlinker 的“热重载/热生效”主要分两类：
 
 - ✅ 短链接数据（缓存重建）
 - ✅ 标记为“无需重启”的运行时配置（通过 Admin API 更新时立即生效）
+- ✅ Cookie 配置（`api.cookie_*`）：对新下发的 Cookie 生效，修改后建议重新登录获取新 Cookie
 
 ### 不支持热重载的配置
 
@@ -362,7 +383,6 @@ Shortlinker 的“热重载/热生效”主要分两类：
 - ❌ 数据库连接
 - ❌ 缓存类型
 - ❌ 路由前缀
-- ❌ Cookie 配置
 
 ### 重载方法
 

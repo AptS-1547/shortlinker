@@ -97,12 +97,14 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker generate-config [output_path]
 ```
 
-Generate a default configuration file template with all configurable options.
+Generate a **startup config** (`config.toml`) template, including `server` / `database` / `cache` / `logging` / `analytics`.  
+Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in the database and is not part of this file.
 
 **Examples**:
 ```bash
-./shortlinker generate-config           # Generate config.toml
-./shortlinker generate-config myconfig.toml  # Specify filename
+./shortlinker generate-config                 # Generate config.example.toml
+./shortlinker generate-config config.toml     # Generate/overwrite config.toml
+./shortlinker generate-config myconfig.toml   # Specify filename
 ```
 
 ### reset-password - Reset Admin Password
@@ -132,7 +134,7 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 The `config` subcommand manages runtime configuration values stored in the database (the same config system used by the web admin panel).
 
 > Note: `config` writes values into the database. To make a **running** server reload configs from the database, call Admin API `POST /admin/v1/config/reload` or restart the service.  
-> Keys marked as “requires restart” (e.g. route prefixes, cookie settings) may not take full effect even after reload; a restart is still recommended.
+> Keys marked as “requires restart” (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload; a restart is required.
 
 Common subcommands:
 
@@ -273,16 +275,16 @@ After link-management operations (add/update/remove/import), CLI notifies the ru
 | 0 | Success |
 | 1 | Failed (validation/storage/command error) |
 
-## Environment Variables
+## Configuration
 
-Main environment variables read by CLI tool:
+The CLI connects to the database using `config.toml` in the current working directory. To point it to a different database:
 
-```bash
-DATABASE_URL=sqlite://links.db  # Database connection URL
-RUST_LOG=info                   # Log level
+```toml
+[database]
+database_url = "sqlite://links.db"
 ```
 
-> For complete environment variable configuration, see [Environment Variables Configuration](/en/config/)
+> See [Configuration Guide](/en/config/).
 
 ## Script Integration
 
