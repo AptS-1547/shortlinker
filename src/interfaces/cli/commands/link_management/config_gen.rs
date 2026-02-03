@@ -6,7 +6,7 @@ use crate::interfaces::cli::CliError;
 
 /// Generate example configuration file
 pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError> {
-    let path = output_path.unwrap_or_else(|| "config.toml".to_string());
+    let path = output_path.unwrap_or_else(|| "config.example.toml".to_string());
 
     println!(
         "{} {}",
