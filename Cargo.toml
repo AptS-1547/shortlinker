@@ -1,6 +1,6 @@
 [package]
 name = "shortlinker"
-version = "0.5.0-alpha.1"
+version = "0.5.0-alpha.2"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 repository = "https://github.com/AptS-1547/shortlinker"
@@ -53,7 +53,8 @@ members = [".", "migration"]
 clap = { version = "4", features = ["derive"] }
 migration = { path = "migration" }
 actix-web = { version = "4.12", features = ["compress-brotli", "compress-gzip"] }
-dotenv = "0.15"
+config = "0.15"
+dotenvy = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
@@ -92,7 +93,7 @@ parking_lot = "0.12"
 argon2 = "0.5"
 url = "2"
 actix-cors = "0.7"
-ts-rs = { version = "11.1", features = ["chrono-impl"] }
+ts-rs = { version = "12.0", features = ["chrono-impl"] }
 csv = "1.4"
 actix-multipart = "0.7"
 strum = { version = "0.27", features = ["derive"] }
@@ -101,9 +102,11 @@ actix-governor = "0.10.0"
 rpassword = "7"
 subtle = "2"
 base64 = "0.22"
+maxminddb = "0.27"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", default-features = false, features = ["signal", "process"] }
+nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", default-features = false, features = ["consoleapi"] }
@@ -113,7 +116,7 @@ tokio-test = "0.4"
 actix-rt = "2.11"
 tempfile = "3.24"
 tokio = { version = "1.49.0", features = ["full"] }
-criterion = { version = "0.5", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 
 [[bench]]
 name = "click_manager"

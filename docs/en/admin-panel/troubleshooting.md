@@ -7,10 +7,14 @@ This document covers common issues and solutions for the Web admin panel, along 
 ### Login Failed
 
 ```bash
-# Check if ADMIN_TOKEN is correctly configured
-echo $ADMIN_TOKEN
+# Get/confirm the admin password (plaintext for runtime config `api.admin_token`)
+# - First startup usually creates `admin_token.txt` (if present)
+cat admin_token.txt
 
-# Check API address configuration
+# - Forgot the password? Rotate it (writes to DB)
+./shortlinker reset-password
+
+# Check (standalone) admin panel API URL configuration
 cat admin-panel/.env.local
 
 # View browser console errors
@@ -18,7 +22,7 @@ cat admin-panel/.env.local
 
 **Possible causes**:
 
-- `ADMIN_TOKEN` not configured or incorrect
+- Admin password (`api.admin_token`) incorrect
 - Backend service not running
 - API address misconfigured
 - CORS configuration issues
@@ -73,9 +77,9 @@ bun dev
 
 ## Security Recommendations
 
-1. **Strong Password**: Use sufficiently complex `ADMIN_TOKEN`
+1. **Strong Password**: Use a sufficiently complex admin password (`api.admin_token`)
 2. **HTTPS**: Production must enable HTTPS
-3. **Path Isolation**: Consider using non-default `FRONTEND_ROUTE_PREFIX`
+3. **Path Isolation**: Consider using non-default `routes.frontend_prefix`
 4. **Network Isolation**: Only expose admin panel in trusted networks
 5. **Regular Updates**: Keep dependencies updated for security fixes
 

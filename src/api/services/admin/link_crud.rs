@@ -215,17 +215,11 @@ pub async fn get_stats(
                 stats.total_links, stats.total_clicks, stats.active_links
             );
 
-            Ok(HttpResponse::Ok()
-                .append_header(("Content-Type", "application/json; charset=utf-8"))
-                .json(ApiResponse {
-                    code: ErrorCode::Success as i32,
-                    message: "OK".to_string(),
-                    data: Some(StatsResponse {
-                        total_links: stats.total_links,
-                        total_clicks: stats.total_clicks,
-                        active_links: stats.active_links,
-                    }),
-                }))
+            Ok(success_response(StatsResponse {
+                total_links: stats.total_links,
+                total_clicks: stats.total_clicks,
+                active_links: stats.active_links,
+            }))
         }
         Err(e) => Ok(error_from_shortlinker(&e)),
     }

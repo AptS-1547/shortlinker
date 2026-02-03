@@ -4,10 +4,10 @@ Shortlinker provides a full-featured HTTP Admin API for managing short links, in
 
 ## Configuration
 
-Admin API settings can come from `config.toml`, environment variables, or runtime config (database). See [Configuration](/en/config/).
+Admin API settings are **runtime config (database)**. See [Configuration](/en/config/).
 
-- `ADMIN_TOKEN`: admin login password (recommended to set explicitly in production; if not set, the server will auto-generate one and write it once to `admin_token.txt` (save it and delete the file))
-- `ADMIN_ROUTE_PREFIX`: route prefix (optional, default: `/admin`)
+- `api.admin_token`: admin login password (stored as an Argon2 hash in the DB; on first startup a random password is generated and written to `admin_token.txt`; save it and delete the file; rotate via `./shortlinker reset-password`)
+- `routes.admin_prefix`: route prefix (default: `/admin`, restart required)
 
 > All API paths include `/v1`, e.g. the default login endpoint is `http://localhost:8080/admin/v1/auth/login`.
 
@@ -18,7 +18,7 @@ Admin API supports two authentication methods:
 1. **JWT cookies (recommended for browser/admin panel)**
    - Access cookie: `shortlinker_access` (`Path=/`)
    - Refresh cookie: `shortlinker_refresh` (`Path={ADMIN_ROUTE_PREFIX}/v1/auth`)
-   - CSRF cookie: `csrf_token` (`Path={ADMIN_ROUTE_PREFIX}`, not HttpOnly so the frontend can read it)
+   - CSRF cookie: `csrf_token` (`Path=/`, not HttpOnly so the frontend can read it)
 2. **Bearer token (for API clients; CSRF-free)**
    - `Authorization: Bearer <ACCESS_TOKEN>` (where `<ACCESS_TOKEN>` is the same JWT access token as the `shortlinker_access` cookie value)
 
@@ -90,7 +90,7 @@ curl -sS -X POST -b cookies.txt -c cookies.txt \
 
 Default: `http://your-domain:port/admin/v1`
 
-> If you changed `ADMIN_ROUTE_PREFIX`, replace `/admin` with your prefix.
+> If you changed `routes.admin_prefix`, replace `/admin` with your prefix.
 
 ## Common JSON format
 
@@ -351,7 +351,7 @@ curl -sS -X POST -b cookies.txt \
 
 ## Auth endpoints notes
 
-- `POST /auth/login`: no cookies required; validates `ADMIN_TOKEN` and sets cookies
+- `POST /auth/login`: no cookies required; validates the admin password (plaintext for `api.admin_token`) and sets cookies
 - `POST /auth/refresh`: no access cookie required, but refresh cookie is required
 - `POST /auth/logout`: no cookies required; clears cookies
 - `GET /auth/verify`: requires access cookie
@@ -388,7 +388,187 @@ print(admin.list_links())
 
 ## Security notes
 
-1. Use a strong `ADMIN_TOKEN` (do not rely on the auto-generated one in production)
+1. Use a strong admin password (`api.admin_token`) (do not rely on the auto-generated one in production)
 2. Use HTTPS in production and set `api.cookie_secure=true`
 3. Expose Admin API only to trusted networks
-4. Rotate `ADMIN_TOKEN` regularly and re-login to get new cookies
+4. Rotate the admin password (`api.admin_token`) regularly and re-login to get new cookies
+
+## Analytics API
+
+Analytics API provides detailed click statistics, including click trends, top links, referrer stats, and geographic distribution.
+
+> You need to enable `analytics.enable_detailed_logging` in runtime config (restart required) to record detailed click logs.
+>
+> - Default range: last 30 days. To set a custom range, provide **both** `start_date` and `end_date`.
+> - Date formats: RFC3339 (e.g. `2024-01-01T00:00:00Z`) or `YYYY-MM-DD` (e.g. `2024-01-01`).
+> - Geo distribution requires `analytics.enable_geo_lookup=true` (and `analytics.enable_ip_logging=true` to keep IPs). The GeoIP provider is configured via startup `[analytics]` (`analytics.maxminddb_path` / `analytics.geoip_api_url`).
+>   - When using the external API provider, it has a built-in cache (LRU 10,000, TTL 15 minutes, negative caching on failures, and singleflight for concurrent requests). HTTP timeout is 2 seconds.
+
+### GET /analytics/trends - Get click trends
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/trends?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z&group_by=day"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `group_by` | String | Grouping (optional; default `day`): `hour`/`day`/`week`/`month` | `?group_by=day` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+    "values": [100, 150, 120]
+  }
+}
+```
+
+### GET /analytics/top - Get top links
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/top?limit=10"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Number of results (optional; default 10; max 100) | `?limit=10` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"code": "github", "clicks": 500},
+    {"code": "google", "clicks": 300}
+  ]
+}
+```
+
+### GET /analytics/referrers - Get referrer stats
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/referrers?limit=10"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Number of results (optional; default 10; max 100) | `?limit=10` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
+    {"referrer": "(direct)", "count": 150, "percentage": 30.0}
+  ]
+}
+```
+
+### GET /analytics/geo - Get geographic distribution
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/geo?limit=20"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Number of results (optional; default 20; max 100) | `?limit=20` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": [
+    {"country": "CN", "city": "Beijing", "count": 100},
+    {"country": "US", "city": "New York", "count": 80}
+  ]
+}
+```
+
+### GET /links/{code}/analytics - Get single link analytics
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "code": "github",
+    "total_clicks": 500,
+    "trend": {
+      "labels": ["2024-01-01", "2024-01-02"],
+      "values": [100, 150]
+    },
+    "top_referrers": [
+      {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
+    ],
+    "geo_distribution": [
+      {"country": "CN", "city": "Beijing", "count": 50}
+    ]
+  }
+}
+```
+
+### GET /analytics/export - Export analytics report (CSV)
+
+```bash
+curl -sS -b cookies.txt \
+  -o analytics_report.csv \
+  "http://localhost:8080/admin/v1/analytics/export?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Export record limit (optional; default 10000; max 100000) | `?limit=10000` |
+
+The exported CSV contains these columns:
+`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+### Analytics configuration
+
+These runtime config options control Analytics behavior:
+
+| Config key | Type | Default | Description |
+|------------|------|---------|-------------|
+| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table; restart required) |
+| `analytics.log_retention_days` | int | 30 | Log retention period in days (automatic cleanup is not implemented yet) |
+| `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
+| `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |

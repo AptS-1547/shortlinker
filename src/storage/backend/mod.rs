@@ -3,6 +3,7 @@
 //! This module provides database storage using SeaORM,
 //! supporting SQLite, MySQL/MariaDB, and PostgreSQL.
 
+mod analytics;
 mod click_sink;
 mod connection;
 pub(crate) mod converters;
@@ -10,6 +11,8 @@ mod mutations;
 mod operations;
 mod query;
 pub mod retry;
+
+pub use analytics::{GeoRow, ReferrerRow, TopLinkRow, TrendRow};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -151,5 +154,10 @@ impl SeaOrmStorage {
     /// 清除分页 COUNT 缓存（数据变更时调用）
     pub fn invalidate_count_cache(&self) {
         self.count_cache.invalidate_all();
+    }
+
+    /// 获取数据库后端名称
+    pub fn get_backend_name(&self) -> &str {
+        &self.backend_name
     }
 }

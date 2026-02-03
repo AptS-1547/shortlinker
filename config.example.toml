@@ -1,75 +1,148 @@
-# shortlinker 配置文件示例
-# 以下配置必须在启动前设置，修改后需要重启服务
-# 其他配置（API、路由、功能等）已迁移到数据库，可通过管理面板动态修改
+# Shortlinker Configuration File
+# ================================
 #
-# 安全配置说明：
-# - 登录限流智能检测：未配置 api.trusted_proxies 时，连接来自私有 IP（Docker/nginx）
-#   将自动信任 X-Forwarded-For header，适合绝大多数反向代理部署
-# - 显式配置：如需精确控制，可在管理面板配置 api.trusted_proxies（支持 IP 和 CIDR）
-#   示例：Docker 部署可配置为 ["172.16.0.0/12"]，nginx 反向代理可配置为代理服务器 IP
-# - IPC socket 权限已限制为 0600（仅属主可访问）
+# This file contains startup configuration that requires a restart to take effect.
+# Runtime settings (API, routes, features, CORS) are stored in the database
+# and can be modified via the Admin Panel without restarting.
+#
+# Usage:
+#   1. Copy this file to config.toml
+#   2. Modify settings as needed
+#   3. Start the server
+#
+# Security Notes:
+# - Login rate limiting uses smart proxy detection: when api.trusted_proxies is not
+#   configured and connections come from private IPs (Docker/nginx), X-Forwarded-For
+#   headers are automatically trusted. This works for most reverse proxy setups.
+# - For precise control, configure api.trusted_proxies in Admin Panel (supports IP and CIDR).
+#   Example: Docker deployments can use ["172.16.0.0/12"], nginx can use the proxy server IP.
+# - IPC socket permissions are restricted to 0600 (owner access only).
 
+# ==============================================================================
+# Server Configuration
+# ==============================================================================
 [server]
-# 服务器监听地址
+# Server bind address
+# Use "0.0.0.0" to listen on all interfaces
 host = "127.0.0.1"
 
-# 服务器监听端口
+# Server port
 port = 8080
 
-# Unix Socket 路径（如果设置了，会覆盖 host 和 port）
+# Unix socket path (optional)
+# If set, overrides host and port settings
+# Useful for nginx reverse proxy with socket connection
 # unix_socket = "/tmp/shortlinker.sock"
 
-# CPU 核心数量（默认为系统核心数）
+# Number of worker threads (optional)
+# Defaults to the number of logical CPU cores
 # cpu_count = 4
 
+# ==============================================================================
+# Database Configuration
+# ==============================================================================
 [database]
-# 数据库连接 URL 或文件路径
-# 数据库类型会从 URL scheme 自动检测：
-# - sqlite:// 或 .db/.sqlite 文件 → SQLite
-# - postgres:// 或 postgresql:// → PostgreSQL
-# - mysql:// → MySQL
-# - mariadb:// → MariaDB（使用 MySQL 协议）
+# Database connection URL or file path
+# Type is auto-detected from URL scheme:
+#   - sqlite:// or .db/.sqlite file -> SQLite
+#   - postgres:// or postgresql://  -> PostgreSQL
+#   - mysql://                       -> MySQL
+#   - mariadb://                     -> MariaDB (uses MySQL protocol)
+#
+# Examples:
+#   SQLite:     "shortlinks.db" or "sqlite:///path/to/db.sqlite"
+#   PostgreSQL: "postgres://user:pass@localhost:5432/shortlinker"
+#   MySQL:      "mysql://user:pass@localhost:3306/shortlinker"
 database_url = "shortlinks.db"
 
-# 数据库连接池大小
+# Connection pool size
+# Increase for high-traffic deployments
 pool_size = 10
 
-# 数据库连接超时（秒）
+# Connection timeout in seconds
 timeout = 30
 
+# Retry configuration for transient database errors
+# Number of retry attempts before failing
+# retry_count = 3
+
+# Initial delay between retries in milliseconds
+# retry_base_delay_ms = 100
+
+# Maximum delay between retries in milliseconds (exponential backoff cap)
+# retry_max_delay_ms = 2000
+
+# ==============================================================================
+# Cache Configuration
+# ==============================================================================
 [cache]
-# 缓存类型：memory, redis
+# Cache backend type: "memory" or "redis"
+# - memory: Fast in-process cache using Moka, suitable for single-instance deployments
+# - redis:  Distributed cache, required for multi-instance deployments
 type = "memory"
 
-# 默认缓存过期时间（秒）
+# Default cache TTL in seconds
+# How long cached entries remain valid
 default_ttl = 3600
 
+# Redis configuration (used when type = "redis")
 [cache.redis]
-# Redis 连接 URL
+# Redis connection URL
+# Format: redis://[username:password@]host[:port][/database]
 url = "redis://127.0.0.1:6379/"
 
-# Redis 键前缀
+# Key prefix for all cached entries
+# Useful when sharing Redis with other applications
 key_prefix = "shortlinker:"
 
+# Memory cache configuration (used when type = "memory")
 [cache.memory]
-# 内存缓存最大容量（条目数）
+# Maximum number of entries in cache
+# Older entries are evicted when limit is reached (LRU policy)
 max_capacity = 10000
 
+# ==============================================================================
+# Logging Configuration
+# ==============================================================================
 [logging]
-# 日志等级：trace, debug, info, warn, error
+# Log level: trace, debug, info, warn, error
+# - trace: Most verbose, includes all details
+# - debug: Detailed information for debugging
+# - info:  General operational messages (recommended for production)
+# - warn:  Warning messages for potential issues
+# - error: Only error messages
 level = "info"
 
-# 日志输出格式：text, json
+# Output format: "text" or "json"
+# - text: Human-readable format for console/development
+# - json: Structured format for log aggregation systems (ELK, Loki, etc.)
 format = "text"
 
-# 日志文件路径（不设置则输出到控制台）
+# Log file path (optional)
+# If not set, logs are written to stdout/stderr
 # file = "shortlinker.log"
 
-# 日志文件最大大小（MB）
+# Maximum log file size in MB before rotation
 max_size = 100
 
-# 保留的日志文件数量
+# Number of rotated log files to keep
 max_backups = 5
 
-# 是否启用日志轮转
+# Enable log file rotation
+# When disabled, logs append to a single file indefinitely
 enable_rotation = true
+
+# ==============================================================================
+# Analytics Configuration
+# ==============================================================================
+[analytics]
+# MaxMindDB file path for local IP geolocation (optional)
+# Download GeoLite2-City.mmdb from MaxMind (free registration required)
+# If configured and file is readable, uses local parsing for better performance
+# Otherwise falls back to external GeoIP API
+# maxminddb_path = "/path/to/GeoLite2-City.mmdb"
+
+# External GeoIP API URL (fallback when MaxMindDB is not available)
+# Use {ip} as placeholder for the IP address
+# Default uses ip-api.com free tier (limited to 45 requests/minute)
+geoip_api_url = "http://ip-api.com/json/{ip}?fields=countryCode,city"

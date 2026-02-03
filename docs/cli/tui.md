@@ -168,8 +168,8 @@ export LANG=en_US.UTF-8
 # 检查存储后端是否可访问
 ./shortlinker list
 
-# 查看错误日志
-RUST_LOG=debug ./shortlinker tui
+# 查看错误输出
+./shortlinker tui
 ```
 
 ### 数据不刷新

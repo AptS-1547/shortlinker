@@ -3,7 +3,10 @@
 在生产环境中，建议通过反向代理来暴露 Shortlinker 服务。
 
 ::: warning 重要：反向代理配置要求
-通过反向代理部署时，**必须**设置 `X-Real-IP` 和 `X-Forwarded-For` 请求头。这些头用于获取客户端真实 IP 地址，是登录限流功能正常工作的前提。如果缺少这些配置，登录时会返回 500 错误。
+通过反向代理部署时，建议设置 `X-Real-IP` 和 `X-Forwarded-For` 请求头，用于获取客户端真实 IP（登录限流/统计等功能会用到）。
+
+- **TCP 反代**：如果未设置这些头，登录通常仍可用，但登录限流会退化为按“代理 IP”限流（所有用户共享同一个限流 key）。
+- **Unix Socket 模式**（配置了 `server.unix_socket`）：**必须**设置 `X-Forwarded-For`，否则登录限流无法提取 key，登录会返回 500。
 :::
 
 ## Caddy 配置
@@ -251,13 +254,13 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### 健康检查
 
-> 注意：`/health/*` 端点默认需要鉴权。推荐在生产环境设置 `HEALTH_TOKEN`，并使用 `Authorization: Bearer <token>` 探测 `/health/live` 或 `/health/ready`。  
+> 注意：`/health/*` 端点默认需要鉴权。推荐在生产环境配置运行时配置 `api.health_token`，并使用 `Authorization: Bearer <token>` 探测 `/health/live` 或 `/health/ready`。  
 > 如果不方便在探活请求中添加请求头，也可以探测根路径 `/`（默认返回 `307`）作为简单存活检查。
 
 ```nginx
 location = /_healthz {
     access_log off;
-    # 推荐：带 Bearer Token 的健康探测（需要你已配置 HEALTH_TOKEN）
+    # 推荐：带 Bearer Token 的健康探测（需要你已配置 api.health_token）
     # proxy_set_header Authorization "Bearer your_health_token";
     # proxy_pass http://127.0.0.1:8080/health/live;
 

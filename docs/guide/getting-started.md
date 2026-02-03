@@ -13,8 +13,8 @@
 推荐使用 `generate-config` 命令生成配置文件：
 
 ```bash
-./shortlinker generate-config
-# 生成 config.toml，包含所有可配置项及默认值
+./shortlinker generate-config config.toml
+# 生成启动配置模板（server/database/cache/logging/analytics）
 ```
 
 然后根据需要修改 `config.toml`：
@@ -24,33 +24,18 @@
 host = "127.0.0.1"
 port = 8080
 
-[features]
-default_url = "https://example.com"
+[database]
+database_url = "shortlinks.db"
 
-# 可选：启用管理功能（Admin API + Health API）
-# - Health 支持 Bearer Token（HEALTH_TOKEN）或 Admin 登录后的 JWT Cookie
-# [api]
-# admin_token = "your_admin_token"
+[logging]
+level = "info"
 ```
 
 ::: tip
 如果不创建配置文件，程序会使用内置的默认配置运行。
 :::
 
-### 方式二：使用环境变量
-
-创建配置文件 `.env`：
-
-```bash
-# 最小配置
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DEFAULT_URL=https://example.com
-
-# 可选：启用管理功能（Admin API + Health API）
-# - Health 支持 Bearer Token（HEALTH_TOKEN）或 Admin 登录后的 JWT Cookie
-# ADMIN_TOKEN=your_admin_token
-```
+> 说明：运行时配置（例如 `features.default_url`、`api.health_token`、`features.enable_admin_panel`）存储在数据库中，需通过 Admin API 或 CLI 修改；当前版本不会从 `config.toml`/环境变量读取这类配置。
 
 ## 第二步：启动服务
 
@@ -119,15 +104,30 @@ kill -USR1 $(cat shortlinker.pid)
 ## 生产环境快速配置
 
 ### 推荐配置
-```bash
-# 生产环境 .env 配置
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DATABASE_URL=sqlite:///data/links.db
-DEFAULT_URL=https://your-domain.com
+```toml
+# config.toml（生产）
+[server]
+host = "127.0.0.1"
+port = 8080
 
-# 启用 API 功能
-ADMIN_TOKEN=your_secure_admin_token
+[database]
+database_url = "sqlite:///data/links.db"
+
+[logging]
+level = "info"
+```
+
+运行时配置（写入数据库）可通过 CLI/Admin API 设置，例如：
+
+```bash
+# 设置根路径默认跳转（无需重启）
+./shortlinker config set features.default_url https://your-domain.com
+
+# 设置 Health Bearer Token（无需重启）
+./shortlinker config set api.health_token your_health_token
+
+# 重置管理员密码（推荐）
+./shortlinker reset-password
 ```
 
 ### 反向代理示例
@@ -153,9 +153,8 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      - DATABASE_URL=sqlite:///data/links.db
 ```
 
 ## 下一步

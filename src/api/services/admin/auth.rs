@@ -6,11 +6,12 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use base64::Engine;
 use governor::middleware::NoOpMiddleware;
 use rand::Rng;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::JwtService;
 use crate::config::{get_config, get_runtime_config, keys};
+use crate::utils::ip::{is_private_or_local, is_trusted_proxy};
 use crate::utils::password::verify_password;
 
 use crate::errors::ShortlinkerError;
@@ -88,21 +89,7 @@ impl KeyExtractor for LoginKeyExtractor {
         if let Ok(socket_addr) = peer_ip.parse::<SocketAddr>() {
             let ip_addr = socket_addr.ip();
 
-            // 检查是否为私有 IP 或 localhost
-            let is_private_or_local = match ip_addr {
-                IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
-                IpAddr::V6(v6) => {
-                    // IPv6 私有地址：
-                    // - fc00::/7 (ULA, RFC 4193): fc00::/8 + fd00::/8
-                    // - fe80::/10 (Link-local)
-                    // - ::1 (Loopback)
-                    v6.is_loopback()
-                        || (v6.segments()[0] & 0xfe00) == 0xfc00 // fc00::/7 (包含 fc00 和 fd00)
-                        || (v6.segments()[0] & 0xffc0) == 0xfe80 // fe80::/10 (link-local)
-                }
-            };
-
-            if is_private_or_local {
+            if is_private_or_local(&ip_addr) {
                 // 连接来自私有 IP/localhost → 假设有反向代理
                 if let Some(real_ip) = conn_info.realip_remote_addr() {
                     debug!(
@@ -118,74 +105,6 @@ impl KeyExtractor for LoginKeyExtractor {
 
         // 步骤 5: 默认使用连接 IP（公网直连或内网直连无 X-Forwarded-For）
         Ok(peer_ip.to_string())
-    }
-}
-
-/// 检查 IP 是否在可信代理列表中
-fn is_trusted_proxy(ip: &str, trusted_proxies: &[String]) -> bool {
-    use std::net::{IpAddr, SocketAddr};
-
-    // 先尝试解析为 SocketAddr（支持 ip:port），如果失败再尝试纯 IpAddr
-    let ip_addr = if let Ok(socket_addr) = ip.parse::<SocketAddr>() {
-        socket_addr.ip()
-    } else if let Ok(ip_addr) = ip.parse::<IpAddr>() {
-        ip_addr
-    } else {
-        return false;
-    };
-
-    for proxy in trusted_proxies {
-        if proxy.contains('/') {
-            // CIDR 格式（如 "192.168.1.0/24"）
-            if ip_in_cidr(&ip_addr, proxy) {
-                return true;
-            }
-        } else {
-            // 单 IP
-            if let Ok(proxy_addr) = proxy.parse::<IpAddr>()
-                && ip_addr == proxy_addr
-            {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// CIDR 检查（简易实现）
-fn ip_in_cidr(ip: &IpAddr, cidr: &str) -> bool {
-    let Some((network, prefix_len)) = cidr.split_once('/') else {
-        return false;
-    };
-
-    let Ok(prefix_len): Result<u8, _> = prefix_len.parse() else {
-        return false;
-    };
-
-    let Ok(network_addr) = network.parse::<IpAddr>() else {
-        return false;
-    };
-
-    match (ip, network_addr) {
-        (IpAddr::V4(ip), IpAddr::V4(net)) => {
-            if prefix_len > 32 {
-                return false;
-            }
-            let mask = u32::MAX.checked_shl(32 - prefix_len as u32).unwrap_or(0);
-            let ip_bits = u32::from_be_bytes(ip.octets());
-            let net_bits = u32::from_be_bytes(net.octets());
-            (ip_bits & mask) == (net_bits & mask)
-        }
-        (IpAddr::V6(ip), IpAddr::V6(net)) => {
-            if prefix_len > 128 {
-                return false;
-            }
-            let mask = u128::MAX.checked_shl(128 - prefix_len as u32).unwrap_or(0);
-            let ip_bits = u128::from_be_bytes(ip.octets());
-            let net_bits = u128::from_be_bytes(net.octets());
-            (ip_bits & mask) == (net_bits & mask)
-        }
-        _ => false, // IPv4 vs IPv6 不匹配
     }
 }
 

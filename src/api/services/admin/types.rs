@@ -295,8 +295,8 @@ pub struct ImportResponse {
     pub failed_items: Vec<ImportFailedItem>,
 }
 
-// Re-export CsvLinkRow from shared csv_handler module
-pub use crate::utils::csv_handler::CsvLinkRow;
+// Re-export CSV row types from shared csv_handler module
+pub use crate::utils::csv_handler::{ClickLogCsvRow, CsvLinkRow};
 
 #[cfg(test)]
 mod tests {
@@ -310,47 +310,48 @@ mod tests {
     fn export_typescript_types() {
         // 运行此测试会自动生成 TypeScript 类型文件
         // cargo test export_typescript_types -- --nocapture
+        let cfg = ts_rs::Config::default();
 
         // Admin types
-        LoginCredentials::export_all().expect("Failed to export LoginCredentials");
-        PostNewLink::export_all().expect("Failed to export PostNewLink");
-        GetLinksQuery::export_all().expect("Failed to export GetLinksQuery");
-        PaginationInfo::export_all().expect("Failed to export PaginationInfo");
-        BatchCreateRequest::export_all().expect("Failed to export BatchCreateRequest");
-        BatchUpdateRequest::export_all().expect("Failed to export BatchUpdateRequest");
-        BatchUpdateItem::export_all().expect("Failed to export BatchUpdateItem");
-        BatchDeleteRequest::export_all().expect("Failed to export BatchDeleteRequest");
-        BatchResponse::export_all().expect("Failed to export BatchResponse");
-        BatchFailedItem::export_all().expect("Failed to export BatchFailedItem");
-        LinkResponse::export_all().expect("Failed to export LinkResponse");
-        StatsResponse::export_all().expect("Failed to export StatsResponse");
+        LoginCredentials::export_all(&cfg).expect("Failed to export LoginCredentials");
+        PostNewLink::export_all(&cfg).expect("Failed to export PostNewLink");
+        GetLinksQuery::export_all(&cfg).expect("Failed to export GetLinksQuery");
+        PaginationInfo::export_all(&cfg).expect("Failed to export PaginationInfo");
+        BatchCreateRequest::export_all(&cfg).expect("Failed to export BatchCreateRequest");
+        BatchUpdateRequest::export_all(&cfg).expect("Failed to export BatchUpdateRequest");
+        BatchUpdateItem::export_all(&cfg).expect("Failed to export BatchUpdateItem");
+        BatchDeleteRequest::export_all(&cfg).expect("Failed to export BatchDeleteRequest");
+        BatchResponse::export_all(&cfg).expect("Failed to export BatchResponse");
+        BatchFailedItem::export_all(&cfg).expect("Failed to export BatchFailedItem");
+        LinkResponse::export_all(&cfg).expect("Failed to export LinkResponse");
+        StatsResponse::export_all(&cfg).expect("Failed to export StatsResponse");
 
         // Response types
-        MessageResponse::export_all().expect("Failed to export MessageResponse");
-        AuthSuccessResponse::export_all().expect("Failed to export AuthSuccessResponse");
-        ReloadResponse::export_all().expect("Failed to export ReloadResponse");
+        MessageResponse::export_all(&cfg).expect("Failed to export MessageResponse");
+        AuthSuccessResponse::export_all(&cfg).expect("Failed to export AuthSuccessResponse");
+        ReloadResponse::export_all(&cfg).expect("Failed to export ReloadResponse");
 
         // Error code
-        ErrorCode::export_all().expect("Failed to export ErrorCode");
+        ErrorCode::export_all(&cfg).expect("Failed to export ErrorCode");
 
         // Health check types
-        HealthStorageBackend::export_all().expect("Failed to export HealthStorageBackend");
-        HealthStorageCheck::export_all().expect("Failed to export HealthStorageCheck");
-        HealthChecks::export_all().expect("Failed to export HealthChecks");
-        HealthResponse::export_all().expect("Failed to export HealthResponse");
+        HealthStorageBackend::export_all(&cfg).expect("Failed to export HealthStorageBackend");
+        HealthStorageCheck::export_all(&cfg).expect("Failed to export HealthStorageCheck");
+        HealthChecks::export_all(&cfg).expect("Failed to export HealthChecks");
+        HealthResponse::export_all(&cfg).expect("Failed to export HealthResponse");
 
         // Export/Import types
-        ExportQuery::export_all().expect("Failed to export ExportQuery");
-        ImportMode::export_all().expect("Failed to export ImportMode");
-        ImportFailedItem::export_all().expect("Failed to export ImportFailedItem");
-        ImportResponse::export_all().expect("Failed to export ImportResponse");
+        ExportQuery::export_all(&cfg).expect("Failed to export ExportQuery");
+        ImportMode::export_all(&cfg).expect("Failed to export ImportMode");
+        ImportFailedItem::export_all(&cfg).expect("Failed to export ImportFailedItem");
+        ImportResponse::export_all(&cfg).expect("Failed to export ImportResponse");
 
         // Config types
-        ValueType::export_all().expect("Failed to export ValueType");
-        ConfigItemResponse::export_all().expect("Failed to export ConfigItemResponse");
-        ConfigUpdateRequest::export_all().expect("Failed to export ConfigUpdateRequest");
-        ConfigUpdateResponse::export_all().expect("Failed to export ConfigUpdateResponse");
-        ConfigHistoryResponse::export_all().expect("Failed to export ConfigHistoryResponse");
+        ValueType::export_all(&cfg).expect("Failed to export ValueType");
+        ConfigItemResponse::export_all(&cfg).expect("Failed to export ConfigItemResponse");
+        ConfigUpdateRequest::export_all(&cfg).expect("Failed to export ConfigUpdateRequest");
+        ConfigUpdateResponse::export_all(&cfg).expect("Failed to export ConfigUpdateResponse");
+        ConfigHistoryResponse::export_all(&cfg).expect("Failed to export ConfigHistoryResponse");
 
         println!("TypeScript types exported to {}", TS_EXPORT_PATH);
     }

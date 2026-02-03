@@ -22,16 +22,22 @@ To enable the Web admin panel in Shortlinker:
    bun run build
    ```
 
-2. **Configure environment variables**:
+2. **Enable settings (runtime config)**:
 
    ```bash
-   ENABLE_ADMIN_PANEL=true
-   ADMIN_TOKEN=your_secure_admin_token
-   FRONTEND_ROUTE_PREFIX=/panel  # Optional, defaults to /panel
+   # Enable admin panel (runtime config, stored in DB; restart required)
+   ./shortlinker config set features.enable_admin_panel true
+
+   # Optional: change frontend route prefix (restart required)
+   ./shortlinker config set routes.frontend_prefix /panel
    ```
 
 3. **Access the interface**:
    After starting Shortlinker, visit `http://your-domain:8080/panel`
+
+> Notes:
+> - The admin login password is the plaintext for runtime config `api.admin_token`. On first startup, a random password is generated and written to `admin_token.txt` (if the file doesn't already exist). You can rotate it via `./shortlinker reset-password`.
+> - Route prefix configs like `routes.frontend_prefix` / `routes.admin_prefix` / `routes.health_prefix` require a restart.
 
 :::tip Note
 This is an **experimental feature** currently under active development. Please report issues via GitHub Issues.
@@ -74,7 +80,7 @@ Custom frontend takes priority over the built-in admin panel. If `./frontend-pan
 
 ### Core Functions
 
-- 🔑 **Login & Session Auth**: Login with `ADMIN_TOKEN`; backend issues JWT cookies via `Set-Cookie` (access/refresh), and the UI uses cookie-based sessions for API calls
+- 🔑 **Login & Session Auth**: Login with the admin password (`api.admin_token`); backend issues JWT cookies via `Set-Cookie` (access/refresh), and the UI uses cookie-based sessions for API calls
 - 📋 **Link Management**: Complete CRUD interface
   - Create new short links (custom codes, expiration, password protection)
   - Edit existing links

@@ -186,8 +186,9 @@ mod tests {
 
     #[test]
     fn export_typescript_types() {
-        EnumOption::export_all().expect("Failed to export EnumOption");
-        ConfigSchema::export_all().expect("Failed to export ConfigSchema");
+        let cfg = ts_rs::Config::default();
+        EnumOption::export_all(&cfg).expect("Failed to export EnumOption");
+        ConfigSchema::export_all(&cfg).expect("Failed to export ConfigSchema");
         println!("Schema TypeScript types exported to {}", TS_EXPORT_PATH);
     }
 

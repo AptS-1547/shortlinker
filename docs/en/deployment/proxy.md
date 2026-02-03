@@ -3,7 +3,10 @@
 In production environments, it's recommended to expose Shortlinker service through a reverse proxy.
 
 ::: warning Important: Reverse Proxy Configuration Requirements
-When deploying behind a reverse proxy, you **must** set `X-Real-IP` and `X-Forwarded-For` headers. These headers are required for obtaining the client's real IP address, which is essential for the login rate limiting feature to function properly. Missing these headers will result in a 500 error during login.
+When deploying behind a reverse proxy, it's recommended to set `X-Real-IP` and `X-Forwarded-For` so the server can extract the real client IP (used by login rate limiting and analytics).
+
+- **TCP reverse proxy**: if missing, login usually still works, but rate limiting degrades to the proxy IP (all users share the same limiter key).
+- **Unix socket mode** (when `server.unix_socket` is configured): `X-Forwarded-For` is **required**; otherwise the login rate limiter cannot extract a key and login will return HTTP 500.
 :::
 
 ## Caddy Configuration
@@ -251,13 +254,13 @@ access_log /var/log/nginx/shortlinker.log shortlinker;
 
 ### Health Check
 
-> Note: `/health/*` endpoints require authentication by default. In production, it’s recommended to set `HEALTH_TOKEN` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`.  
+> Note: `/health/*` endpoints require authentication by default. In production, it’s recommended to set runtime config `api.health_token` and probe `/health/live` or `/health/ready` with `Authorization: Bearer <token>`.  
 > If adding request headers is not convenient, probing `/` (default returns `307`) can be used as a simple liveness check.
 
 ```nginx
 location = /_healthz {
     access_log off;
-    # Recommended: authenticated probe (requires HEALTH_TOKEN configured)
+    # Recommended: authenticated probe (requires api.health_token configured)
     # proxy_set_header Authorization "Bearer your_health_token";
     # proxy_pass http://127.0.0.1:8080/health/live;
 

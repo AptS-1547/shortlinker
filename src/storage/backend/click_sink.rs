@@ -10,15 +10,15 @@
 
 use async_trait::async_trait;
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
-use sea_orm::{ConnectionTrait, ExprTrait};
+use sea_orm::{ConnectionTrait, EntityTrait, ExprTrait, Set};
 use tracing::debug;
 
 use super::SeaOrmStorage;
 use super::retry;
-use crate::analytics::ClickSink;
+use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
 use crate::utils::is_valid_short_code;
 
-use migration::entities::short_link;
+use migration::entities::{click_log, short_link};
 
 #[async_trait]
 impl ClickSink for SeaOrmStorage {
@@ -71,6 +71,53 @@ impl ClickSink for SeaOrmStorage {
 
         debug!(
             "点击计数已刷新到 {} 数据库 ({} 条记录)",
+            self.backend_name.to_uppercase(),
+            total_count
+        );
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl DetailedClickSink for SeaOrmStorage {
+    async fn log_click(&self, detail: ClickDetail) -> anyhow::Result<()> {
+        self.log_clicks_batch(vec![detail]).await
+    }
+
+    async fn log_clicks_batch(&self, details: Vec<ClickDetail>) -> anyhow::Result<()> {
+        if details.is_empty() {
+            return Ok(());
+        }
+
+        let total_count = details.len();
+
+        // 构建批量插入的 ActiveModel 列表
+        let models: Vec<click_log::ActiveModel> = details
+            .into_iter()
+            .map(|detail| click_log::ActiveModel {
+                short_code: Set(detail.code),
+                clicked_at: Set(detail.timestamp),
+                referrer: Set(detail.referrer),
+                user_agent: Set(detail.user_agent),
+                ip_address: Set(detail.ip_address),
+                country: Set(detail.country),
+                city: Set(detail.city),
+                ..Default::default()
+            })
+            .collect();
+
+        // 使用 insert_many 进行批量插入
+        let db = &self.db;
+        retry::with_retry("log_clicks_batch", self.retry_config, || async {
+            click_log::Entity::insert_many(models.clone())
+                .exec(db)
+                .await
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("批量插入点击日志失败: {}", e))?;
+
+        debug!(
+            "详细点击日志已写入 {} 数据库 ({} 条记录)",
             self.backend_name.to_uppercase(),
             total_count
         );

@@ -1,4 +1,5 @@
 pub mod csv_handler;
+pub mod ip;
 pub mod password;
 pub mod time_parser;
 pub mod url_validator;

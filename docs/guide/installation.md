@@ -106,8 +106,10 @@ cargo clean && cargo build --release
 ### 端口被占用
 
 ```bash
-# 使用其他端口
-SERVER_PORT=3000 ./shortlinker
+# 使用其他端口：在 config.toml 中设置
+# [server]
+# port = 3000
+./shortlinker
 ```
 
 ## 下一步

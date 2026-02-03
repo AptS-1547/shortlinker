@@ -20,26 +20,68 @@ cd shortlinker && docker build -t shortlinker .
 
 ### 基本运行
 ```bash
-# 最简单的启动方式
-docker run -d -p 8080:8080 e1saps/shortlinker
+# 1) 准备最小启动配置（config.toml 只在容器当前工作目录读取；默认是 /config.toml）
+cat > config.toml << 'EOF'
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+database_url = "sqlite:///data/shortlinker.db"
+EOF
+
+mkdir -p data
+
+# 2) 启动
+docker run -d --name shortlinker \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
+  e1saps/shortlinker
 ```
 
 ### 数据持久化
 ```bash
-# 挂载数据目录 - TCP
-docker run -d \
+# TCP（推荐）
+docker run -d --name shortlinker \
   -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
   -v $(pwd)/data:/data \
-  -e DATABASE_URL=sqlite:///data/shortlinker.db \
   e1saps/shortlinker
 
-# Unix 套接字
-docker run -d \
+# Unix 套接字（HTTP 走 UDS；host/port 会被忽略）
+cat > config.toml << 'EOF'
+[server]
+unix_socket = "/sock/shortlinker.sock"
+
+[database]
+database_url = "sqlite:///data/shortlinker.db"
+EOF
+
+docker run -d --name shortlinker \
+  -v $(pwd)/config.toml:/config.toml:ro \
   -v $(pwd)/data:/data \
   -v $(pwd)/sock:/sock \
-  -e UNIX_SOCKET=/sock/shortlinker.sock \
-  -e DATABASE_URL=sqlite:///data/shortlinker.db \
   e1saps/shortlinker
+```
+
+### 运行时配置（Admin/Health/Panel）
+
+> 运行时配置存储在数据库中（如 `features.default_url`、`features.enable_admin_panel`、`api.health_token`），可通过容器内 CLI 或 Admin API 修改。详见 [配置指南](/config/)。
+
+```bash
+# 获取首次启动生成的管理员密码（容器内通常为 /admin_token.txt）
+docker exec shortlinker cat /admin_token.txt
+
+# 设置根路径默认跳转（无需重启）
+docker exec shortlinker /shortlinker config set features.default_url https://example.com
+
+# 配置 Health Bearer Token（无需重启）
+docker exec shortlinker /shortlinker config set api.health_token your_health_token
+
+# 启用管理面板（需要重启）
+docker exec shortlinker /shortlinker config set features.enable_admin_panel true
+docker restart shortlinker
 ```
 
 ## Docker Compose
@@ -56,13 +98,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
-      - DATABASE_URL=sqlite:///data/shortlinker.db
-      - DEFAULT_URL=https://example.com
-      - RUST_LOG=info
     restart: unless-stopped
 ```
 
@@ -81,16 +118,8 @@ services:
     # volumes:
     #   - ./sock:/sock
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      # TCP 配置
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
-      # Unix 套接字配置（二选一）
-      # - UNIX_SOCKET=/sock/shortlinker.sock
-      - DATABASE_URL=sqlite:///data/links.db
-      - DEFAULT_URL=https://your-domain.com
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
@@ -168,12 +197,17 @@ chmod +x backup.sh
 ### 网络安全
 ```bash
 # 仅本地监听 - TCP
-docker run -d -p 127.0.0.1:8080:8080 e1saps/shortlinker
+docker run -d --name shortlinker \
+  -p 127.0.0.1:8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
+  e1saps/shortlinker
 
 # Unix 套接字
-docker run -d \
+docker run -d --name shortlinker \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
   -v $(pwd)/sock:/sock \
-  -e UNIX_SOCKET=/sock/shortlinker.sock \
   e1saps/shortlinker
 
 # 自定义网络
@@ -216,11 +250,11 @@ docker stats shortlinker
 
 ### 调试模式
 ```bash
-# 交互模式运行
+# 交互模式运行（把 `config.toml` 的 `logging.level` 设为 `debug` 以获得更详细日志）
 docker run -it --rm \
   -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
   -v $(pwd)/data:/data \
-  -e RUST_LOG=debug \
   e1saps/shortlinker
 ```
 

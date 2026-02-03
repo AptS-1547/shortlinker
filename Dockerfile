@@ -18,6 +18,7 @@ FROM rust:1.93-slim AS builder
 
 # 安装 musl 工具链（项目使用 rustls，不需要 OpenSSL）
 RUN apt-get update && apt-get install -y \
+    cmake \
     musl-tools \
     musl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -49,7 +50,7 @@ FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="0.4.3"
+LABEL version="0.5.0-alpha.2"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 

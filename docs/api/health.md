@@ -11,9 +11,7 @@ Shortlinker 提供健康检查 API，用于监控服务状态和存储健康状�
 
 ## 配置方式
 
-健康检查 API 的路由前缀可通过环境变量配置，详细配置见 [配置指南](/config/)：
-
-- `HEALTH_ROUTE_PREFIX` - 路由前缀（可选，默认 `/health`）
+健康检查 API 的路由前缀由运行时配置 `routes.health_prefix` 控制（默认 `/health`，修改后需要重启），详细配置见 [配置指南](/config/)。
 
 > 备注：Health API 支持两种鉴权方式：
 > - **Bearer Token**：`Authorization: Bearer <HEALTH_TOKEN>`（适合监控/探针，无需 Cookie）
@@ -26,7 +24,7 @@ Health API 需要鉴权，可通过 **Bearer Token**（`HEALTH_TOKEN`）或 **JW
 
 ### 方式 A：Bearer Token（推荐用于监控/探针）
 
-当你配置了 `HEALTH_TOKEN`（或运行时配置 `api.health_token`）后，可以直接通过请求头访问健康检查接口：
+当你配置了运行时配置 `api.health_token` 后，可以直接通过请求头访问健康检查接口：
 
 ```bash
 HEALTH_TOKEN="your_health_token"
@@ -55,7 +53,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> 若你未显式设置 `ADMIN_TOKEN`，首次启动会自动生成一个随机密码并写入 `admin_token.txt`（保存后请删除该文件）。
+> 首次启动时会自动生成一个随机管理员密码并写入 `admin_token.txt`（若文件不存在；保存后请删除该文件）。
 
 ## API 端点
 
@@ -137,11 +135,11 @@ curl -sS -b cookies.txt -I \
 
 ## 监控集成（注意事项）
 
-如果你使用 **Bearer Token**（`HEALTH_TOKEN`），就可以避免 JWT Cookie 有有效期的问题，更适合自动化监控。
+如果你使用 **Bearer Token**（即运行时配置 `api.health_token` 的值），就可以避免 JWT Cookie 有有效期的问题，更适合自动化监控。
 
 建议策略：
 
-1. **推荐：使用 `HEALTH_TOKEN` 探测 `/health/live` 或 `/health/ready`**
+1. **推荐：设置 `api.health_token` 并用 Bearer Token 探测 `/health/live` 或 `/health/ready`**
 2. **兼容方案：探测根路径 `/`**（会返回 `307`，Kubernetes 视为成功），用于确认进程存活
 3. **兼容方案：登录获取 Cookie 再探测 `/health`**（适合已有登录流程的监控脚本）
 
@@ -216,6 +214,6 @@ curl -sS -b cookies.txt http://localhost:8080/health | jq .
 
 ## 安全建议
 
-1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`
+1. **强密码**：使用足够复杂的管理员密码（`api.admin_token`）
 2. **网络隔离**：仅在受信任网络中访问 Health 端点
 3. **HTTPS**：生产环境建议启用 HTTPS，并正确配置 Cookie 安全参数

@@ -28,8 +28,24 @@ Shortlinker supports multiple deployment methods, from simple local running to p
 
 ### Docker Deployment (Recommended)
 ```bash
-# Quick startup
-docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
+# Prepare a minimal startup config (by default the container reads from /config.toml)
+cat > config.toml << 'EOF'
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+database_url = "sqlite:///data/shortlinker.db"
+EOF
+
+mkdir -p data
+
+# Run
+docker run -d --name shortlinker \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
+  e1saps/shortlinker
 ```
 
 ### Pre-compiled Binaries
@@ -81,4 +97,4 @@ Choose the deployment method that suits you:
 - 🔀 [Reverse Proxy](/en/deployment/proxy) - Nginx, Caddy configuration
 - ⚙️ [System Service](/en/deployment/systemd) - systemd and process management
 
-Need configuration help? Check [Configuration Guide](/en/config/) for environment variable settings.
+Need configuration help? Check [Configuration Guide](/en/config/) for `config.toml` (startup config) and DB-backed runtime config.

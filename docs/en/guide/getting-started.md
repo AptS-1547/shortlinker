@@ -13,8 +13,8 @@ Please complete any installation method from the [Installation Guide](/en/guide/
 Use the `generate-config` command to generate a configuration file:
 
 ```bash
-./shortlinker generate-config
-# Generates config.toml with all configurable options and default values
+./shortlinker generate-config config.toml
+# Generates a startup config template (server/database/cache/logging/analytics)
 ```
 
 Then modify `config.toml` as needed:
@@ -24,33 +24,18 @@ Then modify `config.toml` as needed:
 host = "127.0.0.1"
 port = 8080
 
-[features]
-default_url = "https://example.com"
+[database]
+database_url = "shortlinks.db"
 
-# Optional: Enable admin features (Admin API + Health API)
-# - Health supports Bearer token auth (HEALTH_TOKEN) or Admin JWT cookies
-# [api]
-# admin_token = "your_admin_token"
+[logging]
+level = "info"
 ```
 
 ::: tip
 If you don't create a configuration file, the program will run with built-in default settings.
 :::
 
-### Method 2: Using Environment Variables
-
-Create configuration file `.env`:
-
-```bash
-# Minimal configuration
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DEFAULT_URL=https://example.com
-
-# Optional: Enable admin features (Admin API + Health API)
-# - Health supports Bearer token auth (HEALTH_TOKEN) or Admin JWT cookies
-# ADMIN_TOKEN=your_admin_token
-```
+> Note: Runtime config (e.g. `features.default_url`, `api.health_token`, `features.enable_admin_panel`) is stored in the database and should be changed via Admin API or CLI; the current version does not read these from `config.toml` or environment variables.
 
 ## Step 2: Start Service
 
@@ -119,15 +104,30 @@ kill -USR1 $(cat shortlinker.pid)
 ## Production Environment Quick Configuration
 
 ### Recommended Configuration
-```bash
-# Production .env configuration
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DATABASE_URL=sqlite:///data/links.db
-DEFAULT_URL=https://your-domain.com
+```toml
+# config.toml (production)
+[server]
+host = "127.0.0.1"
+port = 8080
 
-# Enable API features
-ADMIN_TOKEN=your_secure_admin_token
+[database]
+database_url = "sqlite:///data/links.db"
+
+[logging]
+level = "info"
+```
+
+Runtime config (stored in the DB) can be updated via CLI/Admin API, for example:
+
+```bash
+# Root default redirect (no restart)
+./shortlinker config set features.default_url https://your-domain.com
+
+# Health Bearer token (no restart)
+./shortlinker config set api.health_token your_health_token
+
+# Rotate admin password (recommended)
+./shortlinker reset-password
 ```
 
 ### Reverse Proxy Example
@@ -153,9 +153,8 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      - DATABASE_URL=sqlite:///data/links.db
 ```
 
 ## Next Steps

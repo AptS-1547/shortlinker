@@ -123,6 +123,7 @@ impl std::str::FromStr for HttpMethod {
 /// - database: 数据库连接配置
 /// - cache: 缓存系统配置
 /// - logging: 日志配置
+/// - analytics: 分析统计配置
 ///
 /// 运行时配置（api, routes, features, click_manager, cors）存储在数据库中，
 /// 通过 Admin Panel 或 API 进行管理，使用 RuntimeConfig 读取。
@@ -136,35 +137,46 @@ pub struct StaticConfig {
     pub cache: CacheConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub analytics: AnalyticsConfig,
 }
 
 impl StaticConfig {
-    /// 从 TOML 文件加载配置
+    /// 从 TOML 文件和环境变量加载配置
+    ///
+    /// 优先级：ENV > config.toml > 默认值
+    /// ENV 前缀：SL，分隔符：__
+    /// 示例：SL__SERVER__PORT=9999
     pub fn load() -> Self {
-        Self::load_from_file()
-    }
+        use config::{Config, Environment, File};
 
-    /// 从 TOML 文件加载配置
-    fn load_from_file() -> Self {
         let path = "config.toml";
 
-        if !std::path::Path::new(path).exists() {
-            return Self::default();
-        }
+        let builder = Config::builder()
+            // 1. 从 TOML 文件加载（可选）
+            .add_source(File::with_name(path).required(false))
+            // 2. 从环境变量覆盖，前缀 SL，分隔符 __
+            .add_source(
+                Environment::with_prefix("SL")
+                    .separator("__")
+                    .try_parsing(true),
+            );
 
-        match std::fs::read_to_string(path) {
-            Ok(content) => match toml::from_str::<StaticConfig>(&content) {
+        match builder.build() {
+            Ok(settings) => match settings.try_deserialize::<StaticConfig>() {
                 Ok(config) => {
-                    eprintln!("[INFO] Configuration loaded from: {}", path);
+                    if std::path::Path::new(path).exists() {
+                        eprintln!("[INFO] Configuration loaded from: {}", path);
+                    }
                     config
                 }
                 Err(e) => {
-                    eprintln!("[ERROR] Failed to parse config file {}: {}", path, e);
+                    eprintln!("[ERROR] Failed to deserialize config: {}", e);
                     Self::default()
                 }
             },
             Err(e) => {
-                eprintln!("[ERROR] Failed to read config file {}: {}", path, e);
+                eprintln!("[ERROR] Failed to build config: {}", e);
                 Self::default()
             }
         }
@@ -426,6 +438,33 @@ impl Default for LoggingConfig {
     }
 }
 
+/// 分析统计配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyticsConfig {
+    /// MaxMindDB 文件路径 (GeoLite2-City.mmdb)
+    /// 如果配置且文件可读，使用本地解析；否则 fallback 到外部 API
+    #[serde(default)]
+    pub maxminddb_path: Option<String>,
+
+    /// 外部 GeoIP API URL (fallback)
+    /// 使用 {ip} 作为占位符，例如: http://ip-api.com/json/{ip}?fields=countryCode,city
+    #[serde(default = "default_geoip_api_url")]
+    pub geoip_api_url: String,
+}
+
+fn default_geoip_api_url() -> String {
+    "http://ip-api.com/json/{ip}?fields=countryCode,city".to_string()
+}
+
+impl Default for AnalyticsConfig {
+    fn default() -> Self {
+        Self {
+            maxminddb_path: None,
+            geoip_api_url: default_geoip_api_url(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,10 +473,11 @@ mod tests {
     fn export_typescript_types() {
         // 运行此测试会自动生成 TypeScript 类型文件
         // cargo test export_typescript_types -- --nocapture
+        let cfg = ts_rs::Config::default();
 
         // Export enums
-        SameSitePolicy::export_all().expect("Failed to export SameSitePolicy");
-        HttpMethod::export_all().expect("Failed to export HttpMethod");
+        SameSitePolicy::export_all(&cfg).expect("Failed to export SameSitePolicy");
+        HttpMethod::export_all(&cfg).expect("Failed to export HttpMethod");
 
         println!("TypeScript types exported to {}", TS_EXPORT_PATH);
     }

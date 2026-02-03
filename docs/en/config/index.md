@@ -10,16 +10,17 @@ Shortlinker configuration is split into two layers:
 ```
 config.toml (read at startup)
        ↓
-Database (persistent storage)
+StaticConfig (startup config, in-memory)
        ↓
-RuntimeConfig (in-memory cache)
+Database (short links + runtime config)
        ↓
-AppConfig (global config)
+RuntimeConfig (runtime config cache, in-memory)
        ↓
-Business logic
+Business logic (routes/auth/cache/etc)
 ```
 
-On first startup, runtime config is migrated from `config.toml` and/or environment variables into the database. After that, **database values take precedence**.
+On first startup, the server initializes **runtime config defaults** into the database (based on built-in definitions) and loads them into memory. After that, **database values take precedence**.  
+The current version does **not** migrate/override runtime config from `config.toml` or environment variables.
 
 ## Configuration Methods
 
@@ -41,18 +42,15 @@ type = "memory"
 level = "info"
 ```
 
-### Environment variables
-
-```bash
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-DATABASE_URL=shortlinks.db
-RUST_LOG=debug
-```
+> Notes:
+> - The backend reads `config.toml` from the **current working directory** (relative path).
+> - You can generate a template via `./shortlinker generate-config config.toml` (startup config only).
+> - Startup config can be overridden via environment variables: prefix `SL__`, nesting separator `__` (priority: ENV > `config.toml` > defaults). Example: `SL__SERVER__PORT=9999`.
+>   - On startup, the program also tries to load a `.env` file from the current directory (it does not override existing env vars), so you can put `SL__...` variables there as well.
 
 ### Admin panel / API (runtime config)
 
-Runtime config can be updated via the Admin API `/{ADMIN_ROUTE_PREFIX}/v1/config`.
+Runtime config can be updated via the Admin API `/{routes.admin_prefix}/v1/config` (default: `/admin/v1/config`).
 
 Because Admin API uses **JWT cookies**, you need to login first:
 
@@ -97,44 +95,61 @@ curl -sS -b cookies.txt \
 
 ## Startup Config Parameters
 
-These settings live in `config.toml` and can be overridden by environment variables.
+These settings live in `config.toml` and require a restart to take effect.
 
 ### Server
 
-| Env | Type | Default | Description |
-|-----|------|---------|-------------|
-| `SERVER_HOST` | String | `127.0.0.1` | Bind address |
-| `SERVER_PORT` | Integer | `8080` | Bind port |
-| `UNIX_SOCKET` | String | *(empty)* | Unix socket path (overrides host/port) |
-| `CPU_COUNT` | Integer | *(auto)* | Worker threads (defaults to CPU cores) |
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `server.host` | String | `127.0.0.1` | Bind address (use `0.0.0.0` in Docker) |
+| `server.port` | Integer | `8080` | Bind port |
+| `server.unix_socket` | String | *(empty)* | Unix socket path (overrides host/port) |
+| `server.cpu_count` | Integer | *(auto)* | Worker threads (defaults to CPU cores, capped at 32) |
 
 ### Database
 
-| Env | Type | Default | Description |
-|-----|------|---------|-------------|
-| `DATABASE_URL` | String | `shortlinks.db` | Database URL or file path |
-| `DATABASE_POOL_SIZE` | Integer | `10` | Connection pool size |
-| `DATABASE_TIMEOUT` | Integer | `30` | Connection timeout (seconds) |
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `database.database_url` | String | `shortlinks.db` | Database URL or file path (backend type inferred from this value) |
+| `database.pool_size` | Integer | `10` | Pool size (MySQL/PostgreSQL only; SQLite uses built-in pool settings) |
+| `database.timeout` | Integer | `30` | *(currently unused; connect/acquire timeout is fixed at 8s)* |
+| `database.retry_count` | Integer | `3` | Retry count for some DB operations |
+| `database.retry_base_delay_ms` | Integer | `100` | Retry base delay (ms) |
+| `database.retry_max_delay_ms` | Integer | `2000` | Retry max delay (ms) |
 
-See [Storage Backends](/en/config/storage) for details.
+See [Storage Backends](/en/config/storage) for URL formats.
 
 ### Cache
 
-| Env | Type | Default | Description |
-|-----|------|---------|-------------|
-| `CACHE_TYPE` | String | `memory` | Cache type: `memory`, `redis` |
-| `CACHE_DEFAULT_TTL` | Integer | `3600` | Default TTL (seconds) |
-| `REDIS_URL` | String | `redis://127.0.0.1:6379/` | Redis URL |
-| `REDIS_KEY_PREFIX` | String | `shortlinker:` | Redis key prefix |
-| `MEMORY_MAX_CAPACITY` | Integer | `10000` | In-memory cache max entries |
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `cache.type` | String | `memory` | Cache type: `memory` / `redis` |
+| `cache.default_ttl` | Integer | `3600` | Default TTL (seconds) |
+| `cache.redis.url` | String | `redis://127.0.0.1:6379/` | Redis URL |
+| `cache.redis.key_prefix` | String | `shortlinker:` | Redis key prefix |
+| `cache.memory.max_capacity` | Integer | `10000` | In-memory cache max entries |
 
 ### Logging
 
-| Env | Type | Default | Description |
-|-----|------|---------|-------------|
-| `RUST_LOG` | String | `info` | Log level: `error`, `warn`, `info`, `debug`, `trace` |
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `logging.level` | String | `info` | Log level: error / warn / info / debug / trace |
+| `logging.format` | String | `text` | Output format: `text` / `json` |
+| `logging.file` | String | *(empty)* | Log file path (empty = stdout) |
+| `logging.max_backups` | Integer | `5` | How many rotated files to keep |
+| `logging.enable_rotation` | Boolean | `true` | Enable rotation (currently daily rotation) |
+| `logging.max_size` | Integer | `100` | *(currently unused; rotation is time-based)* |
 
-> Log format and file output are configured via `config.toml` `[logging]` (e.g. `logging.format`, `logging.file`). The current version does not provide env overrides for them.
+### GeoIP (startup)
+
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `analytics.maxminddb_path` | String | *(empty)* | MaxMind GeoLite2-City.mmdb path (optional; preferred when readable) |
+| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | External GeoIP API URL fallback (`{ip}` placeholder) |
+
+> Notes:
+> - Provider selection: when `analytics.maxminddb_path` is set and readable, MaxMind is used; otherwise it falls back to the external API (`analytics.geoip_api_url`).
+> - The external API provider has a built-in cache (not configurable): LRU max 10,000 entries, TTL 15 minutes (including negative caching on failures). Concurrent lookups for the same IP are singleflighted into one request. HTTP timeout is 2 seconds.
 
 ## Runtime Config Keys
 
@@ -152,12 +167,12 @@ These settings are stored in the database and can be changed at runtime via the 
 | `api.cookie_secure` | Boolean | `true` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
 | `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
-| `api.trusted_proxies` | Json | `[]` | No | Trusted proxy IPs or CIDRs for login rate-limit IP extraction.<br>**Auto-detect** (default): When empty, connections from private IPs (RFC1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) or localhost automatically trust X-Forwarded-For, suitable for Docker/nginx reverse proxy.<br>**Explicit config**: When set, only trust IPs in the list, e.g., `["10.0.0.1", "172.17.0.0/16"]`.<br>**Security**: Public IPs never trust X-Forwarded-For by default to prevent spoofing. |
+| `api.trusted_proxies` | StringArray | `[]` | No | Trusted proxy IPs or CIDRs for login rate-limit IP extraction.<br>**Auto-detect** (default): When empty, connections from private IPs (RFC1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) or localhost automatically trust X-Forwarded-For, suitable for Docker/nginx reverse proxy.<br>**Explicit config**: When set, only trust IPs in the list, e.g., `["10.0.0.1", "172.17.0.0/16"]`.<br>**Security**: Public IPs never trust X-Forwarded-For by default to prevent spoofing. |
 
 > Notes:
 > - Cookie names are fixed: `shortlinker_access` / `shortlinker_refresh` / `csrf_token` (not configurable).
 > - `api.admin_token` is stored as an Argon2 hash in the database. Use `./shortlinker reset-password` to rotate the admin password.
-> - If you didn't set `ADMIN_TOKEN`, the server will auto-generate one on first startup and write it to `admin_token.txt` (save it and delete the file).
+> - On first startup, the server auto-generates an admin password and writes it to `admin_token.txt` (if the file doesn't already exist; save it and delete the file).
 
 ### Routes
 
@@ -183,35 +198,55 @@ These settings are stored in the database and can be changed at runtime via the 
 | `click.flush_interval` | Integer | `30` | Yes | Flush interval (seconds) |
 | `click.max_clicks_before_flush` | Integer | `100` | Yes | Max clicks before flush |
 
+### Detailed Analytics
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `analytics.enable_detailed_logging` | Boolean | `false` | Yes | Enable detailed click logging (writes to click_logs table) |
+| `analytics.log_retention_days` | Integer | `30` | No | Log retention period (days; automatic cleanup is not implemented yet) |
+| `analytics.enable_ip_logging` | Boolean | `true` | No | Whether to record IP addresses |
+| `analytics.enable_geo_lookup` | Boolean | `false` | No | Whether to enable geo-IP lookup |
+
+> **Note**: `analytics.enable_detailed_logging` requires a server restart to take effect. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, user-agent, etc). IPs are only recorded when `analytics.enable_ip_logging` is enabled, and geo lookup only happens when `analytics.enable_geo_lookup` is enabled (and it uses the startup `[analytics]` provider settings). This data powers the Analytics API features like trend analysis, referrer stats, and geographic distribution.
+
 ### CORS
 
 | Key | Type | Default | Restart | Description |
 |-----|------|---------|---------|-------------|
 | `cors.enabled` | Boolean | `false` | Yes | Enable CORS (when disabled, no CORS headers are added; browser keeps same-origin policy) |
-| `cors.allowed_origins` | Json | `[]` | Yes | Allowed origins (JSON array; `["*"]` = allow any origin; empty array = same-origin only / no cross-origin) |
-| `cors.allowed_methods` | Json | `["GET","POST","PUT","DELETE","OPTIONS","HEAD"]` | Yes | Allowed methods |
-| `cors.allowed_headers` | Json | `["Content-Type","Authorization","Accept","X-CSRF-Token"]` | Yes | Allowed headers |
+| `cors.allowed_origins` | StringArray | `[]` | Yes | Allowed origins (JSON array; `["*"]` = allow any origin; empty array = same-origin only / no cross-origin) |
+| `cors.allowed_methods` | EnumArray | `["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"]` | Yes | Allowed methods |
+| `cors.allowed_headers` | StringArray | `["Content-Type","Authorization","Accept"]` | Yes | Allowed headers (for cross-origin + cookie write ops, you typically also need `X-CSRF-Token`) |
 | `cors.max_age` | Integer | `3600` | Yes | Preflight cache TTL (seconds) |
 | `cors.allow_credentials` | Boolean | `false` | Yes | Allow credentials (needed for cross-origin cookies; not recommended together with `["*"]` for security) |
 
 ## Priority
 
-1. **Database config** (runtime config, highest priority)
-2. **Environment variables**
-3. **TOML config file**
-4. **Program defaults** (lowest)
+1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` (click analytics)
+2. **Environment variables (startup overrides)**: `SL__...` (overrides `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` in `config.toml`)
+3. **`config.toml` (startup config)**: `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` (GeoIP provider)
+4. **Program defaults**: used when DB / env vars / `config.toml` doesn't provide a value
+
+> Note: environment variables only affect **startup config**. The current version does not migrate/override runtime config from environment variables or `config.toml`.
 
 ## Examples
 
 ### Development
 
-```bash
-SERVER_HOST=127.0.0.1
-SERVER_PORT=8080
-RUST_LOG=debug
-DATABASE_URL=dev-links.db
-ADMIN_TOKEN=dev_admin
+```toml
+# config.toml (dev)
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+database_url = "dev-links.db"
+
+[logging]
+level = "debug"
 ```
+
+> Runtime config (e.g. `features.enable_admin_panel`, `api.health_token`) lives in the database and should be changed via Admin API or CLI; rotate `api.admin_token` via `./shortlinker reset-password`.
 
 ### Production
 
@@ -224,7 +259,6 @@ cpu_count = 8
 [database]
 database_url = "/data/shortlinks.db"
 pool_size = 20
-timeout = 60
 
 [cache]
 type = "memory"
@@ -240,15 +274,28 @@ file = "/var/log/shortlinker/app.log"
 enable_rotation = true
 ```
 
-### Docker (first startup seeding)
+### Docker
+
+Mount a startup config file (make sure `server.host` is `0.0.0.0`):
+
+```toml
+# /config.toml (inside container)
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+database_url = "sqlite:///data/links.db"
+```
+
+Runtime config (stored in the DB) can be set via the built-in CLI; configs marked as “restart required” need a restart to take effect:
 
 ```bash
-SERVER_HOST=0.0.0.0
-SERVER_PORT=8080
-CPU_COUNT=4
-DATABASE_URL=/data/links.db
-ADMIN_TOKEN=secure_admin_token_here
-ENABLE_ADMIN_PANEL=true
+# Enable admin panel (restart required)
+/shortlinker config set features.enable_admin_panel true
+
+# Health Bearer token (no restart)
+/shortlinker config set api.health_token "your_health_token"
 ```
 
 ## Hot Reload
@@ -262,6 +309,7 @@ Shortlinker has two kinds of “hot reload / hot apply”:
 
 - ✅ Short link data (cache rebuild)
 - ✅ Runtime configs marked as “no restart” (applies immediately when updated via Admin API)
+- ✅ Cookie settings (`api.cookie_*`): affect newly issued cookies; re-login to get updated cookies
 
 ### Not supported
 
@@ -269,7 +317,6 @@ Shortlinker has two kinds of “hot reload / hot apply”:
 - ❌ Database connection
 - ❌ Cache type
 - ❌ Route prefixes
-- ❌ Cookie settings
 
 ### Reload methods
 

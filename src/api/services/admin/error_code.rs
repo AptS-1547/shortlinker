@@ -60,4 +60,9 @@ pub enum ErrorCode {
     ConfigNotFound = 5000,
     ConfigUpdateFailed = 5001,
     ConfigReloadFailed = 5002,
+
+    // Analytics 错误 6000-6099
+    AnalyticsQueryFailed = 6000,
+    AnalyticsLinkNotFound = 6001,
+    AnalyticsInvalidDateRange = 6002,
 }

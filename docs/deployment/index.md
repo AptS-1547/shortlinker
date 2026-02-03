@@ -28,8 +28,24 @@ Shortlinker 支持多种部署方式，从简单的本地运行到生产环境�
 
 ### Docker 部署（推荐）
 ```bash
-# 快速启动
-docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
+# 准备最小启动配置（容器内默认从 /config.toml 读取）
+cat > config.toml << 'EOF'
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+database_url = "sqlite:///data/shortlinker.db"
+EOF
+
+mkdir -p data
+
+# 启动
+docker run -d --name shortlinker \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
+  e1saps/shortlinker
 ```
 
 ### 预编译二进制
@@ -81,4 +97,4 @@ cargo build --release
 - 🔀 [反向代理](/deployment/proxy) - Nginx、Caddy 配置
 - ⚙️ [系统服务](/deployment/systemd) - systemd 和进程管理
 
-需要配置帮助？查看 [配置说明](/config/) 了解环境变量设置。
+需要配置帮助？查看 [配置说明](/config/) 了解 `config.toml`（启动配置）与数据库运行时配置的设置方式。

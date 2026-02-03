@@ -83,6 +83,11 @@ define_shortlinker_errors! {
     // ========== E050-E059: 通用 HTTP 错误 ==========
     ServiceUnavailable("E050", "Service Unavailable"),
     InternalError("E051", "Internal Server Error"),
+
+    // ========== E060-E069: Analytics 错误 ==========
+    AnalyticsQueryFailed("E060", "Analytics Query Failed"),
+    AnalyticsLinkNotFound("E061", "Analytics Link Not Found"),
+    AnalyticsInvalidDateRange("E062", "Analytics Invalid Date Range"),
 }
 
 impl ShortlinkerError {
@@ -115,7 +120,8 @@ impl ShortlinkerError {
             | Self::LinkInvalidExpireTime(_)
             | Self::InvalidMultipartData(_)
             | Self::CsvFileMissing(_)
-            | Self::CsvParseFailed(_) => StatusCode::BAD_REQUEST,
+            | Self::CsvParseFailed(_)
+            | Self::AnalyticsInvalidDateRange(_) => StatusCode::BAD_REQUEST,
 
             // 401 Unauthorized
             Self::AuthPasswordInvalid(_)
@@ -123,7 +129,9 @@ impl ShortlinkerError {
             | Self::AuthTokenInvalid(_) => StatusCode::UNAUTHORIZED,
 
             // 404 Not Found
-            Self::NotFound(_) | Self::ConfigNotFound(_) => StatusCode::NOT_FOUND,
+            Self::NotFound(_) | Self::ConfigNotFound(_) | Self::AnalyticsLinkNotFound(_) => {
+                StatusCode::NOT_FOUND
+            }
 
             // 409 Conflict
             Self::LinkAlreadyExists(_) => StatusCode::CONFLICT,
@@ -276,6 +284,19 @@ impl ShortlinkerError {
     pub fn internal_error<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::InternalError(msg.into())
     }
+
+    // Analytics 错误
+    pub fn analytics_query_failed<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AnalyticsQueryFailed(msg.into())
+    }
+
+    pub fn analytics_link_not_found<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AnalyticsLinkNotFound(msg.into())
+    }
+
+    pub fn analytics_invalid_date_range<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::AnalyticsInvalidDateRange(msg.into())
+    }
 }
 
 // 为常见的错误类型实现 From trait
@@ -337,6 +358,11 @@ impl From<ShortlinkerError> for crate::api::services::admin::error_code::ErrorCo
             ShortlinkerError::Validation(_) => ErrorCode::BadRequest,
             ShortlinkerError::ServiceUnavailable(_) => ErrorCode::ServiceUnavailable,
             ShortlinkerError::NotFound(_) => ErrorCode::NotFound,
+
+            // Analytics 错误
+            ShortlinkerError::AnalyticsQueryFailed(_) => ErrorCode::AnalyticsQueryFailed,
+            ShortlinkerError::AnalyticsLinkNotFound(_) => ErrorCode::AnalyticsLinkNotFound,
+            ShortlinkerError::AnalyticsInvalidDateRange(_) => ErrorCode::AnalyticsInvalidDateRange,
 
             // 其他基础设施错误 → InternalServerError
             _ => ErrorCode::InternalServerError,

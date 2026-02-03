@@ -2,7 +2,7 @@ use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::LinkService;
+use crate::services::{AnalyticsService, LinkService};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -13,6 +13,7 @@ pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
     pub cache: Arc<dyn CompositeCacheTrait>,
     pub link_service: Arc<LinkService>,
+    pub analytics_service: Arc<AnalyticsService>,
     pub route_config: RouteConfig,
 }
 
@@ -65,11 +66,28 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     if enable_click_tracking {
         if let Some(sink) = storage.as_click_sink() {
-            let mgr = Arc::new(ClickManager::new(
-                sink,
-                Duration::from_secs(flush_interval),
-                max_clicks_before_flush as usize,
-            ));
+            // 检查是否启用详细日志
+            let enable_detailed_logging =
+                rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
+
+            let mgr = if enable_detailed_logging {
+                // SeaOrmStorage 实现了 DetailedClickSink trait
+                let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
+                info!("Detailed click logging enabled, initializing with DetailedClickSink");
+                Arc::new(ClickManager::with_detailed_logging(
+                    sink,
+                    detailed_sink,
+                    Duration::from_secs(flush_interval),
+                    max_clicks_before_flush as usize,
+                ))
+            } else {
+                Arc::new(ClickManager::new(
+                    sink,
+                    Duration::from_secs(flush_interval),
+                    max_clicks_before_flush as usize,
+                ))
+            };
+
             set_global_click_manager(mgr.clone());
 
             // 启动后台任务，并保持强引用以确保任务不会被过早销毁
@@ -117,6 +135,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     // Create LinkService for unified link management
     let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
+    // Create AnalyticsService for analytics queries
+    let analytics_service = Arc::new(AnalyticsService::new(storage.clone()));
+
     // Initialize IPC handler with LinkService
     crate::system::ipc::handler::init_link_service(link_service.clone());
 
@@ -148,6 +169,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         storage,
         cache,
         link_service,
+        analytics_service,
         route_config,
     })
 }

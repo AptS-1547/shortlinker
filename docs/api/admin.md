@@ -4,10 +4,10 @@ Shortlinker 提供完整的 HTTP Admin API 用于管理短链接，支持 CRUD�
 
 ## 配置方式
 
-Admin API 相关配置可来自 `config.toml`、环境变量或运行时配置（数据库）。详细配置见 [配置指南](/config/)。
+Admin API 相关配置属于**运行时配置（数据库）**，详细配置见 [配置指南](/config/)。
 
-- `ADMIN_TOKEN`：管理员登录密码（建议生产环境显式设置；未设置时程序会在首次启动时自动生成，并写入 `admin_token.txt`（仅一次，保存后请删除该文件））
-- `ADMIN_ROUTE_PREFIX`：路由前缀（可选，默认 `/admin`）
+- `api.admin_token`：管理员登录密码（数据库中存储为 Argon2 哈希；首次启动会生成随机密码并写入 `admin_token.txt`，保存后请删除该文件；推荐用 `./shortlinker reset-password` 重置）
+- `routes.admin_prefix`：路由前缀（默认 `/admin`，修改后需要重启）
 
 > 实际接口路径固定包含 `/v1`，例如默认登录地址为 `http://localhost:8080/admin/v1/auth/login`。
 
@@ -18,7 +18,7 @@ Admin API 支持两种鉴权方式：
 1. **JWT Cookie（推荐用于浏览器/管理面板）**
    - Access Cookie：`shortlinker_access`（`Path=/`）
    - Refresh Cookie：`shortlinker_refresh`（`Path={ADMIN_ROUTE_PREFIX}/v1/auth`）
-   - CSRF Cookie：`csrf_token`（`Path={ADMIN_ROUTE_PREFIX}`，非 HttpOnly，用于前端读取）
+   - CSRF Cookie：`csrf_token`（`Path=/`，非 HttpOnly，用于前端读取）
 2. **Bearer Token（用于 API 客户端，免 CSRF）**
    - `Authorization: Bearer <ACCESS_TOKEN>`（其中 `<ACCESS_TOKEN>` 是与 `shortlinker_access` Cookie 同一个 JWT Access Token）
 
@@ -93,7 +93,7 @@ curl -sS -X POST -b cookies.txt -c cookies.txt \
 
 默认：`http://your-domain:port/admin/v1`
 
-> 若你修改了 `ADMIN_ROUTE_PREFIX`，只需把 `/admin` 替换为自定义前缀。
+> 若你修改了 `routes.admin_prefix`，只需把 `/admin` 替换为自定义前缀。
 
 ## 通用响应格式
 
@@ -385,7 +385,7 @@ curl -sS -X POST -b cookies.txt \
 
 ## 认证接口补充说明
 
-- `POST /auth/login`：无需 Cookie；验证 `ADMIN_TOKEN` 成功后下发 Cookie
+- `POST /auth/login`：无需 Cookie；验证管理员密码（`api.admin_token` 的明文）成功后下发 Cookie
 - `POST /auth/refresh`：无需 Access Cookie，但需要 Refresh Cookie
 - `POST /auth/logout`：无需 Cookie；用于清理 Cookie
 - `GET /auth/verify`：需要 Access Cookie（中间件校验通过即有效）
@@ -439,7 +439,187 @@ print(admin.get_all_links())
 
 ## 安全建议
 
-1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`（不要使用默认的自动生成值直接上生产）
+1. **强密码**：使用足够复杂的管理员密码（`api.admin_token`）（不要使用默认的自动生成值直接上生产）
 2. **HTTPS**：生产环境建议启用 HTTPS，并将 `api.cookie_secure=true`
 3. **网络隔离**：仅在受信任网络环境中暴露 Admin API
-4. **定期轮换**：定期更换 `ADMIN_TOKEN`（并重新登录获取新 Cookie）
+4. **定期轮换**：定期更换管理员密码（`api.admin_token`）（并重新登录获取新 Cookie）
+
+## Analytics API（统计分析）
+
+Analytics API 提供详细的点击统计分析功能，包括点击趋势、热门链接、来源统计、地理位置分布等。
+
+> 需要先在运行时配置中启用 `analytics.enable_detailed_logging`（需要重启服务生效）才会记录详细的点击日志。
+>
+> - 默认查询最近 30 天；如果要指定范围，请**同时**提供 `start_date` 和 `end_date`。
+> - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`）。
+> - 地理分布数据需要额外开启 `analytics.enable_geo_lookup=true`（并保留 `analytics.enable_ip_logging=true` 才能拿到 IP）；GeoIP provider 使用启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）。
+>   - 使用外部 API provider 时，内部带缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight 合并并发请求），单次请求超时 2 秒。
+
+### GET /analytics/trends - 获取点击趋势
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/trends?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z&group_by=day"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `group_by` | String | 分组方式（可选；默认 `day`）：`hour`/`day`/`week`/`month` | `?group_by=day` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+    "values": [100, 150, 120]
+  }
+}
+```
+
+### GET /analytics/top - 获取热门链接
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/top?limit=10"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"code": "github", "clicks": 500},
+    {"code": "google", "clicks": 300}
+  ]
+}
+```
+
+### GET /analytics/referrers - 获取来源统计
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/referrers?limit=10"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
+    {"referrer": "(direct)", "count": 150, "percentage": 30.0}
+  ]
+}
+```
+
+### GET /analytics/geo - 获取地理位置分布
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/geo?limit=20"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 20；最大 100） | `?limit=20` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": [
+    {"country": "CN", "city": "Beijing", "count": 100},
+    {"country": "US", "city": "New York", "count": 80}
+  ]
+}
+```
+
+### GET /links/{code}/analytics - 获取单链接详细统计
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "code": "github",
+    "total_clicks": 500,
+    "trend": {
+      "labels": ["2024-01-01", "2024-01-02"],
+      "values": [100, 150]
+    },
+    "top_referrers": [
+      {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
+    ],
+    "geo_distribution": [
+      {"country": "CN", "city": "Beijing", "count": 50}
+    ]
+  }
+}
+```
+
+### GET /analytics/export - 导出分析报告（CSV）
+
+```bash
+curl -sS -b cookies.txt \
+  -o analytics_report.csv \
+  "http://localhost:8080/admin/v1/analytics/export?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 导出条数（可选；默认 10000；最大 100000） | `?limit=10000` |
+
+导出的 CSV 包含以下字段：
+`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+### Analytics 相关配置
+
+在运行时配置中，可以调整以下与 Analytics 相关的配置项：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `analytics.enable_detailed_logging` | bool | false | 启用详细日志记录（写入 click_logs 表；需要重启生效） |
+| `analytics.log_retention_days` | int | 30 | 日志保留天数（当前版本暂未实现自动清理） |
+| `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
+| `analytics.enable_geo_lookup` | bool | false | 是否启用地理位置解析 |

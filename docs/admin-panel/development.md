@@ -47,7 +47,7 @@ bun run lint
 
 构建产物位于 `dist/` 目录，可以：
 
-1. 通过 Shortlinker 内置服务（设置 `ENABLE_ADMIN_PANEL=true`）
+1. 通过 Shortlinker 内置服务（运行时配置 `features.enable_admin_panel=true`，需要重启生效）
 2. 部署到独立的静态服务器（Nginx、Caddy 等）
 3. 部署到 CDN（需配置 CORS）
 

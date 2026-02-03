@@ -47,7 +47,7 @@ bun run lint
 
 Build output is in `dist/` directory, which can be:
 
-1. Served through Shortlinker (set `ENABLE_ADMIN_PANEL=true`)
+1. Served through Shortlinker (runtime config `features.enable_admin_panel=true`, restart required)
 2. Deployed to standalone static server (Nginx, Caddy, etc.)
 3. Deployed to CDN (requires CORS configuration)
 
