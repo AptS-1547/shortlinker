@@ -8,7 +8,6 @@
 //! Mode selection is based on command-line arguments and compile-time features.
 
 use clap::Parser;
-use dotenv::dotenv;
 
 use shortlinker::cli::Cli;
 #[cfg(feature = "tui")]
@@ -23,11 +22,14 @@ use shortlinker::system::panic_handler::RunMode;
 /// - `./shortlinker` -> Server mode (default, if compiled with server feature)
 ///
 /// # Configuration
-/// Uses "config.toml" in the current directory if it exists
+/// Priority: ENV > .env > config.toml > default values
+/// - `.env` file in current directory (if exists)
+/// - Environment variables with prefix "SL__" override TOML values
+/// - Example: SL__SERVER__PORT=9999
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
-    // Load environment variables
-    dotenv().ok();
+    // Load .env file if present (before config loading)
+    dotenvy::dotenv().ok();
 
     // Parse command-line arguments using clap
     let cli = Cli::parse();
