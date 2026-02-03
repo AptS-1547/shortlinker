@@ -18,6 +18,7 @@ FROM rust:1.93-slim AS builder
 
 # 安装 musl 工具链（项目使用 rustls，不需要 OpenSSL）
 RUN apt-get update && apt-get install -y \
+    cmake \
     musl-tools \
     musl-dev \
     && rm -rf /var/lib/apt/lists/*
