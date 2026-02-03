@@ -10,6 +10,7 @@ use actix_web::{
     web,
 };
 use anyhow::Result;
+use std::sync::Arc;
 use tracing::warn;
 
 use crate::api::middleware::{AdminAuth, CsrfGuard, FrontendGuard, HealthAuth};
@@ -18,6 +19,7 @@ use crate::api::services::{
 };
 use crate::config::{HttpMethod, get_runtime_config, keys};
 use crate::runtime::lifetime;
+use crate::services::GeoIpProvider;
 
 /// CORS configuration loaded from RuntimeConfig
 #[derive(Clone, Debug)]
@@ -194,6 +196,11 @@ pub async fn run_server() -> Result<()> {
     let cpu_count = config.server.cpu_count.min(32);
     warn!("Using {} CPU cores for the server", cpu_count);
 
+    // GeoIP provider is startup-config driven and can be toggled at runtime via
+    // `analytics.enable_geo_lookup` (runtime config). We always initialize it here so
+    // toggling doesn't require a restart; actual lookup only happens when enabled.
+    let geoip_provider = Arc::new(GeoIpProvider::new(&config.analytics));
+
     // Load CORS configuration from RuntimeConfig
     let cors_config = CorsSettings::from_runtime_config();
 
@@ -250,6 +257,7 @@ pub async fn run_server() -> Result<()> {
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(link_service.clone()))
             .app_data(web::Data::new(analytics_service.clone()))
+            .app_data(web::Data::new(geoip_provider.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024))
             .wrap(

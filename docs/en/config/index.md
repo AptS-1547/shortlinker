@@ -45,7 +45,8 @@ level = "info"
 > Notes:
 > - The backend reads `config.toml` from the **current working directory** (relative path).
 > - You can generate a template via `./shortlinker generate-config config.toml` (startup config only).
-> - Environment variables are **not** mapped into the startup config structs (loading `.env` does not automatically configure the server).
+> - Startup config can be overridden via environment variables: prefix `SL__`, nesting separator `__` (priority: ENV > `config.toml` > defaults). Example: `SL__SERVER__PORT=9999`.
+>   - On startup, the program also tries to load a `.env` file from the current directory (it does not override existing env vars), so you can put `SL__...` variables there as well.
 
 ### Admin panel / API (runtime config)
 
@@ -146,6 +147,10 @@ See [Storage Backends](/en/config/storage) for URL formats.
 | `analytics.maxminddb_path` | String | *(empty)* | MaxMind GeoLite2-City.mmdb path (optional; preferred when readable) |
 | `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | External GeoIP API URL fallback (`{ip}` placeholder) |
 
+> Notes:
+> - Provider selection: when `analytics.maxminddb_path` is set and readable, MaxMind is used; otherwise it falls back to the external API (`analytics.geoip_api_url`).
+> - The external API provider has a built-in cache (not configurable): LRU max 10,000 entries, TTL 15 minutes (including negative caching on failures). Concurrent lookups for the same IP are singleflighted into one request. HTTP timeout is 2 seconds.
+
 ## Runtime Config Keys
 
 These settings are stored in the database and can be changed at runtime via the admin panel / Admin API.
@@ -202,7 +207,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `analytics.enable_ip_logging` | Boolean | `true` | No | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | Boolean | `false` | No | Whether to enable geo-IP lookup |
 
-> **Note**: `analytics.enable_detailed_logging` requires a server restart to take effect. When enabled, each click is recorded with detailed information (timestamp, referrer, user-agent, IP, geo location) to the `click_logs` table, enabling the Analytics API features like trend analysis, referrer stats, and geographic distribution.
+> **Note**: `analytics.enable_detailed_logging` requires a server restart to take effect. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, user-agent, etc). IPs are only recorded when `analytics.enable_ip_logging` is enabled, and geo lookup only happens when `analytics.enable_geo_lookup` is enabled (and it uses the startup `[analytics]` provider settings). This data powers the Analytics API features like trend analysis, referrer stats, and geographic distribution.
 
 ### CORS
 
@@ -218,10 +223,11 @@ These settings are stored in the database and can be changed at runtime via the 
 ## Priority
 
 1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` (click analytics)
-2. **`config.toml` (startup config)**: `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` (GeoIP provider)
-3. **Program defaults**: used when DB / `config.toml` doesn't provide a value
+2. **Environment variables (startup overrides)**: `SL__...` (overrides `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` in `config.toml`)
+3. **`config.toml` (startup config)**: `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` (GeoIP provider)
+4. **Program defaults**: used when DB / env vars / `config.toml` doesn't provide a value
 
-> Note: the current version does not migrate/override runtime config from environment variables or `config.toml`.
+> Note: environment variables only affect **startup config**. The current version does not migrate/override runtime config from environment variables or `config.toml`.
 
 ## Examples
 

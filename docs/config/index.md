@@ -45,7 +45,8 @@ level = "info"
 > 说明：
 > - 后端只会从**当前工作目录**读取 `config.toml`（相对路径）。
 > - 可用 `./shortlinker generate-config config.toml` 生成模板（只包含启动配置）。
-> - 当前版本不支持通过环境变量覆盖启动配置（`dotenv` 仅负责加载 `.env` 文件，不会自动映射到配置结构体）。
+> - 支持通过环境变量覆盖启动配置：前缀 `SL__`，层级分隔符 `__`（优先级：ENV > `config.toml` > 默认值）。例如：`SL__SERVER__PORT=9999`。
+>   - 程序启动时会尝试加载当前目录的 `.env`（不会覆盖已存在的环境变量），因此也可以在 `.env` 中写入上述 `SL__...` 变量。
 
 ### 管理面板（动态配置）
 
@@ -161,6 +162,10 @@ curl -sS -b cookies.txt \
 | `analytics.maxminddb_path` | String | *(空)* | MaxMindDB 文件路径（GeoLite2-City.mmdb，可选；可读时优先使用本地解析） |
 | `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | 外部 GeoIP API URL（MaxMindDB 不可用时 fallback；`{ip}` 为占位符） |
 
+> 说明：
+> - Provider 选择：`analytics.maxminddb_path` 可读时使用本地 MaxMind；否则使用外部 API（`analytics.geoip_api_url`）。
+> - 外部 API Provider 内置缓存（不可配置）：LRU 最大 10000 条，TTL 15 分钟（包含失败的负缓存）；同一 IP 的并发查询会合并为一次请求；单次请求超时 2 秒。
+
 ## 动态配置参数
 
 这些配置存储在数据库中，可通过管理面板在运行时修改。
@@ -217,7 +222,7 @@ curl -sS -b cookies.txt \
 | `analytics.enable_ip_logging` | Boolean | `true` | 否 | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | Boolean | `false` | 否 | 是否启用地理位置解析 |
 
-> **注意**：启用 `analytics.enable_detailed_logging` 后（需要重启生效），每次点击都会记录详细信息（时间、来源、User-Agent、IP、地理位置等）到 `click_logs` 表，用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
+> **注意**：启用 `analytics.enable_detailed_logging` 后（需要重启生效），每次点击都会记录详细信息（时间、来源、User-Agent 等）到 `click_logs` 表；若同时开启 `analytics.enable_ip_logging` 才会记录 IP，开启 `analytics.enable_geo_lookup` 才会进行 GeoIP 解析（并使用启动配置 `[analytics]` 选择 provider）。这些数据用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
 
 ### CORS 跨域配置
 
@@ -233,10 +238,11 @@ curl -sS -b cookies.txt \
 ## 配置优先级
 
 1. **数据库（运行时配置）**：`api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*`（点击分析相关）
-2. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]`（GeoIP provider 相关）
-3. **程序默认值**：当数据库或 `config.toml` 中未设置时使用
+2. **环境变量（启动配置覆盖）**：`SL__...`（会覆盖 `config.toml` 中的 `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]`）
+3. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]`（GeoIP provider 相关）
+4. **程序默认值**：当数据库、环境变量或 `config.toml` 中未设置时使用
 
-> 说明：当前版本不会从环境变量或 `config.toml` 自动“迁移/覆盖”运行时配置到数据库。
+> 说明：环境变量仅影响**启动配置**；当前版本不会从环境变量或 `config.toml` 自动“迁移/覆盖”运行时配置到数据库。
 
 ## 安全最佳实践
 

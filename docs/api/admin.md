@@ -449,6 +449,11 @@ print(admin.get_all_links())
 Analytics API 提供详细的点击统计分析功能，包括点击趋势、热门链接、来源统计、地理位置分布等。
 
 > 需要先在运行时配置中启用 `analytics.enable_detailed_logging`（需要重启服务生效）才会记录详细的点击日志。
+>
+> - 默认查询最近 30 天；如果要指定范围，请**同时**提供 `start_date` 和 `end_date`。
+> - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`）。
+> - 地理分布数据需要额外开启 `analytics.enable_geo_lookup=true`（并保留 `analytics.enable_ip_logging=true` 才能拿到 IP）；GeoIP provider 使用启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）。
+>   - 使用外部 API provider 时，内部带缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight 合并并发请求），单次请求超时 2 秒。
 
 ### GET /analytics/trends - 获取点击趋势
 
@@ -461,9 +466,9 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 | 开始日期 | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 | 结束日期 | `?end_date=2024-12-31T23:59:59Z` |
-| `group_by` | String | 分组方式：`hour`/`day`/`week`/`month` | `?group_by=day` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `group_by` | String | 分组方式（可选；默认 `day`）：`hour`/`day`/`week`/`month` | `?group_by=day` |
 
 **响应格式**：
 ```json
@@ -487,9 +492,9 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 | 开始日期 | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 | 结束日期 | `?end_date=2024-12-31T23:59:59Z` |
-| `limit` | Integer | 返回数量（最大 100） | `?limit=10` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
 
 **响应格式**：
 ```json
@@ -509,6 +514,14 @@ curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/analytics/referrers?limit=10"
 ```
 
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
+
 **响应格式**：
 ```json
 {
@@ -527,6 +540,14 @@ curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/analytics/geo?limit=20"
 ```
 
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 返回数量（可选；默认 20；最大 100） | `?limit=20` |
+
 **响应格式**：
 ```json
 {
@@ -544,6 +565,13 @@ curl -sS -b cookies.txt \
 curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/links/github/analytics"
 ```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31` |
 
 **响应格式**：
 ```json
@@ -573,6 +601,14 @@ curl -sS -b cookies.txt \
   -o analytics_report.csv \
   "http://localhost:8080/admin/v1/analytics/export?start_date=2024-01-01T00:00:00Z&end_date=2024-12-31T23:59:59Z"
 ```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 导出条数（可选；默认 10000；最大 100000） | `?limit=10000` |
 
 导出的 CSV 包含以下字段：
 `short_code,clicked_at,referrer,user_agent,ip_address,country,city`
