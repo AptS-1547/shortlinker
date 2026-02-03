@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.2] - 2026-02-04
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.2 是一次功能增强版本，主要亮点：
+
+- **详细点击分析** - 新增 click_logs 表记录完整点击信息，支持来源、User-Agent、IP 和地理位置
+- **Analytics API** - 6 个分析端点，支持趋势图、热门链接、来源统计、地理分布
+- **GeoIP 服务** - 支持 MaxMind 本地数据库和外部 API 两种查询方式
+- **配置系统增强** - 支持 `SL__` 前缀环境变量覆盖启动配置
+
+### Added
+- **click_logs 数据表** - 存储详细点击日志（short_code、clicked_at、referrer、user_agent、ip_address、country、city）
+  - 添加 short_code、clicked_at 和复合索引优化查询性能
+- **Analytics API 模块** - 新增 `/admin/v1/analytics` 端点组
+  - `GET /analytics/trends` - 点击趋势（支持按小时/天/周/月分组）
+  - `GET /analytics/top` - 热门链接排行
+  - `GET /analytics/referrers` - 来源统计
+  - `GET /analytics/geo` - 地理位置分布
+  - `GET /analytics/export` - 流式导出 CSV 报告（支持大文件）
+  - `GET /links/{code}/analytics` - 单链接详细统计
+- **GeoIP 服务** - 支持两种地理位置查询方式
+  - MaxMind GeoLite2 数据库（本地查询，高性能）
+  - 外部 API 回退（带 LRU 缓存，10000 条，TTL 15 分钟）
+- **环境变量配置覆盖** - 使用 `SL__` 前缀和 `__` 分隔符覆盖启动配置
+  - 例如：`SL__SERVER__PORT=8080` 覆盖 `[server] port`
+- **新增配置项**
+  - `analytics.enable_detailed_logging` - 启用详细日志记录（默认 false）
+  - `analytics.log_retention_days` - 日志保留天数（默认 30）
+  - `analytics.enable_ip_logging` - 记录 IP 地址（默认 true）
+  - `analytics.enable_geo_lookup` - 启用地理位置查询（默认 false）
+- **IP 工具模块** - 新增 `src/utils/ip.rs`，提供私有 IP 检测、CIDR 匹配等功能
+
+### Changed
+- **配置加载方式** - 从 `dotenv` 迁移到 `config` + `dotenvy`，支持更灵活的配置优先级
+- **重定向服务增强** - 支持记录详细点击信息，跳过私有/本地 IP 的 GeoIP 查询
+
+### Improved
+- **CSV 导出流式化** - 分析报告导出改为流式响应，支持大文件，避免内存溢出
+- **分析服务层抽象** - 提取 AnalyticsService 统一业务逻辑，支持多接口复用
+- **CSV 导出安全性** - 使用 csv crate 防止 CSV 注入攻击
+
+### Refactored
+- **IP 处理逻辑统一** - 将 `is_private_or_local`、`is_trusted_proxy`、`ip_in_cidr` 提取到独立模块
+- **客户端 IP 提取** - 使用统一的 `extract_client_ip` 函数替代内联实现
+
+### Dependencies
+- 添加 `maxminddb` (0.27) 用于 MaxMind GeoLite2 数据库解析
+- 添加 `reqwest` (0.13) 用于外部 GeoIP API 调用
+- 添加 `config` (0.15) 用于配置文件加载
+- 替换 `dotenv` 为 `dotenvy` (0.15)
+- 升级 `criterion` 0.5 → 0.8
+- 升级 `nix` 0.30 → 0.31
+- 升级 `ts-rs` 11.1 → 12.0
+- 升级 `socket2`、`windows-sys` 等依赖
+
+### Docs
+- 完善 Analytics API 文档，补充查询参数说明和 GeoIP 配置要求
+- 更新配置文档，说明环境变量覆盖和配置优先级
+- 更新 Docker、systemd 部署文档
+
 ## [v0.5.0-alpha.1] - 2026-02-02
 
 ### 🎉 Release Highlights
@@ -1104,7 +1165,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...HEAD
+[v0.5.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...v0.5.0-alpha.2
 [v0.5.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...v0.5.0-alpha.1
 [v0.4.3]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...v0.4.3
 [v0.4.2]: https://github.com/AptS-1547/shortlinker/compare/v0.4.1...v0.4.2

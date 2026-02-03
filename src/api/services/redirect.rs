@@ -154,11 +154,12 @@ impl RedirectService {
             {
                 // 私有/本地 IP 不查 GeoIP（查了也没意义）
                 if let Ok(ip_addr) = ip.parse::<IpAddr>()
-                    && is_private_or_local(&ip_addr) {
-                        trace!("Skipping GeoIP lookup for private/local IP: {}", ip);
-                        manager.record_detailed(detail);
-                        return;
-                    }
+                    && is_private_or_local(&ip_addr)
+                {
+                    trace!("Skipping GeoIP lookup for private/local IP: {}", ip);
+                    manager.record_detailed(detail);
+                    return;
+                }
 
                 let ip = ip.clone();
                 let geoip = Arc::clone(geoip_provider.get_ref());
