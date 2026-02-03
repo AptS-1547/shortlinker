@@ -78,12 +78,14 @@
 ./shortlinker generate-config [输出路径]
 ```
 
-生成默认配置文件模板，包含所有可配置选项。
+生成**启动配置**（`config.toml`）模板，包含 `server` / `database` / `cache` / `logging` / `analytics` 等配置项。  
+运行时配置（如 `features.*`、`api.*`、`routes.*`、`cors.*`）存储在数据库中，不在该文件内。
 
 **示例**:
 ```bash
-./shortlinker generate-config           # 生成 config.toml
-./shortlinker generate-config myconfig.toml  # 指定文件名
+./shortlinker generate-config                 # 生成 config.example.toml
+./shortlinker generate-config config.toml     # 生成/覆盖 config.toml
+./shortlinker generate-config myconfig.toml   # 指定文件名
 ```
 
 ### reset-password - 重置管理员密码
@@ -113,7 +115,7 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 `config` 子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
 
 > 提示：`config` 命令会把值写入数据库。若要让**正在运行**的服务重新从数据库加载配置，可调用 Admin API `POST /admin/v1/config/reload`，或重启服务。  
-> 另外，标记为“需要重启”的配置（如路由前缀、Cookie 配置）即使 reload 也可能无法完全生效，仍建议重启。
+> 另外，标记为“需要重启”的配置（如 `routes.*`、`click.*`、`cors.*`）即使 reload 也不会热生效，仍需要重启。
 
 常用子命令：
 
@@ -219,13 +221,16 @@ github,https://github.com,2024-12-15T14:30:22Z,,,
 ]
 ```
 
-## 环境变量
+## 数据库配置
 
-```bash
-DATABASE_URL=sqlite://links.db  # 数据库连接 URL
+CLI 会读取当前工作目录的 `config.toml` 来连接数据库。如需指定数据库连接，请在 `config.toml` 中设置：
+
+```toml
+[database]
+database_url = "sqlite://links.db"
 ```
 
-> 完整的环境变量配置请参考 [环境变量配置](/config/)
+> 更多配置见 [配置指南](/config/)。
 
 ## 批量脚本
 

@@ -56,7 +56,7 @@ Focus on the core functionality of short link redirection with simple configurat
 Native Rust performance guarantee, SQLite provides production-grade database performance, asynchronous concurrent processing
 
 ### Easy to Use
-Command line tool management, environment variable configuration, one-click Docker deployment
+Command line tool management, TOML startup config + DB runtime config, one-click Docker deployment
 
 ## Core Features
 
@@ -67,13 +67,17 @@ Command line tool management, environment variable configuration, one-click Dock
 - **Cross-platform Support**: Windows, Linux, macOS, smart process locking to prevent duplicate startup
 - **Container Optimization**: Docker image deployment with container restart detection support
 - **TUI Interface**: Terminal user interface for interactive management and monitoring
-- **TOML Configuration**: Modern configuration file support with environment variable overrides
+- **TOML Configuration**: Startup config (server/database/cache/logging/geoip) + DB runtime config (auth/routes/features, etc.)
 
 ## Quick Experience
 
 ```bash
-# One-click Docker startup
-docker run -d -p 8080:8080 e1saps/shortlinker
+# Docker quick startup (mount config.toml; ensure container-side server.host=0.0.0.0)
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.toml:/config.toml:ro \
+  -v $(pwd)/data:/data \
+  e1saps/shortlinker
 
 # Add short link
 ./shortlinker add github https://github.com
@@ -96,4 +100,3 @@ curl -L http://localhost:8080/github
 
 Ready to go? Check out the [Quick Start Guide](/en/guide/getting-started) to begin with Shortlinker
 More modules: [Web Admin Panel](/en/admin-panel/) | [Cloudflare Worker Version](/en/cf-worker/).
-

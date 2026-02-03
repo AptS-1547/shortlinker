@@ -22,16 +22,22 @@ Shortlinker 提供了基于 React 19 + TypeScript 的现代化 Web 管理界面�
    bun run build
    ```
 
-2. **配置环境变量**：
+2. **启用配置（运行时配置）**：
 
    ```bash
-   ENABLE_ADMIN_PANEL=true
-   ADMIN_TOKEN=your_secure_admin_token
-   FRONTEND_ROUTE_PREFIX=/panel  # 可选，默认为 /panel
+   # 启用管理面板（运行时配置，写入数据库；需要重启生效）
+   ./shortlinker config set features.enable_admin_panel true
+
+   # 可选：修改前端路由前缀（需要重启）
+   ./shortlinker config set routes.frontend_prefix /panel
    ```
 
 3. **访问界面**：
    启动 Shortlinker 后访问 `http://your-domain:8080/panel`
+
+> 提示：
+> - 管理员登录密码是运行时配置 `api.admin_token` 的明文值；首次启动会生成并写入 `admin_token.txt`（若文件不存在），也可用 `./shortlinker reset-password` 重置。
+> - `routes.frontend_prefix` / `routes.admin_prefix` / `routes.health_prefix` 等路由前缀配置修改后需要重启生效。
 
 :::tip 提示
 该特性为**实验性功能**，目前处于活跃开发阶段。如遇问题请通过 GitHub Issues 反馈。
@@ -74,7 +80,7 @@ Shortlinker 支持使用自定义前端实现。你可以通过将自定义前�
 
 ### 核心功能
 
-- 🔑 **登录与会话认证**：使用 `ADMIN_TOKEN` 登录，后端通过 `Set-Cookie` 下发 JWT Cookie（Access/Refresh），前端基于 Cookie 会话访问接口
+- 🔑 **登录与会话认证**：使用管理员密码（`api.admin_token`）登录，后端通过 `Set-Cookie` 下发 JWT Cookie（Access/Refresh），前端基于 Cookie 会话访问接口
 - 📋 **链接管理**：完整的 CRUD 操作界面
   - 创建新短链接（支持自定义短码、过期时间、密码保护）
   - 编辑现有链接
@@ -168,7 +174,7 @@ Shortlinker 支持使用自定义前端实现。你可以通过将自定义前�
 ## 相关链接
 
 - 📖 [Admin API 文档](/api/admin)
-- 🔧 [环境变量配置](/config/)
+- 🔧 [配置指南](/config/)
 - 🚀 [部署指南](/deployment/)
 - 🛠️ [开发指南](./development)
 - ❓ [故障排除](./troubleshooting)

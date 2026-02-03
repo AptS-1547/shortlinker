@@ -481,7 +481,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         value_type: ValueType::Bool,
         rust_type: RustType::Bool,
         default_fn: default_analytics_enable_detailed_logging,
-        requires_restart: false,
+        requires_restart: true,
         is_sensitive: false,
         editable: true,
         category: categories::ANALYTICS,
@@ -496,7 +496,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::ANALYTICS,
-        description: "Number of days to retain click logs before automatic cleanup",
+        description: "Log retention period in days (automatic cleanup is not implemented yet)",
     },
     ConfigDef {
         key: keys::ANALYTICS_ENABLE_IP_LOGGING,

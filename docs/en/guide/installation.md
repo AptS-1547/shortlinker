@@ -106,8 +106,10 @@ cargo clean && cargo build --release
 ### Port Already in Use
 
 ```bash
-# Use a different port
-SERVER_PORT=3000 ./shortlinker
+# Use a different port: set it in config.toml
+# [server]
+# port = 3000
+./shortlinker
 ```
 
 ## Next Steps

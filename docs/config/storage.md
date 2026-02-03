@@ -2,20 +2,20 @@
 
 Shortlinker 支持多种存储后端，您可以根据需求选择最适合的存储方案。所有数据库后端均基于 **Sea-ORM** 和异步连接池，支持高并发和生产环境部署。
 
-> 📋 **配置方法**：存储相关的环境变量配置请参考 [环境变量配置](/config/)
+> 📋 **配置方法**：存储相关配置请参考 [配置指南](/config/)（启动配置 `database.database_url`）。
 
 ## Sea-ORM 数据库层
 
 从 v0.2.0 开始，Shortlinker 使用 **Sea-ORM** 作为数据库抽象层，提供：
 
 - ✅ **原子化 upsert 操作**：防止竞态条件，确保并发安全
-- ✅ **自动数据库类型检测**：从 `DATABASE_URL` 自动推断数据库类型
+- ✅ **自动数据库类型检测**：从 `database.database_url` 自动推断数据库类型
 - ✅ **自动创建 SQLite 数据库**：首次运行时自动创建数据库文件
 - ✅ **自动 schema 迁移**：无需手动运行 SQL 脚本
 - ✅ **统一接口**：所有数据库使用相同的代码路径
 - ✅ **类型安全**：编译时检查数据库操作
 
-> 💡 **提示**：当前版本 **不读取** `DATABASE_BACKEND`。Shortlinker 会从 `DATABASE_URL` 自动推断数据库类型：  
+> 💡 **提示**：当前版本 **不读取** `DATABASE_BACKEND`。Shortlinker 会从 `database.database_url` 自动推断数据库类型：  
 > - SQLite：`sqlite://...` / 以 `.db` 或 `.sqlite` 结尾的文件路径 / `:memory:`  
 > - MySQL/MariaDB：`mysql://...` / `mariadb://...`（会按 MySQL 协议处理）  
 > - PostgreSQL：`postgres://...` / `postgresql://...`
@@ -158,20 +158,22 @@ Shortlinker 支持多种存储后端，您可以根据需求选择最适合的�
 
 **配置示例**：
 
-```bash
+```toml
+# config.toml
+[database]
 # 相对路径（自动创建）
-DATABASE_URL=./shortlinker.db
-DATABASE_URL=data/links.db
+# database_url = "./shortlinker.db"
+# database_url = "data/links.db"
 
 # 绝对路径
-DATABASE_URL=/var/lib/shortlinker/links.db
+# database_url = "/var/lib/shortlinker/links.db"
 
 # 显式 SQLite URL（推荐）
-DATABASE_URL=sqlite://./data/links.db
-DATABASE_URL=sqlite:///absolute/path/to/links.db
+database_url = "sqlite://./data/links.db"
+# database_url = "sqlite:///absolute/path/to/links.db"
 
 # 内存数据库（测试用）
-DATABASE_URL=:memory:
+# database_url = ":memory:"
 ```
 
 **性能优化**（自动应用）：
@@ -202,13 +204,15 @@ DATABASE_URL=:memory:
 
 **配置示例**：
 
-```bash
+```toml
+# config.toml
+[database]
 # 标准连接 URL
-DATABASE_URL=postgresql://user:password@localhost:5432/shortlinker
-DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
+database_url = "postgres://user:password@localhost:5432/shortlinker"
+# database_url = "postgresql://user:password@localhost:5432/shortlinker"
 
 # 生产环境示例
-DATABASE_URL=postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require
+# database_url = "postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require"
 ```
 
 **Docker 快速启动**：
@@ -242,12 +246,14 @@ docker run --name postgres-shortlinker \
 
 **配置示例**：
 
-```bash
+```toml
+# config.toml
+[database]
 # 标准连接 URL
-DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
+database_url = "mysql://user:password@localhost:3306/shortlinker"
 
 # 生产环境示例
-DATABASE_URL=mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod?charset=utf8mb4
+# database_url = "mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod?charset=utf8mb4"
 ```
 
 **Docker 快速启动**：
@@ -281,12 +287,14 @@ docker run --name mysql-shortlinker \
 
 **配置示例**：
 
-```bash
-# MariaDB 使用 mariadb:// scheme（自动转换为 MySQL 协议）
-DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
+```toml
+# config.toml
+[database]
+# MariaDB 使用 mariadb:// scheme（自动按 MySQL 协议处理）
+database_url = "mariadb://user:password@localhost:3306/shortlinker"
 
 # 也可以使用 mysql:// scheme（向后兼容）
-DATABASE_URL=mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod?charset=utf8mb4
+# database_url = "mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod?charset=utf8mb4"
 ```
 
 **Docker 快速启动**：
@@ -310,52 +318,58 @@ docker run --name mariadb-shortlinker \
 
 ### 按部署规模选择
 
-```bash
+```toml
+# config.toml（设置 [database].database_url）
+[database]
 # 小规模部署（< 10,000 链接）
-DATABASE_URL=./links.db
+# database_url = "./links.db"
 # 或使用显式 URL
-DATABASE_URL=sqlite://./links.db
+# database_url = "sqlite://./links.db"
 
 # 中等规模（10,000 - 100,000 链接）
-DATABASE_URL=sqlite://./links.db
+# database_url = "sqlite://./links.db"
 # 或使用 MySQL/MariaDB
-DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "mysql://user:pass@host:3306/db"
 
 # 大规模（> 100,000 链接）
-DATABASE_URL=postgresql://user:pass@host:5432/db
+# database_url = "postgresql://user:pass@host:5432/db"
 # 或使用 MySQL/MariaDB
-DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "mysql://user:pass@host:3306/db"
 ```
 
 ### 按使用场景选择
 
-```bash
+```toml
+# config.toml（设置 [database].database_url）
+[database]
 # 开发环境
-DATABASE_URL=dev-links.db
-DATABASE_URL=sqlite://./dev.db
+# database_url = "dev-links.db"
+# database_url = "sqlite://./dev.db"
 
 # 测试环境
-DATABASE_URL=:memory:
+# database_url = ":memory:"
 
 # 生产环境（单机）
-DATABASE_URL=/data/links.db
+# database_url = "/data/links.db"
 
 # 生产环境（集群）
-DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
+# database_url = "postgresql://user:pass@cluster:5432/shortlinker"
 ```
 
 ### 按并发需求选择
 
-```bash
+```toml
+# config.toml（设置 [database].database_url）
+[database]
 # 低并发（< 100 QPS）
-DATABASE_URL=links.db
+# database_url = "links.db"
 
 # 中等并发（100-1000 QPS）
-DATABASE_URL=sqlite://links.db
-# DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "sqlite://links.db"
+# database_url = "mysql://user:pass@host:3306/db"
 
 # 高并发（> 1000 QPS）
-DATABASE_URL=postgres://user:pass@host:5432/shortlinker
+# database_url = "postgres://user:pass@host:5432/shortlinker"
 ```
 
 ## 性能对比数据
@@ -372,7 +386,7 @@ DATABASE_URL=postgres://user:pass@host:5432/shortlinker
 
 - **SQLite**: 多读单写
 
-> 💡 **性能提示**：通过 `CPU_COUNT` 环境变量调整工作线程数可优化并发处理能力。推荐设置为等于或略小于 CPU 核心数。
+> 💡 **性能提示**：通过 `config.toml` 的 `server.cpu_count` 调整工作线程数可优化并发处理能力。推荐设置为等于或略小于 CPU 核心数。
 
 ## 版本迁移
 
@@ -382,12 +396,12 @@ v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
 
 **新特性**：
 - ✅ 原子化 upsert 操作（防止竞态条件）
-- ✅ 从 DATABASE_URL 自动检测数据库类型
+- ✅ 从 `database.database_url` 自动检测数据库类型
 - ✅ SQLite 数据库文件自动创建
 - ✅ 自动 schema 迁移
 
 **配置变更**：
-- 存储后端类型完全由 `DATABASE_URL` 决定（`sqlite://` / `mysql://` / `mariadb://` / `postgres://` 等）
+- 存储后端类型完全由 `database.database_url` 决定（`sqlite://` / `mysql://` / `mariadb://` / `postgres://` 等）
 
 **数据迁移**：
 
@@ -395,15 +409,17 @@ v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
 
 **推荐配置**（v0.2.0+）：
 
-```bash
+```toml
+# config.toml
+[database]
 # SQLite（推荐）
-DATABASE_URL=sqlite://./data/links.db
+# database_url = "sqlite://./data/links.db"
 
 # PostgreSQL
-DATABASE_URL=postgres://user:pass@localhost:5432/shortlinker
+# database_url = "postgres://user:pass@localhost:5432/shortlinker"
 
 # MySQL
-DATABASE_URL=mysql://user:pass@localhost:3306/shortlinker
+# database_url = "mysql://user:pass@localhost:3306/shortlinker"
 ```
 
 ## 故障排除
@@ -434,7 +450,7 @@ chmod 644 links.*
 使用健康检查 API 监控存储状态：
 
 ```bash
-# 方案 A（推荐）：配置 HEALTH_TOKEN 后使用 Bearer Token（更适合监控/探针）
+# 方案 A（推荐）：配置运行时配置 api.health_token 后使用 Bearer Token（更适合监控/探针）
 # HEALTH_TOKEN="your_health_token"
 # curl -sS -H "Authorization: Bearer ${HEALTH_TOKEN}" http://localhost:8080/health/live -I
 

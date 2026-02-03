@@ -168,8 +168,8 @@ export LANG=en_US.UTF-8
 # Check if storage backend is accessible
 ./shortlinker list
 
-# View error logs
-RUST_LOG=debug ./shortlinker tui
+# View error output
+./shortlinker tui
 ```
 
 ### Data Not Refreshing

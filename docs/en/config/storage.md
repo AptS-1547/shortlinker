@@ -2,7 +2,7 @@
 
 Shortlinker supports multiple storage backends. You can choose the most suitable storage solution based on your needs. All backends are built on asynchronous connection pools, supporting high concurrency and production environment deployment.
 
-> 📋 **Configuration**: For storage-related environment variable configuration, please refer to [Environment Variable Configuration](/en/config/)
+> 📋 **Configuration**: See [Configuration Guide](/en/config/) (startup config `database.database_url`).
 
 ## Storage Backend Comparison
 
@@ -112,19 +112,18 @@ Shortlinker supports multiple storage backends. You can choose the most suitable
 
 **Configuration Examples**:
 
-```bash
-# Relative path (recommended)
-DATABASE_URL=sqlite://./shortlinker.db
-DATABASE_URL=sqlite://./data/links.db
+```toml
+# config.toml
+[database]
+# Relative path
+# database_url = "sqlite://./shortlinker.db"
+database_url = "sqlite://./data/links.db"
 
 # Absolute path
-DATABASE_URL=sqlite:///var/lib/shortlinker/links.db
+# database_url = "sqlite:///var/lib/shortlinker/links.db"
 
-# Explicit SQLite URL
-DATABASE_URL=sqlite://./data/links.db
-
-# In-memory database (for testing)
-DATABASE_URL=:memory:
+# In-memory database (testing)
+# database_url = ":memory:"
 ```
 
 **Use Cases**:
@@ -146,13 +145,15 @@ DATABASE_URL=:memory:
 
 **Configuration Examples**:
 
-```bash
+```toml
+# config.toml
+[database]
 # Standard connection URL
-DATABASE_URL=postgresql://user:password@localhost:5432/shortlinker
-DATABASE_URL=postgres://user:password@localhost:5432/shortlinker
+database_url = "postgres://user:password@localhost:5432/shortlinker"
+# database_url = "postgresql://user:password@localhost:5432/shortlinker"
 
 # Production environment example
-DATABASE_URL=postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require
+# database_url = "postgresql://shortlinker:secure_password@db.example.com:5432/shortlinker_prod?sslmode=require"
 ```
 
 **Docker Quick Start**:
@@ -185,12 +186,14 @@ docker run --name postgres-shortlinker \
 
 **Configuration Examples**:
 
-```bash
+```toml
+# config.toml
+[database]
 # Standard connection URL
-DATABASE_URL=mysql://user:password@localhost:3306/shortlinker
+database_url = "mysql://user:password@localhost:3306/shortlinker"
 
 # Production environment example
-DATABASE_URL=mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod
+# database_url = "mysql://shortlinker:secure_password@mysql.example.com:3306/shortlinker_prod"
 ```
 
 **Docker Quick Start**:
@@ -223,12 +226,14 @@ docker run --name mysql-shortlinker \
 
 **Configuration Examples**:
 
-```bash
-# MariaDB uses mariadb:// scheme (auto-converts to MySQL protocol)
-DATABASE_URL=mariadb://user:password@localhost:3306/shortlinker
+```toml
+# config.toml
+[database]
+# MariaDB uses mariadb:// scheme (handled as MySQL protocol)
+database_url = "mariadb://user:password@localhost:3306/shortlinker"
 
 # Also supports mysql:// scheme (backward compatible)
-DATABASE_URL=mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod
+# database_url = "mysql://shortlinker:secure_password@mariadb.example.com:3306/shortlinker_prod"
 ```
 
 **Docker Quick Start**:
@@ -253,50 +258,56 @@ docker run --name mariadb-shortlinker \
 
 ### Selection by Deployment Scale
 
-```bash
+```toml
+# config.toml ([database].database_url)
+[database]
 # Small scale (< 10,000 links)
-DATABASE_URL=sqlite://./links.db
+# database_url = "sqlite://./links.db"
 
 # Medium scale (10,000 - 100,000 links)
-DATABASE_URL=sqlite://./links.db
+# database_url = "sqlite://./links.db"
 # Or use MySQL/MariaDB
-DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "mysql://user:pass@host:3306/db"
 
 # Large scale (> 100,000 links)
-DATABASE_URL=postgresql://user:pass@host:5432/db
+# database_url = "postgresql://user:pass@host:5432/db"
 # Or use MySQL/MariaDB
-DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "mysql://user:pass@host:3306/db"
 ```
 
 ### Selection by Use Case
 
-```bash
+```toml
+# config.toml ([database].database_url)
+[database]
 # Development environment
-DATABASE_URL=sqlite://./dev.db
+# database_url = "sqlite://./dev.db"
 
 # Testing environment
-DATABASE_URL=:memory:
+# database_url = ":memory:"
 
 # Production environment (single machine)
-DATABASE_URL=sqlite:///data/links.db
+# database_url = "sqlite:///data/links.db"
 
 # Production environment (cluster)
-DATABASE_URL=postgresql://user:pass@cluster:5432/shortlinker
+# database_url = "postgresql://user:pass@cluster:5432/shortlinker"
 ```
 
 ### Selection by Concurrency Requirements
 
-```bash
+```toml
+# config.toml ([database].database_url)
+[database]
 # Low concurrency (< 100 QPS)
-DATABASE_URL=sqlite://links.db
+# database_url = "sqlite://links.db"
 
 # Medium concurrency (100-1000 QPS)
-DATABASE_URL=sqlite://links.db
+# database_url = "sqlite://links.db"
 # Or MySQL/MariaDB
-# DATABASE_URL=mysql://user:pass@host:3306/db
+# database_url = "mysql://user:pass@host:3306/db"
 
 # High concurrency (> 1000 QPS)
-DATABASE_URL=postgres://user:pass@host:5432/shortlinker  # recommended
+# database_url = "postgres://user:pass@host:5432/shortlinker"
 ```
 
 ## Performance Benchmark Data
@@ -364,7 +375,7 @@ chmod 644 links.*
 Use health check API to monitor storage status:
 
 ```bash
-# Option A (recommended): configure HEALTH_TOKEN and use Bearer auth (best for monitoring/probes)
+# Option A (recommended): set runtime config api.health_token and use Bearer auth (best for monitoring/probes)
 # HEALTH_TOKEN="your_health_token"
 # curl -sS -H "Authorization: Bearer ${HEALTH_TOKEN}" http://localhost:8080/health/live -I
 

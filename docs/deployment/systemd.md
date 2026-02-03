@@ -26,23 +26,18 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=5
 
-# 环境变量 - TCP 端口
-Environment=SERVER_HOST=127.0.0.1
-Environment=SERVER_PORT=8080
-
-# 环境变量 - Unix 套接字（二选一）
-# Environment=UNIX_SOCKET=/tmp/shortlinker.sock
-
-Environment=DATABASE_URL=sqlite:///opt/shortlinker/data/links.db
-Environment=DEFAULT_URL=https://example.com
-Environment=RUST_LOG=info
+# 启动配置文件（必须）：
+# - Shortlinker 会从 WorkingDirectory 读取 ./config.toml（相对路径）
+# - 建议放在：/opt/shortlinker/config.toml
+# - 需要配置的典型项：server.host/port、server.unix_socket、database.database_url、logging.*
 
 # 安全配置
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/shortlinker/data
+# 需要写入：shortlinker.pid、./shortlinker.sock（IPC）、admin_token.txt（首次启动可选）、数据库文件等
+ReadWritePaths=/opt/shortlinker
 
 [Install]
 WantedBy=multi-user.target
@@ -97,12 +92,8 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - DATABASE_URL=sqlite:///data/shortlinker.db
-      - DEFAULT_URL=https://your-domain.com
-      - RUST_LOG=info
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s

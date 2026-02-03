@@ -54,7 +54,7 @@ Not Found
 
 ### 根路径重定向
 
-当访问根路径 `/` 时，会重定向到默认 URL（配置项 `features.default_url`，也可用 `DEFAULT_URL` 环境变量覆盖）。
+当访问根路径 `/` 时，会重定向到默认 URL（运行时配置项 `features.default_url`）。
 
 **请求**:
 ```http

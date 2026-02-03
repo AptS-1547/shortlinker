@@ -7,10 +7,14 @@
 ### 登录失败
 
 ```bash
-# 检查 ADMIN_TOKEN 是否正确配置
-echo $ADMIN_TOKEN
+# 获取/确认管理员密码（运行时配置 `api.admin_token` 的明文值）
+# - 首次启动通常会生成 `admin_token.txt`（若存在）
+cat admin_token.txt
 
-# 检查 API 地址配置
+# - 忘记密码可重置（写入数据库）
+./shortlinker reset-password
+
+# 检查（独立部署的）管理面板 API 地址配置
 cat admin-panel/.env.local
 
 # 查看浏览器控制台错误
@@ -18,7 +22,7 @@ cat admin-panel/.env.local
 
 **可能原因**：
 
-- `ADMIN_TOKEN` 未配置或配置错误
+- 管理员密码（`api.admin_token`）错误
 - 后端服务未启动
 - API 地址配置错误
 - CORS 配置问题
@@ -73,9 +77,9 @@ bun dev
 
 ## 安全建议
 
-1. **强密码**：使用足够复杂的 `ADMIN_TOKEN`
+1. **强密码**：使用足够复杂的管理员密码（`api.admin_token`）
 2. **HTTPS**：生产环境必须启用 HTTPS
-3. **路径隔离**：考虑使用非默认的 `FRONTEND_ROUTE_PREFIX`
+3. **路径隔离**：考虑使用非默认的 `routes.frontend_prefix`
 4. **网络隔离**：仅在受信任网络中暴露管理界面
 5. **定期更新**：及时更新依赖包修复安全漏洞
 

@@ -26,23 +26,18 @@ KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=5
 
-# Environment variables - TCP port
-Environment=SERVER_HOST=127.0.0.1
-Environment=SERVER_PORT=8080
-
-# Environment variables - Unix socket (choose one)
-# Environment=UNIX_SOCKET=/tmp/shortlinker.sock
-
-Environment=DATABASE_URL=sqlite:///opt/shortlinker/data/links.db
-Environment=DEFAULT_URL=https://example.com
-Environment=RUST_LOG=info
+# Startup config file (required):
+# - Shortlinker reads ./config.toml from WorkingDirectory (relative path)
+# - Recommended location: /opt/shortlinker/config.toml
+# - Typical keys: server.host/port, server.unix_socket, database.database_url, logging.*
 
 # Security configuration
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/shortlinker/data
+# Needs write access for: shortlinker.pid, ./shortlinker.sock (IPC), admin_token.txt (first startup), DB file, etc.
+ReadWritePaths=/opt/shortlinker
 
 [Install]
 WantedBy=multi-user.target
@@ -97,12 +92,8 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
+      - ./config.toml:/config.toml:ro
       - ./data:/data
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - DATABASE_URL=sqlite:///data/shortlinker.db
-      - DEFAULT_URL=https://your-domain.com
-      - RUST_LOG=info
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s

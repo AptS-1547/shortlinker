@@ -4,10 +4,10 @@ Shortlinker provides a full-featured HTTP Admin API for managing short links, in
 
 ## Configuration
 
-Admin API settings can come from `config.toml`, environment variables, or runtime config (database). See [Configuration](/en/config/).
+Admin API settings are **runtime config (database)**. See [Configuration](/en/config/).
 
-- `ADMIN_TOKEN`: admin login password (recommended to set explicitly in production; if not set, the server will auto-generate one and write it once to `admin_token.txt` (save it and delete the file))
-- `ADMIN_ROUTE_PREFIX`: route prefix (optional, default: `/admin`)
+- `api.admin_token`: admin login password (stored as an Argon2 hash in the DB; on first startup a random password is generated and written to `admin_token.txt`; save it and delete the file; rotate via `./shortlinker reset-password`)
+- `routes.admin_prefix`: route prefix (default: `/admin`, restart required)
 
 > All API paths include `/v1`, e.g. the default login endpoint is `http://localhost:8080/admin/v1/auth/login`.
 
@@ -18,7 +18,7 @@ Admin API supports two authentication methods:
 1. **JWT cookies (recommended for browser/admin panel)**
    - Access cookie: `shortlinker_access` (`Path=/`)
    - Refresh cookie: `shortlinker_refresh` (`Path={ADMIN_ROUTE_PREFIX}/v1/auth`)
-   - CSRF cookie: `csrf_token` (`Path={ADMIN_ROUTE_PREFIX}`, not HttpOnly so the frontend can read it)
+   - CSRF cookie: `csrf_token` (`Path=/`, not HttpOnly so the frontend can read it)
 2. **Bearer token (for API clients; CSRF-free)**
    - `Authorization: Bearer <ACCESS_TOKEN>` (where `<ACCESS_TOKEN>` is the same JWT access token as the `shortlinker_access` cookie value)
 
@@ -90,7 +90,7 @@ curl -sS -X POST -b cookies.txt -c cookies.txt \
 
 Default: `http://your-domain:port/admin/v1`
 
-> If you changed `ADMIN_ROUTE_PREFIX`, replace `/admin` with your prefix.
+> If you changed `routes.admin_prefix`, replace `/admin` with your prefix.
 
 ## Common JSON format
 
@@ -351,7 +351,7 @@ curl -sS -X POST -b cookies.txt \
 
 ## Auth endpoints notes
 
-- `POST /auth/login`: no cookies required; validates `ADMIN_TOKEN` and sets cookies
+- `POST /auth/login`: no cookies required; validates the admin password (plaintext for `api.admin_token`) and sets cookies
 - `POST /auth/refresh`: no access cookie required, but refresh cookie is required
 - `POST /auth/logout`: no cookies required; clears cookies
 - `GET /auth/verify`: requires access cookie
@@ -388,16 +388,16 @@ print(admin.list_links())
 
 ## Security notes
 
-1. Use a strong `ADMIN_TOKEN` (do not rely on the auto-generated one in production)
+1. Use a strong admin password (`api.admin_token`) (do not rely on the auto-generated one in production)
 2. Use HTTPS in production and set `api.cookie_secure=true`
 3. Expose Admin API only to trusted networks
-4. Rotate `ADMIN_TOKEN` regularly and re-login to get new cookies
+4. Rotate the admin password (`api.admin_token`) regularly and re-login to get new cookies
 
 ## Analytics API
 
 Analytics API provides detailed click statistics, including click trends, top links, referrer stats, and geographic distribution.
 
-> You need to enable `analytics.enable_detailed_logging` in runtime config to record detailed click logs.
+> You need to enable `analytics.enable_detailed_logging` in runtime config (restart required) to record detailed click logs.
 
 ### GET /analytics/trends - Get click trends
 
@@ -532,7 +532,7 @@ These runtime config options control Analytics behavior:
 
 | Config key | Type | Default | Description |
 |------------|------|---------|-------------|
-| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table) |
-| `analytics.log_retention_days` | int | 30 | Log retention period in days |
+| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table; restart required) |
+| `analytics.log_retention_days` | int | 30 | Log retention period in days (automatic cleanup is not implemented yet) |
 | `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |
