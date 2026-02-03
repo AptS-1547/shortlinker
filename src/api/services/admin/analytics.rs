@@ -19,8 +19,11 @@ use crate::services::{
     LinkAnalytics as ServiceLinkAnalytics, ReferrerStats as ServiceReferrerStats,
     TopLink as ServiceTopLink, TrendData as ServiceTrendData,
 };
+use crate::storage::SeaOrmStorage;
 
+use super::export_import::create_csv_stream;
 use super::helpers::{error_from_shortlinker, success_response};
+use super::types::ClickLogCsvRow;
 
 /// 输出目录常量
 const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
@@ -268,79 +271,38 @@ pub async fn get_link_analytics(
     }
 }
 
-/// GET /admin/v1/analytics/export - 导出报告
+/// 每批次导出的日志数量
+const EXPORT_BATCH_SIZE: u64 = 10000;
+
+/// GET /admin/v1/analytics/export - 导出报告（流式响应）
 pub async fn export_report(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
-    service: web::Data<Arc<AnalyticsService>>,
+    storage: web::Data<Arc<SeaOrmStorage>>,
 ) -> ActixResult<impl Responder> {
-    info!("Admin API: export_report with query: {:?}", query);
+    info!("Admin API: export_report (streaming) with query: {:?}", query);
 
     let (start, end) =
         AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());
-    let limit = query.limit.unwrap_or(10000).min(100000) as u64;
 
-    let logs = match service.export_click_logs(start, end, limit).await {
-        Ok(logs) => logs,
-        Err(e) => return Ok(error_from_shortlinker(&e)),
+    // 获取流式数据
+    let batch_stream = storage.stream_click_logs_paginated(start, end, EXPORT_BATCH_SIZE);
+
+    // 行映射：click_log::Model → ClickLogCsvRow
+    let row_mapper = |log: migration::entities::click_log::Model| ClickLogCsvRow {
+        short_code: log.short_code,
+        clicked_at: log.clicked_at.to_rfc3339(),
+        referrer: log.referrer.unwrap_or_default(),
+        user_agent: log.user_agent.unwrap_or_default(),
+        ip_address: log.ip_address.unwrap_or_default(),
+        country: log.country.unwrap_or_default(),
+        city: log.city.unwrap_or_default(),
     };
 
-    // 使用 csv crate 生成安全的 CSV
-    let mut wtr = csv::Writer::from_writer(vec![]);
-    if wtr
-        .write_record([
-            "short_code",
-            "clicked_at",
-            "referrer",
-            "user_agent",
-            "ip_address",
-            "country",
-            "city",
-        ])
-        .is_err()
-    {
-        return Ok(error_from_shortlinker(
-            &crate::errors::ShortlinkerError::analytics_query_failed("CSV header 写入失败"),
-        ));
-    }
+    // 创建 CSV 流
+    let csv_stream = create_csv_stream(batch_stream, row_mapper, "logs");
 
-    for log in logs {
-        if wtr
-            .write_record([
-                &log.short_code,
-                &log.clicked_at.to_rfc3339(),
-                log.referrer.as_deref().unwrap_or(""),
-                log.user_agent.as_deref().unwrap_or(""),
-                log.ip_address.as_deref().unwrap_or(""),
-                log.country.as_deref().unwrap_or(""),
-                log.city.as_deref().unwrap_or(""),
-            ])
-            .is_err()
-        {
-            return Ok(error_from_shortlinker(
-                &crate::errors::ShortlinkerError::analytics_query_failed("CSV record 写入失败"),
-            ));
-        }
-    }
-
-    let csv_content = match wtr.into_inner() {
-        Ok(bytes) => match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(_) => {
-                return Ok(error_from_shortlinker(
-                    &crate::errors::ShortlinkerError::analytics_query_failed(
-                        "CSV 输出包含无效 UTF-8",
-                    ),
-                ));
-            }
-        },
-        Err(_) => {
-            return Ok(error_from_shortlinker(
-                &crate::errors::ShortlinkerError::analytics_query_failed("CSV 写入器关闭失败"),
-            ));
-        }
-    };
-
+    // 返回流式响应
     Ok(HttpResponse::Ok()
         .content_type("text/csv; charset=utf-8")
         .insert_header((
@@ -351,7 +313,8 @@ pub async fn export_report(
                 end.format("%Y%m%d")
             ),
         ))
-        .body(csv_content))
+        .insert_header(("Transfer-Encoding", "chunked"))
+        .streaming(csv_stream))
 }
 
 /// Analytics 路由配置

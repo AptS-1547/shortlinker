@@ -295,8 +295,8 @@ pub struct ImportResponse {
     pub failed_items: Vec<ImportFailedItem>,
 }
 
-// Re-export CsvLinkRow from shared csv_handler module
-pub use crate::utils::csv_handler::CsvLinkRow;
+// Re-export CSV row types from shared csv_handler module
+pub use crate::utils::csv_handler::{ClickLogCsvRow, CsvLinkRow};
 
 #[cfg(test)]
 mod tests {

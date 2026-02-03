@@ -2,7 +2,10 @@
 //!
 //! 提供点击日志的统计查询方法，供 AnalyticsService 调用。
 
+use std::pin::Pin;
+
 use chrono::{DateTime, Utc};
+use futures_util::stream::Stream;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, sea_query::Expr,
@@ -241,5 +244,43 @@ impl super::SeaOrmStorage {
             .all(&self.db)
             .await
             .map_err(Into::into)
+    }
+
+    /// 流式导出点击日志（分页）
+    ///
+    /// 使用分页查询避免一次性加载全部数据到内存。
+    /// 返回 boxed stream 产生分批数据。
+    pub fn stream_click_logs_paginated(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        page_size: u64,
+    ) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<click_log::Model>>> + Send + 'static>> {
+        let db = self.db.clone();
+
+        use futures_util::stream;
+
+        Box::pin(stream::unfold(
+            (0u64, db, start, end, page_size),
+            |(page, db, start, end, page_size)| async move {
+                let models = click_log::Entity::find()
+                    .filter(click_log::Column::ClickedAt.gte(start))
+                    .filter(click_log::Column::ClickedAt.lte(end))
+                    .order_by_desc(click_log::Column::ClickedAt)
+                    .limit(page_size)
+                    .offset(page * page_size)
+                    .all(&db)
+                    .await;
+
+                match models {
+                    Ok(models) if models.is_empty() => None,
+                    Ok(models) => Some((Ok(models), (page + 1, db, start, end, page_size))),
+                    Err(e) => Some((
+                        Err(anyhow::anyhow!("分页查询失败 (page={}): {}", page, e)),
+                        (page + 1, db, start, end, page_size),
+                    )),
+                }
+            },
+        ))
     }
 }

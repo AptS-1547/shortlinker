@@ -28,6 +28,18 @@ pub struct CsvLinkRow {
     pub click_count: usize,
 }
 
+/// 点击日志 CSV 导出行（仅用于序列化）
+#[derive(Debug, Clone, Serialize)]
+pub struct ClickLogCsvRow {
+    pub short_code: String,
+    pub clicked_at: String,
+    pub referrer: String,
+    pub user_agent: String,
+    pub ip_address: String,
+    pub country: String,
+    pub city: String,
+}
+
 impl From<&ShortLink> for CsvLinkRow {
     fn from(link: &ShortLink) -> Self {
         Self {
