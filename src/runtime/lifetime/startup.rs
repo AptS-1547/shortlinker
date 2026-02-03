@@ -2,7 +2,7 @@ use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::LinkService;
+use crate::services::{AnalyticsService, LinkService};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -13,6 +13,7 @@ pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
     pub cache: Arc<dyn CompositeCacheTrait>,
     pub link_service: Arc<LinkService>,
+    pub analytics_service: Arc<AnalyticsService>,
     pub route_config: RouteConfig,
 }
 
@@ -134,6 +135,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     // Create LinkService for unified link management
     let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
+    // Create AnalyticsService for analytics queries
+    let analytics_service = Arc::new(AnalyticsService::new(storage.clone()));
+
     // Initialize IPC handler with LinkService
     crate::system::ipc::handler::init_link_service(link_service.clone());
 
@@ -165,6 +169,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         storage,
         cache,
         link_service,
+        analytics_service,
         route_config,
     })
 }

@@ -114,7 +114,8 @@ mod tests {
 
     #[test]
     fn export_typescript_types() {
-        ValueType::export_all().expect("Failed to export ValueType");
+        let cfg = ts_rs::Config::default();
+        ValueType::export_all(&cfg).expect("Failed to export ValueType");
         println!("ValueType exported to {}", TS_EXPORT_PATH);
     }
 }

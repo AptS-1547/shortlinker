@@ -473,10 +473,11 @@ mod tests {
     fn export_typescript_types() {
         // 运行此测试会自动生成 TypeScript 类型文件
         // cargo test export_typescript_types -- --nocapture
+        let cfg = ts_rs::Config::default();
 
         // Export enums
-        SameSitePolicy::export_all().expect("Failed to export SameSitePolicy");
-        HttpMethod::export_all().expect("Failed to export HttpMethod");
+        SameSitePolicy::export_all(&cfg).expect("Failed to export SameSitePolicy");
+        HttpMethod::export_all(&cfg).expect("Failed to export HttpMethod");
 
         println!("TypeScript types exported to {}", TS_EXPORT_PATH);
     }

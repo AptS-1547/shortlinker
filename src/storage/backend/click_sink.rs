@@ -10,7 +10,7 @@
 
 use async_trait::async_trait;
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
-use sea_orm::{ActiveModelTrait, ConnectionTrait, ExprTrait, Set};
+use sea_orm::{ConnectionTrait, EntityTrait, ExprTrait, Set};
 use tracing::debug;
 
 use super::SeaOrmStorage;
@@ -91,10 +91,10 @@ impl DetailedClickSink for SeaOrmStorage {
 
         let total_count = details.len();
 
-        // 批量插入
-        for detail in details {
-            let model = click_log::ActiveModel {
-                id: Default::default(),
+        // 构建批量插入的 ActiveModel 列表
+        let models: Vec<click_log::ActiveModel> = details
+            .into_iter()
+            .map(|detail| click_log::ActiveModel {
                 short_code: Set(detail.code),
                 clicked_at: Set(detail.timestamp),
                 referrer: Set(detail.referrer),
@@ -102,16 +102,19 @@ impl DetailedClickSink for SeaOrmStorage {
                 ip_address: Set(detail.ip_address),
                 country: Set(detail.country),
                 city: Set(detail.city),
-            };
-
-            let db = &self.db;
-            let model_ref = model.clone();
-            retry::with_retry("log_click", self.retry_config, || async {
-                model_ref.clone().insert(db).await
+                ..Default::default()
             })
-            .await
-            .map_err(|e| anyhow::anyhow!("插入点击日志失败: {}", e))?;
-        }
+            .collect();
+
+        // 使用 insert_many 进行批量插入
+        let db = &self.db;
+        retry::with_retry("log_clicks_batch", self.retry_config, || async {
+            click_log::Entity::insert_many(models.clone())
+                .exec(db)
+                .await
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("批量插入点击日志失败: {}", e))?;
 
         debug!(
             "详细点击日志已写入 {} 数据库 ({} 条记录)",

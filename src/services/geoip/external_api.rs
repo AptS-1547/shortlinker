@@ -24,7 +24,7 @@ impl ExternalApiProvider {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(2))
             .build()
-            .unwrap_or_default();
+            .expect("Failed to create reqwest client");
 
         Self {
             client,

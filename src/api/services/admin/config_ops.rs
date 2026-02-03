@@ -305,11 +305,12 @@ mod tests {
 
     #[test]
     fn export_config_types() {
-        ValueType::export_all().expect("Failed to export ValueType");
-        ConfigItemResponse::export_all().expect("Failed to export ConfigItemResponse");
-        ConfigUpdateRequest::export_all().expect("Failed to export ConfigUpdateRequest");
-        ConfigUpdateResponse::export_all().expect("Failed to export ConfigUpdateResponse");
-        ConfigHistoryResponse::export_all().expect("Failed to export ConfigHistoryResponse");
+        let cfg = ts_rs::Config::default();
+        ValueType::export_all(&cfg).expect("Failed to export ValueType");
+        ConfigItemResponse::export_all(&cfg).expect("Failed to export ConfigItemResponse");
+        ConfigUpdateRequest::export_all(&cfg).expect("Failed to export ConfigUpdateRequest");
+        ConfigUpdateResponse::export_all(&cfg).expect("Failed to export ConfigUpdateResponse");
+        ConfigHistoryResponse::export_all(&cfg).expect("Failed to export ConfigHistoryResponse");
         println!("Config TypeScript types exported");
     }
 }
