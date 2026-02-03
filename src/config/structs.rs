@@ -142,32 +142,41 @@ pub struct StaticConfig {
 }
 
 impl StaticConfig {
-    /// 从 TOML 文件加载配置
+    /// 从 TOML 文件和环境变量加载配置
+    ///
+    /// 优先级：ENV > config.toml > 默认值
+    /// ENV 前缀：SL，分隔符：__
+    /// 示例：SL__SERVER__PORT=9999
     pub fn load() -> Self {
-        Self::load_from_file()
-    }
+        use config::{Config, Environment, File};
 
-    /// 从 TOML 文件加载配置
-    fn load_from_file() -> Self {
         let path = "config.toml";
 
-        if !std::path::Path::new(path).exists() {
-            return Self::default();
-        }
+        let builder = Config::builder()
+            // 1. 从 TOML 文件加载（可选）
+            .add_source(File::with_name(path).required(false))
+            // 2. 从环境变量覆盖，前缀 SL，分隔符 __
+            .add_source(
+                Environment::with_prefix("SL")
+                    .separator("__")
+                    .try_parsing(true),
+            );
 
-        match std::fs::read_to_string(path) {
-            Ok(content) => match toml::from_str::<StaticConfig>(&content) {
+        match builder.build() {
+            Ok(settings) => match settings.try_deserialize::<StaticConfig>() {
                 Ok(config) => {
-                    eprintln!("[INFO] Configuration loaded from: {}", path);
+                    if std::path::Path::new(path).exists() {
+                        eprintln!("[INFO] Configuration loaded from: {}", path);
+                    }
                     config
                 }
                 Err(e) => {
-                    eprintln!("[ERROR] Failed to parse config file {}: {}", path, e);
+                    eprintln!("[ERROR] Failed to deserialize config: {}", e);
                     Self::default()
                 }
             },
             Err(e) => {
-                eprintln!("[ERROR] Failed to read config file {}: {}", path, e);
+                eprintln!("[ERROR] Failed to build config: {}", e);
                 Self::default()
             }
         }

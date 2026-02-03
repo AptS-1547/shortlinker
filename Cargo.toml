@@ -53,7 +53,8 @@ members = [".", "migration"]
 clap = { version = "4", features = ["derive"] }
 migration = { path = "migration" }
 actix-web = { version = "4.12", features = ["compress-brotli", "compress-gzip"] }
-dotenv = "0.15"
+config = "0.15"
+dotenvy = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
