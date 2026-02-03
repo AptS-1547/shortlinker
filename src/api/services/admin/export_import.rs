@@ -120,7 +120,9 @@ where
                         Err(e) => {
                             error!("Blocking task panicked: {}", e);
                             Some((
-                                Err(actix_web::error::ErrorInternalServerError("CSV task failed")),
+                                Err(actix_web::error::ErrorInternalServerError(
+                                    "CSV task failed",
+                                )),
                                 (stream, first, count, mapper, item_name),
                             ))
                         }

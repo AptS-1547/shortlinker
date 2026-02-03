@@ -280,7 +280,10 @@ pub async fn export_report(
     query: web::Query<AnalyticsQuery>,
     storage: web::Data<Arc<SeaOrmStorage>>,
 ) -> ActixResult<impl Responder> {
-    info!("Admin API: export_report (streaming) with query: {:?}", query);
+    info!(
+        "Admin API: export_report (streaming) with query: {:?}",
+        query
+    );
 
     let (start, end) =
         AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());

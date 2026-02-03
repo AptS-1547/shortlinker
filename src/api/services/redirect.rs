@@ -12,6 +12,7 @@ use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
 use crate::services::GeoIpProvider;
 use crate::storage::{SeaOrmStorage, ShortLink};
+use crate::utils::ip::extract_client_ip;
 use crate::utils::is_valid_short_code;
 
 pub struct RedirectService {}
@@ -101,24 +102,6 @@ impl RedirectService {
             .body("Internal Server Error")
     }
 
-    /// 提取客户端 IP 地址
-    ///
-    /// 优先级: X-Forwarded-For > X-Real-IP > connection.peer_addr
-    fn extract_client_ip(req: &HttpRequest) -> Option<String> {
-        req.headers()
-            .get("x-forwarded-for")
-            .and_then(|h| h.to_str().ok())
-            .and_then(|s| s.split(',').next())
-            .map(|s| s.trim().to_string())
-            .or_else(|| {
-                req.headers()
-                    .get("x-real-ip")
-                    .and_then(|h| h.to_str().ok())
-                    .map(String::from)
-            })
-            .or_else(|| req.connection_info().peer_addr().map(String::from))
-    }
-
     /// 提取点击详细信息
     fn extract_click_detail(code: &str, req: &HttpRequest) -> ClickDetail {
         let rt = get_runtime_config();
@@ -138,7 +121,7 @@ impl RedirectService {
                 .and_then(|h| h.to_str().ok())
                 .map(String::from),
             ip_address: if enable_ip_logging {
-                Self::extract_client_ip(req)
+                extract_client_ip(req)
             } else {
                 None
             },
