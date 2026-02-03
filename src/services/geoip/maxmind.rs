@@ -18,7 +18,7 @@ pub struct MaxMindProvider {
 
 impl MaxMindProvider {
     /// 从文件路径创建 MaxMind Provider
-    pub fn new(path: &str) -> Result<Self, maxminddb::MaxMindDBError> {
+    pub fn new(path: &str) -> Result<Self, maxminddb::MaxMindDbError> {
         let reader = Reader::open_readfile(path)?;
         Ok(Self {
             reader: Arc::new(reader),
@@ -31,20 +31,12 @@ impl GeoIpLookup for MaxMindProvider {
     async fn lookup(&self, ip: &str) -> Option<GeoInfo> {
         let ip_addr: IpAddr = ip.parse().ok()?;
 
-        let city: maxminddb::geoip2::City = self.reader.lookup(ip_addr).ok()?;
+        let result = self.reader.lookup(ip_addr).ok()?;
+        let city: maxminddb::geoip2::City = result.decode().ok()??;
 
-        let country = city
-            .country
-            .as_ref()
-            .and_then(|c| c.iso_code)
-            .map(String::from);
-
-        let city_name = city
-            .city
-            .as_ref()
-            .and_then(|c| c.names.as_ref())
-            .and_then(|names| names.get("en"))
-            .map(|s| (*s).to_string());
+        // 新版 API: 字段直接访问，不再是 Option
+        let country = city.country.iso_code.map(String::from);
+        let city_name = city.city.names.english.map(|s| s.to_string());
 
         trace!(
             "MaxMind lookup for {}: country={:?}, city={:?}",

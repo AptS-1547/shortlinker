@@ -93,7 +93,7 @@ parking_lot = "0.12"
 argon2 = "0.5"
 url = "2"
 actix-cors = "0.7"
-ts-rs = { version = "11.1", features = ["chrono-impl"] }
+ts-rs = { version = "12.0", features = ["chrono-impl"] }
 csv = "1.4"
 actix-multipart = "0.7"
 strum = { version = "0.27", features = ["derive"] }
@@ -102,11 +102,11 @@ actix-governor = "0.10.0"
 rpassword = "7"
 subtle = "2"
 base64 = "0.22"
-maxminddb = "0.24"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+maxminddb = "0.27"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", default-features = false, features = ["signal", "process"] }
+nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", default-features = false, features = ["consoleapi"] }
@@ -116,7 +116,7 @@ tokio-test = "0.4"
 actix-rt = "2.11"
 tempfile = "3.24"
 tokio = { version = "1.49.0", features = ["full"] }
-criterion = { version = "0.5", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 
 [[bench]]
 name = "click_manager"
