@@ -1,5 +1,7 @@
 // Rust 化完成
 
+use std::net::IpAddr;
+
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use std::sync::Arc;
@@ -12,7 +14,7 @@ use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
 use crate::services::GeoIpProvider;
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::utils::ip::extract_client_ip;
+use crate::utils::ip::{extract_client_ip, is_private_or_local};
 use crate::utils::is_valid_short_code;
 
 pub struct RedirectService {}
@@ -150,6 +152,14 @@ impl RedirectService {
                 && let Some(ref geoip_provider) = geoip
                 && let Some(ref ip) = detail.ip_address
             {
+                // 私有/本地 IP 不查 GeoIP（查了也没意义）
+                if let Ok(ip_addr) = ip.parse::<IpAddr>()
+                    && is_private_or_local(&ip_addr) {
+                        trace!("Skipping GeoIP lookup for private/local IP: {}", ip);
+                        manager.record_detailed(detail);
+                        return;
+                    }
+
                 let ip = ip.clone();
                 let geoip = Arc::clone(geoip_provider.get_ref());
                 let manager = Arc::clone(manager);
