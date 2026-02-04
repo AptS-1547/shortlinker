@@ -68,7 +68,7 @@ impl ExternalApiProvider {
         let resp = match agent.get(&url).call() {
             Ok(r) => r,
             Err(e) => {
-                warn!("GeoIP API request failed: {}", e);
+                warn!("GeoIP API request to \"{}\" failed: {}", url, e);
                 return None;
             }
         };
@@ -76,7 +76,7 @@ impl ExternalApiProvider {
         let json: serde_json::Value = match resp.into_body().read_json() {
             Ok(j) => j,
             Err(e) => {
-                warn!("GeoIP API response parse failed: {}", e);
+                warn!("GeoIP API response from \"{}\" parse failed: {}", url, e);
                 return None;
             }
         };
@@ -97,7 +97,10 @@ impl ExternalApiProvider {
 
         let city = json["city"].as_str().map(String::from);
 
-        trace!("External API lookup: country={:?}, city={:?}", country, city);
+        trace!(
+            "External API lookup: country={:?}, city={:?}",
+            country, city
+        );
 
         Some(GeoInfo { country, city })
     }
@@ -147,7 +150,9 @@ mod tests {
     use super::*;
 
     /// 测试 ureq 基本 HTTP 请求
+    /// 依赖外部网络服务，CI 环境可能失败
     #[test]
+    #[ignore]
     fn test_ureq_basic_request() {
         let agent = get_agent();
 
@@ -164,7 +169,9 @@ mod tests {
     }
 
     /// 测试 fetch_from_api_sync 解析 ip-api.com 格式
+    /// 依赖外部网络服务，CI 环境可能失败
     #[test]
+    #[ignore]
     fn test_fetch_from_api_sync_real() {
         // 用 Google DNS 的 IP 测试（稳定、公开）
         let url = "http://ip-api.com/json/8.8.8.8?fields=status,countryCode,city".to_string();
@@ -174,16 +181,21 @@ mod tests {
         assert!(result.is_some(), "Should get GeoIP result for 8.8.8.8");
 
         let geo = result.unwrap();
-        assert_eq!(geo.country, Some("US".to_string()), "Google DNS should be in US");
+        assert_eq!(
+            geo.country,
+            Some("US".to_string()),
+            "Google DNS should be in US"
+        );
         // city 可能是空的，不强制断言
     }
 
     /// 测试 ExternalApiProvider 完整流程（含缓存）
+    /// 依赖外部网络服务，CI 环境可能失败
     #[tokio::test]
+    #[ignore]
     async fn test_external_api_provider_lookup() {
-        let provider = ExternalApiProvider::new(
-            "http://ip-api.com/json/{ip}?fields=status,countryCode,city",
-        );
+        let provider =
+            ExternalApiProvider::new("http://ip-api.com/json/{ip}?fields=status,countryCode,city");
 
         // 第一次查询（缓存未命中，发起 HTTP 请求）
         let result1 = provider.lookup("8.8.8.8").await;
@@ -197,11 +209,12 @@ mod tests {
     }
 
     /// 测试无效 IP 的处理
+    /// 依赖外部网络服务，CI 环境可能失败
     #[tokio::test]
+    #[ignore]
     async fn test_external_api_provider_invalid_ip() {
-        let provider = ExternalApiProvider::new(
-            "http://ip-api.com/json/{ip}?fields=status,countryCode,city",
-        );
+        let provider =
+            ExternalApiProvider::new("http://ip-api.com/json/{ip}?fields=status,countryCode,city");
 
         // 私有 IP 查询（ip-api.com 返回 {"status":"fail",...}）
         let result = provider.lookup("192.168.1.1").await;
@@ -211,7 +224,9 @@ mod tests {
     }
 
     /// 测试超时处理
+    /// 依赖外部网络服务，CI 环境可能失败
     #[test]
+    #[ignore]
     fn test_timeout_handling() {
         // 用一个不存在的地址测试超时
         let url = "http://192.0.2.1/timeout-test".to_string(); // TEST-NET, 不可路由
