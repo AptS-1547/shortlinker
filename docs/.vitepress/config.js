@@ -1,3 +1,20 @@
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
+
+// 动态读取 Cargo.toml 版本号
+function getVersion() {
+  try {
+    const cargoPath = resolve(__dirname, '../../Cargo.toml')
+    const content = readFileSync(cargoPath, 'utf-8')
+    const match = content.match(/^version\s*=\s*"([^"]+)"/m)
+    return match ? match[1] : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+const VERSION = getVersion()
+
 export default {
   title: "Shortlinker",
   description: "基于 Rust 构建的极简 URL 短链接服务，支持 HTTP 302 重定向，易于部署且性能卓越",
@@ -16,7 +33,14 @@ export default {
           { text: 'CLI 工具', link: '/cli/' },
           { text: 'Web 管理界面', link: '/admin-panel/' },
           { text: '部署指南', link: '/deployment/' },
-          { text: 'API 文档', link: '/api/' }
+          { text: 'API 文档', link: '/api/' },
+          {
+            text: `v${VERSION}`,
+            items: [
+              { text: '更新日志', link: 'https://github.com/AptS-1547/shortlinker/releases' },
+              { text: 'GitHub', link: 'https://github.com/AptS-1547/shortlinker' }
+            ]
+          }
         ],
         footer: {
           message: '基于 MIT 许可证发布',
@@ -56,7 +80,14 @@ export default {
           { text: 'CLI Tools', link: '/en/cli/' },
           { text: 'Web Admin Panel', link: '/en/admin-panel/' },
           { text: 'Deployment', link: '/en/deployment/' },
-          { text: 'API Docs', link: '/en/api/' }
+          { text: 'API Docs', link: '/en/api/' },
+          {
+            text: `v${VERSION}`,
+            items: [
+              { text: 'Changelog', link: 'https://github.com/AptS-1547/shortlinker/releases' },
+              { text: 'GitHub', link: 'https://github.com/AptS-1547/shortlinker' }
+            ]
+          }
         ],
         footer: {
           message: 'Released under the MIT License',

@@ -160,7 +160,7 @@ curl -sS -b cookies.txt \
 | TOML 键 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `analytics.maxminddb_path` | String | *(空)* | MaxMindDB 文件路径（GeoLite2-City.mmdb，可选；可读时优先使用本地解析） |
-| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | 外部 GeoIP API URL（MaxMindDB 不可用时 fallback；`{ip}` 为占位符） |
+| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=status,countryCode,city` | 外部 GeoIP API URL（MaxMindDB 不可用时 fallback；`{ip}` 为占位符） |
 
 > 说明：
 > - Provider 选择：`analytics.maxminddb_path` 可读时使用本地 MaxMind；否则使用外部 API（`analytics.geoip_api_url`）。

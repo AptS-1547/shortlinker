@@ -145,4 +145,4 @@ enable_rotation = true
 # External GeoIP API URL (fallback when MaxMindDB is not available)
 # Use {ip} as placeholder for the IP address
 # Default uses ip-api.com free tier (limited to 45 requests/minute)
-geoip_api_url = "http://ip-api.com/json/{ip}?fields=countryCode,city"
+geoip_api_url = "http://ip-api.com/json/{ip}?fields=status,countryCode,city"

@@ -447,13 +447,13 @@ pub struct AnalyticsConfig {
     pub maxminddb_path: Option<String>,
 
     /// 外部 GeoIP API URL (fallback)
-    /// 使用 {ip} 作为占位符，例如: http://ip-api.com/json/{ip}?fields=countryCode,city
+    /// 使用 {ip} 作为占位符，例如: http://ip-api.com/json/{ip}?fields=status,countryCode,city
     #[serde(default = "default_geoip_api_url")]
     pub geoip_api_url: String,
 }
 
 fn default_geoip_api_url() -> String {
-    "http://ip-api.com/json/{ip}?fields=countryCode,city".to_string()
+    "http://ip-api.com/json/{ip}?fields=status,countryCode,city".to_string()
 }
 
 impl Default for AnalyticsConfig {

@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.3] - 2026-02-04
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.3 是一次依赖优化版本，主要亮点：
+
+- **HTTP 客户端替换** - 将 reqwest 替换为轻量级的 ureq，显著减少依赖体积
+- **GeoIP 服务改进** - 改进日志信息，增强错误处理
+- **Docker 标签策略优化** - alpha/beta/rc 版本不再打 latest 标签
+
+### Changed
+- **HTTP 客户端迁移** - 将 GeoIP 外部 API 调用从 reqwest 迁移到 ureq
+  - ureq 是同步轻量级 HTTP 客户端，通过 `spawn_blocking` 异步执行
+  - 移除 hyper、quinn (QUIC)、tower 等重量级依赖，减小编译体积
+- **Docker 镜像标签策略** - 优化预发布版本的标签行为
+  - alpha/beta/rc 版本仅打版本号标签（如 `v0.5.0-alpha.3`）
+  - 正式版本打 `latest`、`stable` 和主版本号标签（如 `v1`）
+
+### Improved
+- **GeoIP 服务日志** - 错误日志中显示完整 URL，便于调试
+- **GeoIP API 响应处理** - 正确处理 ip-api.com 返回的 `status: fail` 状态
+- **文档版本显示** - VitePress 导航栏动态显示当前版本号
+
+### Fixed
+- **GeoIP API 默认 URL** - 增加 `status` 字段请求参数，确保能检测 API 失败状态
+
+### Dependencies
+- 替换 `reqwest` (0.13) 为 `ureq` (3.1.4)
+- 移除 hyper、hyper-util、quinn、tower、tower-http 等间接依赖
+
+### Tests
+- 新增 4 个 GeoIP 外部 API 测试（标记 `#[ignore]` 因依赖外部网络）
+
 ## [v0.5.0-alpha.2] - 2026-02-04
 
 ### 🎉 Release Highlights
@@ -1165,7 +1198,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...HEAD
+[v0.5.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [v0.5.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...v0.5.0-alpha.2
 [v0.5.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...v0.5.0-alpha.1
 [v0.4.3]: https://github.com/AptS-1547/shortlinker/compare/v0.4.2...v0.4.3

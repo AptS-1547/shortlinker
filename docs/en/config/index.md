@@ -145,7 +145,7 @@ See [Storage Backends](/en/config/storage) for URL formats.
 | TOML key | Type | Default | Description |
 |--------|------|---------|-------------|
 | `analytics.maxminddb_path` | String | *(empty)* | MaxMind GeoLite2-City.mmdb path (optional; preferred when readable) |
-| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=countryCode,city` | External GeoIP API URL fallback (`{ip}` placeholder) |
+| `analytics.geoip_api_url` | String | `http://ip-api.com/json/{ip}?fields=status,countryCode,city` | External GeoIP API URL fallback (`{ip}` placeholder) |
 
 > Notes:
 > - Provider selection: when `analytics.maxminddb_path` is set and readable, MaxMind is used; otherwise it falls back to the external API (`analytics.geoip_api_url`).

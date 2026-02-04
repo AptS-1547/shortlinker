@@ -15,7 +15,7 @@ use super::maxmind::MaxMindProvider;
 use crate::config::AnalyticsConfig;
 
 /// 地理位置信息
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct GeoInfo {
     /// ISO 3166-1 alpha-2 国家代码 (e.g., "CN", "US")
     pub country: Option<String>,

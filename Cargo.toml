@@ -1,6 +1,6 @@
 [package]
 name = "shortlinker"
-version = "0.5.0-alpha.2"
+version = "0.5.0-alpha.3"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 repository = "https://github.com/AptS-1547/shortlinker"
@@ -103,7 +103,7 @@ rpassword = "7"
 subtle = "2"
 base64 = "0.22"
 maxminddb = "0.27"
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+ureq = { version = "3.1.4", features = ["json"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
