@@ -61,13 +61,19 @@ rustc --version  # 应该 >= 1.85.0
 git clone https://github.com/AptS-1547/shortlinker.git
 cd shortlinker
 
-# 基础编译（仅服务器功能）
+# 默认编译（server + CLI）
 cargo build --release
+
+# 仅服务器（不包含 CLI/TUI）
+cargo build --release --no-default-features --features server
+
+# 启用 Prometheus metrics（导出到 /health/metrics，需要编译时启用）
+cargo build --release --features metrics
 
 # 包含 TUI 界面编译
 cargo build --release --features tui
 
-# 全功能编译（服务器 + CLI + TUI）
+# 全功能编译（服务器 + CLI + TUI + Metrics）
 cargo build --release --features full
 
 # 4. 运行

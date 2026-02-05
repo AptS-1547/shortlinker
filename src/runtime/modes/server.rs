@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::api::middleware::{
-    AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware,
+    AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware, TimingMiddleware,
 };
 use crate::api::services::{
     AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
@@ -203,6 +203,10 @@ pub async fn run_server() -> Result<()> {
     // toggling doesn't require a restart; actual lookup only happens when enabled.
     let geoip_provider = Arc::new(GeoIpProvider::new(&config.analytics));
 
+    // Start background system metrics updater (memory, CPU)
+    #[cfg(feature = "metrics")]
+    crate::metrics::spawn_system_metrics_updater();
+
     // Load CORS configuration from RuntimeConfig
     let cors_config = CorsSettings::from_runtime_config();
 
@@ -256,7 +260,8 @@ pub async fn run_server() -> Result<()> {
         let cors = build_cors_middleware(&cors_config);
 
         App::new()
-            .wrap(RequestIdMiddleware) // 最外层，为每个请求生成 request_id
+            .wrap(TimingMiddleware) // 最外层，记录请求延迟
+            .wrap(RequestIdMiddleware) // 为每个请求生成 request_id
             .wrap(cors)
             .wrap(Compress::default())
             .app_data(web::Data::new(cache.clone()))

@@ -101,12 +101,14 @@ curl -sS -X POST -b cookies.txt -c cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": { /* 响应数据 */ }
 }
 ```
 
 - `code = 0`：成功
-- `code = 1`：业务错误（具体原因在 `data.error`）
+- `code != 0`：失败（值为服务端 `ErrorCode` 数字枚举；错误原因在 `message`，`data` 通常会省略）
+- `message`：始终存在的人类可读提示；成功时通常为 `OK`
 - HTTP 状态码用于表达错误类型（如 `401/404/409/500`）
 
 ## 链接管理
@@ -134,6 +136,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {
       "code": "github",
@@ -177,6 +180,8 @@ curl -sS -X POST \
 
 **说明**：
 - `code`：短码（可选），不提供则自动生成随机短码
+  - 格式约束：非空、长度 ≤ 128，字符集 `[a-zA-Z0-9_.-/]`（支持多级路径）
+  - 不能与保留路由前缀冲突：默认 `admin` / `health` / `panel`（来自 `routes.*_prefix`），即短码不能等于这些前缀，也不能以 `{prefix}/` 开头
 - `target`：目标 URL（必需）
 - `expires_at`：过期时间（可选），支持相对时间（如 `"1d"`, `"7d"`, `"1w"`）或 RFC3339
 - `force`：当 `code` 已存在时，是否覆盖（可选，默认 `false`；未开启时会返回 `409 Conflict`）
@@ -239,6 +244,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "total_links": 100,
     "total_clicks": 5000,
@@ -252,6 +258,8 @@ curl -sS -b cookies.txt \
 ### POST /links/batch - 批量创建短链接
 
 > 注意：请求体是对象，字段名为 `links`，不是纯数组。
+>
+> `links[].code` 同样适用上文的短码格式/保留前缀约束。
 
 ```bash
 curl -sS -X POST \
@@ -320,6 +328,7 @@ curl -sS -X POST \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "total_rows": 10,
     "success_count": 9,
@@ -332,7 +341,7 @@ curl -sS -X POST \
 
 ## 运行时配置管理
 
-配置管理接口位于 `/{ADMIN_ROUTE_PREFIX}/v1/config` 下，返回值统一为 `{code,data}` 结构；敏感配置会自动掩码为 `[REDACTED]`。
+配置管理接口位于 `/{ADMIN_ROUTE_PREFIX}/v1/config` 下，返回值统一为 `{code,message,data}` 结构；敏感配置会自动掩码为 `[REDACTED]`。
 
 ### GET /config - 获取所有配置
 
@@ -475,6 +484,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
     "values": [100, 150, 120]
@@ -501,6 +511,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"code": "github", "clicks": 500},
     {"code": "google", "clicks": 300}
@@ -527,6 +538,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
     {"referrer": "(direct)", "count": 150, "percentage": 30.0}
@@ -553,6 +565,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"country": "CN", "city": "Beijing", "count": 100},
     {"country": "US", "city": "New York", "count": 80}
@@ -579,6 +592,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "browsers": [
       {"name": "Chrome", "count": 120, "percentage": 60.0}
@@ -613,6 +627,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "code": "github",
     "total_clicks": 500,
@@ -649,6 +664,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "browsers": [
       {"name": "Chrome", "count": 80, "percentage": 53.3}

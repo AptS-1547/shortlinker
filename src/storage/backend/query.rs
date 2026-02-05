@@ -4,6 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
+use std::time::Instant;
 
 use chrono::Utc;
 use futures_util::stream::Stream;
@@ -21,6 +22,23 @@ use crate::storage::models::LinkStats;
 use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
+
+/// Record database query metrics
+#[cfg(feature = "metrics")]
+fn record_db_metrics(operation: &str, start: Instant) {
+    let duration = start.elapsed().as_secs_f64();
+    crate::metrics::METRICS
+        .db_query_duration_seconds
+        .with_label_values(&[operation])
+        .observe(duration);
+    crate::metrics::METRICS
+        .db_queries_total
+        .with_label_values(&[operation])
+        .inc();
+}
+
+#[cfg(not(feature = "metrics"))]
+fn record_db_metrics(_operation: &str, _start: Instant) {}
 
 /// 根据 LinkFilter 构建 SeaORM 查询条件
 fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Condition {
@@ -74,6 +92,7 @@ struct StatsResult {
 
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
+        let start = Instant::now();
         let db = &self.db;
         let code_owned = code.to_string();
 
@@ -88,10 +107,12 @@ impl SeaOrmStorage {
             ))
         })?;
 
+        record_db_metrics("get", start);
         Ok(result.map(model_to_shortlink))
     }
 
     pub async fn load_all(&self) -> Result<HashMap<String, ShortLink>> {
+        let start = Instant::now();
         let models = short_link::Entity::find()
             .all(&self.db)
             .await
@@ -102,6 +123,7 @@ impl SeaOrmStorage {
                 ))
             })?;
 
+        record_db_metrics("load_all", start);
         let count = models.len();
         let links: HashMap<String, ShortLink> = models
             .into_iter()
@@ -116,6 +138,7 @@ impl SeaOrmStorage {
 
     /// 只加载所有短码（用于 Bloom Filter 初始化，内存占用小）
     pub async fn load_all_codes(&self) -> Result<Vec<String>> {
+        let start = Instant::now();
         let codes = short_link::Entity::find()
             .select_only()
             .column(short_link::Column::ShortCode)
@@ -129,6 +152,7 @@ impl SeaOrmStorage {
                 ))
             })?;
 
+        record_db_metrics("load_all_codes", start);
         info!("Loaded {} short codes for Bloom filter", codes.len());
         Ok(codes)
     }
@@ -177,12 +201,16 @@ impl SeaOrmStorage {
 
     /// 获取链接总数（轻量查询，用于健康检查）
     pub async fn count(&self) -> Result<u64> {
+        let start = Instant::now();
         let db = &self.db;
-        retry::with_retry("count", self.retry_config, || async {
+        let result = retry::with_retry("count", self.retry_config, || async {
             short_link::Entity::find().count(db).await
         })
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)))
+        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)));
+
+        record_db_metrics("count", start);
+        result
     }
 
     /// 带过滤条件的分页加载链接（带 COUNT 缓存）
@@ -192,6 +220,7 @@ impl SeaOrmStorage {
         page_size: u64,
         filter: LinkFilter,
     ) -> Result<(Vec<ShortLink>, u64)> {
+        let start = Instant::now();
         let now = Utc::now();
 
         // 生成缓存 key（基于过滤条件）
@@ -258,6 +287,7 @@ impl SeaOrmStorage {
         })?;
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
+        record_db_metrics("paginated_query", start);
         Ok((links, total))
     }
 
@@ -267,6 +297,7 @@ impl SeaOrmStorage {
             return Ok(HashMap::new());
         }
 
+        let start = Instant::now();
         let db = &self.db;
         let codes_owned: Vec<String> = codes.iter().map(|s| s.to_string()).collect();
 
@@ -284,6 +315,7 @@ impl SeaOrmStorage {
             ))
         })?;
 
+        record_db_metrics("batch_get", start);
         Ok(models
             .into_iter()
             .map(|m| {
@@ -340,6 +372,7 @@ impl SeaOrmStorage {
 
     /// 获取链接统计信息（SeaORM DSL 聚合查询）
     pub async fn get_stats(&self) -> Result<LinkStats> {
+        let start = Instant::now();
         let now = Utc::now();
 
         let result = short_link::Entity::find()
@@ -367,6 +400,7 @@ impl SeaOrmStorage {
                 ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
             })?;
 
+        record_db_metrics("get_stats", start);
         match result {
             Some(stats) => Ok(LinkStats {
                 total_links: stats.total_links as usize,

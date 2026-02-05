@@ -14,6 +14,8 @@ Detailed command line tool usage instructions and parameter options.
 ./shortlinker add <target_url> [options]
 ```
 
+> Note: short codes must satisfy constraints (length ≤ 128, allowed chars `[a-zA-Z0-9_.-/]`) and must not conflict with reserved route prefixes (default `admin`/`health`/`panel`, from `routes.*_prefix`).
+
 **Options**:
 - `--force`: Force overwrite existing short code
 - `--expire <time>`: Set expiration time

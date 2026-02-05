@@ -112,6 +112,7 @@ where
             }
             Err(e) => {
                 warn!("Bearer token validation failed: {}", e);
+                inc_counter!(crate::metrics::METRICS.auth_failures_total, &["bearer"]);
                 false
             }
         }
@@ -132,6 +133,7 @@ where
                 }
                 Err(e) => {
                     warn!("JWT validation failed: {}", e);
+                    inc_counter!(crate::metrics::METRICS.auth_failures_total, &["cookie"]);
                     return false;
                 }
             }

@@ -41,16 +41,19 @@ COPY --from=frontend-builder /app/admin-panel/dist ./admin-panel/dist
 # 编译选项
 ENV RUSTFLAGS="-C link-arg=-s -C opt-level=z -C target-feature=+crt-static"
 
+# 构建参数：可选 features（默认 cli）
+ARG CARGO_FEATURES="cli"
+
 # 静态链接编译 - 使用 musl 目标
 RUN touch src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl --features cli
+    cargo build --release --target x86_64-unknown-linux-musl --features "${CARGO_FEATURES}"
 
 # 运行阶段 - 使用scratch
 FROM scratch
 
 LABEL maintainer="AptS:1547 <apts-1547@esaps.net>"
 LABEL description="Shortlinker is a simple, fast, and secure URL shortener written in Rust."
-LABEL version="0.5.0-alpha.5"
+LABEL version="0.5.0-alpha.6"
 LABEL homepage="https://github.com/AptS-1547/shortlinker"
 LABEL license="MIT"
 

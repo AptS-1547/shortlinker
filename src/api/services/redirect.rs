@@ -73,6 +73,10 @@ impl RedirectService {
                     },
                     Ok(None) => {
                         debug!("Redirect link not found in database: {}", &capture_path);
+                        // Bloom filter false positive: bloom said "maybe exists" but DB says no
+                        inc_plain_counter!(
+                            crate::metrics::METRICS.bloom_filter_false_positives_total
+                        );
                         cache.mark_not_found(&capture_path).await;
                         Self::not_found_response()
                     }
@@ -91,6 +95,8 @@ impl RedirectService {
 
     #[inline]
     fn not_found_response() -> HttpResponse {
+        inc_counter!(crate::metrics::METRICS.redirects_total, &["404"]);
+
         HttpResponse::build(StatusCode::NOT_FOUND)
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
             .insert_header(("Cache-Control", "public, max-age=60"))
@@ -99,6 +105,8 @@ impl RedirectService {
 
     #[inline]
     fn error_response() -> HttpResponse {
+        inc_counter!(crate::metrics::METRICS.redirects_total, &["500"]);
+
         HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
             .body("Internal Server Error")
@@ -192,6 +200,8 @@ impl RedirectService {
     }
 
     fn finish_redirect(link: ShortLink) -> HttpResponse {
+        inc_counter!(crate::metrics::METRICS.redirects_total, &["307"]);
+
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
             .insert_header(("Location", link.target))
             .finish()

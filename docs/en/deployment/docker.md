@@ -4,16 +4,52 @@ Shortlinker provides optimized Docker images supporting various deployment metho
 
 ## Image Availability
 
+### Standard (Default)
+
+Without Prometheus metrics export, smaller image size.
+
 ```bash
 # Docker Hub (recommended)
 docker pull e1saps/shortlinker
 
-# GitHub Container Registry  
+# GitHub Container Registry
 docker pull ghcr.io/apts-1547/shortlinker
+```
 
-# Build from source
+### Metrics Edition
+
+Includes Prometheus metrics export (`/health/metrics` endpoint), suitable for monitored production environments.
+
+```bash
+# Docker Hub
+docker pull e1saps/shortlinker:latest-metrics
+
+# GitHub Container Registry
+docker pull ghcr.io/apts-1547/shortlinker:latest-metrics
+```
+
+### Available Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest build (standard) |
+| `latest-metrics` | Latest build (with Prometheus metrics) |
+| `stable` / `stable-metrics` | Latest stable release |
+| `edge` / `edge-metrics` | Latest pre-release (alpha/beta/rc) |
+| `v0.5.0-alpha.6` | Specific version (standard) |
+| `v0.5.0-alpha.6-metrics` | Specific version (with Prometheus metrics) |
+
+### Build from Source
+
+```bash
 git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker && docker build -t shortlinker .
+cd shortlinker
+
+# Standard
+docker build -t shortlinker .
+
+# Metrics edition
+docker build --build-arg CARGO_FEATURES="cli,metrics" -t shortlinker:metrics .
 ```
 
 ## Quick Start
@@ -151,6 +187,35 @@ docker-compose pull && docker-compose up -d
 - **Security**: No operating system, reduced attack surface
 - **Performance**: Single binary file, fast startup
 - **Cross-platform**: Supports amd64, arm64 architectures
+
+### Prometheus Metrics (Optional)
+
+`/health/metrics` (Prometheus text format) is provided by the compile-time `metrics` feature.
+
+If `GET /health/metrics` returns `404`, the current image/binary was built without that feature.
+
+**Recommended: Use the pre-built metrics image**
+
+```bash
+# Use the official image with -metrics suffix
+docker pull e1saps/shortlinker:latest-metrics
+```
+
+**Manual build:**
+
+```bash
+# Add metrics on top of default features
+cargo build --release --features metrics
+
+# Or explicitly enable (common in Dockerfile-style builds)
+cargo build --release --features cli,metrics
+
+# Full build (includes metrics)
+cargo build --release --features full
+
+# Docker self-build
+docker build --build-arg CARGO_FEATURES="cli,metrics" -t shortlinker:metrics .
+```
 
 ### Multi-stage Build
 ```dockerfile

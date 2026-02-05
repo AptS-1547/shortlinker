@@ -4,16 +4,52 @@ Shortlinker 提供了优化的 Docker 镜像，支持多种部署方式。
 
 ## 镜像获取
 
+### 标准版（默认）
+
+不含 Prometheus 指标导出功能，体积更小。
+
 ```bash
 # Docker Hub（推荐）
 docker pull e1saps/shortlinker
 
-# GitHub Container Registry  
+# GitHub Container Registry
 docker pull ghcr.io/apts-1547/shortlinker
+```
 
-# 自构建镜像
+### Metrics 版
+
+包含 Prometheus 指标导出功能（`/health/metrics` 端点），适合需要监控的生产环境。
+
+```bash
+# Docker Hub
+docker pull e1saps/shortlinker:latest-metrics
+
+# GitHub Container Registry
+docker pull ghcr.io/apts-1547/shortlinker:latest-metrics
+```
+
+### 可用标签
+
+| 标签 | 说明 |
+|------|------|
+| `latest` | 最新构建（标准版） |
+| `latest-metrics` | 最新构建（含 Prometheus 指标） |
+| `stable` / `stable-metrics` | 最新正式发布版本 |
+| `edge` / `edge-metrics` | 最新预发布版本（alpha/beta/rc） |
+| `v0.5.0-alpha.6` | 特定版本（标准版） |
+| `v0.5.0-alpha.6-metrics` | 特定版本（含 Prometheus 指标） |
+
+### 自构建镜像
+
+```bash
 git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker && docker build -t shortlinker .
+cd shortlinker
+
+# 标准版
+docker build -t shortlinker .
+
+# Metrics 版
+docker build --build-arg CARGO_FEATURES="cli,metrics" -t shortlinker:metrics .
 ```
 
 ## 快速启动
@@ -151,6 +187,35 @@ docker-compose pull && docker-compose up -d
 - **安全性**：无操作系统，减少攻击面
 - **性能**：单一二进制文件，启动迅速
 - **跨平台**：支持 amd64、arm64 架构
+
+### Prometheus metrics（可选）
+
+`/health/metrics`（Prometheus 文本格式）是**编译时** `metrics` feature 提供的能力。
+
+如果你访问 `GET /health/metrics` 返回 `404`，说明当前镜像/二进制未启用该 feature。
+
+**推荐方式：使用预构建的 metrics 镜像**
+
+```bash
+# 直接使用带 -metrics 后缀的官方镜像
+docker pull e1saps/shortlinker:latest-metrics
+```
+
+**手动编译启用：**
+
+```bash
+# 直接编译（在默认 features 基础上追加 metrics）
+cargo build --release --features metrics
+
+# 或者显式启用（例如 Dockerfile 中常见的 CLI 构建）
+cargo build --release --features cli,metrics
+
+# 全功能（包含 metrics）
+cargo build --release --features full
+
+# Docker 自构建
+docker build --build-arg CARGO_FEATURES="cli,metrics" -t shortlinker:metrics .
+```
 
 ### 多阶段构建
 ```dockerfile

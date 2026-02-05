@@ -9,6 +9,8 @@ use crate::storage::ShortLink;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(feature = "metrics")]
+use std::time::Instant;
 
 pub struct CompositeCache {
     filter_plugin: Arc<dyn ExistenceFilter>,
@@ -54,20 +56,76 @@ impl CompositeCache {
 impl CompositeCacheTrait for CompositeCache {
     async fn get(&self, key: &str) -> CacheResult {
         // Step 1: Bloom Filter 全量加载，false = 确定不存在
+        #[cfg(feature = "metrics")]
+        let bloom_start = Instant::now();
+
         if !self.filter_plugin.check(key).await {
+            #[cfg(feature = "metrics")]
+            {
+                let duration = bloom_start.elapsed().as_secs_f64();
+                crate::metrics::METRICS
+                    .cache_operation_duration_seconds
+                    .with_label_values(&["get", "bloom_filter"])
+                    .observe(duration);
+            }
+            inc_counter!(crate::metrics::METRICS.cache_hits_total, &["bloom_filter"]);
             return CacheResult::NotFound;
         }
 
         // Step 2: 检查 Negative Cache（数据库确认不存在的 key）
+        #[cfg(feature = "metrics")]
+        let neg_start = Instant::now();
+
         if self.negative_cache.contains(key).await {
+            #[cfg(feature = "metrics")]
+            {
+                let duration = neg_start.elapsed().as_secs_f64();
+                crate::metrics::METRICS
+                    .cache_operation_duration_seconds
+                    .with_label_values(&["get", "negative_cache"])
+                    .observe(duration);
+            }
+            inc_counter!(
+                crate::metrics::METRICS.cache_hits_total,
+                &["negative_cache"]
+            );
             return CacheResult::NotFound;
         }
 
         // Step 3: 检查 Object Cache
-        self.object_cache.get(key).await
+        #[cfg(feature = "metrics")]
+        let obj_start = Instant::now();
+
+        let result = self.object_cache.get(key).await;
+
+        #[cfg(feature = "metrics")]
+        {
+            let duration = obj_start.elapsed().as_secs_f64();
+            crate::metrics::METRICS
+                .cache_operation_duration_seconds
+                .with_label_values(&["get", "object_cache"])
+                .observe(duration);
+        }
+
+        match &result {
+            CacheResult::Found(_) => {
+                inc_counter!(crate::metrics::METRICS.cache_hits_total, &["object_cache"]);
+            }
+            CacheResult::Miss | CacheResult::NotFound => {
+                inc_counter!(
+                    crate::metrics::METRICS.cache_misses_total,
+                    &["object_cache"]
+                );
+            }
+        }
+
+        result
     }
 
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>) {
+        #[cfg(feature = "metrics")]
+        let start = Instant::now();
+
         // 清除 Negative Cache（如果有）
         self.negative_cache.remove(key).await;
 
@@ -76,12 +134,33 @@ impl CompositeCacheTrait for CompositeCache {
 
         // 写入 Object Cache
         self.object_cache.insert(key, value, ttl_secs).await;
+
+        #[cfg(feature = "metrics")]
+        {
+            let duration = start.elapsed().as_secs_f64();
+            crate::metrics::METRICS
+                .cache_operation_duration_seconds
+                .with_label_values(&["insert", "object_cache"])
+                .observe(duration);
+        }
     }
 
     async fn remove(&self, key: &str) {
+        #[cfg(feature = "metrics")]
+        let start = Instant::now();
+
         self.object_cache.remove(key).await;
         // Bloom Filter 不支持删除，用 Negative Cache 拦截后续请求
         self.negative_cache.mark(key).await;
+
+        #[cfg(feature = "metrics")]
+        {
+            let duration = start.elapsed().as_secs_f64();
+            crate::metrics::METRICS
+                .cache_operation_duration_seconds
+                .with_label_values(&["remove", "object_cache"])
+                .observe(duration);
+        }
     }
 
     async fn mark_not_found(&self, key: &str) {
@@ -124,6 +203,15 @@ impl CompositeCacheTrait for CompositeCache {
     async fn health_check(&self) -> CacheHealthStatus {
         let config = crate::config::get_config();
         let cache_type = config.cache.cache_type.clone();
+
+        // Update cache entry count metric
+        #[cfg(feature = "metrics")]
+        let entry_count = self.object_cache.entry_count();
+        set_gauge!(
+            crate::metrics::METRICS.cache_entries,
+            &["object_cache"],
+            entry_count as f64
+        );
 
         // Bloom filter 和 Negative cache 在创建时就初始化了，如果能到这里就是健康的
         CacheHealthStatus {

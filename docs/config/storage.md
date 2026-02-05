@@ -470,6 +470,7 @@ curl -sS -b cookies.txt http://localhost:8080/health
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "status": "healthy",
     "timestamp": "2025-06-01T12:00:00Z",
@@ -482,6 +483,12 @@ curl -sS -b cookies.txt http://localhost:8080/health
           "storage_type": "sqlite",
           "support_click": true
         }
+      },
+      "cache": {
+        "status": "healthy",
+        "cache_type": "memory",
+        "bloom_filter_enabled": true,
+        "negative_cache_enabled": true
       }
     },
     "response_time_ms": 15
