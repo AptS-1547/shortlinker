@@ -98,12 +98,12 @@ where
 
                 METRICS
                     .http_request_duration_seconds
-                    .with_label_values(&[method, &endpoint, status])
+                    .with_label_values(&[method, endpoint, status])
                     .observe(duration);
 
                 METRICS
                     .http_requests_total
-                    .with_label_values(&[method, &endpoint, status])
+                    .with_label_values(&[method, endpoint, status])
                     .inc();
             }
 
@@ -179,15 +179,15 @@ fn get_route_prefixes() -> &'static RoutePrefixes {
 ///
 /// This prevents label cardinality explosion by grouping paths.
 #[cfg(feature = "metrics")]
-fn classify_endpoint(path: &str) -> String {
+fn classify_endpoint(path: &str) -> &'static str {
     let prefixes = get_route_prefixes();
     if path.starts_with(&prefixes.admin) {
-        "admin".to_string()
+        "admin"
     } else if path.starts_with(&prefixes.health) {
-        "health".to_string()
+        "health"
     } else if path.starts_with(&prefixes.frontend) || path.starts_with("/assets") {
-        "frontend".to_string()
+        "frontend"
     } else {
-        "redirect".to_string()
+        "redirect"
     }
 }

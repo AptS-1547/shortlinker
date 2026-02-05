@@ -400,19 +400,14 @@ impl SeaOrmStorage {
                 ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
             })?;
 
+        record_db_metrics("get_stats", start);
         match result {
-            Some(stats) => {
-                record_db_metrics("get_stats", start);
-                Ok(LinkStats {
-                    total_links: stats.total_links as usize,
-                    total_clicks: stats.total_clicks.unwrap_or(0) as usize,
-                    active_links: stats.active_links.unwrap_or(0) as usize,
-                })
-            }
-            None => {
-                record_db_metrics("get_stats", start);
-                Ok(LinkStats::default())
-            }
+            Some(stats) => Ok(LinkStats {
+                total_links: stats.total_links as usize,
+                total_clicks: stats.total_clicks.unwrap_or(0) as usize,
+                active_links: stats.active_links.unwrap_or(0) as usize,
+            }),
+            None => Ok(LinkStats::default()),
         }
     }
 }
