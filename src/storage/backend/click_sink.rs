@@ -12,14 +12,12 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
 use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, ExprTrait};
-use std::collections::HashMap;
 use tracing::{debug, warn};
 
 use super::SeaOrmStorage;
 use super::retry;
 use crate::analytics::{
-    ClickAggregation, ClickDetail, ClickSink, DetailedClickSink, HourlyRollupWriter,
-    truncate_to_hour,
+    ClickDetail, ClickSink, DetailedClickSink, HourlyRollupWriter, truncate_to_hour,
 };
 use crate::utils::is_valid_short_code;
 
@@ -151,9 +149,6 @@ impl DetailedClickSink for SeaOrmStorage {
     }
 }
 
-/// 小时级聚合值: (count, referrer_counts, country_counts)
-type HourlyAggregation = (usize, HashMap<String, usize>, HashMap<String, usize>);
-
 impl SeaOrmStorage {
     /// 创建 HourlyRollupWriter 实例
     fn hourly_writer(&self) -> HourlyRollupWriter<'_, impl ConnectionTrait> {
@@ -199,49 +194,11 @@ impl SeaOrmStorage {
             return Ok(());
         }
 
-        // 按 (short_code, hour_bucket) 聚合
-        let mut aggregated: HashMap<(String, DateTime<Utc>), HourlyAggregation> = HashMap::new();
+        // 复用已有的聚合函数
+        let aggregated = crate::analytics::aggregate_click_details(details);
 
-        for detail in details {
-            let hour_bucket = truncate_to_hour(detail.timestamp);
-            let key = (detail.code.clone(), hour_bucket);
-
-            let entry = aggregated
-                .entry(key)
-                .or_insert_with(|| (0, HashMap::new(), HashMap::new()));
-            entry.0 += 1;
-
-            // 统计 referrer
-            let referrer_key = detail
-                .referrer
-                .clone()
-                .unwrap_or_else(|| "direct".to_string());
-            *entry.1.entry(referrer_key).or_insert(0) += 1;
-
-            // 统计 country
-            let country_key = detail
-                .country
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string());
-            *entry.2.entry(country_key).or_insert(0) += 1;
-        }
-
-        // 转换为 ClickAggregation 格式
-        let click_aggregated: HashMap<(String, DateTime<Utc>), ClickAggregation> = aggregated
-            .into_iter()
-            .map(|(key, (count, referrers, countries))| {
-                let agg = ClickAggregation {
-                    count,
-                    referrers,
-                    countries,
-                };
-                (key, agg)
-            })
-            .collect();
-
-        // 委托给 HourlyRollupWriter
         self.hourly_writer()
-            .upsert_hourly_with_details(&click_aggregated, "sink")
+            .upsert_hourly_with_details(&aggregated, "sink")
             .await
     }
 }
