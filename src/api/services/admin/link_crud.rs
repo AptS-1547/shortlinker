@@ -10,7 +10,7 @@ use crate::services::{CreateLinkRequest, LinkService, UpdateLinkRequest};
 use crate::storage::LinkFilter;
 
 use super::error_code::ErrorCode;
-use super::helpers::{error_from_shortlinker, success_response};
+use super::helpers::{error_from_shortlinker, error_response, success_response};
 use super::types::{
     ApiResponse, GetLinksQuery, LinkResponse, MessageResponse, PaginatedResponse, PaginationInfo,
     PostNewLink, StatsResponse,
@@ -30,19 +30,46 @@ pub async fn get_all_links(
     let page = query.page.unwrap_or(1).max(1) as u64;
     let page_size = query.page_size.unwrap_or(20).clamp(1, 100) as u64;
 
+    // 解析并验证日期参数
+    let created_after = match &query.created_after {
+        Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
+            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+            Err(_) => {
+                return Ok(error_response(
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    ErrorCode::InvalidDateFormat,
+                    &format!(
+                        "Invalid created_after: '{}'. Use RFC3339 (e.g., 2024-01-01T00:00:00Z)",
+                        s
+                    ),
+                ));
+            }
+        },
+        None => None,
+    };
+
+    let created_before = match &query.created_before {
+        Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
+            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+            Err(_) => {
+                return Ok(error_response(
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    ErrorCode::InvalidDateFormat,
+                    &format!(
+                        "Invalid created_before: '{}'. Use RFC3339 (e.g., 2024-01-01T00:00:00Z)",
+                        s
+                    ),
+                ));
+            }
+        },
+        None => None,
+    };
+
     // 构建过滤条件
     let filter = LinkFilter {
         search: query.search.clone(),
-        created_after: query
-            .created_after
-            .as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc)),
-        created_before: query
-            .created_before
-            .as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        created_after,
+        created_before,
         only_expired: query.only_expired.unwrap_or(false),
         only_active: query.only_active.unwrap_or(false),
     };

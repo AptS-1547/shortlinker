@@ -21,11 +21,14 @@ use crate::utils::password::{hash_password, is_argon2_hash};
 use crate::utils::url_validator::validate_url;
 
 use super::error_code::ErrorCode;
-use super::helpers::{error_from_shortlinker, success_response};
+use super::helpers::{error_from_shortlinker, error_response, success_response};
 use super::types::{CsvLinkRow, ExportQuery, ImportFailedItem, ImportMode, ImportResponse};
 
 /// 每批次序列化的链接数量
 const EXPORT_BATCH_SIZE: usize = 10000;
+
+/// 最大导入文件大小 (10MB)
+const MAX_IMPORT_FILE_SIZE: usize = 10 * 1024 * 1024;
 
 /// 通用流式 CSV 响应体生成器
 ///
@@ -162,19 +165,46 @@ pub async fn export_links(
         query
     );
 
+    // 解析并验证日期参数
+    let created_after = match &query.created_after {
+        Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
+            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+            Err(_) => {
+                return Ok(error_response(
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    ErrorCode::InvalidDateFormat,
+                    &format!(
+                        "Invalid created_after: '{}'. Use RFC3339 (e.g., 2024-01-01T00:00:00Z)",
+                        s
+                    ),
+                ));
+            }
+        },
+        None => None,
+    };
+
+    let created_before = match &query.created_before {
+        Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
+            Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
+            Err(_) => {
+                return Ok(error_response(
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    ErrorCode::InvalidDateFormat,
+                    &format!(
+                        "Invalid created_before: '{}'. Use RFC3339 (e.g., 2024-01-01T00:00:00Z)",
+                        s
+                    ),
+                ));
+            }
+        },
+        None => None,
+    };
+
     // 构建过滤条件
     let filter = LinkFilter {
         search: query.search.clone(),
-        created_after: query
-            .created_after
-            .as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc)),
-        created_before: query
-            .created_before
-            .as_ref()
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        created_after,
+        created_before,
         only_expired: query.only_expired.unwrap_or(false),
         only_active: query.only_active.unwrap_or(false),
     };
@@ -245,11 +275,24 @@ pub async fn import_links(
 
         match field_name.as_str() {
             "file" => {
-                // 读取文件内容
+                // 读取文件内容（带大小限制）
                 let mut data = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
-                        Ok(bytes) => data.extend_from_slice(&bytes),
+                        Ok(bytes) => {
+                            // 检查累积大小
+                            if data.len() + bytes.len() > MAX_IMPORT_FILE_SIZE {
+                                return Ok(error_response(
+                                    actix_web::http::StatusCode::BAD_REQUEST,
+                                    ErrorCode::FileTooLarge,
+                                    &format!(
+                                        "File size exceeds maximum {} MB",
+                                        MAX_IMPORT_FILE_SIZE / 1024 / 1024
+                                    ),
+                                ));
+                            }
+                            data.extend_from_slice(&bytes);
+                        }
                         Err(e) => {
                             error!("Failed to read file chunk: {}", e);
                             return Ok(error_from_shortlinker(&ShortlinkerError::file_read_error(

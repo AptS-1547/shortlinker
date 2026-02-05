@@ -48,12 +48,6 @@ pub use config_ops::{
     update_config,
 };
 
-/// 获取随机码长度配置
-pub(crate) fn get_random_code_length() -> usize {
-    crate::config::get_runtime_config()
-        .get_usize_or(crate::config::keys::FEATURES_RANDOM_CODE_LENGTH, 6)
-}
-
 /// AdminService 结构体，保持向后兼容
 pub struct AdminService;
 
@@ -127,28 +121,25 @@ impl AdminService {
     pub async fn batch_create_links(
         req: actix_web::HttpRequest,
         batch: actix_web::web::Json<BatchCreateRequest>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        batch_ops::batch_create_links(req, batch, cache, storage).await
+        batch_ops::batch_create_links(req, batch, service).await
     }
 
     pub async fn batch_update_links(
         req: actix_web::HttpRequest,
         batch: actix_web::web::Json<BatchUpdateRequest>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        batch_ops::batch_update_links(req, batch, cache, storage).await
+        batch_ops::batch_update_links(req, batch, service).await
     }
 
     pub async fn batch_delete_links(
         req: actix_web::HttpRequest,
         batch: actix_web::web::Json<BatchDeleteRequest>,
-        cache: actix_web::web::Data<std::sync::Arc<dyn crate::cache::traits::CompositeCacheTrait>>,
-        storage: actix_web::web::Data<std::sync::Arc<crate::storage::SeaOrmStorage>>,
+        service: actix_web::web::Data<std::sync::Arc<crate::services::LinkService>>,
     ) -> actix_web::Result<impl actix_web::Responder> {
-        batch_ops::batch_delete_links(req, batch, cache, storage).await
+        batch_ops::batch_delete_links(req, batch, service).await
     }
 
     pub async fn get_stats(

@@ -6,7 +6,7 @@ use actix_web::web;
 
 use super::AdminService;
 use super::analytics::{analytics_routes, get_link_analytics, get_link_device_stats};
-use super::auth::login_rate_limiter;
+use super::auth::{login_rate_limiter, refresh_rate_limiter};
 use super::config_ops::{
     get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
     update_config,
@@ -58,7 +58,7 @@ pub fn stats_routes() -> actix_web::Scope {
 ///
 /// 包含：
 /// - POST /auth/login - 登录（带限流）
-/// - POST /auth/refresh - 刷新 token
+/// - POST /auth/refresh - 刷新 token（带限流）
 /// - POST /auth/logout - 登出
 /// - GET /auth/verify - 验证 token
 pub fn auth_routes() -> actix_web::Scope {
@@ -69,7 +69,12 @@ pub fn auth_routes() -> actix_web::Scope {
                 .to(AdminService::check_admin_token)
                 .wrap(login_rate_limiter()),
         )
-        .route("/refresh", web::post().to(AdminService::refresh_token))
+        .route(
+            "/refresh",
+            web::post()
+                .to(AdminService::refresh_token)
+                .wrap(refresh_rate_limiter()),
+        )
         .route("/logout", web::post().to(AdminService::logout))
         .route("/verify", web::get().to(AdminService::verify_token))
 }

@@ -81,6 +81,15 @@ impl ObjectCache for MokaCacheWrapper {
         self.inner.invalidate(key).await;
     }
 
+    /// Invalidates all entries in the cache.
+    ///
+    /// # Note
+    /// Moka's `invalidate_all()` is **lazy** - entries are marked for deletion but
+    /// may still be readable for a brief window (typically <1ms). This is by design
+    /// for performance. The actual cleanup happens asynchronously via background tasks.
+    ///
+    /// If strong consistency is required (e.g., in tests), call `run_pending_tasks()`
+    /// after `invalidate_all()`, but be aware this has a performance cost.
     async fn invalidate_all(&self) {
         self.inner.invalidate_all();
     }

@@ -124,6 +124,23 @@ pub fn login_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
     Governor::new(&config)
 }
 
+/// 创建 refresh token 限流器
+///
+/// 配置：每 10 秒补充 1 个令牌，突发最多 10 次请求
+/// 比 login 限流更宽松，因为 refresh 是正常使用场景
+/// 超限返回 HTTP 429 Too Many Requests
+pub fn refresh_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
+    let config = GovernorConfigBuilder::default()
+        .seconds_per_request(10) // 令牌补充速率：每 10 秒 1 个
+        .burst_size(10) // 突发最多 10 次请求
+        .key_extractor(LoginKeyExtractor)
+        .finish()
+        .expect("Invalid rate limit config");
+
+    debug!("Refresh rate limiter created: 1 req/10s, burst 10");
+    Governor::new(&config)
+}
+
 /// 登录验证 - 检查管理员 token
 pub async fn check_admin_token(
     _req: HttpRequest,

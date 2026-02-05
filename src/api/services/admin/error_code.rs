@@ -29,6 +29,9 @@ pub enum ErrorCode {
     Unauthorized = 1001,
     NotFound = 1004,
     InternalServerError = 1005,
+    BatchSizeTooLarge = 1010,
+    FileTooLarge = 1011,
+    InvalidDateFormat = 1012,
     ServiceUnavailable = 1030,
 
     // 认证错误 2000-2099
