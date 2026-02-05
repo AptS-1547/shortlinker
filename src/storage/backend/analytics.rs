@@ -14,6 +14,7 @@ use sea_orm::{
     ColumnTrait, EntityTrait, ExprTrait, FromQueryResult, JoinType, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, sea_query::Expr,
 };
+use tracing::warn;
 
 use migration::entities::{
     click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly, user_agent,
@@ -591,6 +592,9 @@ impl super::SeaOrmStorage {
     }
 
     /// 从小时汇总表获取来源统计
+    ///
+    /// 注意：此方法在内存中聚合 JSON 字段，大时间范围查询可能影响性能。
+    /// 建议时间范围不超过 30 天。
     pub async fn get_link_referrers_from_rollup(
         &self,
         code: &str,
@@ -598,12 +602,32 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: usize,
     ) -> anyhow::Result<Vec<ReferrerRow>> {
+        // 时间范围检查
+        let duration = end - start;
+        if duration.num_days() > 30 {
+            warn!(
+                "get_link_referrers_from_rollup: Large time range ({} days) may cause memory issues",
+                duration.num_days()
+            );
+        }
+
+        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
+        const MAX_HOURLY_RECORDS: u64 = 2160;
+
         let records = click_stats_hourly::Entity::find()
             .filter(click_stats_hourly::Column::ShortCode.eq(code))
             .filter(click_stats_hourly::Column::HourBucket.gte(start))
             .filter(click_stats_hourly::Column::HourBucket.lte(end))
+            .limit(MAX_HOURLY_RECORDS)
             .all(&self.db)
             .await?;
+
+        if records.len() >= MAX_HOURLY_RECORDS as usize {
+            warn!(
+                "get_link_referrers_from_rollup: Query hit limit ({} records), results may be incomplete",
+                MAX_HOURLY_RECORDS
+            );
+        }
 
         // 聚合所有记录的 referrer 统计
         let mut aggregated: HashMap<String, i64> = HashMap::new();
@@ -636,6 +660,9 @@ impl super::SeaOrmStorage {
     }
 
     /// 从小时汇总表获取地理分布
+    ///
+    /// 注意：此方法在内存中聚合 JSON 字段，大时间范围查询可能影响性能。
+    /// 建议时间范围不超过 30 天。
     pub async fn get_link_geo_from_rollup(
         &self,
         code: &str,
@@ -643,12 +670,32 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: usize,
     ) -> anyhow::Result<Vec<GeoRow>> {
+        // 时间范围检查
+        let duration = end - start;
+        if duration.num_days() > 30 {
+            warn!(
+                "get_link_geo_from_rollup: Large time range ({} days) may cause memory issues",
+                duration.num_days()
+            );
+        }
+
+        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
+        const MAX_HOURLY_RECORDS: u64 = 2160;
+
         let records = click_stats_hourly::Entity::find()
             .filter(click_stats_hourly::Column::ShortCode.eq(code))
             .filter(click_stats_hourly::Column::HourBucket.gte(start))
             .filter(click_stats_hourly::Column::HourBucket.lte(end))
+            .limit(MAX_HOURLY_RECORDS)
             .all(&self.db)
             .await?;
+
+        if records.len() >= MAX_HOURLY_RECORDS as usize {
+            warn!(
+                "get_link_geo_from_rollup: Query hit limit ({} records), results may be incomplete",
+                MAX_HOURLY_RECORDS
+            );
+        }
 
         // 聚合所有记录的 country 统计
         let mut aggregated: HashMap<String, i64> = HashMap::new();
@@ -682,33 +729,30 @@ impl super::SeaOrmStorage {
     }
 
     /// 从天汇总表获取热门链接
+    ///
+    /// 使用 SQL GROUP BY + SUM 聚合，性能优于内存聚合。
     pub async fn get_top_links_from_daily(
         &self,
         start: NaiveDate,
         end: NaiveDate,
         limit: usize,
     ) -> anyhow::Result<Vec<TopLinkRow>> {
-        let records = click_stats_daily::Entity::find()
+        let count_expr = click_stats_daily::Column::ClickCount.sum();
+
+        let results = click_stats_daily::Entity::find()
+            .select_only()
+            .column(click_stats_daily::Column::ShortCode)
+            .column_as(count_expr.clone(), "count")
             .filter(click_stats_daily::Column::DayBucket.gte(start))
             .filter(click_stats_daily::Column::DayBucket.lte(end))
+            .group_by(click_stats_daily::Column::ShortCode)
+            .order_by_desc(count_expr)
+            .limit(limit as u64)
+            .into_model::<TopLinkRow>()
             .all(&self.db)
             .await?;
 
-        // 按 short_code 聚合
-        let mut aggregated: HashMap<String, i64> = HashMap::new();
-        for record in records {
-            *aggregated.entry(record.short_code).or_insert(0) += record.click_count;
-        }
-
-        // 排序并取 top N
-        let mut items: Vec<_> = aggregated.into_iter().collect();
-        items.sort_by(|a, b| b.1.cmp(&a.1));
-        items.truncate(limit);
-
-        Ok(items
-            .into_iter()
-            .map(|(short_code, count)| TopLinkRow { short_code, count })
-            .collect())
+        Ok(results)
     }
 
     // ============ 导出与分页 ============

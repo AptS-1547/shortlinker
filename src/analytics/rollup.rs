@@ -10,6 +10,7 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{debug, info};
 
+use super::HourlyRollupWriter;
 use crate::storage::backend::SeaOrmStorage;
 use crate::storage::backend::retry::{self, RetryConfig};
 use migration::entities::{click_stats_daily, click_stats_global_hourly, click_stats_hourly};
@@ -66,6 +67,11 @@ impl RollupManager {
         }
     }
 
+    /// 创建 HourlyRollupWriter 实例
+    fn hourly_writer(&self) -> HourlyRollupWriter<'_, impl sea_orm::ConnectionTrait> {
+        HourlyRollupWriter::new(self.storage.get_db(), self.retry_config)
+    }
+
     /// 将时间戳截断到当天开始
     pub fn truncate_to_day(ts: DateTime<Utc>) -> NaiveDate {
         ts.date_naive()
@@ -84,51 +90,18 @@ impl RollupManager {
         }
 
         let hour_bucket = super::truncate_to_hour(timestamp);
-        let db = self.storage.get_db();
+        let writer = self.hourly_writer();
 
-        for (code, count) in updates {
-            // 尝试查找现有记录
-            let existing = click_stats_hourly::Entity::find()
-                .filter(click_stats_hourly::Column::ShortCode.eq(code.as_str()))
-                .filter(click_stats_hourly::Column::HourBucket.eq(hour_bucket))
-                .one(db)
-                .await?;
-
-            if let Some(record) = existing {
-                // 更新现有记录
-                let mut active: click_stats_hourly::ActiveModel = record.into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count = Set(old_count + *count as i64);
-                }
-                retry::with_retry("update_hourly_stats", self.retry_config, || async {
-                    click_stats_hourly::Entity::update(active.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            } else {
-                // 插入新记录
-                let model = click_stats_hourly::ActiveModel {
-                    short_code: Set(code.clone()),
-                    hour_bucket: Set(hour_bucket),
-                    click_count: Set(*count as i64),
-                    referrer_counts: Set(None),
-                    country_counts: Set(None),
-                    ..Default::default()
-                };
-                retry::with_retry("insert_hourly_stats", self.retry_config, || async {
-                    click_stats_hourly::Entity::insert(model.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            }
-        }
+        // 更新各链接的小时汇总
+        writer
+            .upsert_hourly_counts(updates, timestamp, "rollup")
+            .await?;
 
         // 同时更新全局小时汇总
         let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
         let unique_links = updates.len() as i32;
-        self.update_global_hourly(hour_bucket, total_clicks, unique_links)
+        writer
+            .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "rollup")
             .await?;
 
         debug!(
@@ -152,110 +125,14 @@ impl RollupManager {
             return Ok(());
         }
 
-        let db = self.storage.get_db();
-
-        for ((code, hour_bucket), agg) in aggregated {
-            // 尝试查找现有记录
-            let existing = click_stats_hourly::Entity::find()
-                .filter(click_stats_hourly::Column::ShortCode.eq(code.as_str()))
-                .filter(click_stats_hourly::Column::HourBucket.eq(*hour_bucket))
-                .one(db)
-                .await?;
-
-            if let Some(record) = existing {
-                // 合并现有数据
-                let mut merged_referrers = super::parse_json_counts(&record.referrer_counts);
-                let mut merged_countries = super::parse_json_counts(&record.country_counts);
-
-                for (k, v) in &agg.referrers {
-                    *merged_referrers.entry(k.clone()).or_insert(0) += v;
-                }
-                for (k, v) in &agg.countries {
-                    *merged_countries.entry(k.clone()).or_insert(0) += v;
-                }
-
-                let mut active: click_stats_hourly::ActiveModel = record.into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count = Set(old_count + agg.count as i64);
-                }
-                active.referrer_counts = Set(Some(super::to_json_string(&merged_referrers)));
-                active.country_counts = Set(Some(super::to_json_string(&merged_countries)));
-
-                retry::with_retry("update_hourly_detailed", self.retry_config, || async {
-                    click_stats_hourly::Entity::update(active.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            } else {
-                // 插入新记录
-                let model = click_stats_hourly::ActiveModel {
-                    short_code: Set(code.clone()),
-                    hour_bucket: Set(*hour_bucket),
-                    click_count: Set(agg.count as i64),
-                    referrer_counts: Set(Some(super::to_json_string(&agg.referrers))),
-                    country_counts: Set(Some(super::to_json_string(&agg.countries))),
-                    ..Default::default()
-                };
-                retry::with_retry("insert_hourly_detailed", self.retry_config, || async {
-                    click_stats_hourly::Entity::insert(model.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            }
-        }
+        self.hourly_writer()
+            .upsert_hourly_with_details(aggregated, "rollup")
+            .await?;
 
         debug!(
             "Detailed hourly rollup updated: {} records",
             aggregated.len()
         );
-        Ok(())
-    }
-
-    /// 更新全局小时汇总
-    async fn update_global_hourly(
-        &self,
-        hour_bucket: DateTime<Utc>,
-        clicks: usize,
-        unique_links: i32,
-    ) -> anyhow::Result<()> {
-        let db = self.storage.get_db();
-
-        let existing = click_stats_global_hourly::Entity::find()
-            .filter(click_stats_global_hourly::Column::HourBucket.eq(hour_bucket))
-            .one(db)
-            .await?;
-
-        if let Some(record) = existing {
-            let mut active: click_stats_global_hourly::ActiveModel = record.into();
-            if let Set(old_clicks) = active.total_clicks {
-                active.total_clicks = Set(old_clicks + clicks as i64);
-            }
-            // unique_links 不做累加（会导致重复计数），留给 rollup_hourly_to_daily 从 hourly 表统计
-            retry::with_retry("update_global_hourly", self.retry_config, || async {
-                click_stats_global_hourly::Entity::update(active.clone())
-                    .exec(db)
-                    .await
-            })
-            .await?;
-        } else {
-            let model = click_stats_global_hourly::ActiveModel {
-                hour_bucket: Set(hour_bucket),
-                total_clicks: Set(clicks as i64),
-                unique_links: Set(Some(unique_links)),
-                top_referrers: Set(None),
-                top_countries: Set(None),
-                ..Default::default()
-            };
-            retry::with_retry("insert_global_hourly", self.retry_config, || async {
-                click_stats_global_hourly::Entity::insert(model.clone())
-                    .exec(db)
-                    .await
-            })
-            .await?;
-        }
-
         Ok(())
     }
 

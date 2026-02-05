@@ -1,9 +1,11 @@
 pub mod global;
+pub mod hourly_writer;
 pub mod manager;
 pub mod retention;
 pub mod rollup;
 pub mod sink;
 
+pub use hourly_writer::HourlyRollupWriter;
 pub use manager::ClickManager;
 pub use retention::DataRetentionTask;
 pub use rollup::{ClickAggregation, RollupManager, aggregate_click_details};

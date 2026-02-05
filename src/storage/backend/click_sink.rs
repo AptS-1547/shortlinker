@@ -11,18 +11,19 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
-use sea_orm::{
-    ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter,
-};
+use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, ExprTrait};
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
 use super::SeaOrmStorage;
 use super::retry;
-use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
+use crate::analytics::{
+    ClickAggregation, ClickDetail, ClickSink, DetailedClickSink, HourlyRollupWriter,
+    truncate_to_hour,
+};
 use crate::utils::is_valid_short_code;
 
-use migration::entities::{click_log, click_stats_global_hourly, click_stats_hourly, short_link};
+use migration::entities::{click_log, short_link};
 
 #[async_trait]
 impl ClickSink for SeaOrmStorage {
@@ -154,58 +155,30 @@ impl DetailedClickSink for SeaOrmStorage {
 type HourlyAggregation = (usize, HashMap<String, usize>, HashMap<String, usize>);
 
 impl SeaOrmStorage {
+    /// 创建 HourlyRollupWriter 实例
+    fn hourly_writer(&self) -> HourlyRollupWriter<'_, impl ConnectionTrait> {
+        HourlyRollupWriter::new(&self.db, self.retry_config)
+    }
+
     /// 更新小时汇总（仅计数）
     async fn update_hourly_rollup(
         &self,
         updates: &[(String, usize)],
         timestamp: DateTime<Utc>,
     ) -> anyhow::Result<()> {
-        let hour_bucket = crate::analytics::truncate_to_hour(timestamp);
-        let db = &self.db;
+        let hour_bucket = truncate_to_hour(timestamp);
+        let writer = self.hourly_writer();
 
-        for (code, count) in updates {
-            // 尝试查找现有记录
-            let existing = click_stats_hourly::Entity::find()
-                .filter(click_stats_hourly::Column::ShortCode.eq(code.as_str()))
-                .filter(click_stats_hourly::Column::HourBucket.eq(hour_bucket))
-                .one(db)
-                .await?;
-
-            if let Some(record) = existing {
-                // 更新现有记录
-                let mut active: click_stats_hourly::ActiveModel = record.into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count = Set(old_count + *count as i64);
-                }
-                retry::with_retry("sink_update_hourly", self.retry_config, || async {
-                    click_stats_hourly::Entity::update(active.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            } else {
-                // 插入新记录
-                let model = click_stats_hourly::ActiveModel {
-                    short_code: Set(code.clone()),
-                    hour_bucket: Set(hour_bucket),
-                    click_count: Set(*count as i64),
-                    referrer_counts: Set(None),
-                    country_counts: Set(None),
-                    ..Default::default()
-                };
-                retry::with_retry("sink_insert_hourly", self.retry_config, || async {
-                    click_stats_hourly::Entity::insert(model.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            }
-        }
+        // 更新各链接的小时汇总
+        writer
+            .upsert_hourly_counts(updates, timestamp, "sink")
+            .await?;
 
         // 更新全局小时汇总
         let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
         let unique_links = updates.len() as i32;
-        self.update_global_hourly(hour_bucket, total_clicks, unique_links)
+        writer
+            .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "sink")
             .await?;
 
         debug!(
@@ -226,13 +199,11 @@ impl SeaOrmStorage {
             return Ok(());
         }
 
-        let db = &self.db;
-
         // 按 (short_code, hour_bucket) 聚合
         let mut aggregated: HashMap<(String, DateTime<Utc>), HourlyAggregation> = HashMap::new();
 
         for detail in details {
-            let hour_bucket = crate::analytics::truncate_to_hour(detail.timestamp);
+            let hour_bucket = truncate_to_hour(detail.timestamp);
             let key = (detail.code.clone(), hour_bucket);
 
             let entry = aggregated
@@ -255,106 +226,22 @@ impl SeaOrmStorage {
             *entry.2.entry(country_key).or_insert(0) += 1;
         }
 
-        for ((code, hour_bucket), (count, referrers, countries)) in aggregated {
-            let existing = click_stats_hourly::Entity::find()
-                .filter(click_stats_hourly::Column::ShortCode.eq(&code))
-                .filter(click_stats_hourly::Column::HourBucket.eq(hour_bucket))
-                .one(db)
-                .await?;
-
-            if let Some(record) = existing {
-                // 合并现有数据
-                let mut merged_referrers =
-                    crate::analytics::parse_json_counts(&record.referrer_counts);
-                let mut merged_countries =
-                    crate::analytics::parse_json_counts(&record.country_counts);
-
-                for (k, v) in &referrers {
-                    *merged_referrers.entry(k.clone()).or_insert(0) += v;
-                }
-                for (k, v) in &countries {
-                    *merged_countries.entry(k.clone()).or_insert(0) += v;
-                }
-
-                let mut active: click_stats_hourly::ActiveModel = record.into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count = Set(old_count + count as i64);
-                }
-                active.referrer_counts =
-                    Set(Some(crate::analytics::to_json_string(&merged_referrers)));
-                active.country_counts =
-                    Set(Some(crate::analytics::to_json_string(&merged_countries)));
-
-                retry::with_retry("sink_update_hourly_detailed", self.retry_config, || async {
-                    click_stats_hourly::Entity::update(active.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            } else {
-                let model = click_stats_hourly::ActiveModel {
-                    short_code: Set(code),
-                    hour_bucket: Set(hour_bucket),
-                    click_count: Set(count as i64),
-                    referrer_counts: Set(Some(crate::analytics::to_json_string(&referrers))),
-                    country_counts: Set(Some(crate::analytics::to_json_string(&countries))),
-                    ..Default::default()
+        // 转换为 ClickAggregation 格式
+        let click_aggregated: HashMap<(String, DateTime<Utc>), ClickAggregation> = aggregated
+            .into_iter()
+            .map(|(key, (count, referrers, countries))| {
+                let agg = ClickAggregation {
+                    count,
+                    referrers,
+                    countries,
                 };
-                retry::with_retry("sink_insert_hourly_detailed", self.retry_config, || async {
-                    click_stats_hourly::Entity::insert(model.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// 更新全局小时汇总
-    async fn update_global_hourly(
-        &self,
-        hour_bucket: DateTime<Utc>,
-        clicks: usize,
-        unique_links: i32,
-    ) -> anyhow::Result<()> {
-        let db = &self.db;
-
-        let existing = click_stats_global_hourly::Entity::find()
-            .filter(click_stats_global_hourly::Column::HourBucket.eq(hour_bucket))
-            .one(db)
-            .await?;
-
-        if let Some(record) = existing {
-            let mut active: click_stats_global_hourly::ActiveModel = record.into();
-            if let Set(old_clicks) = active.total_clicks {
-                active.total_clicks = Set(old_clicks + clicks as i64);
-            }
-            // unique_links 不做累加（会导致重复计数），留给 rollup 从 hourly 表统计
-            retry::with_retry("sink_update_global_hourly", self.retry_config, || async {
-                click_stats_global_hourly::Entity::update(active.clone())
-                    .exec(db)
-                    .await
+                (key, agg)
             })
-            .await?;
-        } else {
-            let model = click_stats_global_hourly::ActiveModel {
-                hour_bucket: Set(hour_bucket),
-                total_clicks: Set(clicks as i64),
-                unique_links: Set(Some(unique_links)),
-                top_referrers: Set(None),
-                top_countries: Set(None),
-                ..Default::default()
-            };
-            retry::with_retry("sink_insert_global_hourly", self.retry_config, || async {
-                click_stats_global_hourly::Entity::insert(model.clone())
-                    .exec(db)
-                    .await
-            })
-            .await?;
-        }
+            .collect();
 
-        Ok(())
+        // 委托给 HourlyRollupWriter
+        self.hourly_writer()
+            .upsert_hourly_with_details(&click_aggregated, "sink")
+            .await
     }
 }
