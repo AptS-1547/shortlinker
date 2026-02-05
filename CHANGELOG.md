@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.5] - 2026-02-05
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.5 是一次代码质量和安全性提升版本，主要亮点：
+
+- **请求 ID 中间件** - 每个请求分配唯一 UUID，注入日志 span 和响应头，便于追踪调试
+- **缓存健康检查** - 健康检查端点新增缓存状态信息（类型、Bloom filter、Negative cache 状态）
+- **批量操作安全增强** - 新增 5000 条批量大小限制和 10MB 导入文件限制
+- **关机超时机制** - 优雅关闭增加 30 秒总超时保护，防止关闭卡死
+
+### Added
+- **Request ID 中间件** - 为每个请求生成 UUID v4，注入 tracing span 和 `X-Request-ID` 响应头
+- **缓存健康检查** - `/health` 端点现在返回缓存状态（类型、Bloom filter、Negative cache）
+- **Refresh Token 限流** - 每 10 秒 1 次请求，突发最多 10 次，防止滥用
+- **批量操作大小限制** - 批量创建/更新/删除最多 5000 条
+- **导入文件大小限制** - CSV 导入最大 10MB
+- **新增错误码** - `BatchSizeTooLarge`、`FileTooLarge`、`InvalidDateFormat`、`LinkInvalidCode`、`LinkReservedCode`
+
+### Improved
+- **关机流程** - 增加超时机制（30 秒总超时，单任务 10 秒），超时强制退出防止卡死
+- **日期参数验证** - `created_after`/`created_before` 参数无效时返回明确错误信息
+- **JWT Service 缓存** - 使用 `OnceLock` 缓存实例，避免每次请求重复创建
+- **登录日志** - 登录成功/失败日志包含客户端 IP
+- **Bloom filter 初始容量** - 改为 100（启动时 reconfigure 会用实际数量替换），减少初始内存占用
+
+### Security
+- **Health Token 常量时间比较** - 使用 `subtle::ConstantTimeEq` 防止时序攻击
+- **Admin Token 生成增强** - 默认使用加密安全的 `OsRng` 生成 32 字符令牌
+
+### Refactored
+- **移除 AdminService 包装层** - 直接使用函数，减少间接调用
+- **IP 提取逻辑统一** - 登录限流和其他地方共用 `utils/ip.rs` 中的函数
+- **批量操作重构** - 使用 `LinkService` 统一业务逻辑层
+- **小时汇总写入器** - 新增 `HourlyRollupWriter` 统一 click_sink 和 rollup 的汇总逻辑
+- **配置管理代码** - 使用宏简化 `get_runtime_config_or_return!()` 重复模式
+- **前端服务** - 统一 `serve_index_html()` 逻辑，消除代码重复
+
 ## [v0.5.0-alpha.4] - 2026-02-05
 
 ### 🎉 Release Highlights
@@ -1255,7 +1293,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...HEAD
+[v0.5.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...v0.5.0-alpha.5
 [v0.5.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...v0.5.0-alpha.4
 [v0.5.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [v0.5.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...v0.5.0-alpha.2
