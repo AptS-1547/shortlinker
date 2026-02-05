@@ -9,7 +9,7 @@ use rand::Rng;
 use std::net::SocketAddr;
 use tracing::{debug, error, info, warn};
 
-use crate::api::jwt::JwtService;
+use crate::api::jwt::get_jwt_service;
 use crate::config::{get_config, get_runtime_config, keys};
 use crate::utils::ip::{is_private_or_local, is_trusted_proxy};
 use crate::utils::password::verify_password;
@@ -169,8 +169,8 @@ pub async fn check_admin_token(
 
     info!("Admin API: login successful");
 
-    // Generate JWT tokens
-    let jwt_service = JwtService::from_config();
+    // Generate JWT tokens using cached service
+    let jwt_service = get_jwt_service();
     let access_token = match jwt_service.generate_access_token() {
         Ok(token) => token,
         Err(e) => {
@@ -230,8 +230,8 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
         }
     };
 
-    // Validate refresh token
-    let jwt_service = JwtService::from_config();
+    // Validate refresh token using cached service
+    let jwt_service = get_jwt_service();
     if let Err(e) = jwt_service.validate_refresh_token(&refresh_token) {
         warn!("Admin API: invalid refresh token: {}", e);
         return Ok(error_from_shortlinker(

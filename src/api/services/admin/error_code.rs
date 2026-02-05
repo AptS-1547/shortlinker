@@ -49,6 +49,8 @@ pub enum ErrorCode {
     LinkPasswordHashError = 3004,
     LinkDatabaseError = 3005,
     LinkEmptyCode = 3006,
+    LinkInvalidCode = 3007,
+    LinkReservedCode = 3008,
 
     // 导入导出错误 4000-4099
     ImportFailed = 4000,

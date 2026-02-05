@@ -4,13 +4,18 @@
 
 use actix_web::web;
 
-use super::AdminService;
 use super::analytics::{analytics_routes, get_link_analytics, get_link_device_stats};
-use super::auth::{login_rate_limiter, refresh_rate_limiter};
+use super::auth::{
+    check_admin_token, login_rate_limiter, logout, refresh_rate_limiter, refresh_token,
+    verify_token,
+};
+use super::batch_ops::{batch_create_links, batch_delete_links, batch_update_links};
 use super::config_ops::{
     get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
     update_config,
 };
+use super::export_import::{export_links, import_links};
+use super::link_crud::{delete_link, get_all_links, get_link, get_stats, post_link, update_link};
 
 /// 链接管理路由 `/links`
 ///
@@ -24,16 +29,16 @@ use super::config_ops::{
 /// - GET /links/{code}/analytics/devices - 获取单链接设备统计
 pub fn links_routes() -> actix_web::Scope {
     web::scope("/links")
-        .route("", web::get().to(AdminService::get_all_links))
-        .route("", web::head().to(AdminService::get_all_links))
-        .route("", web::post().to(AdminService::post_link))
+        .route("", web::get().to(get_all_links))
+        .route("", web::head().to(get_all_links))
+        .route("", web::post().to(post_link))
         // Batch operations (must be before /{code:.*})
-        .route("/batch", web::post().to(AdminService::batch_create_links))
-        .route("/batch", web::put().to(AdminService::batch_update_links))
-        .route("/batch", web::delete().to(AdminService::batch_delete_links))
+        .route("/batch", web::post().to(batch_create_links))
+        .route("/batch", web::put().to(batch_update_links))
+        .route("/batch", web::delete().to(batch_delete_links))
         // Export/Import operations (must be before /{code:.*})
-        .route("/export", web::get().to(AdminService::export_links))
-        .route("/import", web::post().to(AdminService::import_links))
+        .route("/export", web::get().to(export_links))
+        .route("/import", web::post().to(import_links))
         // Single link analytics (must be before /{code:.*})
         .route(
             "/{code}/analytics/devices",
@@ -41,17 +46,17 @@ pub fn links_routes() -> actix_web::Scope {
         )
         .route("/{code}/analytics", web::get().to(get_link_analytics))
         // Single link operations (must be last due to wildcard)
-        .route("/{code:.*}", web::get().to(AdminService::get_link))
-        .route("/{code:.*}", web::head().to(AdminService::get_link))
-        .route("/{code:.*}", web::put().to(AdminService::update_link))
-        .route("/{code:.*}", web::delete().to(AdminService::delete_link))
+        .route("/{code:.*}", web::get().to(get_link))
+        .route("/{code:.*}", web::head().to(get_link))
+        .route("/{code:.*}", web::put().to(update_link))
+        .route("/{code:.*}", web::delete().to(delete_link))
 }
 
 /// 统计路由 `/stats`
 pub fn stats_routes() -> actix_web::Scope {
     web::scope("/stats")
-        .route("", web::get().to(AdminService::get_stats))
-        .route("", web::head().to(AdminService::get_stats))
+        .route("", web::get().to(get_stats))
+        .route("", web::head().to(get_stats))
 }
 
 /// 认证路由 `/auth`
@@ -65,18 +70,14 @@ pub fn auth_routes() -> actix_web::Scope {
     web::scope("/auth")
         .route(
             "/login",
-            web::post()
-                .to(AdminService::check_admin_token)
-                .wrap(login_rate_limiter()),
+            web::post().to(check_admin_token).wrap(login_rate_limiter()),
         )
         .route(
             "/refresh",
-            web::post()
-                .to(AdminService::refresh_token)
-                .wrap(refresh_rate_limiter()),
+            web::post().to(refresh_token).wrap(refresh_rate_limiter()),
         )
-        .route("/logout", web::post().to(AdminService::logout))
-        .route("/verify", web::get().to(AdminService::verify_token))
+        .route("/logout", web::post().to(logout))
+        .route("/verify", web::get().to(verify_token))
 }
 
 /// 配置管理路由 `/config`

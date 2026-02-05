@@ -23,6 +23,42 @@ pub fn is_valid_short_code(code: &str) -> bool {
         )
 }
 
+/// 获取保留的路由前缀
+///
+/// 必须从 RuntimeConfig 读取，因为配置可能在数据库中被修改。
+/// RuntimeConfig 未初始化时使用默认值（仅启动早期）。
+pub fn get_reserved_prefixes() -> Vec<String> {
+    use crate::config::{keys, try_get_runtime_config};
+
+    let rt = match try_get_runtime_config() {
+        Some(rt) => rt,
+        None => {
+            return vec!["admin".into(), "health".into(), "panel".into()];
+        }
+    };
+
+    vec![
+        rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin"),
+        rt.get_or(keys::ROUTES_HEALTH_PREFIX, "/health"),
+        rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel"),
+    ]
+    .into_iter()
+    .map(|p| p.trim_start_matches('/').to_string())
+    .collect()
+}
+
+/// 检查短码是否与保留路由冲突
+///
+/// 检查规则：
+/// - 短码完全匹配保留前缀（如 "admin"）
+/// - 短码以 "保留前缀/" 开头（如 "admin/xxx"）
+pub fn is_reserved_short_code(code: &str) -> bool {
+    let prefixes = get_reserved_prefixes();
+    prefixes
+        .iter()
+        .any(|prefix| code == prefix || code.starts_with(&format!("{}/", prefix)))
+}
+
 pub fn generate_random_code(length: usize) -> String {
     use rand::Rng;
     use std::iter;

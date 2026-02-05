@@ -1,6 +1,18 @@
 use chrono::{Duration, Utc};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+
+/// Global cached JwtService instance
+static JWT_SERVICE: OnceLock<JwtService> = OnceLock::new();
+
+/// Get the cached JwtService instance
+///
+/// Uses OnceLock for thread-safe lazy initialization.
+/// The service is initialized once on first use and reused for all subsequent requests.
+pub fn get_jwt_service() -> &'static JwtService {
+    JWT_SERVICE.get_or_init(JwtService::from_config)
+}
 
 /// Access Token Claims
 #[derive(Debug, Serialize, Deserialize)]

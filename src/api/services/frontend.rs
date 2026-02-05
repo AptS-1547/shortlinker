@@ -39,10 +39,13 @@ impl FrontendService {
         FrontendAssets::get(file_path).map(|c| c.data.into_owned())
     }
 
-    /// 处理前端首页 - 服务构建好的 index.html
-    pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
-        trace!("Serving frontend index page from dist");
-
+    /// 服务 index.html 的公共逻辑
+    ///
+    /// 处理：
+    /// - 尾部斜杠规范化
+    /// - 配置占位符替换
+    /// - 自定义前端 fallback
+    async fn serve_index_html(req: &HttpRequest) -> Result<HttpResponse> {
         let rt = get_runtime_config();
         let frontend_prefix = rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel");
         let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
@@ -57,39 +60,37 @@ impl FrontendService {
                 .finish());
         }
 
-        // 优先尝试加载自定义前端
+        // 加载 index.html
         let content = Self::load_frontend_file("index.html").await;
 
-        match content {
-            Some(data) => {
-                // 将字节数组转换为字符串并替换占位符
-                let html_content = String::from_utf8_lossy(&data);
-                let processed_html = html_content
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
-                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
-
-                Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
-                    .body(processed_html))
-            }
+        let html = match content {
+            Some(data) => String::from_utf8_lossy(&data).into_owned(),
             None => {
                 // 使用编译时包含作为后备
-                let fallback_html = include_str!(concat!(
+                include_str!(concat!(
                     env!("CARGO_MANIFEST_DIR"),
                     "/admin-panel/dist/index.html"
-                ));
-                let processed_html = fallback_html
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
-                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
-                Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
-                    .body(processed_html))
+                ))
+                .to_string()
             }
-        }
+        };
+
+        // 替换配置占位符
+        let processed_html = html
+            .replace("%BASE_PATH%", &frontend_prefix)
+            .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
+            .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
+            .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
+
+        Ok(HttpResponse::Ok()
+            .content_type("text/html; charset=utf-8")
+            .body(processed_html))
+    }
+
+    /// 处理前端首页 - 服务构建好的 index.html
+    pub async fn handle_index(req: HttpRequest) -> Result<HttpResponse> {
+        trace!("Serving frontend index page from dist");
+        Self::serve_index_html(&req).await
     }
 
     /// 处理静态资源文件
@@ -143,54 +144,7 @@ impl FrontendService {
     /// 处理所有未匹配的路由，返回 index.html（用于 SPA 路由）
     pub async fn handle_spa_fallback(req: HttpRequest) -> Result<HttpResponse> {
         trace!("SPA fallback - serving index.html");
-
-        let rt = get_runtime_config();
-        let frontend_prefix = rt.get_or(keys::ROUTES_FRONTEND_PREFIX, "/panel");
-        let admin_prefix = rt.get_or(keys::ROUTES_ADMIN_PREFIX, "/admin");
-        let health_prefix = rt.get_or(keys::ROUTES_HEALTH_PREFIX, "/health");
-
-        // 检查路径是否需要规范化（添加尾部斜杠）
-        let path = req.path();
-        if path == frontend_prefix && !path.ends_with('/') {
-            trace!("Redirecting {} to {}/", path, path);
-            return Ok(HttpResponse::Found()
-                .append_header(("Location", format!("{}/", path)))
-                .finish());
-        }
-
-        // 优先尝试加载自定义前端
-        let content = Self::load_frontend_file("index.html").await;
-
-        match content {
-            Some(data) => {
-                // 将字节数组转换为字符串并替换占位符
-                let html_content = String::from_utf8_lossy(&data);
-                let processed_html = html_content
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
-                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
-
-                Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
-                    .body(processed_html))
-            }
-            None => {
-                // 如果没有找到，使用直接包含的方式作为后备
-                let html = include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/admin-panel/dist/index.html"
-                ));
-                let processed_html = html
-                    .replace("%BASE_PATH%", &frontend_prefix)
-                    .replace("%ADMIN_ROUTE_PREFIX%", &admin_prefix)
-                    .replace("%HEALTH_ROUTE_PREFIX%", &health_prefix)
-                    .replace("%SHORTLINKER_VERSION%", env!("CARGO_PKG_VERSION"));
-                Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
-                    .body(processed_html))
-            }
-        }
+        Self::serve_index_html(&req).await
     }
 
     /// 处理 PWA 相关文件（manifest, service worker, 图标）

@@ -224,9 +224,25 @@ impl LinkService {
         // Validate URL
         validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
 
-        // Generate code if not provided
+        // Generate code if not provided, or validate user-provided code
         let (code, generated) = match req.code.filter(|c| !c.is_empty()) {
-            Some(c) => (c, false),
+            Some(c) => {
+                // Validate short code format
+                if !crate::utils::is_valid_short_code(&c) {
+                    return Err(ShortlinkerError::link_invalid_code(format!(
+                        "Invalid short code '{}'. Only alphanumeric, underscore, hyphen, dot, and slash allowed.",
+                        c
+                    )));
+                }
+                // Check reserved route conflicts (reads from RuntimeConfig)
+                if crate::utils::is_reserved_short_code(&c) {
+                    return Err(ShortlinkerError::link_reserved_code(format!(
+                        "Short code '{}' conflicts with reserved routes",
+                        c
+                    )));
+                }
+                (c, false)
+            }
             None => (generate_random_code(self.random_code_length()), true),
         };
 
