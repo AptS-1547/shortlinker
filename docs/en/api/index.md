@@ -30,6 +30,8 @@ Redirects to the target URL corresponding to the specified short code.
 - Max length: 128
 - Allowed characters: `[a-zA-Z0-9_.-/]`
 
+> Note: Route prefixes configured by `routes.admin_prefix` / `routes.health_prefix` / `routes.frontend_prefix` (default `/admin` / `/health` / `/panel`) are reserved and won’t hit the redirect route. Short link `code` must not conflict with these prefixes (e.g. `admin` or `admin/...`), otherwise creation will be rejected.
+
 **Responses**:
 
 #### Successful Redirect (307)

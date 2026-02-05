@@ -55,16 +55,44 @@ impl CompositeCacheTrait for CompositeCache {
     async fn get(&self, key: &str) -> CacheResult {
         // Step 1: Bloom Filter 全量加载，false = 确定不存在
         if !self.filter_plugin.check(key).await {
+            #[cfg(feature = "metrics")]
+            crate::metrics::METRICS
+                .cache_hits_total
+                .with_label_values(&["bloom_filter"])
+                .inc();
             return CacheResult::NotFound;
         }
 
         // Step 2: 检查 Negative Cache（数据库确认不存在的 key）
         if self.negative_cache.contains(key).await {
+            #[cfg(feature = "metrics")]
+            crate::metrics::METRICS
+                .cache_hits_total
+                .with_label_values(&["negative_cache"])
+                .inc();
             return CacheResult::NotFound;
         }
 
         // Step 3: 检查 Object Cache
-        self.object_cache.get(key).await
+        let result = self.object_cache.get(key).await;
+
+        #[cfg(feature = "metrics")]
+        match &result {
+            CacheResult::Found(_) => {
+                crate::metrics::METRICS
+                    .cache_hits_total
+                    .with_label_values(&["object_cache"])
+                    .inc();
+            }
+            CacheResult::Miss | CacheResult::NotFound => {
+                crate::metrics::METRICS
+                    .cache_misses_total
+                    .with_label_values(&["object_cache"])
+                    .inc();
+            }
+        }
+
+        result
     }
 
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>) {

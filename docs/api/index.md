@@ -30,6 +30,8 @@ Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 - 最大长度：128
 - 允许字符：`[a-zA-Z0-9_.-/]`
 
+> 注意：`routes.admin_prefix` / `routes.health_prefix` / `routes.frontend_prefix` 对应的路径前缀是保留路由（默认 `/admin` / `/health` / `/panel`），不会命中重定向接口；短链接 `code` 也不能与这些前缀冲突（如 `admin` 或 `admin/...`），否则创建会被拒绝。
+
 **响应**:
 
 #### 成功重定向 (307)

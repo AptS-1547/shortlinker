@@ -72,6 +72,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "status": "healthy",
     "timestamp": "2025-06-01T12:00:00Z",
@@ -84,6 +85,12 @@ curl -sS -b cookies.txt \
           "storage_type": "sqlite",
           "support_click": true
         }
+      },
+      "cache": {
+        "status": "healthy",
+        "cache_type": "memory",
+        "bloom_filter_enabled": true,
+        "negative_cache_enabled": true
       }
     },
     "response_time_ms": 15
@@ -95,13 +102,15 @@ curl -sS -b cookies.txt \
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `code` | Integer | 响应码：0 表示健康，1 表示不健康 |
+| `code` | Integer | 服务端 `ErrorCode` 数字枚举：`0` 表示成功；不健康时通常为 `1030`（ServiceUnavailable） |
+| `message` | String | 响应信息：成功时通常为 `OK`；失败时为错误原因 |
 | `data.status` | String | 总体健康状态：`healthy` 或 `unhealthy` |
 | `data.timestamp` | RFC3339 | 检查时的时间戳 |
 | `data.uptime` | Integer | 服务运行时长（秒） |
 | `data.checks.storage.status` | String | 存储后端健康状态 |
 | `data.checks.storage.links_count` | Integer | 当前存储的短链接数量 |
 | `data.checks.storage.backend` | Object | 存储后端配置信息 |
+| `data.checks.cache.status` | String | 缓存健康状态 |
 | `data.response_time_ms` | Integer | 健康检查响应时间（毫秒） |
 
 ### GET /health/ready - 就绪检查
@@ -129,9 +138,10 @@ curl -sS -b cookies.txt -I \
 | 200 | 健康/就绪 |
 | 204 | 活跃（无内容） |
 | 401 | 鉴权失败（缺少/无效 Cookie 或 Bearer Token） |
+| 404 | 端点被禁用（`api.admin_token` 与 `api.health_token` 均为空） |
 | 503 | 服务不健康 |
 
-> 鉴权失败时（HTTP 401），响应体示例：`{"code":1,"data":{"error":"Unauthorized: Invalid or missing token"}}`
+> 鉴权失败时（HTTP 401），响应体示例：`{"code":1001,"message":"Unauthorized: Invalid or missing token"}`
 
 ## 监控集成（注意事项）
 

@@ -176,6 +176,8 @@ These settings are stored in the database and can be changed at runtime via the 
 
 ### Routes
 
+> Note: these prefixes are treated as “reserved short-code prefixes”. Short link `code` cannot equal these prefixes (without the leading `/`) and cannot start with `{prefix}/`, otherwise it will conflict with system routes.
+
 | Key | Type | Default | Restart | Description |
 |-----|------|---------|---------|-------------|
 | `routes.admin_prefix` | String | `/admin` | Yes | Admin API prefix |

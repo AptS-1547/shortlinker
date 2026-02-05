@@ -233,6 +233,12 @@ impl ClickManager {
         let current_size = self.buffer.increment(key);
         trace!("ClickManager: Current buffer size: {}", current_size);
 
+        // Update Prometheus gauge
+        #[cfg(feature = "metrics")]
+        crate::metrics::METRICS
+            .clicks_buffer_size
+            .set(current_size as f64);
+
         // 检查是否达到阈值，尝试触发刷盘
         if current_size >= self.max_clicks_before_flush {
             // 使用 compare_exchange 防止任务风暴：

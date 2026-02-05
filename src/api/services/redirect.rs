@@ -91,6 +91,12 @@ impl RedirectService {
 
     #[inline]
     fn not_found_response() -> HttpResponse {
+        #[cfg(feature = "metrics")]
+        crate::metrics::METRICS
+            .redirects_total
+            .with_label_values(&["404"])
+            .inc();
+
         HttpResponse::build(StatusCode::NOT_FOUND)
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
             .insert_header(("Cache-Control", "public, max-age=60"))
@@ -192,6 +198,12 @@ impl RedirectService {
     }
 
     fn finish_redirect(link: ShortLink) -> HttpResponse {
+        #[cfg(feature = "metrics")]
+        crate::metrics::METRICS
+            .redirects_total
+            .with_label_values(&["307"])
+            .inc();
+
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
             .insert_header(("Location", link.target))
             .finish()

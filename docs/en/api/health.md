@@ -72,6 +72,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "status": "healthy",
     "timestamp": "2025-06-01T12:00:00Z",
@@ -84,6 +85,12 @@ curl -sS -b cookies.txt \
           "storage_type": "sqlite",
           "support_click": true
         }
+      },
+      "cache": {
+        "status": "healthy",
+        "cache_type": "memory",
+        "bloom_filter_enabled": true,
+        "negative_cache_enabled": true
       }
     },
     "response_time_ms": 15
@@ -116,9 +123,10 @@ Returns HTTP 204 when alive.
 | 200 | Healthy/Ready |
 | 204 | Alive (no content) |
 | 401 | Unauthorized (missing/invalid auth) |
+| 404 | Disabled (both `api.admin_token` and `api.health_token` are empty) |
 | 503 | Unhealthy |
 
-> Unauthorized body example (HTTP 401): `{"code":1,"data":{"error":"Unauthorized: Invalid or missing token"}}`
+> Unauthorized body example (HTTP 401): `{"code":1001,"message":"Unauthorized: Invalid or missing token"}`
 
 ## Monitoring integration notes
 

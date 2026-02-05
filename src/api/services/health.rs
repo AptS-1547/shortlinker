@@ -11,6 +11,9 @@ use crate::cache::CompositeCacheTrait;
 use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
 
+#[cfg(feature = "metrics")]
+use super::metrics::MetricsService;
+
 // 应用启动时间结构体
 #[derive(Clone, Debug)]
 pub struct AppStartTime {
@@ -153,11 +156,16 @@ impl HealthService {
 
 /// Health 路由配置
 pub fn health_routes() -> actix_web::Scope {
-    web::scope("")
+    let scope = web::scope("")
         .route("", web::get().to(HealthService::health_check))
         .route("", web::head().to(HealthService::health_check))
         .route("/ready", web::get().to(HealthService::readiness_check))
         .route("/ready", web::head().to(HealthService::readiness_check))
         .route("/live", web::get().to(HealthService::liveness_check))
-        .route("/live", web::head().to(HealthService::liveness_check))
+        .route("/live", web::head().to(HealthService::liveness_check));
+
+    #[cfg(feature = "metrics")]
+    let scope = scope.route("/metrics", web::get().to(MetricsService::metrics));
+
+    scope
 }

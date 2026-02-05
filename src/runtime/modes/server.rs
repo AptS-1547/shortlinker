@@ -17,7 +17,8 @@ use crate::api::middleware::{
     AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware,
 };
 use crate::api::services::{
-    AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
+    AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes,
+    redirect_routes,
 };
 use crate::config::{HttpMethod, get_runtime_config, keys};
 use crate::runtime::lifetime;

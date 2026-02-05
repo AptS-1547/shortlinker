@@ -98,12 +98,14 @@ Most endpoints return:
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": { /* payload */ }
 }
 ```
 
 - `code = 0`: success
-- `code = 1`: error (details in `data.error`)
+- `code != 0`: failure (the value is the server-side numeric `ErrorCode`; details are in `message`, and `data` is usually omitted)
+- `message`: always present; usually `OK` on success
 - HTTP status code indicates error category (`401/404/409/500`, etc.)
 
 ## Link management
@@ -131,6 +133,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {
       "code": "github",
@@ -174,6 +177,8 @@ curl -sS -X POST \
 
 Notes:
 - `code` optional (auto-generated if omitted)
+  - Constraints: non-empty, length ≤ 128, allowed chars `[a-zA-Z0-9_.-/]` (multi-level paths supported)
+  - Must not conflict with reserved route prefixes (default `admin` / `health` / `panel`, from `routes.*_prefix`): it cannot equal the prefix, and cannot start with `{prefix}/`
 - `target` required
 - `expires_at` optional (relative like `"7d"` or RFC3339)
 - `force` optional (default `false`); when `code` exists and `force=false`, returns `409 Conflict`
@@ -237,6 +242,8 @@ curl -sS -b cookies.txt \
 ### POST /links/batch - Batch create
 
 > The request body is an object with `links`, not a raw array.
+>
+> `links[].code` follows the same short-code constraints and reserved-prefix rules described above.
 
 ```bash
 curl -sS -X POST \
@@ -303,7 +310,7 @@ curl -sS -X POST \
 
 ## Runtime config management
 
-Config endpoints are under `/{ADMIN_ROUTE_PREFIX}/v1/config`. Sensitive values are masked as `[REDACTED]`.
+Config endpoints are under `/{ADMIN_ROUTE_PREFIX}/v1/config`. Responses use `{code,message,data}`; sensitive values are masked as `[REDACTED]`.
 
 ### GET /config
 ```bash
@@ -424,6 +431,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
     "values": [100, 150, 120]
@@ -450,6 +458,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"code": "github", "clicks": 500},
     {"code": "google", "clicks": 300}
@@ -476,6 +485,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"referrer": "https://google.com", "count": 200, "percentage": 40.0},
     {"referrer": "(direct)", "count": 150, "percentage": 30.0}
@@ -502,6 +512,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": [
     {"country": "CN", "city": "Beijing", "count": 100},
     {"country": "US", "city": "New York", "count": 80}
@@ -528,6 +539,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "browsers": [
       {"name": "Chrome", "count": 120, "percentage": 60.0}
@@ -562,6 +574,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "code": "github",
     "total_clicks": 500,
@@ -598,6 +611,7 @@ curl -sS -b cookies.txt \
 ```json
 {
   "code": 0,
+  "message": "OK",
   "data": {
     "browsers": [
       {"name": "Chrome", "count": 80, "percentage": 53.3}
