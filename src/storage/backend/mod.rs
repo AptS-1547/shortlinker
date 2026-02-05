@@ -12,7 +12,7 @@ mod operations;
 mod query;
 pub mod retry;
 
-pub use analytics::{GeoRow, ReferrerRow, TopLinkRow, TrendRow};
+pub use analytics::{GeoRow, GroupBy, ReferrerRow, TopLinkRow, TrendRow};
 
 use std::sync::Arc;
 use std::time::Duration;

@@ -2,11 +2,18 @@
 //!
 //! Provides unified business logic for analytics queries, shared between
 //! HTTP API, IPC, CLI and TUI interfaces.
+//!
+//! # Query Strategies
+//!
+//! - 原始查询（get_trends, get_top_links 等）：从 click_logs 表实时聚合，适用于小数据量
+//! - v2 查询（get_trends_v2 等）：从汇总表读取，性能更好，适用于大数据量
+//!
+//! 调用方可根据数据规模选择使用哪套方法。
 
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use sea_orm::{DbBackend, sea_query::Expr};
+use sea_orm::{sea_query::Expr, DbBackend};
 use tracing::{debug, info};
 
 use crate::errors::ShortlinkerError;
@@ -440,5 +447,222 @@ impl AnalyticsService {
         );
 
         Ok(logs)
+    }
+
+    // ============ v2 查询方法（从汇总表读取） ============
+
+    /// 获取点击趋势（从汇总表）
+    ///
+    /// 性能优于 get_trends，但需要汇总表有数据
+    pub async fn get_trends_v2(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        group_by: GroupBy,
+    ) -> Result<TrendData, ShortlinkerError> {
+        info!(
+            "Analytics: get_trends_v2 from {} to {}, group_by={:?}",
+            start, end, group_by
+        );
+
+        let results = match group_by {
+            GroupBy::Hour => self.storage.get_global_trend_from_hourly(start, end).await,
+            _ => {
+                // 对于 Day/Week/Month，暂时回退到原始查询
+                // TODO: 添加全局天汇总表后可优化
+                let date_expr = self.date_format_expr(group_by);
+                self.storage.get_global_trend(start, end, date_expr).await
+            }
+        }
+        .map_err(|e| ShortlinkerError::analytics_query_failed(format!("趋势查询失败: {}", e)))?;
+
+        let mut labels = Vec::with_capacity(results.len());
+        let mut values = Vec::with_capacity(results.len());
+        for row in results {
+            labels.push(row.label);
+            values.push(row.count as u64);
+        }
+
+        debug!(
+            "Analytics: get_trends_v2 returned {} data points",
+            labels.len()
+        );
+
+        Ok(TrendData { labels, values })
+    }
+
+    /// 获取单链接趋势（从汇总表）
+    pub async fn get_link_trends_v2(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        group_by: GroupBy,
+    ) -> Result<TrendData, ShortlinkerError> {
+        info!(
+            "Analytics: get_link_trends_v2 for '{}' from {} to {}, group_by={:?}",
+            code, start, end, group_by
+        );
+
+        let results = match group_by {
+            GroupBy::Hour => {
+                self.storage
+                    .get_link_trend_from_hourly(code, start, end)
+                    .await
+            }
+            _ => {
+                let start_date = start.date_naive();
+                let end_date = end.date_naive();
+                self.storage
+                    .get_link_trend_from_daily(code, start_date, end_date)
+                    .await
+            }
+        }
+        .map_err(|e| {
+            ShortlinkerError::analytics_query_failed(format!("链接趋势查询失败: {}", e))
+        })?;
+
+        let mut labels = Vec::with_capacity(results.len());
+        let mut values = Vec::with_capacity(results.len());
+        for row in results {
+            labels.push(row.label);
+            values.push(row.count as u64);
+        }
+
+        debug!(
+            "Analytics: get_link_trends_v2 returned {} data points",
+            labels.len()
+        );
+
+        Ok(TrendData { labels, values })
+    }
+
+    /// 获取来源统计（从汇总表）
+    pub async fn get_link_referrers_v2(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u32,
+    ) -> Result<Vec<ReferrerStats>, ShortlinkerError> {
+        info!(
+            "Analytics: get_link_referrers_v2 for '{}' from {} to {}, limit={}",
+            code, start, end, limit
+        );
+
+        let limit = limit.min(100) as usize;
+        let results = self
+            .storage
+            .get_link_referrers_from_rollup(code, start, end, limit)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::analytics_query_failed(format!("来源统计查询失败: {}", e))
+            })?;
+
+        let total: u64 = results.iter().map(|r| r.count as u64).sum();
+
+        let referrer_stats: Vec<ReferrerStats> = results
+            .into_iter()
+            .map(|row| {
+                let referrer = row.referrer.unwrap_or_else(|| "(direct)".to_string());
+                let count = row.count as u64;
+                let percentage = if total > 0 {
+                    (count as f64 / total as f64) * 100.0
+                } else {
+                    0.0
+                };
+                ReferrerStats {
+                    referrer,
+                    count,
+                    percentage,
+                }
+            })
+            .collect();
+
+        debug!(
+            "Analytics: get_link_referrers_v2 returned {} referrers",
+            referrer_stats.len()
+        );
+
+        Ok(referrer_stats)
+    }
+
+    /// 获取地理位置分布（从汇总表）
+    pub async fn get_link_geo_v2(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u32,
+    ) -> Result<Vec<GeoStats>, ShortlinkerError> {
+        info!(
+            "Analytics: get_link_geo_v2 for '{}' from {} to {}, limit={}",
+            code, start, end, limit
+        );
+
+        let limit = limit.min(100) as usize;
+        let results = self
+            .storage
+            .get_link_geo_from_rollup(code, start, end, limit)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::analytics_query_failed(format!("地理位置查询失败: {}", e))
+            })?;
+
+        let geo_stats: Vec<GeoStats> = results
+            .into_iter()
+            .map(|row| GeoStats {
+                country: row.country.unwrap_or_else(|| "Unknown".to_string()),
+                city: row.city,
+                count: row.count as u64,
+            })
+            .collect();
+
+        debug!(
+            "Analytics: get_link_geo_v2 returned {} locations",
+            geo_stats.len()
+        );
+
+        Ok(geo_stats)
+    }
+
+    /// 获取热门链接（从汇总表）
+    pub async fn get_top_links_v2(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u32,
+    ) -> Result<Vec<TopLink>, ShortlinkerError> {
+        info!(
+            "Analytics: get_top_links_v2 from {} to {}, limit={}",
+            start, end, limit
+        );
+
+        let start_date = start.date_naive();
+        let end_date = end.date_naive();
+        let limit = limit.min(100) as usize;
+
+        let results = self
+            .storage
+            .get_top_links_from_daily(start_date, end_date, limit)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::analytics_query_failed(format!("热门链接查询失败: {}", e))
+            })?;
+
+        let top_links: Vec<TopLink> = results
+            .into_iter()
+            .map(|row| TopLink {
+                code: row.short_code,
+                clicks: row.count as u64,
+            })
+            .collect();
+
+        debug!(
+            "Analytics: get_top_links_v2 returned {} links",
+            top_links.len()
+        );
+
+        Ok(top_links)
     }
 }

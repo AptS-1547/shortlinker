@@ -4455,7 +4455,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shortlinker"
-version = "0.5.0-alpha.3"
+version = "0.5.0-alpha.4"
 dependencies = [
  "actix-cors",
  "actix-governor",
@@ -4517,6 +4517,8 @@ dependencies = [
  "url",
  "uuid",
  "winapi",
+ "woothee",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -6134,6 +6136,16 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "woothee"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "896174c6a4779d4d7d4523dd27aef7d46609eda2497e370f6c998325c6bf6971"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
 
 [[package]]
 name = "writeable"
