@@ -5,6 +5,7 @@ description = "A minimalist URL shortener service supporting HTTP 307 redirectio
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 repository = "https://github.com/AptS-1547/shortlinker"
 edition = "2024"
+rust-version = "1.88"
 
 [features]
 default = ["server", "cli"]  # 默认启用服务器和CLI功能
