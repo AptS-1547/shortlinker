@@ -328,13 +328,11 @@ impl SeaOrmStorage {
                             models.into_iter().map(model_to_shortlink).collect();
                         Some((Ok(links), (page + 1, db, condition, page_size)))
                     }
-                    Err(e) => Some((
-                        Err(ShortlinkerError::database_operation(format!(
-                            "Paginated query failed (page={}): {}",
-                            page, e
-                        ))),
-                        (page + 1, db, condition, page_size),
-                    )),
+                    Err(e) => {
+                        // 查询失败时记录错误并终止 stream，避免跳过失败页继续下一页
+                        tracing::error!("Paginated query failed at page {}: {}", page, e);
+                        None
+                    }
                 }
             },
         ))

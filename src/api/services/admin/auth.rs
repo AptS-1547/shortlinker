@@ -6,12 +6,13 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use base64::Engine;
 use governor::middleware::NoOpMiddleware;
 use rand::Rng;
-use std::net::SocketAddr;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::get_jwt_service;
 use crate::config::{get_config, get_runtime_config, keys};
-use crate::utils::ip::{is_private_or_local, is_trusted_proxy};
+use crate::utils::ip::{
+    extract_client_ip, extract_client_ip_from_conn_info, extract_forwarded_ip_from_headers,
+};
 use crate::utils::password::verify_password;
 
 use crate::errors::ShortlinkerError;
@@ -44,17 +45,14 @@ impl KeyExtractor for LoginKeyExtractor {
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
         let conn_info = req.connection_info();
         let config = get_config();
-        let rt = get_runtime_config();
 
-        // 步骤 1: 检查是否配置了 Unix Socket 模式
+        // Unix Socket 模式特殊处理：必须有 X-Forwarded-For
         #[cfg(unix)]
         if config.server.unix_socket.is_some() {
-            // Unix Socket 模式：强制要求 X-Forwarded-For
             if let Some(real_ip) = conn_info.realip_remote_addr() {
                 debug!("Unix Socket mode: using X-Forwarded-For: {}", real_ip);
                 return Ok(real_ip.to_string());
             } else {
-                // Unix Socket 模式下没有 X-Forwarded-For 是配置错误
                 error!(
                     "Unix Socket mode enabled but X-Forwarded-For header missing. \
                      Ensure nginx/proxy sets: proxy_set_header X-Forwarded-For $remote_addr;"
@@ -65,46 +63,13 @@ impl KeyExtractor for LoginKeyExtractor {
             }
         }
 
-        // 步骤 2: TCP 连接模式 - 获取 peer_addr
-        let peer_ip = conn_info.peer_addr().ok_or_else(|| {
-            // 这不应该发生（非 Unix Socket 模式下 peer_addr 为 None）
-            warn!("Unable to extract peer IP in TCP mode - this should not happen");
-            SimpleKeyExtractionError::new("Unable to extract peer IP")
-        })?;
-
-        // 步骤 3: 检查是否显式配置了可信代理（优先级最高）
-        let trusted_proxies: Vec<String> = rt.get_json_or(keys::API_TRUSTED_PROXIES, Vec::new());
-        if !trusted_proxies.is_empty() {
-            if is_trusted_proxy(peer_ip, &trusted_proxies) {
-                let real_ip = conn_info.realip_remote_addr().unwrap_or(peer_ip);
-                debug!("Trusted proxy (explicit): {} -> {}", peer_ip, real_ip);
-                return Ok(real_ip.to_string());
-            }
-            // 显式配置了但不匹配 → 使用连接 IP（不信任 X-Forwarded-For）
-            debug!("Connection from {}, not in trusted_proxies", peer_ip);
-            return Ok(peer_ip.to_string());
-        }
-
-        // 步骤 4: 未配置 trusted_proxies → 智能检测
-        if let Ok(socket_addr) = peer_ip.parse::<SocketAddr>() {
-            let ip_addr = socket_addr.ip();
-
-            if is_private_or_local(&ip_addr) {
-                // 连接来自私有 IP/localhost → 假设有反向代理
-                if let Some(real_ip) = conn_info.realip_remote_addr() {
-                    debug!(
-                        "Auto-detect proxy (private IP {}): using X-Forwarded-For: {}",
-                        peer_ip, real_ip
-                    );
-                    return Ok(real_ip.to_string());
-                }
-                // 私有 IP 但无 X-Forwarded-For（可能是内网直连）
-                debug!("Private IP {} without X-Forwarded-For", peer_ip);
-            }
-        }
-
-        // 步骤 5: 默认使用连接 IP（公网直连或内网直连无 X-Forwarded-For）
-        Ok(peer_ip.to_string())
+        // 使用核心函数提取 IP
+        let headers = req.headers().clone();
+        extract_client_ip_from_conn_info(&conn_info, || extract_forwarded_ip_from_headers(&headers))
+            .ok_or_else(|| {
+                warn!("Unable to extract peer IP in TCP mode - this should not happen");
+                SimpleKeyExtractionError::new("Unable to extract peer IP")
+            })
     }
 }
 
@@ -143,9 +108,10 @@ pub fn refresh_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
 
 /// 登录验证 - 检查管理员 token
 pub async fn check_admin_token(
-    _req: HttpRequest,
+    req: HttpRequest,
     login_body: web::Json<LoginCredentials>,
 ) -> ActixResult<impl Responder> {
+    let client_ip = extract_client_ip(&req).unwrap_or_else(|| "unknown".to_string());
     let rt = get_runtime_config();
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
 
@@ -161,13 +127,16 @@ pub async fn check_admin_token(
     };
 
     if !password_valid {
-        error!("Admin API: login failed - invalid token");
+        error!(
+            "Admin API: login failed - invalid token (from {})",
+            client_ip
+        );
         return Ok(error_from_shortlinker(
             &ShortlinkerError::auth_password_invalid("Invalid admin token"),
         ));
     }
 
-    info!("Admin API: login successful");
+    info!("Admin API: login successful (from {})", client_ip);
 
     // Generate JWT tokens using cached service
     let jwt_service = get_jwt_service();

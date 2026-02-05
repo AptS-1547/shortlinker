@@ -8,6 +8,7 @@
 use std::net::{IpAddr, SocketAddr};
 
 use actix_web::HttpRequest;
+use actix_web::dev::ConnectionInfo;
 use tracing::debug;
 
 use crate::config::{get_config, get_runtime_config, keys};
@@ -94,15 +95,22 @@ pub fn ip_in_cidr(ip: &IpAddr, cidr: &str) -> bool {
     }
 }
 
-/// 从请求头中提取真实客户端 IP
+/// 从 ConnectionInfo 提取真实客户端 IP（核心逻辑）
 ///
 /// 策略（按优先级）：
 /// 1. Unix Socket 模式 → 强制使用 X-Forwarded-For
 /// 2. 显式配置 trusted_proxies 且匹配 → 使用 X-Forwarded-For
 /// 3. 未配置 trusted_proxies 且连接来自私有 IP → 自动检测代理，使用 X-Forwarded-For
 /// 4. 默认 → 使用连接 IP（公网直连场景，防止伪造）
-pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
-    let conn_info = req.connection_info();
+///
+/// `get_forwarded_ip` 闭包用于从请求头获取转发的 IP（X-Forwarded-For 或 X-Real-IP）
+pub fn extract_client_ip_from_conn_info<F>(
+    conn_info: &ConnectionInfo,
+    get_forwarded_ip: F,
+) -> Option<String>
+where
+    F: FnOnce() -> Option<String>,
+{
     let config = get_config();
     let rt = get_runtime_config();
 
@@ -110,7 +118,7 @@ pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
     #[cfg(unix)]
     if config.server.unix_socket.is_some() {
         // Unix Socket 模式：必须使用 X-Forwarded-For
-        return extract_forwarded_ip(req);
+        return get_forwarded_ip();
     }
 
     // 步骤 2: 获取 peer_addr
@@ -120,7 +128,7 @@ pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
     let trusted_proxies: Vec<String> = rt.get_json_or(keys::API_TRUSTED_PROXIES, Vec::new());
     if !trusted_proxies.is_empty() {
         if is_trusted_proxy(peer_ip, &trusted_proxies) {
-            let real_ip = extract_forwarded_ip(req).unwrap_or_else(|| peer_ip.to_string());
+            let real_ip = get_forwarded_ip().unwrap_or_else(|| peer_ip.to_string());
             debug!("Trusted proxy (explicit): {} -> {}", peer_ip, real_ip);
             return Some(real_ip);
         }
@@ -138,7 +146,7 @@ pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
 
         if is_private_or_local(&ip_addr) {
             // 连接来自私有 IP/localhost → 假设有反向代理
-            if let Some(real_ip) = extract_forwarded_ip(req) {
+            if let Some(real_ip) = get_forwarded_ip() {
                 debug!(
                     "Auto-detect proxy (private IP {}): using X-Forwarded-For: {}",
                     peer_ip, real_ip
@@ -154,17 +162,29 @@ pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
     Some(peer_ip.to_string())
 }
 
+/// 从 HttpRequest 提取真实客户端 IP
+pub fn extract_client_ip(req: &HttpRequest) -> Option<String> {
+    extract_client_ip_from_conn_info(&req.connection_info(), || extract_forwarded_ip(req))
+}
+
 /// 从请求头提取转发的 IP（X-Forwarded-For 或 X-Real-IP）
 fn extract_forwarded_ip(req: &HttpRequest) -> Option<String> {
+    extract_forwarded_ip_from_headers(req.headers())
+}
+
+/// 从 HeaderMap 提取转发的 IP
+pub fn extract_forwarded_ip_from_headers(
+    headers: &actix_web::http::header::HeaderMap,
+) -> Option<String> {
     // 优先 X-Forwarded-For（取第一个，即原始客户端 IP）
-    req.headers()
+    headers
         .get("x-forwarded-for")
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.split(',').next())
         .map(|s| s.trim().to_string())
         .or_else(|| {
             // 其次 X-Real-IP
-            req.headers()
+            headers
                 .get("x-real-ip")
                 .and_then(|h| h.to_str().ok())
                 .map(String::from)

@@ -1,16 +1,44 @@
 //! 配置管理 API 端点
 
-use actix_web::{HttpRequest, Responder, Result as ActixResult, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ts_rs::TS;
 
-use crate::config::{get_all_schemas, try_get_runtime_config};
+use crate::config::{RuntimeConfig, get_all_schemas, try_get_runtime_config};
 use crate::errors::ShortlinkerError;
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 
 use super::helpers::{error_from_shortlinker, success_response};
 use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
+
+/// 获取 RuntimeConfig 或返回错误响应
+///
+/// 用于简化各 handler 中的重复模式。
+/// 由于 actix-web handler 返回类型的限制，需要使用 `match` 而非 `?`。
+fn require_runtime_config() -> Option<&'static RuntimeConfig> {
+    try_get_runtime_config()
+}
+
+/// 返回 RuntimeConfig 未初始化的错误响应
+fn runtime_config_unavailable_error() -> HttpResponse {
+    error_from_shortlinker(&ShortlinkerError::service_unavailable(
+        "Runtime config not initialized",
+    ))
+}
+
+/// 宏：获取 RuntimeConfig 或返回错误
+///
+/// 由于 actix-web 的 handler 返回 `ActixResult<impl Responder>`，
+/// 无法直接用 `?` 运算符返回 HttpResponse。此宏简化这种模式。
+macro_rules! get_runtime_config_or_return {
+    () => {
+        match require_runtime_config() {
+            Some(rc) => rc,
+            None => return Ok(runtime_config_unavailable_error()),
+        }
+    };
+}
 
 /// 配置项响应
 #[derive(Debug, Serialize, TS)]
@@ -69,14 +97,7 @@ pub struct ConfigHistoryResponse {
 
 /// 获取所有配置
 pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     let configs = rc.get_all();
     let items: Vec<ConfigItemResponse> = configs
@@ -105,15 +126,7 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
 /// 获取单个配置
 pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     match rc.get_full(&key) {
         Some(item) => {
@@ -145,15 +158,7 @@ pub async fn update_config(
     body: web::Json<ConfigUpdateRequest>,
 ) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     match rc.set(&key, &body.value).await {
         Ok(result) => {
@@ -201,15 +206,7 @@ pub async fn get_config_history(
     query: web::Query<HistoryQuery>,
 ) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     let limit = query.limit.unwrap_or(20).min(100);
 

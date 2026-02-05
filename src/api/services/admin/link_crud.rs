@@ -27,6 +27,15 @@ pub async fn get_all_links(
         query
     );
 
+    // 校验互斥参数：only_expired 和 only_active 不能同时为 true
+    if query.only_expired.unwrap_or(false) && query.only_active.unwrap_or(false) {
+        return Ok(error_response(
+            actix_web::http::StatusCode::BAD_REQUEST,
+            ErrorCode::BadRequest,
+            "only_expired and only_active are mutually exclusive",
+        ));
+    }
+
     let page = query.page.unwrap_or(1).max(1) as u64;
     let page_size = query.page_size.unwrap_or(20).clamp(1, 100) as u64;
 
