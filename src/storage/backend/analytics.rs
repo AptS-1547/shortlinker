@@ -11,12 +11,12 @@ use std::pin::Pin;
 use chrono::{DateTime, NaiveDate, Utc};
 use futures_util::stream::Stream;
 use sea_orm::{
-    ColumnTrait, DatabaseBackend, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Statement, sea_query::Expr,
+    ColumnTrait, EntityTrait, ExprTrait, FromQueryResult, JoinType, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, sea_query::Expr,
 };
 
 use migration::entities::{
-    click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly,
+    click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly, user_agent,
 };
 
 /// 游标分页的点击日志流类型
@@ -267,13 +267,12 @@ impl super::SeaOrmStorage {
 
     // ============ UA/设备统计查询（JOIN user_agents 表） ============
 
-    /// 获取数据库后端类型枚举
-    fn get_db_backend(&self) -> DatabaseBackend {
-        match self.get_backend_name() {
-            "sqlite" => DatabaseBackend::Sqlite,
-            "mysql" => DatabaseBackend::MySql,
-            _ => DatabaseBackend::Postgres,
-        }
+    /// 构建 click_logs -> user_agents 的 JOIN 关系
+    fn click_log_to_user_agent_relation() -> sea_orm::RelationDef {
+        click_log::Entity::belongs_to(user_agent::Entity)
+            .from(click_log::Column::UserAgentHash)
+            .to(user_agent::Column::Hash)
+            .into()
     }
 
     /// 获取浏览器统计
@@ -283,45 +282,21 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
-  AND ua.browser_name IS NOT NULL
-GROUP BY ua.browser_name
-ORDER BY count DESC
-LIMIT $3"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::BrowserName, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.browser_name IS NOT NULL
-GROUP BY ua.browser_name
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::BrowserName.is_not_null())
+            .group_by(user_agent::Column::BrowserName)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -334,45 +309,21 @@ LIMIT ?"#
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.os_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
-  AND ua.os_name IS NOT NULL
-GROUP BY ua.os_name
-ORDER BY count DESC
-LIMIT $3"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::OsName, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.os_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.os_name IS NOT NULL
-GROUP BY ua.os_name
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::OsName.is_not_null())
+            .group_by(user_agent::Column::OsName)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -385,45 +336,21 @@ LIMIT ?"#
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.device_category as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
-  AND ua.device_category IS NOT NULL
-GROUP BY ua.device_category
-ORDER BY count DESC
-LIMIT $3"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::DeviceCategory, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.device_category as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.device_category IS NOT NULL
-GROUP BY ua.device_category
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::DeviceCategory.is_not_null())
+            .group_by(user_agent::Column::DeviceCategory)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -437,47 +364,22 @@ LIMIT ?"#
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
-  AND ua.browser_name IS NOT NULL
-GROUP BY ua.browser_name
-ORDER BY count DESC
-LIMIT $4"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::BrowserName, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.browser_name IS NOT NULL
-GROUP BY ua.browser_name
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ShortCode.eq(code))
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::BrowserName.is_not_null())
+            .group_by(user_agent::Column::BrowserName)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -491,47 +393,22 @@ LIMIT ?"#
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.os_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
-  AND ua.os_name IS NOT NULL
-GROUP BY ua.os_name
-ORDER BY count DESC
-LIMIT $4"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::OsName, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.os_name as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.os_name IS NOT NULL
-GROUP BY ua.os_name
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ShortCode.eq(code))
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::OsName.is_not_null())
+            .group_by(user_agent::Column::OsName)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -545,47 +422,22 @@ LIMIT ?"#
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT ua.device_category as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
-  AND ua.device_category IS NOT NULL
-GROUP BY ua.device_category
-ORDER BY count DESC
-LIMIT $4"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
+        click_log::Entity::find()
+            .select_only()
+            .column_as(user_agent::Column::DeviceCategory, "field_value")
+            .column_as(click_log::Column::Id.count(), "count")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
             )
-        } else {
-            (
-                r#"SELECT ua.device_category as field_value, COUNT(*) as count
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
-  AND ua.device_category IS NOT NULL
-GROUP BY ua.device_category
-ORDER BY count DESC
-LIMIT ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                    sea_orm::Value::from(limit as i64),
-                ],
-            )
-        };
-
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        UaStatsRow::find_by_statement(stmt)
+            .filter(click_log::Column::ShortCode.eq(code))
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .filter(user_agent::Column::DeviceCategory.is_not_null())
+            .group_by(user_agent::Column::DeviceCategory)
+            .order_by_desc(Expr::cust("count"))
+            .limit(limit)
+            .into_model::<UaStatsRow>()
             .all(&self.db)
             .await
             .map_err(Into::into)
@@ -598,41 +450,25 @@ LIMIT ?"#
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> anyhow::Result<(i64, i64)> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT
-  SUM(CASE WHEN ua.is_bot = true THEN 1 ELSE 0 END) as bot_count,
-  COUNT(*) as total
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                ],
-            )
-        } else {
-            (
-                r#"SELECT
-  SUM(CASE WHEN ua.is_bot = 1 THEN 1 ELSE 0 END) as bot_count,
-  COUNT(*) as total
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(code.to_string()),
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                ],
-            )
-        };
+        // SUM(CASE WHEN is_bot = true THEN 1 ELSE 0 END)
+        let bot_sum = Expr::case(user_agent::Column::IsBot.eq(true), 1)
+            .finally(0)
+            .sum();
 
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        let result = BotStatsRaw::find_by_statement(stmt).one(&self.db).await?;
+        let result = click_log::Entity::find()
+            .select_only()
+            .column_as(bot_sum, "bot_count")
+            .column_as(click_log::Column::Id.count(), "total")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
+            )
+            .filter(click_log::Column::ShortCode.eq(code))
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .into_model::<BotStatsRaw>()
+            .one(&self.db)
+            .await?;
 
         match result {
             Some(row) => Ok((row.bot_count, row.total)),
@@ -646,39 +482,24 @@ WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?"#
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> anyhow::Result<(i64, i64)> {
-        let backend = self.get_db_backend();
-        let (sql, values) = if backend == DatabaseBackend::Postgres {
-            (
-                r#"SELECT
-  SUM(CASE WHEN ua.is_bot = true THEN 1 ELSE 0 END) as bot_count,
-  COUNT(*) as total
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                ],
-            )
-        } else {
-            (
-                r#"SELECT
-  SUM(CASE WHEN ua.is_bot = 1 THEN 1 ELSE 0 END) as bot_count,
-  COUNT(*) as total
-FROM click_logs cl
-INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
-WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?"#
-                    .to_string(),
-                vec![
-                    sea_orm::Value::from(start.to_rfc3339()),
-                    sea_orm::Value::from(end.to_rfc3339()),
-                ],
-            )
-        };
+        // SUM(CASE WHEN is_bot = true THEN 1 ELSE 0 END)
+        let bot_sum = Expr::case(user_agent::Column::IsBot.eq(true), 1)
+            .finally(0)
+            .sum();
 
-        let stmt = Statement::from_sql_and_values(backend, &sql, values);
-        let result = BotStatsRaw::find_by_statement(stmt).one(&self.db).await?;
+        let result = click_log::Entity::find()
+            .select_only()
+            .column_as(bot_sum, "bot_count")
+            .column_as(click_log::Column::Id.count(), "total")
+            .join(
+                JoinType::InnerJoin,
+                Self::click_log_to_user_agent_relation(),
+            )
+            .filter(click_log::Column::ClickedAt.gte(start))
+            .filter(click_log::Column::ClickedAt.lte(end))
+            .into_model::<BotStatsRaw>()
+            .one(&self.db)
+            .await?;
 
         match result {
             Some(row) => Ok((row.bot_count, row.total)),

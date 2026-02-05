@@ -399,10 +399,11 @@ Analytics API provides detailed click statistics, including click trends, top li
 
 > You need to enable `analytics.enable_detailed_logging` in runtime config (restart required) to record detailed click logs.
 >
-> - Default range: last 30 days. To set a custom range, provide **both** `start_date` and `end_date`.
-> - Date formats: RFC3339 (e.g. `2024-01-01T00:00:00Z`) or `YYYY-MM-DD` (e.g. `2024-01-01`).
+> - Default range: last 30 days. To set a custom range, provide **both** `start_date` and `end_date` (if only one is provided, it falls back to the default range; if parsing fails, it falls back to the default start/end values).
+> - Date formats: RFC3339 (e.g. `2024-01-01T00:00:00Z`) or `YYYY-MM-DD` (e.g. `2024-01-01`; note: `YYYY-MM-DD` is interpreted as `00:00:00Z` of that day).
 > - Geo distribution requires `analytics.enable_geo_lookup=true` (and `analytics.enable_ip_logging=true` to keep IPs). The GeoIP provider is configured via startup `[analytics]` (`analytics.maxminddb_path` / `analytics.geoip_api_url`).
 >   - When using the external API provider, it has a built-in cache (LRU 10,000, TTL 15 minutes, negative caching on failures, and singleflight for concurrent requests). HTTP timeout is 2 seconds.
+> - Device/browser distribution (`/analytics/devices`) is based on `user_agent_hash` (User-Agent strings are deduplicated into `user_agents` and linked by hash).
 
 ### GET /analytics/trends - Get click trends
 
@@ -415,8 +416,8 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
 | `group_by` | String | Grouping (optional; default `day`): `hour`/`day`/`week`/`month` | `?group_by=day` |
 
 **Response**:
@@ -441,8 +442,8 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | Number of results (optional; default 10; max 100) | `?limit=10` |
 
 **Response**:
@@ -467,8 +468,8 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | Number of results (optional; default 10; max 100) | `?limit=10` |
 
 **Response**:
@@ -493,8 +494,8 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | Number of results (optional; default 20; max 100) | `?limit=20` |
 
 **Response**:
@@ -505,6 +506,41 @@ curl -sS -b cookies.txt \
     {"country": "CN", "city": "Beijing", "count": 100},
     {"country": "US", "city": "New York", "count": 80}
   ]
+}
+```
+
+### GET /analytics/devices - Get device analytics
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/devices?limit=10"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31` |
+| `limit` | Integer | Number of results per dimension (optional; default 10; max 20) | `?limit=10` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "browsers": [
+      {"name": "Chrome", "count": 120, "percentage": 60.0}
+    ],
+    "operating_systems": [
+      {"name": "Mac OS X", "count": 80, "percentage": 40.0}
+    ],
+    "devices": [
+      {"name": "pc", "count": 150, "percentage": 75.0}
+    ],
+    "bot_percentage": 12.3,
+    "total_with_ua": 200
+  }
 }
 ```
 
@@ -519,8 +555,8 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31` |
 
 **Response**:
 ```json
@@ -543,6 +579,41 @@ curl -sS -b cookies.txt \
 }
 ```
 
+### GET /links/{code}/analytics/devices - Get single link device analytics
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics/devices?limit=10"
+```
+
+**Query params**:
+
+| Param | Type | Description | Example |
+|-------|------|-------------|---------|
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31` |
+| `limit` | Integer | Number of results per dimension (optional; default 10; max 20) | `?limit=10` |
+
+**Response**:
+```json
+{
+  "code": 0,
+  "data": {
+    "browsers": [
+      {"name": "Chrome", "count": 80, "percentage": 53.3}
+    ],
+    "operating_systems": [
+      {"name": "Windows", "count": 60, "percentage": 40.0}
+    ],
+    "devices": [
+      {"name": "pc", "count": 120, "percentage": 80.0}
+    ],
+    "bot_percentage": 8.5,
+    "total_with_ua": 150
+  }
+}
+```
+
 ### GET /analytics/export - Export analytics report (CSV)
 
 ```bash
@@ -555,12 +626,14 @@ curl -sS -b cookies.txt \
 
 | Param | Type | Description | Example |
 |-------|------|-------------|---------|
-| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; must be provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; must be provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
-| `limit` | Integer | Export record limit (optional; default 10000; max 100000) | `?limit=10000` |
+| `start_date` | RFC3339 / YYYY-MM-DD | Start date (optional; only effective when provided together with `end_date`; default = last 30 days) | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | End date (optional; only effective when provided together with `start_date`; default = last 30 days) | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | Export record limit (optional; **currently ignored**; exports all records within the time range; narrow the date range to control output size) | `?limit=10000` |
 
 The exported CSV contains these columns:
 `short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+Note: in the current version, the `user_agent` column may be empty (the server deduplicates User-Agent strings via `user_agent_hash` + the `user_agents` table for device analytics).
 
 ### Analytics configuration
 
@@ -569,6 +642,11 @@ These runtime config options control Analytics behavior:
 | Config key | Type | Default | Description |
 |------------|------|---------|-------------|
 | `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table; restart required) |
-| `analytics.log_retention_days` | int | 30 | Log retention period in days (automatic cleanup is not implemented yet) |
+| `analytics.enable_auto_rollup` | bool | true | Enable automatic data retention task (restart required; runs every 4 hours by default) |
+| `analytics.log_retention_days` | int | 30 | Raw click log retention in days (cleaned by background task; requires `analytics.enable_auto_rollup`) |
+| `analytics.hourly_retention_days` | int | 7 | Hourly rollup retention in days (cleans `click_stats_hourly` / `click_stats_global_hourly`; requires `analytics.enable_auto_rollup`) |
+| `analytics.daily_retention_days` | int | 365 | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |
+
+Note: in the current implementation, retention parameters are read when the background task starts; after changing retention days, you may need to restart the server for the cleanup task to pick up new values.

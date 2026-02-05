@@ -450,10 +450,11 @@ Analytics API 提供详细的点击统计分析功能，包括点击趋势、热
 
 > 需要先在运行时配置中启用 `analytics.enable_detailed_logging`（需要重启服务生效）才会记录详细的点击日志。
 >
-> - 默认查询最近 30 天；如果要指定范围，请**同时**提供 `start_date` 和 `end_date`。
-> - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`）。
+> - 默认查询最近 30 天；若要指定范围，请**同时**提供 `start_date` 和 `end_date`（只提供一个会忽略并回退到默认范围；日期解析失败会回退到默认范围对应的起止值）。
+> - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`；注意：`YYYY-MM-DD` 会按当天 `00:00:00Z` 解析）。
 > - 地理分布数据需要额外开启 `analytics.enable_geo_lookup=true`（并保留 `analytics.enable_ip_logging=true` 才能拿到 IP）；GeoIP provider 使用启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）。
 >   - 使用外部 API provider 时，内部带缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight 合并并发请求），单次请求超时 2 秒。
+> - 设备/浏览器分布（`/analytics/devices`）基于 `user_agent_hash`（User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联）。
 
 ### GET /analytics/trends - 获取点击趋势
 
@@ -466,8 +467,8 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
 | `group_by` | String | 分组方式（可选；默认 `day`）：`hour`/`day`/`week`/`month` | `?group_by=day` |
 
 **响应格式**：
@@ -492,8 +493,8 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
 
 **响应格式**：
@@ -518,8 +519,8 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | 返回数量（可选；默认 10；最大 100） | `?limit=10` |
 
 **响应格式**：
@@ -544,8 +545,8 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
 | `limit` | Integer | 返回数量（可选；默认 20；最大 100） | `?limit=20` |
 
 **响应格式**：
@@ -556,6 +557,41 @@ curl -sS -b cookies.txt \
     {"country": "CN", "city": "Beijing", "count": 100},
     {"country": "US", "city": "New York", "count": 80}
   ]
+}
+```
+
+### GET /analytics/devices - 获取设备分析
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/analytics/devices?limit=10"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 20） | `?limit=10` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "browsers": [
+      {"name": "Chrome", "count": 120, "percentage": 60.0}
+    ],
+    "operating_systems": [
+      {"name": "Mac OS X", "count": 80, "percentage": 40.0}
+    ],
+    "devices": [
+      {"name": "pc", "count": 150, "percentage": 75.0}
+    ],
+    "bot_percentage": 12.3,
+    "total_with_ua": 200
+  }
 }
 ```
 
@@ -570,8 +606,8 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31` |
 
 **响应格式**：
 ```json
@@ -594,6 +630,41 @@ curl -sS -b cookies.txt \
 }
 ```
 
+### GET /links/{code}/analytics/devices - 获取单链接设备分析
+
+```bash
+curl -sS -b cookies.txt \
+  "http://localhost:8080/admin/v1/links/github/analytics/devices?limit=10"
+```
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31` |
+| `limit` | Integer | 返回数量（可选；默认 10；最大 20） | `?limit=10` |
+
+**响应格式**：
+```json
+{
+  "code": 0,
+  "data": {
+    "browsers": [
+      {"name": "Chrome", "count": 80, "percentage": 53.3}
+    ],
+    "operating_systems": [
+      {"name": "Windows", "count": 60, "percentage": 40.0}
+    ],
+    "devices": [
+      {"name": "pc", "count": 120, "percentage": 80.0}
+    ],
+    "bot_percentage": 8.5,
+    "total_with_ua": 150
+  }
+}
+```
+
 ### GET /analytics/export - 导出分析报告（CSV）
 
 ```bash
@@ -606,12 +677,14 @@ curl -sS -b cookies.txt \
 
 | 参数 | 类型 | 说明 | 示例 |
 |------|------|------|------|
-| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；需与 `end_date` 成对出现；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
-| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；需与 `start_date` 成对出现；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
-| `limit` | Integer | 导出条数（可选；默认 10000；最大 100000） | `?limit=10000` |
+| `start_date` | RFC3339 / YYYY-MM-DD | 开始日期（可选；仅当与 `end_date` 同时提供时生效；缺省=最近 30 天） | `?start_date=2024-01-01T00:00:00Z` |
+| `end_date` | RFC3339 / YYYY-MM-DD | 结束日期（可选；仅当与 `start_date` 同时提供时生效；缺省=最近 30 天） | `?end_date=2024-12-31T23:59:59Z` |
+| `limit` | Integer | 导出条数（可选；当前版本会忽略该参数，导出时间范围内全部记录；如需控制大小请缩小日期范围） | `?limit=10000` |
 
 导出的 CSV 包含以下字段：
 `short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+
+说明：当前版本 `user_agent` 字段可能为空（服务端使用 `user_agent_hash` + `user_agents` 表进行 UA 去重与设备分析）。
 
 ### Analytics 相关配置
 
@@ -620,6 +693,11 @@ curl -sS -b cookies.txt \
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `analytics.enable_detailed_logging` | bool | false | 启用详细日志记录（写入 click_logs 表；需要重启生效） |
-| `analytics.log_retention_days` | int | 30 | 日志保留天数（当前版本暂未实现自动清理） |
+| `analytics.enable_auto_rollup` | bool | true | 启用自动数据清理任务（需要重启生效；默认每 4 小时运行一次） |
+| `analytics.log_retention_days` | int | 30 | 原始点击日志保留天数（由后台任务自动清理；需要启用 `analytics.enable_auto_rollup`） |
+| `analytics.hourly_retention_days` | int | 7 | 小时汇总保留天数（清理 `click_stats_hourly` / `click_stats_global_hourly`；需要启用 `analytics.enable_auto_rollup`） |
+| `analytics.daily_retention_days` | int | 365 | 天汇总保留天数（清理 `click_stats_daily`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | bool | false | 是否启用地理位置解析 |
+
+说明：当前实现中，保留天数参数在后台任务启动时读取；修改保留天数后，可能需要重启服务才能让清理任务使用新值。
