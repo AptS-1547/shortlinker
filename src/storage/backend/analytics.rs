@@ -11,15 +11,18 @@ use std::pin::Pin;
 use chrono::{DateTime, NaiveDate, Utc};
 use futures_util::stream::Stream;
 use sea_orm::{
-    sea_query::Expr, ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect,
+    ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, sea_query::Expr,
 };
 
-use migration::entities::{click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly};
+use migration::entities::{
+    click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly,
+};
 
 /// 游标分页的点击日志流类型
-type ClickLogStream =
-    Pin<Box<dyn Stream<Item = anyhow::Result<(Vec<click_log::Model>, Option<i64>)>> + Send + 'static>>;
+type ClickLogStream = Pin<
+    Box<dyn Stream<Item = anyhow::Result<(Vec<click_log::Model>, Option<i64>)>> + Send + 'static>,
+>;
 
 // ============ 查询结果类型 ============
 
@@ -504,8 +507,7 @@ impl super::SeaOrmStorage {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
         page_size: u64,
-    ) -> ClickLogStream
-    {
+    ) -> ClickLogStream {
         let db = self.db.clone();
 
         use futures_util::stream;

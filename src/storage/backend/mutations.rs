@@ -96,7 +96,7 @@ impl SeaOrmStorage {
             .map_err(|e| ShortlinkerError::database_operation(format!("批量删除失败: {}", e)))?;
 
         self.invalidate_count_cache();
-        info!("批量删除 {} 条链接成功", existing.len());
+        info!("Batch deleted {} links", existing.len());
 
         Ok((existing, not_found))
     }
@@ -140,7 +140,7 @@ impl SeaOrmStorage {
             .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
 
         self.invalidate_count_cache();
-        info!("批量插入 {} 条链接成功", links.len());
+        info!("Batch inserted {} links", links.len());
         Ok(())
     }
 }

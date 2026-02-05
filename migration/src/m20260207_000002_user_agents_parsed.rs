@@ -15,7 +15,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(UserAgents::Table)
-                    .add_column(ColumnDef::new(UserAgents::BrowserName).string_len(50).null())
+                    .add_column(
+                        ColumnDef::new(UserAgents::BrowserName)
+                            .string_len(50)
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -24,7 +28,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(UserAgents::Table)
-                    .add_column(ColumnDef::new(UserAgents::BrowserVersion).string_len(20).null())
+                    .add_column(
+                        ColumnDef::new(UserAgents::BrowserVersion)
+                            .string_len(20)
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -51,7 +59,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(UserAgents::Table)
-                    .add_column(ColumnDef::new(UserAgents::DeviceCategory).string_len(20).null())
+                    .add_column(
+                        ColumnDef::new(UserAgents::DeviceCategory)
+                            .string_len(20)
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -60,7 +72,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(UserAgents::Table)
-                    .add_column(ColumnDef::new(UserAgents::DeviceVendor).string_len(50).null())
+                    .add_column(
+                        ColumnDef::new(UserAgents::DeviceVendor)
+                            .string_len(50)
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -138,7 +154,11 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_index(Index::drop().name("idx_user_agents_browser_name").to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("idx_user_agents_browser_name")
+                    .to_owned(),
+            )
             .await?;
 
         manager

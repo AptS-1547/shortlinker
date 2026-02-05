@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use sea_orm::{sea_query::Expr, DbBackend};
+use sea_orm::{DbBackend, sea_query::Expr};
 use tracing::{debug, info};
 
 use crate::errors::ShortlinkerError;

@@ -42,8 +42,16 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(ClickStatsHourly::ReferrerCounts).text().null())
-                    .col(ColumnDef::new(ClickStatsHourly::CountryCounts).text().null())
+                    .col(
+                        ColumnDef::new(ClickStatsHourly::ReferrerCounts)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ClickStatsHourly::CountryCounts)
+                            .text()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -99,8 +107,16 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(ClickStatsDaily::UniqueReferrers).integer().null())
-                    .col(ColumnDef::new(ClickStatsDaily::UniqueCountries).integer().null())
+                    .col(
+                        ColumnDef::new(ClickStatsDaily::UniqueReferrers)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ClickStatsDaily::UniqueCountries)
+                            .integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(ClickStatsDaily::TopReferrers).text().null())
                     .col(ColumnDef::new(ClickStatsDaily::TopCountries).text().null())
                     .to_owned(),
@@ -157,9 +173,21 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     )
-                    .col(ColumnDef::new(ClickStatsGlobalHourly::UniqueLinks).integer().null())
-                    .col(ColumnDef::new(ClickStatsGlobalHourly::TopReferrers).text().null())
-                    .col(ColumnDef::new(ClickStatsGlobalHourly::TopCountries).text().null())
+                    .col(
+                        ColumnDef::new(ClickStatsGlobalHourly::UniqueLinks)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ClickStatsGlobalHourly::TopReferrers)
+                            .text()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ClickStatsGlobalHourly::TopCountries)
+                            .text()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -190,7 +218,11 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
-            .drop_table(Table::drop().table(ClickStatsGlobalHourly::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(ClickStatsGlobalHourly::Table)
+                    .to_owned(),
+            )
             .await?;
 
         // 删除 click_stats_daily
@@ -209,7 +241,11 @@ impl MigrationTrait for Migration {
             .drop_index(Index::drop().name("idx_stats_hourly_bucket").to_owned())
             .await?;
         manager
-            .drop_index(Index::drop().name("idx_stats_hourly_code_bucket").to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("idx_stats_hourly_code_bucket")
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(ClickStatsHourly::Table).to_owned())

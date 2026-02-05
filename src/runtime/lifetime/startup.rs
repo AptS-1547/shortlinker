@@ -3,9 +3,7 @@ use crate::analytics::manager::ClickManager;
 use crate::analytics::{DataRetentionTask, RollupManager};
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::{
-    set_global_user_agent_store, AnalyticsService, LinkService, UserAgentStore,
-};
+use crate::services::{AnalyticsService, LinkService, UserAgentStore, set_global_user_agent_store};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -94,7 +92,10 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     let known_count = ua_store.known_count();
     set_global_user_agent_store(ua_store);
-    debug!("UserAgentStore initialized with {} known hashes", known_count);
+    debug!(
+        "UserAgentStore initialized with {} known hashes",
+        known_count
+    );
 
     // 启动 UserAgent 后台刷新任务（每 30 秒批量写入新 UA）
     let db_for_ua = storage.get_db().clone();

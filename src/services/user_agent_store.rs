@@ -7,8 +7,8 @@
 use chrono::Utc;
 use dashmap::{DashMap, DashSet};
 use sea_orm::{
-    sea_query::OnConflict, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QuerySelect,
+    ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QuerySelect, sea_query::OnConflict,
 };
 use std::sync::OnceLock;
 use tracing::{debug, info, warn};
@@ -324,10 +324,7 @@ impl UserAgentStore {
     /// Backfill parsed fields for existing user_agents records that have NULL browser_name
     ///
     /// This handles records that were inserted before the parsing feature was added.
-    pub async fn backfill_parsed_fields(
-        &self,
-        db: &DatabaseConnection,
-    ) -> anyhow::Result<usize> {
+    pub async fn backfill_parsed_fields(&self, db: &DatabaseConnection) -> anyhow::Result<usize> {
         let batch_size = 500u64;
         let mut backfilled = 0;
 
@@ -381,7 +378,10 @@ impl UserAgentStore {
         }
 
         if backfilled > 0 {
-            info!("Backfilled parsed fields for {} UserAgent records", backfilled);
+            info!(
+                "Backfilled parsed fields for {} UserAgent records",
+                backfilled
+            );
         }
 
         Ok(backfilled)

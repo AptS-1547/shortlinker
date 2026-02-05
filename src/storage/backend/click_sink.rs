@@ -11,12 +11,14 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
-use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter};
+use sea_orm::{
+    ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter,
+};
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
-use super::retry;
 use super::SeaOrmStorage;
+use super::retry;
 use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
 use crate::utils::is_valid_short_code;
 
@@ -72,14 +74,14 @@ impl ClickSink for SeaOrmStorage {
         .map_err(|e| anyhow::anyhow!("批量更新点击数失败（重试后仍失败）: {}", e))?;
 
         debug!(
-            "点击计数已刷新到 {} 数据库 ({} 条记录)",
+            "Click counts flushed to {} database ({} records)",
             self.backend_name.to_uppercase(),
             total_count
         );
 
         // 同步更新小时汇总表
         if let Err(e) = self.update_hourly_rollup(&updates, Utc::now()).await {
-            warn!("更新小时汇总表失败（不影响主流程）: {}", e);
+            warn!("Failed to update hourly rollup (non-blocking): {}", e);
         }
 
         Ok(())
@@ -126,14 +128,17 @@ impl DetailedClickSink for SeaOrmStorage {
         .map_err(|e| anyhow::anyhow!("批量插入点击日志失败: {}", e))?;
 
         debug!(
-            "详细点击日志已写入 {} 数据库 ({} 条记录)",
+            "Detailed click logs written to {} database ({} records)",
             self.backend_name.to_uppercase(),
             total_count
         );
 
         // 更新带详细信息的小时汇总
         if let Err(e) = self.update_hourly_rollup_with_details(&details).await {
-            warn!("更新详细小时汇总失败（不影响主流程）: {}", e);
+            warn!(
+                "Failed to update detailed hourly rollup (non-blocking): {}",
+                e
+            );
         }
 
         Ok(())
@@ -199,7 +204,7 @@ impl SeaOrmStorage {
             .await?;
 
         debug!(
-            "小时汇总已更新: {} 条链接 (bucket: {})",
+            "Hourly rollup updated: {} links (bucket: {})",
             updates.len(),
             hour_bucket
         );
@@ -219,22 +224,29 @@ impl SeaOrmStorage {
         let db = &self.db;
 
         // 按 (short_code, hour_bucket) 聚合
-        let mut aggregated: HashMap<(String, DateTime<Utc>), HourlyAggregation> =
-            HashMap::new();
+        let mut aggregated: HashMap<(String, DateTime<Utc>), HourlyAggregation> = HashMap::new();
 
         for detail in details {
             let hour_bucket = crate::analytics::truncate_to_hour(detail.timestamp);
             let key = (detail.code.clone(), hour_bucket);
 
-            let entry = aggregated.entry(key).or_insert_with(|| (0, HashMap::new(), HashMap::new()));
+            let entry = aggregated
+                .entry(key)
+                .or_insert_with(|| (0, HashMap::new(), HashMap::new()));
             entry.0 += 1;
 
             // 统计 referrer
-            let referrer_key = detail.referrer.clone().unwrap_or_else(|| "direct".to_string());
+            let referrer_key = detail
+                .referrer
+                .clone()
+                .unwrap_or_else(|| "direct".to_string());
             *entry.1.entry(referrer_key).or_insert(0) += 1;
 
             // 统计 country
-            let country_key = detail.country.clone().unwrap_or_else(|| "Unknown".to_string());
+            let country_key = detail
+                .country
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string());
             *entry.2.entry(country_key).or_insert(0) += 1;
         }
 
@@ -247,8 +259,10 @@ impl SeaOrmStorage {
 
             if let Some(record) = existing {
                 // 合并现有数据
-                let mut merged_referrers = crate::analytics::parse_json_counts(&record.referrer_counts);
-                let mut merged_countries = crate::analytics::parse_json_counts(&record.country_counts);
+                let mut merged_referrers =
+                    crate::analytics::parse_json_counts(&record.referrer_counts);
+                let mut merged_countries =
+                    crate::analytics::parse_json_counts(&record.country_counts);
 
                 for (k, v) in &referrers {
                     *merged_referrers.entry(k.clone()).or_insert(0) += v;
@@ -261,8 +275,10 @@ impl SeaOrmStorage {
                 if let Set(old_count) = active.click_count {
                     active.click_count = Set(old_count + count as i64);
                 }
-                active.referrer_counts = Set(Some(crate::analytics::to_json_string(&merged_referrers)));
-                active.country_counts = Set(Some(crate::analytics::to_json_string(&merged_countries)));
+                active.referrer_counts =
+                    Set(Some(crate::analytics::to_json_string(&merged_referrers)));
+                active.country_counts =
+                    Set(Some(crate::analytics::to_json_string(&merged_countries)));
 
                 retry::with_retry("sink_update_hourly_detailed", self.retry_config, || async {
                     click_stats_hourly::Entity::update(active.clone())

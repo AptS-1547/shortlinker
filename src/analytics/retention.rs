@@ -45,14 +45,11 @@ impl DataRetentionTask {
         // 从运行时配置读取保留天数
         let runtime_config = get_runtime_config();
 
-        let raw_log_retention_days =
-            runtime_config.get_u64_or("analytics.log_retention_days", 30);
+        let raw_log_retention_days = runtime_config.get_u64_or("analytics.log_retention_days", 30);
 
-        let hourly_retention_days =
-            runtime_config.get_u64_or("analytics.hourly_retention_days", 7);
+        let hourly_retention_days = runtime_config.get_u64_or("analytics.hourly_retention_days", 7);
 
-        let daily_retention_days =
-            runtime_config.get_u64_or("analytics.daily_retention_days", 365);
+        let daily_retention_days = runtime_config.get_u64_or("analytics.daily_retention_days", 365);
 
         Self {
             storage,
@@ -74,7 +71,7 @@ impl DataRetentionTask {
                 report.raw_logs_deleted = deleted;
             }
             Err(e) => {
-                error!("清理原始点击日志失败: {}", e);
+                error!("Failed to clean up raw click logs: {}", e);
             }
         }
 
@@ -89,12 +86,12 @@ impl DataRetentionTask {
                 report.daily_stats_deleted = daily;
             }
             Err(e) => {
-                error!("清理汇总数据失败: {}", e);
+                error!("Failed to clean up rollup data: {}", e);
             }
         }
 
         info!(
-            "数据清理完成: 原始日志 {} 条, 小时汇总 {} 条, 天汇总 {} 条",
+            "Data cleanup completed: raw logs {}, hourly rollups {}, daily rollups {}",
             report.raw_logs_deleted, report.hourly_stats_deleted, report.daily_stats_deleted
         );
 
@@ -113,7 +110,7 @@ impl DataRetentionTask {
         loop {
             if iterations >= max_iterations {
                 warn!(
-                    "原始日志清理达到最大迭代次数 {}，已删除 {} 条",
+                    "Raw log cleanup reached max iterations {} (deleted {} rows)",
                     max_iterations, total_deleted
                 );
                 break;
@@ -145,7 +142,7 @@ impl DataRetentionTask {
             iterations += 1;
 
             debug!(
-                "原始日志清理批次 {}: 删除 {} 条 (累计 {})",
+                "Raw log cleanup batch {}: deleted {} rows (total {})",
                 iterations, deleted, total_deleted
             );
 
@@ -173,13 +170,16 @@ impl DataRetentionTask {
 
             loop {
                 if let Err(e) = self.run_cleanup().await {
-                    error!("数据清理任务失败: {}", e);
+                    error!("Data cleanup task failed: {}", e);
                 }
 
                 tokio::time::sleep(interval).await;
             }
         });
 
-        info!("数据清理后台任务已启动 (间隔 {} 小时)", interval_hours);
+        info!(
+            "Data cleanup background task started (interval: {} hours)",
+            interval_hours
+        );
     }
 }

@@ -70,11 +70,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_index(
-                Index::drop()
-                    .name("idx_click_logs_country_time")
-                    .to_owned(),
-            )
+            .drop_index(Index::drop().name("idx_click_logs_country_time").to_owned())
             .await?;
 
         Ok(())

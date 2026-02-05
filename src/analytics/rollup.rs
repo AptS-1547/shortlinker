@@ -10,8 +10,8 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{debug, info};
 
-use crate::storage::backend::retry::{self, RetryConfig};
 use crate::storage::backend::SeaOrmStorage;
+use crate::storage::backend::retry::{self, RetryConfig};
 use migration::entities::{click_stats_daily, click_stats_global_hourly, click_stats_hourly};
 
 /// 点击聚合数据
@@ -132,7 +132,7 @@ impl RollupManager {
             .await?;
 
         debug!(
-            "小时汇总已更新: {} 条链接, {} 次点击 (bucket: {})",
+            "Hourly rollup updated: {} links, {} clicks (bucket: {})",
             updates.len(),
             total_clicks,
             hour_bucket
@@ -206,7 +206,10 @@ impl RollupManager {
             }
         }
 
-        debug!("详细小时汇总已更新: {} 条记录", aggregated.len());
+        debug!(
+            "Detailed hourly rollup updated: {} records",
+            aggregated.len()
+        );
         Ok(())
     }
 
@@ -354,7 +357,7 @@ impl RollupManager {
         }
 
         info!(
-            "小时->天汇总完成: {} 条链接 (日期: {})",
+            "Hourly-to-daily rollup completed: {} links (date: {})",
             processed, target_date
         );
         Ok(processed)
@@ -392,7 +395,7 @@ impl RollupManager {
             .await?;
 
         info!(
-            "汇总数据清理完成: 小时汇总 {} 条, 天汇总 {} 条",
+            "Rollup cleanup completed: hourly {} rows, daily {} rows",
             hourly_deleted, daily_deleted
         );
 
@@ -419,7 +422,9 @@ pub fn aggregate_click_details(
         let hour_bucket = super::truncate_to_hour(detail.timestamp);
         let key = (detail.code.clone(), hour_bucket);
 
-        let agg = result.entry(key).or_insert_with(|| ClickAggregation::new(0));
+        let agg = result
+            .entry(key)
+            .or_insert_with(|| ClickAggregation::new(0));
         agg.count += 1;
 
         if let Some(ref referrer) = detail.referrer {

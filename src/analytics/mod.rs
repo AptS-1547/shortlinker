@@ -6,7 +6,7 @@ pub mod sink;
 
 pub use manager::ClickManager;
 pub use retention::DataRetentionTask;
-pub use rollup::{aggregate_click_details, ClickAggregation, RollupManager};
+pub use rollup::{ClickAggregation, RollupManager, aggregate_click_details};
 pub use sink::{ClickSink, DetailedClickSink};
 
 use std::collections::HashMap;

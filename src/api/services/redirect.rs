@@ -12,7 +12,7 @@ use crate::analytics::global::get_click_manager;
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
-use crate::services::{get_user_agent_store, GeoIpProvider};
+use crate::services::{GeoIpProvider, get_user_agent_store};
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::ip::{extract_client_ip, is_private_or_local};
 use crate::utils::is_valid_short_code;
@@ -115,9 +115,8 @@ impl RedirectService {
             .get("user-agent")
             .and_then(|h| h.to_str().ok());
 
-        let user_agent_hash = user_agent_str.and_then(|ua| {
-            get_user_agent_store().map(|store| store.get_or_create_hash(ua))
-        });
+        let user_agent_hash = user_agent_str
+            .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
 
         ClickDetail {
             code: code.to_string(),

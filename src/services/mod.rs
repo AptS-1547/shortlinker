@@ -11,4 +11,4 @@ mod user_agent_store;
 pub use analytics_service::*;
 pub use geoip::{GeoInfo, GeoIpLookup, GeoIpProvider};
 pub use link_service::*;
-pub use user_agent_store::{get_user_agent_store, set_global_user_agent_store, UserAgentStore};
+pub use user_agent_store::{UserAgentStore, get_user_agent_store, set_global_user_agent_store};
