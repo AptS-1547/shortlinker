@@ -245,6 +245,9 @@ pub async fn run_server() -> Result<()> {
         }
     }
 
+    // Clone db reference before storage moves into HttpServer closure
+    let db_for_shutdown = storage.get_db().clone();
+
     // Configure HTTP server
     let server = HttpServer::new(move || {
         // Build CORS middleware
@@ -327,7 +330,7 @@ pub async fn run_server() -> Result<()> {
         res = server => {
             res?;
         }
-        _ = lifetime::shutdown::listen_for_shutdown() => {
+        _ = lifetime::shutdown::listen_for_shutdown(&db_for_shutdown) => {
             warn!("Graceful shutdown: all tasks completed");
         }
     }

@@ -1,11 +1,48 @@
 pub mod global;
 pub mod manager;
+pub mod retention;
+pub mod rollup;
 pub mod sink;
 
 pub use manager::ClickManager;
+pub use retention::DataRetentionTask;
+pub use rollup::{ClickAggregation, RollupManager, aggregate_click_details};
 pub use sink::{ClickSink, DetailedClickSink};
 
-use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+
+use chrono::{DateTime, Timelike, Utc};
+use tracing::warn;
+
+// ============ 公共工具函数 ============
+
+/// 将时间戳截断到整点
+pub(crate) fn truncate_to_hour(ts: DateTime<Utc>) -> DateTime<Utc> {
+    ts.date_naive()
+        .and_hms_opt(ts.time().hour(), 0, 0)
+        .unwrap()
+        .and_utc()
+}
+
+/// 从 JSON 字符串解析计数 HashMap
+pub(crate) fn parse_json_counts(json_str: &Option<String>) -> HashMap<String, usize> {
+    match json_str {
+        Some(s) if !s.is_empty() => serde_json::from_str(s).unwrap_or_else(|e| {
+            warn!(
+                "Failed to parse JSON counts: {} (data: {})",
+                e,
+                &s[..s.len().min(200)]
+            );
+            HashMap::new()
+        }),
+        _ => HashMap::new(),
+    }
+}
+
+/// 将计数 HashMap 序列化为 JSON 字符串
+pub(crate) fn to_json_string(map: &HashMap<String, usize>) -> String {
+    serde_json::to_string(map).unwrap_or_else(|_| "{}".to_string())
+}
 
 /// 详细点击信息
 #[derive(Debug, Clone)]
@@ -16,8 +53,10 @@ pub struct ClickDetail {
     pub timestamp: DateTime<Utc>,
     /// 来源页面 (Referer header)
     pub referrer: Option<String>,
-    /// 用户代理 (User-Agent header)
+    /// 用户代理 (User-Agent header) - 兼容保留
     pub user_agent: Option<String>,
+    /// UserAgent hash (references user_agents.hash)
+    pub user_agent_hash: Option<String>,
     /// 客户端 IP 地址
     pub ip_address: Option<String>,
     /// 国家代码 (ISO 3166-1 alpha-2)
@@ -34,6 +73,7 @@ impl ClickDetail {
             timestamp: Utc::now(),
             referrer: None,
             user_agent: None,
+            user_agent_hash: None,
             ip_address: None,
             country: None,
             city: None,

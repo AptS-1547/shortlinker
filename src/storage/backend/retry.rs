@@ -52,7 +52,10 @@ where
         match operation().await {
             Ok(result) => {
                 if attempt > 0 {
-                    debug!("操作 '{}' 在第 {} 次重试后成功", operation_name, attempt);
+                    debug!(
+                        "Operation '{}' succeeded after {} retries",
+                        operation_name, attempt
+                    );
                 }
                 return Ok(result);
             }
@@ -60,7 +63,7 @@ where
                 attempt += 1;
                 let delay = calculate_backoff(attempt, config.base_delay_ms, config.max_delay_ms);
                 warn!(
-                    "操作 '{}' 失败 (尝试 {}/{}): {}，{} 毫秒后重试",
+                    "Operation '{}' failed (attempt {}/{}): {}; retrying in {} ms",
                     operation_name,
                     attempt,
                     config.max_retries + 1,
@@ -71,7 +74,10 @@ where
             }
             Err(e) => {
                 if !is_retryable_error(&e) {
-                    debug!("操作 '{}' 失败，错误不可重试: {}", operation_name, e);
+                    debug!(
+                        "Operation '{}' failed with non-retryable error: {}",
+                        operation_name, e
+                    );
                 }
                 return Err(e);
             }

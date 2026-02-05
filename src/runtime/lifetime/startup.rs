@@ -1,8 +1,9 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
+use crate::analytics::{DataRetentionTask, RollupManager};
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::{AnalyticsService, LinkService};
+use crate::services::{AnalyticsService, LinkService, UserAgentStore, set_global_user_agent_store};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -53,10 +54,61 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     // 初始化运行时配置系统
     let db = storage.get_db().clone();
-    init_runtime_config(db)
+    init_runtime_config(db.clone())
         .await
         .context("Failed to initialize runtime config")?;
     debug!("Runtime config system initialized");
+
+    // 初始化 UserAgentStore（UA 去重存储）
+    let ua_store = UserAgentStore::new();
+    if let Err(e) = ua_store.load_known_hashes(&db).await {
+        warn!("Failed to preload UserAgent hashes (non-fatal): {}", e);
+    }
+
+    // 迁移历史 UserAgent 数据（首次启动时执行）
+    match ua_store.migrate_historical_data(&db).await {
+        Ok(stats) if stats.records_updated > 0 => {
+            info!(
+                "UserAgent historical migration: {} records updated, {} unique UAs",
+                stats.records_updated, stats.unique_uas_inserted
+            );
+        }
+        Err(e) => {
+            warn!("UserAgent historical migration failed (non-fatal): {}", e);
+        }
+        _ => {}
+    }
+
+    // 回填已有 UserAgent 记录的解析字段
+    match ua_store.backfill_parsed_fields(&db).await {
+        Ok(count) if count > 0 => {
+            info!("UserAgent parsed fields backfilled: {} records", count);
+        }
+        Err(e) => {
+            warn!("UserAgent backfill failed (non-fatal): {}", e);
+        }
+        _ => {}
+    }
+
+    let known_count = ua_store.known_count();
+    set_global_user_agent_store(ua_store);
+    debug!(
+        "UserAgentStore initialized with {} known hashes",
+        known_count
+    );
+
+    // 启动 UserAgent 后台刷新任务（每 30 秒批量写入新 UA）
+    let db_for_ua = storage.get_db().clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            if let Some(store) = crate::services::get_user_agent_store()
+                && let Err(e) = store.flush_pending(&db_for_ua).await
+            {
+                tracing::warn!("Failed to flush UserAgent pending inserts: {}", e);
+            }
+        }
+    });
 
     // 初始化点击计数器（从 RuntimeConfig 读取配置）
     let rt = get_runtime_config();
@@ -137,6 +189,21 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     // Create AnalyticsService for analytics queries
     let analytics_service = Arc::new(AnalyticsService::new(storage.clone()));
+
+    // 初始化数据清理后台任务
+    let enable_auto_rollup = rt.get_bool_or(keys::ANALYTICS_ENABLE_AUTO_ROLLUP, true);
+    if enable_auto_rollup {
+        let rollup_manager = Arc::new(RollupManager::new(storage.clone()));
+        let retention_task = Arc::new(DataRetentionTask::new(
+            storage.clone(),
+            rollup_manager.clone(),
+        ));
+        // 每 4 小时运行一次清理
+        retention_task.spawn_background_task(4);
+        debug!("Data retention background task initialized");
+    } else {
+        debug!("Auto rollup and data retention is disabled");
+    }
 
     // Initialize IPC handler with LinkService
     crate::system::ipc::handler::init_link_service(link_service.clone());

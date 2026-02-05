@@ -79,6 +79,9 @@ pub mod keys {
     pub const ANALYTICS_LOG_RETENTION_DAYS: &str = "analytics.log_retention_days";
     pub const ANALYTICS_ENABLE_IP_LOGGING: &str = "analytics.enable_ip_logging";
     pub const ANALYTICS_ENABLE_GEO_LOOKUP: &str = "analytics.enable_geo_lookup";
+    pub const ANALYTICS_HOURLY_RETENTION_DAYS: &str = "analytics.hourly_retention_days";
+    pub const ANALYTICS_DAILY_RETENTION_DAYS: &str = "analytics.daily_retention_days";
+    pub const ANALYTICS_ENABLE_AUTO_ROLLUP: &str = "analytics.enable_auto_rollup";
 
     // 路由配置
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
@@ -201,6 +204,18 @@ fn default_analytics_enable_ip_logging() -> String {
 
 fn default_analytics_enable_geo_lookup() -> String {
     "false".to_string()
+}
+
+fn default_analytics_hourly_retention_days() -> String {
+    "7".to_string()
+}
+
+fn default_analytics_daily_retention_days() -> String {
+    "365".to_string()
+}
+
+fn default_analytics_enable_auto_rollup() -> String {
+    "true".to_string()
 }
 
 /// 所有配置定义（单一数据源）
@@ -496,7 +511,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::ANALYTICS,
-        description: "Log retention period in days (automatic cleanup is not implemented yet)",
+        description: "Raw click log retention period in days (cleaned by DataRetentionTask)",
     },
     ConfigDef {
         key: keys::ANALYTICS_ENABLE_IP_LOGGING,
@@ -519,6 +534,39 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable geographic location lookup for IP addresses",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_HOURLY_RETENTION_DAYS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_hourly_retention_days,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Hourly rollup data retention period in days",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_DAILY_RETENTION_DAYS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_daily_retention_days,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Daily rollup data retention period in days",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_ENABLE_AUTO_ROLLUP,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_analytics_enable_auto_rollup,
+        requires_restart: true,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable automatic rollup aggregation and data cleanup",
     },
 ];
 

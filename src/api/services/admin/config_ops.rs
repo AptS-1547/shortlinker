@@ -165,7 +165,7 @@ pub async fn update_config(
             }
 
             let message = if result.requires_restart {
-                Some("此配置需要重启服务后生效".to_string())
+                Some("This configuration requires a service restart to take effect".to_string())
             } else {
                 None
             };

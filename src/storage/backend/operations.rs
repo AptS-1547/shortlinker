@@ -36,7 +36,7 @@ pub async fn upsert(db: &DatabaseConnection, link: &ShortLink) -> Result<()> {
             Ok(())
         }
         Err(e) => Err(ShortlinkerError::database_operation(format!(
-            "Upsert 短链接 '{}' 失败 (target: {}): {}",
+            "Failed to upsert short link '{}' (target: {}): {}",
             link.code,
             if link.target.len() > 50 {
                 format!("{}...", &link.target[..50])

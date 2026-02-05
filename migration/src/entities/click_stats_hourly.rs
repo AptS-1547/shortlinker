@@ -1,23 +1,19 @@
-//! Click log entity for detailed click tracking
+//! 小时级点击统计汇总实体
 
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "click_logs")]
+#[sea_orm(table_name = "click_stats_hourly")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub short_code: String,
-    pub clicked_at: DateTimeUtc,
+    pub hour_bucket: DateTimeUtc,
+    pub click_count: i64,
     #[sea_orm(column_type = "Text", nullable)]
-    pub referrer: Option<String>,
+    pub referrer_counts: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
-    pub user_agent: Option<String>,
-    pub ip_address: Option<String>,
-    pub country: Option<String>,
-    pub city: Option<String>,
-    /// UserAgent hash (references user_agents.hash)
-    pub user_agent_hash: Option<String>,
+    pub country_counts: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

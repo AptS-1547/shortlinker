@@ -12,7 +12,7 @@ mod operations;
 mod query;
 pub mod retry;
 
-pub use analytics::{GeoRow, ReferrerRow, TopLinkRow, TrendRow};
+pub use analytics::{GeoRow, GroupBy, ReferrerRow, TopLinkRow, TrendRow, UaStatsRow};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,7 +44,7 @@ pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
         Ok("postgres".to_string())
     } else {
         Err(ShortlinkerError::database_config(format!(
-            "无法从 URL 推断数据库类型: {}. 支持的 URL 格式: sqlite://, mysql://, mariadb://, postgres://",
+            "Failed to infer database type from URL: {}. Supported URL schemes: sqlite://, mysql://, mariadb://, postgres://",
             database_url
         )))
     }
@@ -88,7 +88,7 @@ impl SeaOrmStorage {
     pub async fn new(database_url: &str, backend_name: &str) -> Result<Self> {
         if database_url.is_empty() {
             return Err(ShortlinkerError::database_config(
-                "DATABASE_URL 未设置".to_string(),
+                "DATABASE_URL is not set".to_string(),
             ));
         }
 

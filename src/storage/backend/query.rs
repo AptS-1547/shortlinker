@@ -82,7 +82,10 @@ impl SeaOrmStorage {
         })
         .await
         .map_err(|e| {
-            ShortlinkerError::database_operation(format!("查询短链接失败（重试后仍失败）: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to query short link (still failed after retries): {}",
+                e
+            ))
         })?;
 
         Ok(result.map(model_to_shortlink))
@@ -93,7 +96,10 @@ impl SeaOrmStorage {
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("加载所有短链接失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to load all short links: {}",
+                    e
+                ))
             })?;
 
         let count = models.len();
@@ -117,7 +123,10 @@ impl SeaOrmStorage {
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("加载短码列表失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to load short code list: {}",
+                    e
+                ))
             })?;
 
         info!("Loaded {} short codes for Bloom filter", codes.len());
@@ -149,7 +158,10 @@ impl SeaOrmStorage {
                 })
                 .await
                 .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("批量检查短码存在性失败: {}", e))
+                    ShortlinkerError::database_operation(format!(
+                        "Failed to batch-check short code existence: {}",
+                        e
+                    ))
                 })?;
 
             existing.extend(result);
@@ -170,7 +182,7 @@ impl SeaOrmStorage {
             short_link::Entity::find().count(db).await
         })
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("查询链接总数失败: {}", e)))
+        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)))
     }
 
     /// 带过滤条件的分页加载链接（带 COUNT 缓存）
@@ -215,7 +227,10 @@ impl SeaOrmStorage {
             )
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("分页 COUNT 查询失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Pagination COUNT query failed: {}",
+                    e
+                ))
             })?;
 
             self.count_cache.insert(cache_key, count);
@@ -238,7 +253,9 @@ impl SeaOrmStorage {
             },
         )
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("分页数据查询失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("Pagination data query failed: {}", e))
+        })?;
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
         Ok((links, total))
@@ -261,7 +278,10 @@ impl SeaOrmStorage {
         })
         .await
         .map_err(|e| {
-            ShortlinkerError::database_operation(format!("批量查询失败（重试后仍失败）: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Batch query failed (still failed after retries): {}",
+                e
+            ))
         })?;
 
         Ok(models
@@ -310,7 +330,7 @@ impl SeaOrmStorage {
                     }
                     Err(e) => Some((
                         Err(ShortlinkerError::database_operation(format!(
-                            "分页查询失败 (page={}): {}",
+                            "Paginated query failed (page={}): {}",
                             page, e
                         ))),
                         (page + 1, db, condition, page_size),
@@ -345,7 +365,9 @@ impl SeaOrmStorage {
             .into_model::<StatsResult>()
             .one(&self.db)
             .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("统计查询失败: {}", e)))?;
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
+            })?;
 
         match result {
             Some(stats) => Ok(LinkStats {

@@ -13,7 +13,9 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
     use std::str::FromStr;
 
     let opt = SqliteConnectOptions::from_str(database_url)
-        .map_err(|e| ShortlinkerError::database_config(format!("SQLite URL 解析失败: {}", e)))?
+        .map_err(|e| {
+            ShortlinkerError::database_config(format!("Failed to parse SQLite URL: {}", e))
+        })?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
@@ -33,7 +35,10 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
         .connect_with(opt)
         .await
         .map_err(|e| {
-            ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
+            ShortlinkerError::database_connection(format!(
+                "Failed to connect to SQLite database: {}",
+                e
+            ))
         })?;
 
     // 转换为 Sea-ORM 的 DatabaseConnection
@@ -57,7 +62,7 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
 
     Database::connect(opt).await.map_err(|e| {
         ShortlinkerError::database_connection(format!(
-            "无法连接到 {} 数据库: {}",
+            "Failed to connect to {} database: {}",
             backend_name.to_uppercase(),
             e
         ))
@@ -68,7 +73,7 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     Migrator::up(db, None)
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("迁移失败: {}", e)))?;
+        .map_err(|e| ShortlinkerError::database_operation(format!("Migration failed: {}", e)))?;
 
     info!("Database migrations completed");
     Ok(())

@@ -261,7 +261,11 @@ mod tests {
 
         for case in extreme_cases {
             let result = TimeParser::parse_expire_time(case);
-            assert!(result.is_err(), "极端值 '{}' 应该返回错误而非 panic", case);
+            assert!(
+                result.is_err(),
+                "Extreme value '{}' should return an error instead of panicking",
+                case
+            );
         }
     }
 
@@ -269,22 +273,28 @@ mod tests {
     fn test_overflow_multiplication() {
         // 测试乘法溢出的情况 (num * 30 和 num * 365)
         let result = TimeParser::parse_expire_time("999999999999999M"); // months: num * 30
-        assert!(result.is_err(), "月份乘法溢出应返回错误");
+        assert!(
+            result.is_err(),
+            "Month multiplication overflow should return an error"
+        );
 
         let result = TimeParser::parse_expire_time("999999999999999y"); // years: num * 365
-        assert!(result.is_err(), "年份乘法溢出应返回错误");
+        assert!(
+            result.is_err(),
+            "Year multiplication overflow should return an error"
+        );
     }
 
     #[test]
     fn test_reasonable_large_values() {
         // 合理的大值应该正常工作
         let result = TimeParser::parse_expire_time("100y"); // 100 年
-        assert!(result.is_ok(), "100年应该是有效值");
+        assert!(result.is_ok(), "100y should be a valid value");
 
         let result = TimeParser::parse_expire_time("3650d"); // 约 10 年
-        assert!(result.is_ok(), "3650天应该是有效值");
+        assert!(result.is_ok(), "3650d should be a valid value");
 
         let result = TimeParser::parse_expire_time("520w"); // 约 10 年
-        assert!(result.is_ok(), "520周应该是有效值");
+        assert!(result.is_ok(), "520w should be a valid value");
     }
 }

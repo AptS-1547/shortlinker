@@ -108,6 +108,7 @@ mod tests {
     #[test]
     fn test_invalid_short_code_unicode() {
         assert!(!is_valid_short_code("代码"));
+        assert!(!is_valid_short_code("code_with_symbol_✓"));
         assert!(!is_valid_short_code("código"));
         assert!(!is_valid_short_code("🔗"));
     }
