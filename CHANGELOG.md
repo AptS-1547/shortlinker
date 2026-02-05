@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.6] - 2026-02-06
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.6 是一次可观测性增强版本，主要亮点：
+
+- **Prometheus 指标系统** - 全新 18 项指标，涵盖 HTTP、数据库、缓存、重定向、认证等维度
+- **Docker 多变体构建** - 标准版和 metrics 版分离，按需选择
+- **事件系统文档重构** - 为插件化架构做准备，引入 trait-based Event 系统设计
+
+### Added
+- **Prometheus 指标导出** - 新增 `/health/metrics` 端点，导出 Prometheus 文本格式指标
+  - HTTP：请求延迟直方图、请求计数、活跃连接数
+  - 数据库：查询延迟、查询计数
+  - 缓存：操作延迟、条目数、命中/未命中计数
+  - 重定向：按状态码（307/404/500）统计
+  - 点击：缓冲区大小、刷盘计数（按触发方式）
+  - 认证：鉴权失败计数
+  - Bloom Filter：假阳性计数
+  - 系统：运行时间、进程内存、CPU 时间、构建信息
+- **TimingMiddleware** - 自动记录所有 HTTP 请求的延迟和计数，使用 Drop Guard 确保活跃连接数准确
+- **系统指标收集器** - 使用 sysinfo 库每 15 秒更新进程内存和 CPU 时间
+- **指标辅助宏** - `observe_duration!`、`inc_counter!`、`set_gauge!` 等宏减少样板代码
+- **Docker metrics 变体** - 新增 `latest-metrics`、`stable-metrics`、`edge-metrics` 等镜像标签
+
+### Improved
+- **API 响应格式统一** - 所有端点响应统一为 `{code, message, data}` 格式
+- **健康检查增强** - 新增缓存状态信息和 uptime 指标
+- **ObjectCache trait** - 新增 `entry_count()` 方法用于指标收集
+
+### Refactored
+- **指标记录优化** - 移除不必要的字符串克隆，端点分类返回 `&'static str` 避免堆分配
+- **事件系统设计** - 文档重构为 trait-based Event 系统，支持事件取消和优先级机制
+
+### Dependencies
+- 添加 `prometheus` 0.14（可选，metrics feature）
+- 添加 `sysinfo` 0.38（可选，metrics feature）
+- 升级 `ureq` 3.1.4 → 3.2.0
+- 升级 `time` 0.3.45 → 0.3.47
+- 升级 `darling` 0.20.11 → 0.23.0
+
+### CI/CD
+- **Docker 多变体构建** - 构建矩阵支持 default 和 metrics 两个变体
+- **镜像标签策略** - 新增 edge/stable 标签，metrics 版添加 `-metrics` 后缀
+- **VitePress 文档** - 新增标签触发构建
+
+### Docs
+- 新增 `/health/metrics` 端点文档
+- 新增 Docker metrics 版部署说明
+- 重构事件系统文档，引入插件化架构设计
+- 更新 API 响应格式说明
+
+### Breaking Changes
+- **最低 Rust 版本** - 要求 Rust 1.88+
+- **API 响应格式** - 从 `{code, data}` 变更为 `{code, message, data}`
+
 ## [v0.5.0-alpha.5] - 2026-02-05
 
 ### 🎉 Release Highlights
@@ -1293,7 +1349,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.6...HEAD
+[v0.5.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...v0.5.0-alpha.6
 [v0.5.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...v0.5.0-alpha.5
 [v0.5.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...v0.5.0-alpha.4
 [v0.5.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
