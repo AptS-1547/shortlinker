@@ -18,7 +18,16 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
-    
+    strategy:
+      matrix:
+        include:
+          - variant: default
+            features: "cli"
+            suffix: ""
+          - variant: metrics
+            features: "cli,metrics"
+            suffix: "-metrics"
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -29,7 +38,7 @@ jobs:
     #   uses: docker/setup-qemu-action@v3
     #   with:
     #     platforms: arm64,386
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
@@ -38,7 +47,7 @@ jobs:
         buildkitd-flags: |
           --allow-insecure-entitlement security.insecure
           --allow-insecure-entitlement network.host
-      
+
     - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
@@ -60,18 +69,21 @@ jobs:
           ${{ env.REGISTRY_IMAGE_DOCKERHUB }}
           ${{ env.REGISTRY_IMAGE_GHCR }}
         tags: |
-          # 版本号 tag（如 v1.0.0、v1.0.0-alpha.1）
-          type=ref,event=tag
-          # 正式版本打 latest 和 stable
-          type=raw,value=latest,enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
-          type=raw,value=stable,enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
-          # 主版本号 tag（如 v1），仅正式版本
-          type=semver,pattern=v{{major}},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+          # 版本号 tag（如 v1.0.0-metrics、v1.0.0-alpha.1-metrics）
+          type=ref,event=tag,suffix=${{ matrix.suffix }}
+          # latest 始终指向最新构建
+          type=raw,value=latest${{ matrix.suffix }}
+          # 正式版本打 stable
+          type=raw,value=stable${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+          # 预发布版本打 edge
+          type=raw,value=edge${{ matrix.suffix }},enable=${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          # 主版本号 tag（如 v1、v1-metrics），仅正式版本
+          type=semver,pattern=v{{major}},suffix=${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
         labels: |
           org.opencontainers.image.title=Shortlinker
           org.opencontainers.image.description=A simple, fast, and secure URL shortener written in Rust
           org.opencontainers.image.vendor=AptS-1547
-        
+
     - name: Build and push Docker images
       uses: docker/build-push-action@v6
       with:
@@ -80,16 +92,17 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        # 启用多层缓存策略
+        # 启用多层缓存策略（按变体隔离缓存）
         cache-from: |
-          type=gha
-          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache
-          type=registry,ref=${{ env.REGISTRY_IMAGE_GHCR }}:buildcache
+          type=gha,scope=${{ matrix.variant }}
+          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache-${{ matrix.variant }}
+          type=registry,ref=${{ env.REGISTRY_IMAGE_GHCR }}:buildcache-${{ matrix.variant }}
         cache-to: |
-          type=gha,mode=max
-          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache,mode=max
+          type=gha,mode=max,scope=${{ matrix.variant }}
+          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache-${{ matrix.variant }},mode=max
         build-args: |
           VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          CARGO_FEATURES=${{ matrix.features }}
         # 启用构建记录和证明
         provenance: true
         sbom: true
@@ -98,7 +111,9 @@ jobs:
     - name: Build Summary
       if: always()
       run: |
-        echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## Docker Build Summary (${{ matrix.variant }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Variant**: ${{ matrix.variant }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Features**: ${{ matrix.features }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Version**: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
         echo "- **Images**:" >> $GITHUB_STEP_SUMMARY
