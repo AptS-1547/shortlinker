@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-alpha.4] - 2026-02-05
+
+### 🎉 Release Highlights
+
+v0.5.0-alpha.4 是一次 Analytics 系统的重大升级，主要亮点：
+
+- **点击数据汇总系统** - 多级汇总架构（小时/天/全局），大数据量查询性能提升 10-100 倍
+- **UserAgent 去重存储** - xxHash64 去重 + woothee 解析，存储减少 30-70%
+- **设备分析 API** - 新增浏览器、操作系统、设备类型统计端点
+- **自动数据清理** - 可配置的保留策略，防止存储无限增长
+
+### Added
+- **点击数据汇总系统** - 实时更新的多级汇总架构
+  - `click_stats_hourly`：每个短链接每小时的点击数、来源分布、国家分布
+  - `click_stats_daily`：每个短链接每天的点击数、唯一来源数、唯一国家数
+  - `click_stats_global_hourly`：全局每小时总点击数、活跃链接数
+  - 后台任务自动将小时汇总滚动到天汇总
+- **UserAgent 去重存储系统** - 新增 `user_agents` 表和 `UserAgentStore` 服务
+  - 使用 xxHash64 生成 16 字符 hex hash 作为唯一标识
+  - 使用 woothee 解析浏览器、操作系统、设备类型
+  - DashMap/DashSet 高性能并发缓存
+  - 后台任务每 30 秒批量写入新 UA
+  - 支持历史数据自动迁移和字段回填
+- **设备分析 API** - 两个新端点
+  - `GET /admin/v1/analytics/devices` - 全局设备分析
+  - `GET /admin/v1/links/{code}/analytics/devices` - 单链接设备分析
+  - 返回浏览器、操作系统、设备类型分布和 Bot 占比
+- **自动数据清理任务** - 可配置的保留策略
+  - 原始点击日志：默认 30 天
+  - 小时汇总：默认 7 天
+  - 天汇总：默认 365 天
+  - 后台任务每 4 小时运行，分批删除避免长事务
+- **新增配置项**
+  - `analytics.enable_auto_rollup` - 启用自动汇总和清理（默认 true）
+  - `analytics.hourly_retention_days` - 小时汇总保留天数（默认 7）
+  - `analytics.daily_retention_days` - 天汇总保留天数（默认 365）
+
+### Improved
+- **Analytics V2 查询方法** - 从汇总表读取的高性能查询
+  - `get_trends_v2()`、`get_link_trends_v2()` 等方法提升 10-100 倍性能
+  - 游标分页导出替代 OFFSET，大数据量导出性能显著提升
+- **Click Sink 增强** - 每次 flush 时自动更新汇总表
+- **查询表达式统一** - 排序和分组使用统一的表达式克隆，避免字符串表达式
+
+### Refactored
+- **启动流程重构** - 新增 UserAgentStore 初始化、历史数据迁移、UA 后台任务、数据清理任务
+- **日志消息语言统一** - 从中文统一为英文
+
+### Dependencies
+- 添加 `xxhash-rust` 用于 UA hash 生成
+- 添加 `woothee` 用于 UA 解析
+
+### Docs
+- 新增设备分析 API 文档
+- 更新配置文档，添加汇总和清理相关配置项说明
+- 更新 `analytics.log_retention_days` 说明（自动清理已实装）
+
 ## [v0.5.0-alpha.3] - 2026-02-04
 
 ### 🎉 Release Highlights
@@ -1198,7 +1255,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...HEAD
+[v0.5.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...v0.5.0-alpha.4
 [v0.5.0-alpha.3]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [v0.5.0-alpha.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.1...v0.5.0-alpha.2
 [v0.5.0-alpha.1]: https://github.com/AptS-1547/shortlinker/compare/v0.4.3...v0.5.0-alpha.1
