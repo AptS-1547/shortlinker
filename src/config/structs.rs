@@ -277,6 +277,10 @@ pub struct LoggingConfig {
     pub format: String,
     #[serde(default = "default_log_file")]
     pub file: Option<String>,
+    /// 单个日志文件最大大小（MB）
+    ///
+    /// **注意**: 当前版本未使用此字段，日志轮转按天而非按大小。
+    /// 保留字段以保持配置文件向后兼容。
     #[serde(default = "default_max_size")]
     pub max_size: u64,
     #[serde(default = "default_max_backups")]

@@ -26,10 +26,12 @@ pub struct RouteConfig {
     pub enable_frontend: bool,
 }
 
-/// CLI / TUI 模式预处理
+/// CLI / TUI 模式预处理（预留扩展点）
+///
+/// 当前为空实现，供未来 CLI/TUI 特定初始化使用。
 #[cfg(any(feature = "cli", feature = "tui"))]
 pub async fn cli_tui_pre_startup() {
-    // CLI / TUI Mode
+    // Reserved for future CLI/TUI-specific initialization
 }
 
 /// 准备服务器启动的上下文
@@ -225,7 +227,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         enable_frontend: rt.get_bool_or(keys::FEATURES_ENABLE_ADMIN_PANEL, false),
     };
 
-    check_compoment_enabled(&route_config);
+    check_component_enabled(&route_config);
 
     debug!(
         "Pre-startup processing completed in {} ms",
@@ -241,7 +243,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     })
 }
 
-fn check_compoment_enabled(route_config: &RouteConfig) {
+fn check_component_enabled(route_config: &RouteConfig) {
     let rt = get_runtime_config();
 
     // 检查 JWT Secret 安全性

@@ -103,7 +103,7 @@ fn default_empty() -> String {
 }
 
 fn default_admin_token() -> String {
-    crate::utils::generate_random_code(16)
+    crate::utils::generate_secure_token(32) // 使用加密安全的 OsRng
 }
 
 fn default_jwt_secret() -> String {

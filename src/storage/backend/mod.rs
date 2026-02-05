@@ -127,6 +127,10 @@ impl SeaOrmStorage {
         Ok(storage)
     }
 
+    /// Reload storage state (placeholder for future extensions)
+    ///
+    /// Currently this is a no-op. The actual data reload is handled by
+    /// `ReloadCoordinator` which refreshes the cache layer directly.
     pub async fn reload(&self) -> Result<()> {
         tracing::info!(
             "Reloading links from {} storage",
