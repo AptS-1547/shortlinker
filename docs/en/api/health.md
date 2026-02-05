@@ -59,7 +59,7 @@ curl -sS -b cookies.txt \
 
 **Base URL**: `http://your-domain:port/health`
 
-> All endpoints support both `GET` and `HEAD`.
+> Note: `/health`, `/health/ready`, `/health/live` support `GET` and `HEAD`. `/health/metrics` is `GET` only (Prometheus scrape endpoint; requires the `metrics` feature).
 
 ### GET /health - Full health check
 
@@ -115,6 +115,55 @@ curl -sS -b cookies.txt -I \
 ```
 
 Returns HTTP 204 when alive.
+
+### GET /health/metrics - Prometheus Metrics (Optional)
+
+> This endpoint is registered only when the binary is built with the `metrics` feature. If not enabled, it will return `404`.
+
+- Default path: `/health/metrics`
+- Actual path: `{routes.health_prefix}/metrics` (controlled by runtime config `routes.health_prefix`)
+
+Authentication is the same as other Health endpoints (Bearer Token / JWT cookies). For monitoring, Bearer Token is recommended:
+
+```bash
+HEALTH_TOKEN="your_health_token"
+
+curl -sS \
+  -H "Authorization: Bearer ${HEALTH_TOKEN}" \
+  http://localhost:8080/health/metrics
+```
+
+Returns Prometheus text format (`text/plain; version=0.0.4; charset=utf-8`). On export failure, it returns `500` with a text error message.
+
+**Exported metrics (current implementation)**:
+
+| Metric | Type | Labels | Description |
+|------|------|--------|-------------|
+| `shortlinker_http_request_duration_seconds` | HistogramVec | `method`,`endpoint`,`status` | HTTP request latency (seconds) |
+| `shortlinker_http_requests_total` | CounterVec | `method`,`endpoint`,`status` | Total HTTP requests |
+| `shortlinker_http_active_connections` | Gauge | - | In-flight requests (approx. concurrency) |
+| `shortlinker_db_query_duration_seconds` | HistogramVec | `operation` | DB query latency (seconds) |
+| `shortlinker_db_queries_total` | CounterVec | `operation` | Total DB queries |
+| `shortlinker_cache_operation_duration_seconds` | HistogramVec | `operation`,`layer` | Cache op latency (seconds) |
+| `shortlinker_cache_entries` | GaugeVec | `layer` | Cache entries (currently updated for `object_cache` only) |
+| `shortlinker_cache_hits_total` | CounterVec | `layer` | Cache hits by layer |
+| `shortlinker_cache_misses_total` | CounterVec | `layer` | Cache misses by layer (currently `object_cache` only) |
+| `shortlinker_redirects_total` | CounterVec | `status` | Redirects by status code (e.g. `307`/`404`) |
+| `shortlinker_clicks_buffer_entries` | Gauge | - | Click buffer entries (unique short codes, not total clicks) |
+| `shortlinker_clicks_flush_total` | CounterVec | `trigger`,`status` | Click buffer flushes by trigger and result |
+| `shortlinker_auth_failures_total` | CounterVec | `method` | Auth failures (currently mainly from Admin API: `bearer`/`cookie`) |
+| `shortlinker_bloom_filter_false_positives_total` | Counter | - | Bloom filter false positives |
+| `shortlinker_uptime_seconds` | Gauge | - | Server uptime (seconds) |
+| `shortlinker_process_memory_bytes` | GaugeVec | `type` | Process memory usage (bytes, `rss`/`virtual`) |
+| `shortlinker_process_cpu_seconds` | Gauge | - | Total process CPU time (seconds, user+system) |
+| `shortlinker_build_info` | GaugeVec | `version` | Build info (convention: value is always `1`, version carried in label) |
+
+Label notes (common values):
+
+- `endpoint`: `admin` / `health` / `frontend` / `redirect` (path-prefix classification to avoid label cardinality explosion; prefixes come from `routes.admin_prefix` / `routes.health_prefix` / `routes.frontend_prefix` and require restart to apply)
+- `layer`: `bloom_filter` / `negative_cache` / `object_cache`
+- `operation` (DB): `get` / `load_all` / `load_all_codes` / `count` / `paginated_query` / `batch_get` / `get_stats`
+- `trigger` (click flush): `interval` / `threshold` / `manual`; `status`: `success` / `failed`
 
 ## Status codes
 

@@ -233,12 +233,6 @@ impl ClickManager {
         let current_size = self.buffer.increment(key);
         trace!("ClickManager: Current buffer size: {}", current_size);
 
-        // Update Prometheus gauge
-        #[cfg(feature = "metrics")]
-        crate::metrics::METRICS
-            .clicks_buffer_size
-            .set(current_size as f64);
-
         // 检查是否达到阈值，尝试触发刷盘
         if current_size >= self.max_clicks_before_flush {
             // 使用 compare_exchange 防止任务风暴：
@@ -317,6 +311,12 @@ impl ClickManager {
     ) {
         let updates = buffer.drain();
 
+        // Update buffer size gauge after drain
+        set_plain_gauge!(
+            crate::metrics::METRICS.clicks_buffer_entries,
+            buffer.data.len() as f64
+        );
+
         if updates.is_empty() {
             trace!("ClickManager: No clicks to flush");
             return;
@@ -326,11 +326,10 @@ impl ClickManager {
         match sink.flush_clicks(updates.clone()).await {
             Ok(_) => {
                 debug!("ClickManager: Successfully flushed {} entries", count);
-                #[cfg(feature = "metrics")]
-                crate::metrics::METRICS
-                    .clicks_flush_total
-                    .with_label_values(&[trigger, "success"])
-                    .inc();
+                inc_counter!(
+                    crate::metrics::METRICS.clicks_flush_total,
+                    &[trigger, "success"]
+                );
             }
             Err(e) => {
                 // 刷盘失败，恢复数据到 buffer
@@ -339,11 +338,15 @@ impl ClickManager {
                     "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
                     e, count
                 );
-                #[cfg(feature = "metrics")]
-                crate::metrics::METRICS
-                    .clicks_flush_total
-                    .with_label_values(&[trigger, "failed"])
-                    .inc();
+                inc_counter!(
+                    crate::metrics::METRICS.clicks_flush_total,
+                    &[trigger, "failed"]
+                );
+                // Update gauge again after restore
+                set_plain_gauge!(
+                    crate::metrics::METRICS.clicks_buffer_entries,
+                    buffer.data.len() as f64
+                );
             }
         }
     }

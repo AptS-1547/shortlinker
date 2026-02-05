@@ -152,6 +152,23 @@ docker-compose pull && docker-compose up -d
 - **Performance**: Single binary file, fast startup
 - **Cross-platform**: Supports amd64, arm64 architectures
 
+### Prometheus Metrics (Optional)
+
+`/health/metrics` (Prometheus text format) is provided by the compile-time `metrics` feature.
+
+If `GET /health/metrics` returns `404`, the current image/binary was built without that feature. Enable it at build time, for example:
+
+```bash
+# Add metrics on top of default features
+cargo build --release --features metrics
+
+# Or explicitly enable (common in Dockerfile-style builds)
+cargo build --release --features cli,metrics
+
+# Full build (includes metrics)
+cargo build --release --features full
+```
+
 ### Multi-stage Build
 ```dockerfile
 # Build stage

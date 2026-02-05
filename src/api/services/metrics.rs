@@ -11,7 +11,7 @@ use actix_web::web;
 use super::AppStartTime;
 
 #[cfg(feature = "metrics")]
-use crate::metrics::{METRICS, update_system_metrics};
+use crate::metrics::METRICS;
 
 /// Metrics service handler
 pub struct MetricsService;
@@ -20,20 +20,25 @@ impl MetricsService {
     /// Handle metrics export request
     #[cfg(feature = "metrics")]
     pub async fn metrics(app_start_time: web::Data<AppStartTime>) -> impl Responder {
-        // Update uptime
+        // Update uptime (cheap operation, fine to do on-demand)
         let now = chrono::Utc::now();
         let uptime = (now - app_start_time.start_datetime).num_seconds().max(0) as f64;
         METRICS.uptime_seconds.set(uptime);
 
-        // Update system metrics (memory, CPU)
-        update_system_metrics();
+        // System metrics (memory, CPU) are updated by a background task
 
         // Export metrics in Prometheus format
-        let output = METRICS.export();
-
-        HttpResponse::Ok()
-            .content_type("text/plain; version=0.0.4; charset=utf-8")
-            .body(output)
+        match METRICS.export() {
+            Ok(output) => HttpResponse::Ok()
+                .content_type("text/plain; version=0.0.4; charset=utf-8")
+                .body(output),
+            Err(e) => {
+                tracing::error!("Failed to export metrics: {}", e);
+                HttpResponse::InternalServerError()
+                    .content_type("text/plain")
+                    .body(format!("Failed to export metrics: {}", e))
+            }
+        }
     }
 
     /// Metrics not available when feature is disabled

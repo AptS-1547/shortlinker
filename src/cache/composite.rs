@@ -55,67 +55,67 @@ impl CompositeCache {
 #[async_trait]
 impl CompositeCacheTrait for CompositeCache {
     async fn get(&self, key: &str) -> CacheResult {
-        #[cfg(feature = "metrics")]
-        let start = Instant::now();
-
         // Step 1: Bloom Filter 全量加载，false = 确定不存在
+        #[cfg(feature = "metrics")]
+        let bloom_start = Instant::now();
+
         if !self.filter_plugin.check(key).await {
             #[cfg(feature = "metrics")]
             {
-                let duration = start.elapsed().as_secs_f64();
+                let duration = bloom_start.elapsed().as_secs_f64();
                 crate::metrics::METRICS
                     .cache_operation_duration_seconds
                     .with_label_values(&["get", "bloom_filter"])
                     .observe(duration);
-                crate::metrics::METRICS
-                    .cache_hits_total
-                    .with_label_values(&["bloom_filter"])
-                    .inc();
             }
+            inc_counter!(crate::metrics::METRICS.cache_hits_total, &["bloom_filter"]);
             return CacheResult::NotFound;
         }
 
         // Step 2: 检查 Negative Cache（数据库确认不存在的 key）
+        #[cfg(feature = "metrics")]
+        let neg_start = Instant::now();
+
         if self.negative_cache.contains(key).await {
             #[cfg(feature = "metrics")]
             {
-                let duration = start.elapsed().as_secs_f64();
+                let duration = neg_start.elapsed().as_secs_f64();
                 crate::metrics::METRICS
                     .cache_operation_duration_seconds
                     .with_label_values(&["get", "negative_cache"])
                     .observe(duration);
-                crate::metrics::METRICS
-                    .cache_hits_total
-                    .with_label_values(&["negative_cache"])
-                    .inc();
             }
+            inc_counter!(
+                crate::metrics::METRICS.cache_hits_total,
+                &["negative_cache"]
+            );
             return CacheResult::NotFound;
         }
 
         // Step 3: 检查 Object Cache
+        #[cfg(feature = "metrics")]
+        let obj_start = Instant::now();
+
         let result = self.object_cache.get(key).await;
 
         #[cfg(feature = "metrics")]
         {
-            let duration = start.elapsed().as_secs_f64();
+            let duration = obj_start.elapsed().as_secs_f64();
             crate::metrics::METRICS
                 .cache_operation_duration_seconds
                 .with_label_values(&["get", "object_cache"])
                 .observe(duration);
+        }
 
-            match &result {
-                CacheResult::Found(_) => {
-                    crate::metrics::METRICS
-                        .cache_hits_total
-                        .with_label_values(&["object_cache"])
-                        .inc();
-                }
-                CacheResult::Miss | CacheResult::NotFound => {
-                    crate::metrics::METRICS
-                        .cache_misses_total
-                        .with_label_values(&["object_cache"])
-                        .inc();
-                }
+        match &result {
+            CacheResult::Found(_) => {
+                inc_counter!(crate::metrics::METRICS.cache_hits_total, &["object_cache"]);
+            }
+            CacheResult::Miss | CacheResult::NotFound => {
+                inc_counter!(
+                    crate::metrics::METRICS.cache_misses_total,
+                    &["object_cache"]
+                );
             }
         }
 
@@ -206,13 +206,12 @@ impl CompositeCacheTrait for CompositeCache {
 
         // Update cache entry count metric
         #[cfg(feature = "metrics")]
-        {
-            let entry_count = self.object_cache.entry_count();
-            crate::metrics::METRICS
-                .cache_entries
-                .with_label_values(&["object_cache"])
-                .set(entry_count as f64);
-        }
+        let entry_count = self.object_cache.entry_count();
+        set_gauge!(
+            crate::metrics::METRICS.cache_entries,
+            &["object_cache"],
+            entry_count as f64
+        );
 
         // Bloom filter 和 Negative cache 在创建时就初始化了，如果能到这里就是健康的
         CacheHealthStatus {

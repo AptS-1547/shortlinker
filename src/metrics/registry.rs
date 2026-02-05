@@ -45,8 +45,8 @@ pub struct Metrics {
     pub redirects_total: CounterVec,
 
     // ===== 点击统计指标 (P1) =====
-    /// Current size of the click buffer
-    pub clicks_buffer_size: Gauge,
+    /// Number of unique keys in the click buffer
+    pub clicks_buffer_entries: Gauge,
     /// 点击刷盘次数
     pub clicks_flush_total: CounterVec,
 
@@ -56,7 +56,7 @@ pub struct Metrics {
 
     // ===== Bloom Filter 指标 (P2) =====
     /// Bloom Filter 误报次数
-    pub bloom_false_positives_total: Counter,
+    pub bloom_filter_false_positives_total: Counter,
 
     // ===== 系统指标 (P2) =====
     /// Server uptime in seconds
@@ -64,7 +64,9 @@ pub struct Metrics {
     /// 进程内存使用
     pub process_memory_bytes: GaugeVec,
     /// 进程 CPU 时间 (用户态 + 内核态)
-    pub process_cpu_seconds_total: Gauge,
+    pub process_cpu_seconds: Gauge,
+    /// Build information (version label, value always 1.0)
+    pub build_info: GaugeVec,
 }
 
 impl Metrics {
@@ -162,11 +164,11 @@ impl Metrics {
         .expect("Failed to create redirects_total metric");
 
         // ===== 点击统计指标 =====
-        let clicks_buffer_size = Gauge::new(
-            "shortlinker_clicks_buffer_size",
-            "Current size of the click buffer",
+        let clicks_buffer_entries = Gauge::new(
+            "shortlinker_clicks_buffer_entries",
+            "Number of unique keys in the click buffer",
         )
-        .expect("Failed to create clicks_buffer_size metric");
+        .expect("Failed to create clicks_buffer_entries metric");
 
         let clicks_flush_total = CounterVec::new(
             Opts::new(
@@ -188,11 +190,11 @@ impl Metrics {
         .expect("Failed to create auth_failures_total metric");
 
         // ===== Bloom Filter 指标 =====
-        let bloom_false_positives_total = Counter::new(
-            "shortlinker_bloom_false_positives_total",
+        let bloom_filter_false_positives_total = Counter::new(
+            "shortlinker_bloom_filter_false_positives_total",
             "Total number of Bloom filter false positives",
         )
-        .expect("Failed to create bloom_false_positives_total metric");
+        .expect("Failed to create bloom_filter_false_positives_total metric");
 
         // ===== 系统指标 =====
         let uptime_seconds = Gauge::new("shortlinker_uptime_seconds", "Server uptime in seconds")
@@ -207,64 +209,52 @@ impl Metrics {
         )
         .expect("Failed to create process_memory_bytes metric");
 
-        let process_cpu_seconds_total = Gauge::new(
-            "shortlinker_process_cpu_seconds_total",
+        let process_cpu_seconds = Gauge::new(
+            "shortlinker_process_cpu_seconds",
             "Total CPU time consumed by the process in seconds (user + system)",
         )
-        .expect("Failed to create process_cpu_seconds_total metric");
+        .expect("Failed to create process_cpu_seconds metric");
+
+        let build_info = GaugeVec::new(
+            Opts::new(
+                "shortlinker_build_info",
+                "Build information about the running binary",
+            ),
+            &["version"],
+        )
+        .expect("Failed to create build_info metric");
 
         // Register all metrics
-        registry
-            .register(Box::new(http_request_duration_seconds.clone()))
-            .expect("Failed to register http_request_duration_seconds");
-        registry
-            .register(Box::new(http_requests_total.clone()))
-            .expect("Failed to register http_requests_total");
-        registry
-            .register(Box::new(http_active_connections.clone()))
-            .expect("Failed to register http_active_connections");
-        registry
-            .register(Box::new(db_query_duration_seconds.clone()))
-            .expect("Failed to register db_query_duration_seconds");
-        registry
-            .register(Box::new(db_queries_total.clone()))
-            .expect("Failed to register db_queries_total");
-        registry
-            .register(Box::new(cache_operation_duration_seconds.clone()))
-            .expect("Failed to register cache_operation_duration_seconds");
-        registry
-            .register(Box::new(cache_entries.clone()))
-            .expect("Failed to register cache_entries");
-        registry
-            .register(Box::new(cache_hits_total.clone()))
-            .expect("Failed to register cache_hits_total");
-        registry
-            .register(Box::new(cache_misses_total.clone()))
-            .expect("Failed to register cache_misses_total");
-        registry
-            .register(Box::new(redirects_total.clone()))
-            .expect("Failed to register redirects_total");
-        registry
-            .register(Box::new(clicks_buffer_size.clone()))
-            .expect("Failed to register clicks_buffer_size");
-        registry
-            .register(Box::new(clicks_flush_total.clone()))
-            .expect("Failed to register clicks_flush_total");
-        registry
-            .register(Box::new(auth_failures_total.clone()))
-            .expect("Failed to register auth_failures_total");
-        registry
-            .register(Box::new(bloom_false_positives_total.clone()))
-            .expect("Failed to register bloom_false_positives_total");
-        registry
-            .register(Box::new(uptime_seconds.clone()))
-            .expect("Failed to register uptime_seconds");
-        registry
-            .register(Box::new(process_memory_bytes.clone()))
-            .expect("Failed to register process_memory_bytes");
-        registry
-            .register(Box::new(process_cpu_seconds_total.clone()))
-            .expect("Failed to register process_cpu_seconds_total");
+        macro_rules! register {
+            ($metric:ident) => {
+                registry
+                    .register(Box::new($metric.clone()))
+                    .expect(concat!("Failed to register ", stringify!($metric)));
+            };
+        }
+        register!(http_request_duration_seconds);
+        register!(http_requests_total);
+        register!(http_active_connections);
+        register!(db_query_duration_seconds);
+        register!(db_queries_total);
+        register!(cache_operation_duration_seconds);
+        register!(cache_entries);
+        register!(cache_hits_total);
+        register!(cache_misses_total);
+        register!(redirects_total);
+        register!(clicks_buffer_entries);
+        register!(clicks_flush_total);
+        register!(auth_failures_total);
+        register!(bloom_filter_false_positives_total);
+        register!(uptime_seconds);
+        register!(process_memory_bytes);
+        register!(process_cpu_seconds);
+        register!(build_info);
+
+        // Initialize build info (value 1.0 is Prometheus convention for info metrics)
+        build_info
+            .with_label_values(&[env!("CARGO_PKG_VERSION")])
+            .set(1.0);
 
         Self {
             registry,
@@ -278,24 +268,25 @@ impl Metrics {
             cache_hits_total,
             cache_misses_total,
             redirects_total,
-            clicks_buffer_size,
+            clicks_buffer_entries,
             clicks_flush_total,
             auth_failures_total,
-            bloom_false_positives_total,
+            bloom_filter_false_positives_total,
             uptime_seconds,
             process_memory_bytes,
-            process_cpu_seconds_total,
+            process_cpu_seconds,
+            build_info,
         }
     }
 
     /// Export metrics in Prometheus text format
-    pub fn export(&self) -> String {
+    pub fn export(&self) -> Result<String, String> {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
         let mut buffer = Vec::new();
         encoder
             .encode(&metric_families, &mut buffer)
-            .expect("Failed to encode metrics");
-        String::from_utf8(buffer).expect("Metrics output is not valid UTF-8")
+            .map_err(|e| format!("Failed to encode metrics: {}", e))?;
+        String::from_utf8(buffer).map_err(|e| format!("Metrics output is not valid UTF-8: {}", e))
     }
 }

@@ -203,6 +203,10 @@ pub async fn run_server() -> Result<()> {
     // toggling doesn't require a restart; actual lookup only happens when enabled.
     let geoip_provider = Arc::new(GeoIpProvider::new(&config.analytics));
 
+    // Start background system metrics updater (memory, CPU)
+    #[cfg(feature = "metrics")]
+    crate::metrics::spawn_system_metrics_updater();
+
     // Load CORS configuration from RuntimeConfig
     let cors_config = CorsSettings::from_runtime_config();
 

@@ -152,6 +152,23 @@ docker-compose pull && docker-compose up -d
 - **性能**：单一二进制文件，启动迅速
 - **跨平台**：支持 amd64、arm64 架构
 
+### Prometheus metrics（可选）
+
+`/health/metrics`（Prometheus 文本格式）是**编译时** `metrics` feature 提供的能力。
+
+如果你访问 `GET /health/metrics` 返回 `404`，说明当前镜像/二进制未启用该 feature。自构建时可以这样开启：
+
+```bash
+# 直接编译（在默认 features 基础上追加 metrics）
+cargo build --release --features metrics
+
+# 或者显式启用（例如 Dockerfile 中常见的 CLI 构建）
+cargo build --release --features cli,metrics
+
+# 全功能（包含 metrics）
+cargo build --release --features full
+```
+
 ### 多阶段构建
 ```dockerfile
 # 构建阶段

@@ -61,13 +61,19 @@ rustc --version  # Should be >= 1.85.0
 git clone https://github.com/AptS-1547/shortlinker.git
 cd shortlinker
 
-# Basic compilation (server only)
+# Default build (server + CLI)
 cargo build --release
+
+# Server only (no CLI/TUI)
+cargo build --release --no-default-features --features server
+
+# Enable Prometheus metrics (exported at /health/metrics; compile-time feature)
+cargo build --release --features metrics
 
 # Compile with TUI interface
 cargo build --release --features tui
 
-# Full compilation (server + CLI + TUI)
+# Full build (server + CLI + TUI + Metrics)
 cargo build --release --features full
 
 # 4. Run

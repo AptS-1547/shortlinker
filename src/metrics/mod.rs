@@ -9,4 +9,4 @@ mod registry;
 mod system;
 
 pub use registry::METRICS;
-pub use system::update_system_metrics;
+pub use system::spawn_system_metrics_updater;
