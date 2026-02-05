@@ -58,7 +58,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(result.map(|m| m.value))
@@ -70,7 +73,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(result.map(|m| ConfigItem {
@@ -90,7 +96,7 @@ impl ConfigStore {
             Some(v) => match v.parse::<T>() {
                 Ok(parsed) => Ok(Some(parsed)),
                 Err(_) => Err(ShortlinkerError::database_operation(format!(
-                    "配置 '{}' 值 '{}' 解析失败",
+                    "Failed to parse config '{}' value '{}'",
                     key, v
                 ))),
             },
@@ -124,14 +130,17 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         let (old_value, requires_restart, is_sensitive) = match &old_record {
             Some(r) => (Some(r.value.clone()), r.requires_restart, r.is_sensitive),
             None => {
                 return Err(ShortlinkerError::database_operation(format!(
-                    "配置项 '{}' 不存在",
+                    "Config key '{}' does not exist",
                     key
                 )));
             }
@@ -154,7 +163,10 @@ impl ConfigStore {
         active_model.updated_at = Set(chrono::Utc::now());
 
         active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("更新配置 '{}' 失败: {}", key, e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to update config '{}': {}",
+                key, e
+            ))
         })?;
 
         // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
@@ -182,7 +194,10 @@ impl ConfigStore {
         };
 
         history.insert(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("记录配置变更历史失败: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to record config change history: {}",
+                e
+            ))
         })?;
 
         Ok(ConfigUpdateResult {
@@ -200,7 +215,7 @@ impl ConfigStore {
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询所有配置失败: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to query all configs: {}", e))
             })?;
 
         let mut map = HashMap::new();
@@ -230,7 +245,10 @@ impl ConfigStore {
             .fetch_page(0)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置历史失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config history: {}",
+                    e
+                ))
             })?;
 
         Ok(records
@@ -252,7 +270,10 @@ impl ConfigStore {
             .count(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("检查配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to check config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(count > 0)
@@ -282,7 +303,10 @@ impl ConfigStore {
         };
 
         model.insert(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("插入配置 '{}' 失败: {}", key, e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to insert config '{}': {}",
+                key, e
+            ))
         })?;
 
         Ok(true)
@@ -309,7 +333,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         let Some(r) = record else {
@@ -344,7 +371,10 @@ impl ConfigStore {
         }
 
         active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("同步配置 '{}' 的元信息失败: {}", key, e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to sync metadata for config '{}': {}",
+                key, e
+            ))
         })?;
 
         Ok(true)
@@ -356,7 +386,7 @@ impl ConfigStore {
             .count(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("统计配置数量失败: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to count configs: {}", e))
             })?;
 
         Ok(count)

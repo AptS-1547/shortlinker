@@ -5,7 +5,7 @@
 use actix_web::web;
 
 use super::AdminService;
-use super::analytics::{analytics_routes, get_link_analytics};
+use super::analytics::{analytics_routes, get_link_analytics, get_link_device_stats};
 use super::auth::login_rate_limiter;
 use super::config_ops::{
     get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
@@ -21,6 +21,7 @@ use super::config_ops::{
 /// - PUT /links/{code} - 更新链接
 /// - DELETE /links/{code} - 删除链接
 /// - GET /links/{code}/analytics - 获取单链接统计
+/// - GET /links/{code}/analytics/devices - 获取单链接设备统计
 pub fn links_routes() -> actix_web::Scope {
     web::scope("/links")
         .route("", web::get().to(AdminService::get_all_links))
@@ -34,6 +35,10 @@ pub fn links_routes() -> actix_web::Scope {
         .route("/export", web::get().to(AdminService::export_links))
         .route("/import", web::post().to(AdminService::import_links))
         // Single link analytics (must be before /{code:.*})
+        .route(
+            "/{code}/analytics/devices",
+            web::get().to(get_link_device_stats),
+        )
         .route("/{code}/analytics", web::get().to(get_link_analytics))
         // Single link operations (must be last due to wildcard)
         .route("/{code:.*}", web::get().to(AdminService::get_link))

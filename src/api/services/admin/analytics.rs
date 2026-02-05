@@ -15,9 +15,11 @@ use tracing::info;
 use ts_rs::TS;
 
 use crate::services::{
-    AnalyticsService, GeoStats as ServiceGeoStats, GroupBy as ServiceGroupBy,
-    LinkAnalytics as ServiceLinkAnalytics, ReferrerStats as ServiceReferrerStats,
-    TopLink as ServiceTopLink, TrendData as ServiceTrendData,
+    AnalyticsService, CategoryStats as ServiceCategoryStats,
+    DeviceAnalytics as ServiceDeviceAnalytics, GeoStats as ServiceGeoStats,
+    GroupBy as ServiceGroupBy, LinkAnalytics as ServiceLinkAnalytics,
+    ReferrerStats as ServiceReferrerStats, TopLink as ServiceTopLink,
+    TrendData as ServiceTrendData,
 };
 use crate::storage::SeaOrmStorage;
 
@@ -166,6 +168,48 @@ impl From<ServiceLinkAnalytics> for LinkAnalytics {
     }
 }
 
+/// 设备分析响应
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct DeviceAnalyticsResponse {
+    pub browsers: Vec<CategoryStatsResponse>,
+    pub operating_systems: Vec<CategoryStatsResponse>,
+    pub devices: Vec<CategoryStatsResponse>,
+    pub bot_percentage: f64,
+    pub total_with_ua: u64,
+}
+
+/// 分类统计响应
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct CategoryStatsResponse {
+    pub name: String,
+    pub count: u64,
+    pub percentage: f64,
+}
+
+impl From<ServiceDeviceAnalytics> for DeviceAnalyticsResponse {
+    fn from(d: ServiceDeviceAnalytics) -> Self {
+        DeviceAnalyticsResponse {
+            browsers: d.browsers.into_iter().map(Into::into).collect(),
+            operating_systems: d.operating_systems.into_iter().map(Into::into).collect(),
+            devices: d.devices.into_iter().map(Into::into).collect(),
+            bot_percentage: d.bot_percentage,
+            total_with_ua: d.total_with_ua,
+        }
+    }
+}
+
+impl From<ServiceCategoryStats> for CategoryStatsResponse {
+    fn from(c: ServiceCategoryStats) -> Self {
+        CategoryStatsResponse {
+            name: c.name,
+            count: c.count,
+            percentage: c.percentage,
+        }
+    }
+}
+
 // ============ API 端点 ============
 
 /// GET /admin/v1/analytics/trends - 获取点击趋势
@@ -271,6 +315,50 @@ pub async fn get_link_analytics(
     }
 }
 
+/// GET /admin/v1/links/{code}/analytics/devices - 获取单链接设备分析
+pub async fn get_link_device_stats(
+    _req: HttpRequest,
+    code: web::Path<String>,
+    query: web::Query<AnalyticsQuery>,
+    service: web::Data<Arc<AnalyticsService>>,
+) -> ActixResult<impl Responder> {
+    let code = code.into_inner();
+    info!(
+        "Admin API: get_link_device_stats for '{}' with query: {:?}",
+        code, query
+    );
+
+    let (start, end) =
+        AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());
+    let limit = query.limit.unwrap_or(10);
+
+    match service
+        .get_link_device_analytics(&code, start, end, limit)
+        .await
+    {
+        Ok(analytics) => Ok(success_response(DeviceAnalyticsResponse::from(analytics))),
+        Err(e) => Ok(error_from_shortlinker(&e)),
+    }
+}
+
+/// GET /admin/v1/analytics/devices - 获取设备分析
+pub async fn get_device_stats(
+    _req: HttpRequest,
+    query: web::Query<AnalyticsQuery>,
+    service: web::Data<Arc<AnalyticsService>>,
+) -> ActixResult<impl Responder> {
+    info!("Admin API: get_device_stats with query: {:?}", query);
+
+    let (start, end) =
+        AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());
+    let limit = query.limit.unwrap_or(10);
+
+    match service.get_device_analytics(start, end, limit).await {
+        Ok(analytics) => Ok(success_response(DeviceAnalyticsResponse::from(analytics))),
+        Err(e) => Ok(error_from_shortlinker(&e)),
+    }
+}
+
 /// 每批次导出的日志数量
 const EXPORT_BATCH_SIZE: u64 = 10000;
 
@@ -331,6 +419,8 @@ pub fn analytics_routes() -> actix_web::Scope {
         .route("/referrers", web::head().to(get_referrers))
         .route("/geo", web::get().to(get_geo_stats))
         .route("/geo", web::head().to(get_geo_stats))
+        .route("/devices", web::get().to(get_device_stats))
+        .route("/devices", web::head().to(get_device_stats))
         .route("/export", web::get().to(export_report))
         .route("/export", web::head().to(export_report))
 }
@@ -350,6 +440,9 @@ mod tests {
         ReferrerStats::export_all(&cfg).expect("Failed to export ReferrerStats");
         GeoStats::export_all(&cfg).expect("Failed to export GeoStats");
         LinkAnalytics::export_all(&cfg).expect("Failed to export LinkAnalytics");
+        DeviceAnalyticsResponse::export_all(&cfg)
+            .expect("Failed to export DeviceAnalyticsResponse");
+        CategoryStatsResponse::export_all(&cfg).expect("Failed to export CategoryStatsResponse");
         println!("Analytics TypeScript types exported to {}", TS_EXPORT_PATH);
     }
 }

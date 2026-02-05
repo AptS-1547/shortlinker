@@ -73,6 +73,24 @@ pub struct LinkAnalytics {
     pub geo_distribution: Vec<GeoStats>,
 }
 
+/// 设备分析数据
+#[derive(Debug, Clone)]
+pub struct DeviceAnalytics {
+    pub browsers: Vec<CategoryStats>,
+    pub operating_systems: Vec<CategoryStats>,
+    pub devices: Vec<CategoryStats>,
+    pub bot_percentage: f64,
+    pub total_with_ua: u64,
+}
+
+/// 分类统计
+#[derive(Debug, Clone)]
+pub struct CategoryStats {
+    pub name: String,
+    pub count: u64,
+    pub percentage: f64,
+}
+
 // ============ AnalyticsService ============
 
 /// Analytics 服务
@@ -112,28 +130,28 @@ impl AnalyticsService {
             (Some(s), Some(e)) => {
                 let start = Self::parse_date(s).ok_or_else(|| {
                     ShortlinkerError::analytics_invalid_date_range(format!(
-                        "无效的开始日期格式: '{}', 支持 RFC3339 或 YYYY-MM-DD",
+                        "Invalid start date format: '{}'. Supported formats: RFC3339 or YYYY-MM-DD",
                         s
                     ))
                 })?;
                 let end = Self::parse_date(e).ok_or_else(|| {
                     ShortlinkerError::analytics_invalid_date_range(format!(
-                        "无效的结束日期格式: '{}', 支持 RFC3339 或 YYYY-MM-DD",
+                        "Invalid end date format: '{}'. Supported formats: RFC3339 or YYYY-MM-DD",
                         e
                     ))
                 })?;
                 if start > end {
                     return Err(ShortlinkerError::analytics_invalid_date_range(
-                        "开始日期不能晚于结束日期",
+                        "Start date must not be later than end date",
                     ));
                 }
                 Ok((start, end))
             }
             (Some(_), None) => Err(ShortlinkerError::analytics_invalid_date_range(
-                "提供了开始日期但缺少结束日期",
+                "Start date is provided but end date is missing",
             )),
             (None, Some(_)) => Err(ShortlinkerError::analytics_invalid_date_range(
-                "提供了结束日期但缺少开始日期",
+                "End date is provided but start date is missing",
             )),
             (None, None) => Ok(Self::default_date_range()),
         }
@@ -199,7 +217,7 @@ impl AnalyticsService {
             .get_global_trend(start, end, date_expr)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("趋势查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!("Trend query failed: {}", e))
             })?;
 
         let mut labels = Vec::with_capacity(results.len());
@@ -235,7 +253,7 @@ impl AnalyticsService {
             .get_top_links(start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("热门链接查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!("Top links query failed: {}", e))
             })?;
 
         let top_links: Vec<TopLink> = results
@@ -274,7 +292,10 @@ impl AnalyticsService {
             .get_global_referrers(start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("来源统计查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!(
+                    "Referrer stats query failed: {}",
+                    e
+                ))
             })?;
 
         // 从聚合结果计算总数（limit 内的总数）
@@ -324,7 +345,7 @@ impl AnalyticsService {
             .get_global_geo(start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("地理位置查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!("Geolocation query failed: {}", e))
             })?;
 
         let geo_stats: Vec<GeoStats> = results
@@ -420,6 +441,145 @@ impl AnalyticsService {
         })
     }
 
+    /// 获取单链接设备分析数据
+    ///
+    /// 并发查询指定链接的浏览器、操作系统、设备类型和 Bot 统计
+    pub async fn get_link_device_analytics(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u32,
+    ) -> Result<DeviceAnalytics, ShortlinkerError> {
+        info!(
+            "Analytics: get_link_device_analytics for '{}' from {} to {}, limit={}",
+            code, start, end, limit
+        );
+
+        let limit = limit.min(20) as u64;
+
+        // 并发执行 4 个查询
+        let (browsers, os, devices, bot_stats) = tokio::try_join!(
+            self.storage.get_link_browser_stats(code, start, end, limit),
+            self.storage.get_link_os_stats(code, start, end, limit),
+            self.storage.get_link_device_stats(code, start, end, limit),
+            self.storage.get_link_bot_stats(code, start, end),
+        )
+        .map_err(|e| ShortlinkerError::analytics_query_failed(e.to_string()))?;
+
+        // 转换为 CategoryStats 并计算百分比
+        let to_category = |rows: Vec<crate::storage::backend::UaStatsRow>| -> Vec<CategoryStats> {
+            let total: u64 = rows.iter().map(|r| r.count as u64).sum();
+            rows.into_iter()
+                .map(|r| {
+                    let count = r.count as u64;
+                    CategoryStats {
+                        name: r.field_value.unwrap_or_else(|| "Unknown".to_string()),
+                        count,
+                        percentage: if total > 0 {
+                            (count as f64 / total as f64) * 100.0
+                        } else {
+                            0.0
+                        },
+                    }
+                })
+                .collect()
+        };
+
+        let (bot_count, total_with_ua) = bot_stats;
+        let bot_percentage = if total_with_ua > 0 {
+            (bot_count as f64 / total_with_ua as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        debug!(
+            "Analytics: get_link_device_analytics for '{}' returned {} browsers, {} os, {} devices, bot={:.1}%",
+            code,
+            browsers.len(),
+            os.len(),
+            devices.len(),
+            bot_percentage
+        );
+
+        Ok(DeviceAnalytics {
+            browsers: to_category(browsers),
+            operating_systems: to_category(os),
+            devices: to_category(devices),
+            bot_percentage,
+            total_with_ua: total_with_ua as u64,
+        })
+    }
+
+    /// 获取设备分析数据
+    ///
+    /// 并发查询浏览器、操作系统、设备类型和 Bot 统计，
+    /// 返回各维度的分类统计及百分比。
+    pub async fn get_device_analytics(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u32,
+    ) -> Result<DeviceAnalytics, ShortlinkerError> {
+        info!(
+            "Analytics: get_device_analytics from {} to {}, limit={}",
+            start, end, limit
+        );
+
+        let limit = limit.min(20) as u64;
+
+        // 并发执行 4 个查询
+        let (browsers, os, devices, bot_stats) = tokio::try_join!(
+            self.storage.get_browser_stats(start, end, limit),
+            self.storage.get_os_stats(start, end, limit),
+            self.storage.get_device_stats(start, end, limit),
+            self.storage.get_bot_stats(start, end),
+        )
+        .map_err(|e| ShortlinkerError::analytics_query_failed(e.to_string()))?;
+
+        // 转换为 CategoryStats 并计算百分比
+        let to_category = |rows: Vec<crate::storage::backend::UaStatsRow>| -> Vec<CategoryStats> {
+            let total: u64 = rows.iter().map(|r| r.count as u64).sum();
+            rows.into_iter()
+                .map(|r| {
+                    let count = r.count as u64;
+                    CategoryStats {
+                        name: r.field_value.unwrap_or_else(|| "Unknown".to_string()),
+                        count,
+                        percentage: if total > 0 {
+                            (count as f64 / total as f64) * 100.0
+                        } else {
+                            0.0
+                        },
+                    }
+                })
+                .collect()
+        };
+
+        let (bot_count, total_with_ua) = bot_stats;
+        let bot_percentage = if total_with_ua > 0 {
+            (bot_count as f64 / total_with_ua as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        debug!(
+            "Analytics: get_device_analytics returned {} browsers, {} os, {} devices, bot={:.1}%",
+            browsers.len(),
+            os.len(),
+            devices.len(),
+            bot_percentage
+        );
+
+        Ok(DeviceAnalytics {
+            browsers: to_category(browsers),
+            operating_systems: to_category(os),
+            devices: to_category(devices),
+            bot_percentage,
+            total_with_ua: total_with_ua as u64,
+        })
+    }
+
     /// 导出点击日志（带分页限制）
     pub async fn export_click_logs(
         &self,
@@ -438,7 +598,10 @@ impl AnalyticsService {
             .export_click_logs(start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("导出点击日志失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!(
+                    "Failed to export click logs: {}",
+                    e
+                ))
             })?;
 
         debug!(
@@ -474,7 +637,9 @@ impl AnalyticsService {
                 self.storage.get_global_trend(start, end, date_expr).await
             }
         }
-        .map_err(|e| ShortlinkerError::analytics_query_failed(format!("趋势查询失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::analytics_query_failed(format!("Trend query failed: {}", e))
+        })?;
 
         let mut labels = Vec::with_capacity(results.len());
         let mut values = Vec::with_capacity(results.len());
@@ -519,7 +684,7 @@ impl AnalyticsService {
             }
         }
         .map_err(|e| {
-            ShortlinkerError::analytics_query_failed(format!("链接趋势查询失败: {}", e))
+            ShortlinkerError::analytics_query_failed(format!("Link trend query failed: {}", e))
         })?;
 
         let mut labels = Vec::with_capacity(results.len());
@@ -556,7 +721,10 @@ impl AnalyticsService {
             .get_link_referrers_from_rollup(code, start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("来源统计查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!(
+                    "Referrer stats query failed: {}",
+                    e
+                ))
             })?;
 
         let total: u64 = results.iter().map(|r| r.count as u64).sum();
@@ -606,7 +774,7 @@ impl AnalyticsService {
             .get_link_geo_from_rollup(code, start, end, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("地理位置查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!("Geolocation query failed: {}", e))
             })?;
 
         let geo_stats: Vec<GeoStats> = results
@@ -647,7 +815,7 @@ impl AnalyticsService {
             .get_top_links_from_daily(start_date, end_date, limit)
             .await
             .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!("热门链接查询失败: {}", e))
+                ShortlinkerError::analytics_query_failed(format!("Top links query failed: {}", e))
             })?;
 
         let top_links: Vec<TopLink> = results

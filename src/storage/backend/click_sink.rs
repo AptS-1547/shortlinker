@@ -71,7 +71,12 @@ impl ClickSink for SeaOrmStorage {
             db.execute(stmt_ref).await
         })
         .await
-        .map_err(|e| anyhow::anyhow!("批量更新点击数失败（重试后仍失败）: {}", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to batch update click counts (still failed after retries): {}",
+                e
+            )
+        })?;
 
         debug!(
             "Click counts flushed to {} database ({} records)",
@@ -125,7 +130,7 @@ impl DetailedClickSink for SeaOrmStorage {
                 .await
         })
         .await
-        .map_err(|e| anyhow::anyhow!("批量插入点击日志失败: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to batch insert click logs: {}", e))?;
 
         debug!(
             "Detailed click logs written to {} database ({} records)",

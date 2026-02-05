@@ -11,8 +11,8 @@ use std::pin::Pin;
 use chrono::{DateTime, NaiveDate, Utc};
 use futures_util::stream::Stream;
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, sea_query::Expr,
+    ColumnTrait, DatabaseBackend, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Statement, sea_query::Expr,
 };
 
 use migration::entities::{
@@ -53,6 +53,20 @@ pub struct GeoRow {
 pub struct TopLinkRow {
     pub short_code: String,
     pub count: i64,
+}
+
+/// UA 统计查询结果行
+#[derive(Debug, FromQueryResult, Clone)]
+pub struct UaStatsRow {
+    pub field_value: Option<String>,
+    pub count: i64,
+}
+
+/// Bot 统计原始查询结果
+#[derive(Debug, FromQueryResult)]
+struct BotStatsRaw {
+    pub bot_count: i64,
+    pub total: i64,
 }
 
 /// 分组方式
@@ -249,6 +263,427 @@ impl super::SeaOrmStorage {
             .all(&self.db)
             .await
             .map_err(Into::into)
+    }
+
+    // ============ UA/设备统计查询（JOIN user_agents 表） ============
+
+    /// 获取数据库后端类型枚举
+    fn get_db_backend(&self) -> DatabaseBackend {
+        match self.get_backend_name() {
+            "sqlite" => DatabaseBackend::Sqlite,
+            "mysql" => DatabaseBackend::MySql,
+            _ => DatabaseBackend::Postgres,
+        }
+    }
+
+    /// 获取浏览器统计
+    pub async fn get_browser_stats(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
+  AND ua.browser_name IS NOT NULL
+GROUP BY ua.browser_name
+ORDER BY count DESC
+LIMIT $3"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.browser_name IS NOT NULL
+GROUP BY ua.browser_name
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取操作系统统计
+    pub async fn get_os_stats(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.os_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
+  AND ua.os_name IS NOT NULL
+GROUP BY ua.os_name
+ORDER BY count DESC
+LIMIT $3"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.os_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.os_name IS NOT NULL
+GROUP BY ua.os_name
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取设备类型统计
+    pub async fn get_device_stats(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.device_category as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2
+  AND ua.device_category IS NOT NULL
+GROUP BY ua.device_category
+ORDER BY count DESC
+LIMIT $3"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.device_category as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.device_category IS NOT NULL
+GROUP BY ua.device_category
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取指定链接的浏览器统计
+    pub async fn get_link_browser_stats(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
+  AND ua.browser_name IS NOT NULL
+GROUP BY ua.browser_name
+ORDER BY count DESC
+LIMIT $4"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.browser_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.browser_name IS NOT NULL
+GROUP BY ua.browser_name
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取指定链接的操作系统统计
+    pub async fn get_link_os_stats(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.os_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
+  AND ua.os_name IS NOT NULL
+GROUP BY ua.os_name
+ORDER BY count DESC
+LIMIT $4"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.os_name as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.os_name IS NOT NULL
+GROUP BY ua.os_name
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取指定链接的设备类型统计
+    pub async fn get_link_device_stats(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        limit: u64,
+    ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT ua.device_category as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3
+  AND ua.device_category IS NOT NULL
+GROUP BY ua.device_category
+ORDER BY count DESC
+LIMIT $4"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT ua.device_category as field_value, COUNT(*) as count
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?
+  AND ua.device_category IS NOT NULL
+GROUP BY ua.device_category
+ORDER BY count DESC
+LIMIT ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                    sea_orm::Value::from(limit as i64),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        UaStatsRow::find_by_statement(stmt)
+            .all(&self.db)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// 获取指定链接的 Bot 统计 (bot_count, total_with_ua)
+    pub async fn get_link_bot_stats(
+        &self,
+        code: &str,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> anyhow::Result<(i64, i64)> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT
+  SUM(CASE WHEN ua.is_bot = true THEN 1 ELSE 0 END) as bot_count,
+  COUNT(*) as total
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = $1 AND cl.clicked_at >= $2 AND cl.clicked_at <= $3"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT
+  SUM(CASE WHEN ua.is_bot = 1 THEN 1 ELSE 0 END) as bot_count,
+  COUNT(*) as total
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.short_code = ? AND cl.clicked_at >= ? AND cl.clicked_at <= ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(code.to_string()),
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        let result = BotStatsRaw::find_by_statement(stmt).one(&self.db).await?;
+
+        match result {
+            Some(row) => Ok((row.bot_count, row.total)),
+            None => Ok((0, 0)),
+        }
+    }
+
+    /// 获取 Bot 统计 (bot_count, total_with_ua)
+    pub async fn get_bot_stats(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> anyhow::Result<(i64, i64)> {
+        let backend = self.get_db_backend();
+        let (sql, values) = if backend == DatabaseBackend::Postgres {
+            (
+                r#"SELECT
+  SUM(CASE WHEN ua.is_bot = true THEN 1 ELSE 0 END) as bot_count,
+  COUNT(*) as total
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= $1 AND cl.clicked_at <= $2"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                ],
+            )
+        } else {
+            (
+                r#"SELECT
+  SUM(CASE WHEN ua.is_bot = 1 THEN 1 ELSE 0 END) as bot_count,
+  COUNT(*) as total
+FROM click_logs cl
+INNER JOIN user_agents ua ON cl.user_agent_hash = ua.hash
+WHERE cl.clicked_at >= ? AND cl.clicked_at <= ?"#
+                    .to_string(),
+                vec![
+                    sea_orm::Value::from(start.to_rfc3339()),
+                    sea_orm::Value::from(end.to_rfc3339()),
+                ],
+            )
+        };
+
+        let stmt = Statement::from_sql_and_values(backend, &sql, values);
+        let result = BotStatsRaw::find_by_statement(stmt).one(&self.db).await?;
+
+        match result {
+            Some(row) => Ok((row.bot_count, row.total)),
+            None => Ok((0, 0)),
+        }
     }
 
     // ============ v2 查询（从汇总表读取） ============
@@ -490,7 +925,11 @@ impl super::SeaOrmStorage {
                     Ok(models) if models.is_empty() => None,
                     Ok(models) => Some((Ok(models), (page + 1, db, start, end, page_size))),
                     Err(e) => Some((
-                        Err(anyhow::anyhow!("分页查询失败 (page={}): {}", page, e)),
+                        Err(anyhow::anyhow!(
+                            "Paginated query failed (page={}): {}",
+                            page,
+                            e
+                        )),
                         (page + 1, db, start, end, page_size),
                     )),
                 }
@@ -545,7 +984,7 @@ impl super::SeaOrmStorage {
                         ))
                     }
                     Err(e) => Some((
-                        Err(anyhow::anyhow!("游标分页查询失败: {}", e)),
+                        Err(anyhow::anyhow!("Cursor pagination query failed: {}", e)),
                         (cursor, db, start, end, page_size, true),
                     )),
                 }
