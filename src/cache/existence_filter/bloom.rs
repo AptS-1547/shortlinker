@@ -22,7 +22,8 @@ impl Default for BloomExistenceFilterPlugin {
 
 impl BloomExistenceFilterPlugin {
     pub fn new() -> Result<Self> {
-        let bloom = Bloom::new_for_fp_rate(10_000, 0.001).map_err(|e| {
+        // 使用最小初始容量，因为 startup.rs 中的 reconfigure() 会立即用实际数量替换
+        let bloom = Bloom::new_for_fp_rate(100, 0.001).map_err(|e| {
             ShortlinkerError::cache_connection(format!("Failed to create bloom filter: {e}"))
         })?;
         Ok(Self {
@@ -128,6 +129,9 @@ mod tests {
     #[tokio::test]
     async fn test_false_positive_rate_within_bounds() {
         let filter = BloomExistenceFilterPlugin::new().unwrap();
+
+        // 重新配置为足够大的容量（初始容量只有 100）
+        filter.clear(1000, 0.001).await.unwrap();
 
         // 插入 1000 个 key
         let keys: Vec<String> = (0..1000).map(|i| format!("existing_{}", i)).collect();

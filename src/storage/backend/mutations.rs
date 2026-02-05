@@ -70,10 +70,15 @@ impl SeaOrmStorage {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        // 先查询哪些存在
+        // 使用事务确保查询和删除的原子性
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
+        })?;
+
+        // 在事务内查询哪些存在
         let existing: Vec<String> = short_link::Entity::find()
             .filter(short_link::Column::ShortCode.is_in(codes.iter().cloned()))
-            .all(&self.db)
+            .all(&txn)
             .await
             .map_err(|e| {
                 ShortlinkerError::database_operation(format!(
@@ -94,17 +99,25 @@ impl SeaOrmStorage {
             .collect();
 
         if existing.is_empty() {
+            // 没有需要删除的，直接提交空事务
+            txn.commit().await.map_err(|e| {
+                ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
+            })?;
             return Ok((Vec::new(), not_found));
         }
 
-        // 批量删除
+        // 在事务内批量删除
         short_link::Entity::delete_many()
             .filter(short_link::Column::ShortCode.is_in(existing.iter().cloned()))
-            .exec(&self.db)
+            .exec(&txn)
             .await
             .map_err(|e| {
                 ShortlinkerError::database_operation(format!("Batch delete failed: {}", e))
             })?;
+
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
+        })?;
 
         self.invalidate_count_cache();
         info!("Batch deleted {} links", existing.len());

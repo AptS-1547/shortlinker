@@ -4,8 +4,10 @@ use std::time::{Duration, Instant};
 use tracing::{error, info, trace};
 
 use crate::api::services::admin::{
-    ApiResponse, ErrorCode, HealthChecks, HealthResponse, HealthStorageBackend, HealthStorageCheck,
+    ApiResponse, ErrorCode, HealthCacheCheck, HealthChecks, HealthResponse, HealthStorageBackend,
+    HealthStorageCheck,
 };
+use crate::cache::CompositeCacheTrait;
 use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
 
@@ -20,6 +22,7 @@ pub struct HealthService;
 impl HealthService {
     pub async fn health_check(
         storage: web::Data<Arc<SeaOrmStorage>>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
         app_start_time: web::Data<AppStartTime>,
     ) -> impl Responder {
         let start_time = Instant::now();
@@ -64,6 +67,16 @@ impl HealthService {
                 }
             };
 
+        // 检查缓存健康状况
+        let cache_health = cache.health_check().await;
+        let cache_status = Some(HealthCacheCheck {
+            status: cache_health.status,
+            cache_type: cache_health.cache_type,
+            bloom_filter_enabled: cache_health.bloom_filter_enabled,
+            negative_cache_enabled: cache_health.negative_cache_enabled,
+            error: cache_health.error,
+        });
+
         let now = chrono::Utc::now();
 
         // 使用 TimeParser 的方法格式化运行时间
@@ -84,6 +97,7 @@ impl HealthService {
             uptime: uptime_seconds,
             checks: HealthChecks {
                 storage: storage_status,
+                cache: cache_status,
             },
             response_time_ms: start_time.elapsed().as_millis() as u32,
         };

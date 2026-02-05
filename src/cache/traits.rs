@@ -9,6 +9,16 @@ pub struct BloomConfig {
     pub fp_rate: f64,
 }
 
+/// 缓存健康检查状态
+#[derive(Debug, Clone)]
+pub struct CacheHealthStatus {
+    pub status: String,
+    pub cache_type: String,
+    pub bloom_filter_enabled: bool,
+    pub negative_cache_enabled: bool,
+    pub error: Option<String>,
+}
+
 /// 缓存查询结果
 #[derive(Debug, Clone)]
 pub enum CacheResult {
@@ -43,6 +53,9 @@ pub trait CompositeCacheTrait: Send + Sync {
     /// - `false` = 一定不存在
     /// - `true` = 可能存在（有误报可能）
     async fn bloom_check(&self, key: &str) -> bool;
+
+    /// 健康检查 - 返回缓存类型和状态
+    async fn health_check(&self) -> CacheHealthStatus;
 }
 
 #[async_trait]

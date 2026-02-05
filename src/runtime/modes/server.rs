@@ -13,7 +13,9 @@ use anyhow::Result;
 use std::sync::Arc;
 use tracing::warn;
 
-use crate::api::middleware::{AdminAuth, CsrfGuard, FrontendGuard, HealthAuth};
+use crate::api::middleware::{
+    AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware,
+};
 use crate::api::services::{
     AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
 };
@@ -254,6 +256,7 @@ pub async fn run_server() -> Result<()> {
         let cors = build_cors_middleware(&cors_config);
 
         App::new()
+            .wrap(RequestIdMiddleware) // 最外层，为每个请求生成 request_id
             .wrap(cors)
             .wrap(Compress::default())
             .app_data(web::Data::new(cache.clone()))

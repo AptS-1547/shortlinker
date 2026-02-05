@@ -1,7 +1,8 @@
 use crate::cache::negative_cache::MokaNegativeCache;
 use crate::cache::register::{get_filter_plugin, get_object_cache_plugin};
 use crate::cache::{
-    BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, NegativeCache, ObjectCache,
+    BloomConfig, CacheHealthStatus, CacheResult, CompositeCacheTrait, ExistenceFilter,
+    NegativeCache, ObjectCache,
 };
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
@@ -118,6 +119,20 @@ impl CompositeCacheTrait for CompositeCache {
 
     async fn bloom_check(&self, key: &str) -> bool {
         self.filter_plugin.check(key).await
+    }
+
+    async fn health_check(&self) -> CacheHealthStatus {
+        let config = crate::config::get_config();
+        let cache_type = config.cache.cache_type.clone();
+
+        // Bloom filter 和 Negative cache 在创建时就初始化了，如果能到这里就是健康的
+        CacheHealthStatus {
+            status: "healthy".to_string(),
+            cache_type,
+            bloom_filter_enabled: true,
+            negative_cache_enabled: true,
+            error: None,
+        }
     }
 }
 

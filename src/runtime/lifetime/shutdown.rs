@@ -1,8 +1,16 @@
 use sea_orm::DatabaseConnection;
+use std::time::Duration;
 use tokio::signal;
-use tracing::warn;
+use tokio::time::timeout;
+use tracing::{error, warn};
 
 use crate::analytics::global::get_click_manager;
+
+/// 关闭超时时间（秒）
+const SHUTDOWN_TIMEOUT_SECS: u64 = 30;
+
+/// 单个任务超时时间（秒）
+const TASK_TIMEOUT_SECS: u64 = 10;
 
 pub async fn listen_for_shutdown(db: &DatabaseConnection) {
     // 等待 Ctrl+C 信号
@@ -18,27 +26,72 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
         }
     }
 
+    // 将所有关闭任务包裹在超时内
+    let shutdown_result = timeout(
+        Duration::from_secs(SHUTDOWN_TIMEOUT_SECS),
+        perform_shutdown_tasks(db),
+    )
+    .await;
+
+    match shutdown_result {
+        Ok(()) => {
+            warn!("All shutdown tasks completed successfully");
+        }
+        Err(_) => {
+            error!(
+                "Shutdown tasks timed out after {} seconds! Forcing exit.",
+                SHUTDOWN_TIMEOUT_SECS
+            );
+            // 超时也要清理 lockfile
+            crate::system::platform::cleanup_lockfile();
+            std::process::exit(1);
+        }
+    }
+
+    crate::system::platform::cleanup_lockfile();
+    warn!("Lockfile cleaned up, shutting down...");
+}
+
+/// 执行所有关闭任务（在超时内调用）
+async fn perform_shutdown_tasks(db: &DatabaseConnection) {
     // 刷新点击计数
     if let Some(manager) = get_click_manager() {
-        manager.flush().await;
-        warn!("ClickManager flushed successfully");
+        match timeout(Duration::from_secs(TASK_TIMEOUT_SECS), manager.flush()).await {
+            Ok(()) => {
+                warn!("ClickManager flushed successfully");
+            }
+            Err(_) => {
+                error!(
+                    "ClickManager flush timed out after {} seconds",
+                    TASK_TIMEOUT_SECS
+                );
+            }
+        }
     } else {
         warn!("ClickManager is not initialized, skipping flush");
     }
 
     // 刷新待写入的 UserAgent 数据
     if let Some(store) = crate::services::get_user_agent_store() {
-        match store.flush_pending(db).await {
-            Ok(count) if count > 0 => {
+        match timeout(
+            Duration::from_secs(TASK_TIMEOUT_SECS),
+            store.flush_pending(db),
+        )
+        .await
+        {
+            Ok(Ok(count)) if count > 0 => {
                 warn!("Flushed {} pending UserAgents on shutdown", count);
             }
-            Err(e) => {
-                warn!("Failed to flush UserAgents on shutdown: {}", e);
+            Ok(Err(e)) => {
+                error!("Failed to flush UserAgents on shutdown: {}", e);
+            }
+            Err(_) => {
+                error!(
+                    "UserAgent flush timed out after {} seconds",
+                    TASK_TIMEOUT_SECS
+                );
             }
             _ => {}
         }
     }
-
-    crate::system::platform::cleanup_lockfile();
-    warn!("Lockfile cleaned up, shutting down...");
 }

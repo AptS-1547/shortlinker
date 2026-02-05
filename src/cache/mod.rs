@@ -8,5 +8,6 @@ pub mod traits;
 
 pub use composite::CompositeCache;
 pub use traits::{
-    BloomConfig, CacheResult, CompositeCacheTrait, ExistenceFilter, NegativeCache, ObjectCache,
+    BloomConfig, CacheHealthStatus, CacheResult, CompositeCacheTrait, ExistenceFilter,
+    NegativeCache, ObjectCache,
 };

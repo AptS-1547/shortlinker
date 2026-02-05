@@ -94,6 +94,16 @@ impl CompositeCacheTrait for MockCache {
     async fn bloom_check(&self, key: &str) -> bool {
         self.data.read().await.contains_key(key)
     }
+
+    async fn health_check(&self) -> shortlinker::cache::CacheHealthStatus {
+        shortlinker::cache::CacheHealthStatus {
+            status: "healthy".to_string(),
+            cache_type: "mock".to_string(),
+            bloom_filter_enabled: false,
+            negative_cache_enabled: true,
+            error: None,
+        }
+    }
 }
 
 /// Create a test service with temporary storage

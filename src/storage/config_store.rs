@@ -1,6 +1,6 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
+    QueryOrder, Set, TransactionTrait,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -157,18 +157,6 @@ impl ConfigStore {
             });
         }
 
-        // 更新配置
-        let mut active_model: system_config::ActiveModel = old_record.unwrap().into();
-        active_model.value = Set(value.to_string());
-        active_model.updated_at = Set(chrono::Utc::now());
-
-        active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to update config '{}': {}",
-                key, e
-            ))
-        })?;
-
         // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
         let is_sensitive_config = get_def(key)
             .map(|def| def.is_sensitive)
@@ -184,20 +172,41 @@ impl ConfigStore {
             (old_value.clone(), value.to_string())
         };
 
+        // 使用事务确保更新和历史记录的原子性
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
+        })?;
+
+        // 更新配置
+        let mut active_model: system_config::ActiveModel = old_record.unwrap().into();
+        active_model.value = Set(value.to_string());
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        active_model.update(&txn).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!(
+                "Failed to update config '{}': {}",
+                key, e
+            ))
+        })?;
+
         let history = config_history::ActiveModel {
             id: Default::default(),
             config_key: Set(key.to_string()),
             old_value: Set(history_old_value),
             new_value: Set(history_new_value),
             changed_at: Set(chrono::Utc::now()),
-            changed_by: Set(None), // TODO: 未来可以传入操作者信息
+            changed_by: Set(None),
         };
 
-        history.insert(&self.db).await.map_err(|e| {
+        history.insert(&txn).await.map_err(|e| {
             ShortlinkerError::database_operation(format!(
                 "Failed to record config change history: {}",
                 e
             ))
+        })?;
+
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
         })?;
 
         Ok(ConfigUpdateResult {
