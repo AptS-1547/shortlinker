@@ -24,10 +24,8 @@ impl SeaOrmStorage {
             &format!("set({})", link.code),
             self.retry_config,
             || async {
-                upsert(db, &link).await.map_err(|e| {
-                    // 转换为 DbErr 以便重试机制判断
-                    sea_orm::DbErr::Custom(e.to_string())
-                })
+                // upsert() 返回原始 DbErr，retry 能正确识别连接错误
+                upsert(db, &link).await
             },
         )
         .await

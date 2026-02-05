@@ -1,6 +1,6 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TransactionTrait,
+    QueryOrder, Set, TransactionTrait, sea_query::OnConflict,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -288,7 +288,13 @@ impl ConfigStore {
         Ok(count > 0)
     }
 
-    /// 批量插入配置
+    /// 原子性插入配置（如果不存在）
+    ///
+    /// 使用 `INSERT ... ON CONFLICT DO NOTHING` 避免 TOCTOU 竞态条件。
+    ///
+    /// 返回值:
+    /// - `Ok(true)`: 插入成功（配置之前不存在）
+    /// - `Ok(false)`: 配置已存在，未执行插入
     pub async fn insert_if_not_exists(
         &self,
         key: &str,
@@ -297,11 +303,6 @@ impl ConfigStore {
         requires_restart: bool,
         is_sensitive: bool,
     ) -> Result<bool> {
-        // 检查是否已存在
-        if self.exists(key).await? {
-            return Ok(false);
-        }
-
         let model = system_config::ActiveModel {
             key: Set(key.to_string()),
             value: Set(value.to_string()),
@@ -311,14 +312,32 @@ impl ConfigStore {
             updated_at: Set(chrono::Utc::now()),
         };
 
-        model.insert(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to insert config '{}': {}",
-                key, e
-            ))
-        })?;
+        // 使用 ON CONFLICT DO NOTHING 实现原子性的 "insert if not exists"
+        let result = system_config::Entity::insert(model)
+            .on_conflict(
+                OnConflict::column(system_config::Column::Key)
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(&self.db)
+            .await;
 
-        Ok(true)
+        match result {
+            Ok(_) => Ok(true),
+            Err(sea_orm::DbErr::RecordNotInserted) => Ok(false), // PostgreSQL
+            Err(e) => {
+                // 某些数据库后端在 do_nothing 时可能返回特定错误
+                let err_str = e.to_string().to_lowercase();
+                if err_str.contains("no rows") || err_str.contains("record not inserted") {
+                    Ok(false)
+                } else {
+                    Err(ShortlinkerError::database_operation(format!(
+                        "Failed to insert config '{}': {}",
+                        key, e
+                    )))
+                }
+            }
+        }
     }
 
     /// 同步配置项的元信息（不修改 value / updated_at）
