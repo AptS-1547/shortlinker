@@ -1,338 +1,314 @@
-# Shortlinker 事件系统文档
+# Shortlinker 事件系统
 
 ## 概述
 
-Shortlinker 的事件系统是一个强大而灵活的组件，用于处理应用程序中发生的各种事件。该系统基于发布-订阅模式，允许不同的组件响应系统中的状态变化。
+事件系统是 Shortlinker 的核心组件，用于解耦系统各部分之间的通信。基于 `tokio::sync::broadcast` 实现发布-订阅模式。
+
+### 设计原则
+
+1. **扩展而非重写**：基于现有 `ReloadCoordinator` 扩展
+2. **简单优先**：不做过度抽象
+3. **按需实现**：处理器按实际需求添加
+
+## 事件类型
+
+所有事件统一定义在 `SystemEvent` 枚举中：
+
+```rust
+#[derive(Debug, Clone)]
+pub enum SystemEvent {
+    // === 生命周期事件 ===
+    /// 系统启动完成
+    Startup,
+    /// 系统关闭
+    Shutdown { graceful: bool },
+
+    // === 配置/数据重载 ===
+    /// 重载开始
+    ReloadStarted { target: ReloadTarget },
+    /// 重载完成
+    ReloadCompleted { target: ReloadTarget, duration_ms: u64 },
+    /// 重载失败
+    ReloadFailed { target: ReloadTarget, error: String },
+
+    // === 链接事件 ===
+    /// 链接创建
+    LinkCreated { code: String },
+    /// 链接更新
+    LinkUpdated { code: String },
+    /// 链接删除
+    LinkDeleted { code: String },
+    /// 批量导入完成
+    BulkImport { count: usize, success: usize },
+
+    // === 配置变更 ===
+    /// 运行时配置变更
+    ConfigChanged { key: String },
+}
+```
+
+### ReloadTarget
+
+```rust
+#[derive(Debug, Clone, Copy)]
+pub enum ReloadTarget {
+    /// 重载所有（配置 + 数据）
+    All,
+    /// 仅重载配置
+    Config,
+    /// 仅重载数据（存储 + 缓存）
+    Data,
+}
+```
 
 ## 核心组件
 
-### 1. 事件类型 (EventType)
+### SystemEventBus
 
-系统支持以下预定义的事件类型：
-
-- `ShortLinkCreated` - 短链接创建事件
-- `ShortLinkDeleted` - 短链接删除事件  
-- `ShortLinkUpdated` - 短链接更新事件
-- `ShortLinkAccessed` - 短链接访问事件
-- `SystemStartup` - 系统启动事件
-- `SystemShutdown` - 系统关闭事件
-- `ConfigReloaded` - 配置重载事件
-- `Custom(String)` - 自定义事件类型
-
-### 2. 事件结构 (Event)
-
-每个事件包含以下信息：
+事件总线，负责事件的发布和订阅。
 
 ```rust
-pub struct Event {
-    pub id: String,                    // 唯一标识符
-    pub event_type: EventType,         // 事件类型
-    pub timestamp: SystemTime,         // 时间戳
-    pub payload: EventPayload,         // 事件数据
-    pub source: String,                // 事件来源
+pub struct SystemEventBus {
+    sender: broadcast::Sender<SystemEvent>,
+}
+
+impl SystemEventBus {
+    /// 创建新的事件总线
+    pub fn new(capacity: usize) -> Self;
+
+    /// 发布事件
+    pub fn publish(&self, event: SystemEvent);
+
+    /// 订阅事件流
+    pub fn subscribe(&self) -> broadcast::Receiver<SystemEvent>;
 }
 ```
 
-### 3. 事件负载 (EventPayload)
-
-事件负载包含与特定事件相关的数据：
-
-- `ShortLink` - 短链接相关数据（代码、目标URL等）
-- `System` - 系统相关数据（消息、详细信息等）
-- `Access` - 访问相关数据（客户端IP、用户代理等）
-- `Custom` - 自定义数据
-
-### 4. 事件处理器 (EventHandler)
-
-事件处理器是实现 `EventHandler` trait 的组件，用于响应特定类型的事件：
+### 全局实例
 
 ```rust
-#[async_trait::async_trait]
-pub trait EventHandler: Send + Sync {
-    async fn handle(&self, event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-    fn name(&self) -> &str;
-    fn interested_events(&self) -> Vec<EventType>;
-}
+/// 获取全局事件总线实例
+pub fn event_bus() -> &'static SystemEventBus;
+
+/// 初始化事件总线（在 startup 时调用）
+pub fn init_event_bus(capacity: usize);
 ```
-
-### 5. 事件总线 (EventBus)
-
-事件总线是系统的核心，负责：
-
-- 管理事件处理器的注册
-- 发布事件到所有相关处理器
-- 维护事件历史记录
-- 提供事件订阅功能
 
 ## 使用方法
 
-### 基本使用
-
-#### 1. 初始化事件系统
+### 发布事件
 
 ```rust
-use shortlinker::system::{EventBusManager, Event, EventType};
+use crate::system::events::{event_bus, SystemEvent};
 
-// 初始化默认处理器
-EventBusManager::initialize_default_handlers();
+// 在 LinkService 中发布链接创建事件
+event_bus().publish(SystemEvent::LinkCreated {
+    code: "abc123".to_string(),
+});
+
+// 批量导入完成
+event_bus().publish(SystemEvent::BulkImport {
+    count: 100,
+    success: 98,
+});
 ```
 
-#### 2. 发布事件
+### 订阅事件
 
 ```rust
-// 使用便捷方法创建事件
-let event = Event::shortlink_created("abc123", "https://example.com", "api_service");
+use crate::system::events::{event_bus, SystemEvent};
 
-// 发布事件
-let event_bus = EventBusManager::instance();
-event_bus.publish(event).await?;
-```
+// 在后台任务中订阅事件
+let mut receiver = event_bus().subscribe();
 
-#### 3. 使用便捷宏
-
-```rust
-// 使用宏快速发布事件
-publish_shortlink_created!("abc123", "https://example.com", "api_service");
-publish_shortlink_accessed!("abc123", Some("192.168.1.1"), Some("Mozilla/5.0..."), "redirect");
-publish_shortlink_updated!("abc123", "https://new-url.com", "admin");
-publish_shortlink_deleted!("abc123", "admin");
-```
-
-### 创建自定义事件处理器
-
-```rust
-use async_trait::async_trait;
-use shortlinker::system::{EventHandler, Event, EventType};
-
-#[derive(Debug)]
-pub struct MyCustomHandler {
-    name: String,
-}
-
-impl MyCustomHandler {
-    pub fn new() -> Self {
-        Self {
-            name: "my_custom_handler".to_string(),
-        }
-    }
-}
-
-#[async_trait]
-impl EventHandler for MyCustomHandler {
-    async fn handle(&self, event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        match &event.event_type {
-            EventType::ShortLinkCreated => {
-                // 处理短链接创建逻辑
-                println!("处理短链接创建: {:?}", event.payload);
-            },
-            EventType::ShortLinkAccessed => {
-                // 处理访问统计逻辑
-                println!("记录访问统计: {:?}", event.payload);
-            },
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn interested_events(&self) -> Vec<EventType> {
-        vec![
-            EventType::ShortLinkCreated,
-            EventType::ShortLinkAccessed,
-        ]
-    }
-}
-
-// 注册自定义处理器
-EventBusManager::register_handler(Arc::new(MyCustomHandler::new()));
-```
-
-### 订阅事件流
-
-```rust
-let event_bus = EventBusManager::instance();
-let mut receiver = event_bus.subscribe();
-
-// 在后台任务中监听事件
 tokio::spawn(async move {
     while let Ok(event) = receiver.recv().await {
-        println!("收到实时事件: {:?}", event.event_type);
+        match event {
+            SystemEvent::LinkCreated { code } => {
+                println!("链接创建: {}", code);
+            }
+            SystemEvent::Shutdown { graceful } => {
+                println!("系统关闭 (graceful: {})", graceful);
+                break;
+            }
+            _ => {}
+        }
     }
 });
 ```
 
-### 查询事件历史
+## 事件处理器
+
+### EventHandler Trait
 
 ```rust
-let event_bus = EventBusManager::instance();
+#[async_trait]
+pub trait EventHandler: Send + Sync {
+    /// 处理事件
+    async fn handle(&self, event: &SystemEvent);
 
-// 获取所有历史事件
-let all_history = event_bus.get_history();
-
-// 获取特定类型的历史事件
-let access_events = event_bus.get_history_by_type(&EventType::ShortLinkAccessed);
-
-// 获取历史统计信息
-let (count, recent_events) = EventBusManager::get_history_stats();
+    /// 处理器名称（用于日志）
+    fn name(&self) -> &str;
+}
 ```
 
-## 内置事件处理器
-
-### 1. LoggingHandler
-
-将所有事件记录到应用程序日志中，便于调试和监控。
-
-### 2. StatisticsHandler
-
-统计各类事件的数量，提供系统使用情况的洞察。
-
-### 3. CacheInvalidationHandler
-
-当短链接发生变化时自动清理相关缓存，确保数据一致性。
-
-## 最佳实践
-
-### 1. 事件命名
-
-- 使用清晰、描述性的事件名称
-- 遵循一致的命名约定
-- 为自定义事件使用有意义的标识符
-
-### 2. 错误处理
-
-- 事件处理器应该处理错误但不应该抛出异常
-- 使用日志记录处理失败的情况
-- 考虑实现重试机制
-
-### 3. 性能考虑
-
-- 避免在事件处理器中执行耗时操作
-- 考虑使用异步处理来避免阻塞
-- 定期清理事件历史以控制内存使用
-
-### 4. 测试
-
-- 为自定义事件处理器编写单元测试
-- 测试事件的发布和处理流程
-- 验证事件负载的正确性
-
-## 配置选项
-
-### 事件历史大小
+### 创建自定义处理器
 
 ```rust
-// 创建事件总线时指定历史记录大小
-let event_bus = EventBus::new(5000); // 保留最近 5000 个事件
-```
+use async_trait::async_trait;
+use crate::system::events::{EventHandler, SystemEvent};
 
-### 自定义事件总线
-
-```rust
-// 如果需要独立的事件总线实例
-let custom_event_bus = Arc::new(EventBus::new(1000));
-custom_event_bus.register_handler(Arc::new(MyHandler::new()));
-```
-
-## 扩展示例
-
-### 1. 集成外部服务
-
-```rust
-#[derive(Debug)]
 pub struct WebhookHandler {
-    webhook_url: String,
     client: reqwest::Client,
+    webhook_url: String,
 }
 
 #[async_trait]
 impl EventHandler for WebhookHandler {
-    async fn handle(&self, event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // 将事件发送到外部 webhook
-        let payload = serde_json::to_string(event)?;
-        self.client.post(&self.webhook_url)
-            .header("Content-Type", "application/json")
-            .body(payload)
-            .send()
-            .await?;
-        Ok(())
+    async fn handle(&self, event: &SystemEvent) {
+        // 只处理链接事件
+        match event {
+            SystemEvent::LinkCreated { code } => {
+                self.send_webhook("link_created", code).await;
+            }
+            SystemEvent::LinkDeleted { code } => {
+                self.send_webhook("link_deleted", code).await;
+            }
+            _ => {} // 忽略其他事件
+        }
     }
 
     fn name(&self) -> &str {
         "webhook_handler"
     }
-
-    fn interested_events(&self) -> Vec<EventType> {
-        vec![EventType::ShortLinkCreated, EventType::ShortLinkDeleted]
-    }
 }
 ```
 
-### 2. 数据库审计
+### 注册处理器
 
 ```rust
-#[derive(Debug)]
-pub struct AuditHandler {
-    db_pool: sqlx::Pool<sqlx::Sqlite>,
-}
+use crate::system::events::event_bus;
+
+// 在启动时注册处理器
+let handler = Arc::new(WebhookHandler::new(webhook_url));
+let mut receiver = event_bus().subscribe();
+
+tokio::spawn(async move {
+    while let Ok(event) = receiver.recv().await {
+        handler.handle(&event).await;
+    }
+});
+```
+
+## 内置处理器
+
+### LoggingHandler
+
+将事件记录到日志系统。
+
+```rust
+pub struct LoggingHandler;
 
 #[async_trait]
-impl EventHandler for AuditHandler {
-    async fn handle(&self, event: &Event) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // 将事件保存到审计表
-        sqlx::query!(
-            "INSERT INTO audit_log (event_id, event_type, timestamp, payload, source) VALUES (?, ?, ?, ?, ?)",
-            event.id,
-            format!("{:?}", event.event_type),
-            event.timestamp,
-            serde_json::to_string(&event.payload)?,
-            event.source
-        )
-        .execute(&self.db_pool)
-        .await?;
-        Ok(())
+impl EventHandler for LoggingHandler {
+    async fn handle(&self, event: &SystemEvent) {
+        match event {
+            SystemEvent::LinkCreated { code } => {
+                info!(code = %code, "Link created");
+            }
+            SystemEvent::LinkDeleted { code } => {
+                info!(code = %code, "Link deleted");
+            }
+            SystemEvent::ReloadCompleted { target, duration_ms } => {
+                info!(?target, duration_ms, "Reload completed");
+            }
+            _ => {
+                debug!(?event, "Event received");
+            }
+        }
     }
 
     fn name(&self) -> &str {
-        "audit_handler"
-    }
-
-    fn interested_events(&self) -> Vec<EventType> {
-        // 审计所有事件
-        vec![
-            EventType::ShortLinkCreated,
-            EventType::ShortLinkDeleted,
-            EventType::ShortLinkUpdated,
-            EventType::ShortLinkAccessed,
-        ]
+        "logging_handler"
     }
 }
 ```
 
-## 故障排查
+## 注意事项
 
-### 常见问题
+### Broadcast Channel 特性
 
-1. **事件处理器未被调用**
-   - 检查处理器是否正确注册
-   - 验证 `interested_events()` 方法返回正确的事件类型
+1. **容量限制**：创建时指定容量（默认 256），超出会丢弃旧消息
+2. **Lagged 错误**：消费者处理太慢会收到 `RecvError::Lagged`
+3. **Clone 要求**：事件必须实现 `Clone`
 
-2. **事件丢失**
-   - 检查事件总线的容量设置
-   - 确保在发布事件前已注册处理器
+### 性能考虑
 
-3. **性能问题**
-   - 检查事件处理器是否执行耗时操作
-   - 考虑使用异步处理或后台任务
+1. **避免在热路径发布事件**：重定向处理（`redirect.rs`）不应发布事件
+2. **事件数据要小**：只包含必要信息（如 code），不要包含整个对象
+3. **处理器要快**：耗时操作应该 spawn 新任务
 
-### 调试建议
+### 错误处理
 
-- 启用详细日志记录
-- 使用 `LoggingHandler` 查看所有事件流
-- 监控事件历史大小和处理延迟
+```rust
+// 发布事件不会失败（无接收者时静默丢弃）
+event_bus().publish(event);
 
-## 结论
+// 接收可能返回 Lagged 错误
+match receiver.recv().await {
+    Ok(event) => { /* 处理事件 */ }
+    Err(broadcast::error::RecvError::Lagged(n)) => {
+        warn!("Missed {} events", n);
+    }
+    Err(broadcast::error::RecvError::Closed) => {
+        break; // 发送端关闭
+    }
+}
+```
 
-Shortlinker 的事件系统提供了一个强大且灵活的机制来处理应用程序中的各种事件。通过合理使用事件处理器和遵循最佳实践，可以构建出高度可扩展和可维护的应用程序架构。
+## 模块结构
+
+```
+src/system/events/
+├── mod.rs              # 模块导出
+├── types.rs            # SystemEvent, ReloadTarget 定义
+├── bus.rs              # SystemEventBus 实现
+├── coordinator.rs      # ReloadCoordinator（重载功能）
+├── global.rs           # 全局实例管理
+└── handlers/
+    ├── mod.rs
+    └── logging.rs      # LoggingHandler
+```
+
+## 与 ReloadCoordinator 的关系
+
+`ReloadCoordinator` 是事件系统的特化应用，专门处理配置和数据重载：
+
+```rust
+pub trait ReloadCoordinator: Send + Sync {
+    /// 执行重载
+    async fn reload(&self, target: ReloadTarget) -> Result<ReloadResult>;
+
+    /// 获取重载状态
+    fn status(&self) -> ReloadStatus;
+
+    /// 订阅重载事件（返回 SystemEvent 的子集）
+    fn subscribe(&self) -> broadcast::Receiver<SystemEvent>;
+}
+```
+
+`ReloadCoordinator` 在执行重载时会发布 `ReloadStarted`、`ReloadCompleted` 或 `ReloadFailed` 事件到 `SystemEventBus`。
+
+## FAQ
+
+### Q: 为什么不用 `mpsc` channel？
+
+A: `mpsc` 是多生产者单消费者，而我们需要多个处理器同时收到事件。`broadcast` 支持多消费者。
+
+### Q: 为什么没有事件历史？
+
+A: 事件历史增加内存开销且实际需求不明确。日志系统已经记录了所有重要事件。
+
+### Q: 为什么处理器没有 `interested_events()` 方法？
+
+A: 在 `handle()` 中用 `match` 过滤更简单直接，不需要额外的元数据。
