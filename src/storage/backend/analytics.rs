@@ -114,8 +114,8 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ShortCode.eq(code))
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
-            .group_by(date_expr)
-            .order_by_asc(Expr::cust("label"))
+            .group_by(date_expr.clone())
+            .order_by_asc(date_expr)
             .into_model::<TrendRow>()
             .all(&self.db)
             .await
@@ -130,15 +130,16 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<ReferrerRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column(click_log::Column::Referrer)
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ShortCode.eq(code))
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
             .group_by(click_log::Column::Referrer)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<ReferrerRow>()
             .all(&self.db)
@@ -154,18 +155,19 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<GeoRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column(click_log::Column::Country)
             .column(click_log::Column::City)
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ShortCode.eq(code))
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(click_log::Column::Country.is_not_null())
             .group_by(click_log::Column::Country)
             .group_by(click_log::Column::City)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<GeoRow>()
             .all(&self.db)
@@ -188,8 +190,8 @@ impl super::SeaOrmStorage {
             .column_as(click_log::Column::Id.count(), "count")
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
-            .group_by(date_expr)
-            .order_by_asc(Expr::cust("label"))
+            .group_by(date_expr.clone())
+            .order_by_asc(date_expr)
             .into_model::<TrendRow>()
             .all(&self.db)
             .await
@@ -203,14 +205,15 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<TopLinkRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column(click_log::Column::ShortCode)
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
             .group_by(click_log::Column::ShortCode)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<TopLinkRow>()
             .all(&self.db)
@@ -225,14 +228,15 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<ReferrerRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column(click_log::Column::Referrer)
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
             .group_by(click_log::Column::Referrer)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<ReferrerRow>()
             .all(&self.db)
@@ -247,17 +251,18 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<GeoRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column(click_log::Column::Country)
             .column(click_log::Column::City)
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(click_log::Column::Country.is_not_null())
             .group_by(click_log::Column::Country)
             .group_by(click_log::Column::City)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<GeoRow>()
             .all(&self.db)
@@ -282,10 +287,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::BrowserName, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -294,7 +300,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::BrowserName.is_not_null())
             .group_by(user_agent::Column::BrowserName)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
@@ -309,10 +315,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::OsName, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -321,7 +328,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::OsName.is_not_null())
             .group_by(user_agent::Column::OsName)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
@@ -336,10 +343,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::DeviceCategory, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -348,7 +356,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::DeviceCategory.is_not_null())
             .group_by(user_agent::Column::DeviceCategory)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
@@ -364,10 +372,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::BrowserName, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -377,7 +386,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::BrowserName.is_not_null())
             .group_by(user_agent::Column::BrowserName)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
@@ -393,10 +402,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::OsName, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -406,7 +416,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::OsName.is_not_null())
             .group_by(user_agent::Column::OsName)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
@@ -422,10 +432,11 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: u64,
     ) -> anyhow::Result<Vec<UaStatsRow>> {
+        let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
             .column_as(user_agent::Column::DeviceCategory, "field_value")
-            .column_as(click_log::Column::Id.count(), "count")
+            .column_as(count_expr.clone(), "count")
             .join(
                 JoinType::InnerJoin,
                 Self::click_log_to_user_agent_relation(),
@@ -435,7 +446,7 @@ impl super::SeaOrmStorage {
             .filter(click_log::Column::ClickedAt.lte(end))
             .filter(user_agent::Column::DeviceCategory.is_not_null())
             .group_by(user_agent::Column::DeviceCategory)
-            .order_by_desc(Expr::cust("count"))
+            .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<UaStatsRow>()
             .all(&self.db)
