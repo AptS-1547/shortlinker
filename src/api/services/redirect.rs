@@ -73,6 +73,9 @@ impl RedirectService {
                     },
                     Ok(None) => {
                         debug!("Redirect link not found in database: {}", &capture_path);
+                        // Bloom filter false positive: bloom said "maybe exists" but DB says no
+                        #[cfg(feature = "metrics")]
+                        crate::metrics::METRICS.bloom_false_positives_total.inc();
                         cache.mark_not_found(&capture_path).await;
                         Self::not_found_response()
                     }

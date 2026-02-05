@@ -11,7 +11,7 @@ default = ["server", "cli"]  # 默认启用服务器和CLI功能
 server = []           # 服务器功能（核心）
 cli = ["server"]      # CLI功能（依赖服务器）
 tui = ["server", "dep:color-eyre", "dep:crossterm", "dep:ratatui", "dep:arboard", "dep:nucleo-matcher"]      # TUI功能（依赖服务器）
-metrics = ["server", "dep:prometheus"]  # Prometheus 指标导出
+metrics = ["server", "dep:prometheus", "dep:sysinfo"]  # Prometheus 指标导出
 full = ["server", "cli", "tui", "metrics"]  # 全功能版本
 
 # 优化配置
@@ -88,6 +88,7 @@ ratatui = { version = "0.30.0", optional = true }
 arboard = { version = "3.6", optional = true }
 nucleo-matcher = { version = "0.3", optional = true }
 prometheus = { version = "0.14", optional = true, default-features = false }
+sysinfo = { version = "0.38", optional = true, default-features = false, features = ["system"] }
 sea-orm = { version = "2.0.0-rc.30", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 arc-swap = "1"

@@ -90,6 +90,11 @@ pub trait ObjectCache: Send + Sync {
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
 
+    /// Returns the number of entries in the cache (for metrics)
+    fn entry_count(&self) -> u64 {
+        0 // Default: unknown/not supported
+    }
+
     async fn load_object_cache(&self, _keys: HashMap<String, ShortLink>) {
         // 默认实现：子类可以选择覆盖
         tracing::trace!("Not loading Object Cache, no operation defined");

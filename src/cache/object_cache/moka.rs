@@ -81,6 +81,10 @@ impl ObjectCache for MokaCacheWrapper {
         self.inner.invalidate(key).await;
     }
 
+    fn entry_count(&self) -> u64 {
+        self.inner.entry_count()
+    }
+
     /// Invalidates all entries in the cache.
     ///
     /// # Note

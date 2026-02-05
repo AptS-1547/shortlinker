@@ -11,7 +11,7 @@ use actix_web::web;
 use super::AppStartTime;
 
 #[cfg(feature = "metrics")]
-use crate::metrics::METRICS;
+use crate::metrics::{METRICS, update_system_metrics};
 
 /// Metrics service handler
 pub struct MetricsService;
@@ -24,6 +24,9 @@ impl MetricsService {
         let now = chrono::Utc::now();
         let uptime = (now - app_start_time.start_datetime).num_seconds().max(0) as f64;
         METRICS.uptime_seconds.set(uptime);
+
+        // Update system metrics (memory, CPU)
+        update_system_metrics();
 
         // Export metrics in Prometheus format
         let output = METRICS.export();

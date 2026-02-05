@@ -253,7 +253,7 @@ impl ClickManager {
                 let sink = Arc::clone(&self.sink);
                 tokio::spawn(async move {
                     if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                        Self::flush_buffer(&buffer, &sink).await;
+                        Self::flush_buffer_with_trigger(&buffer, &sink, "threshold").await;
                     } else {
                         trace!("ClickManager: flush already in progress, skipping");
                     }
@@ -292,7 +292,7 @@ impl ClickManager {
     pub async fn flush(&self) {
         debug!("ClickManager: Manual flush triggered");
         let _guard = self.buffer.flush_lock.lock().await;
-        Self::flush_buffer(&self.buffer, &self.sink).await;
+        Self::flush_buffer_with_trigger(&self.buffer, &self.sink, "manual").await;
 
         // 刷新详细日志
         if let (Some(detailed_buffer), Some(detailed_sink)) =
@@ -305,6 +305,16 @@ impl ClickManager {
 
     /// 执行实际的刷盘操作
     async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) {
+        Self::flush_buffer_with_trigger(buffer, sink, "interval").await;
+    }
+
+    /// 执行实际的刷盘操作（带触发类型标记）
+    #[allow(unused_variables)]
+    async fn flush_buffer_with_trigger(
+        buffer: &ClickBuffer,
+        sink: &Arc<dyn ClickSink>,
+        trigger: &str,
+    ) {
         let updates = buffer.drain();
 
         if updates.is_empty() {
@@ -316,6 +326,11 @@ impl ClickManager {
         match sink.flush_clicks(updates.clone()).await {
             Ok(_) => {
                 debug!("ClickManager: Successfully flushed {} entries", count);
+                #[cfg(feature = "metrics")]
+                crate::metrics::METRICS
+                    .clicks_flush_total
+                    .with_label_values(&[trigger, "success"])
+                    .inc();
             }
             Err(e) => {
                 // 刷盘失败，恢复数据到 buffer
@@ -324,6 +339,11 @@ impl ClickManager {
                     "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
                     e, count
                 );
+                #[cfg(feature = "metrics")]
+                crate::metrics::METRICS
+                    .clicks_flush_total
+                    .with_label_values(&[trigger, "failed"])
+                    .inc();
             }
         }
     }
