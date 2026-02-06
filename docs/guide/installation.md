@@ -11,7 +11,7 @@
 
 ### 源码编译环境
 
-- **Rust**: >= 1.85.0 (必需，Edition 2024)
+- **Rust**: >= 1.88.0 (必需，Edition 2024)
 - **Git**: 用于克隆项目
 
 ## 安装方式
@@ -55,7 +55,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 
 # 2. 检查版本
-rustc --version  # 应该 >= 1.85.0
+rustc --version  # 应该 >= 1.88.0
 
 # 3. 克隆并编译
 git clone https://github.com/AptS-1547/shortlinker.git
@@ -123,5 +123,5 @@ cargo clean && cargo build --release
 安装完成后，继续阅读：
 
 - 🚀 [快速开始](/guide/getting-started) - 学习基本使用
-- ⚙️ [配置说明](/config/) - 了解配置选项
+- ⚙️ [配置指南](/config/) - 了解配置选项
 - 📋 [CLI 工具](/cli/) - 掌握命令行操作

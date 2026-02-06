@@ -2,68 +2,32 @@
 
 Shortlinker 支持多种部署方式，从简单的本地运行到生产环境的容器化部署。
 
+## 推荐阅读顺序
+
+1. [Docker 部署概览](/deployment/docker)
+2. [Docker 快速开始与 Compose](/deployment/docker-quickstart)
+3. [反向代理概览](/deployment/proxy)
+4. [systemd 服务概览](/deployment/systemd)
+
+如果需要生产运维细节，再继续阅读：
+
+- [Docker 运维与安全](/deployment/docker-operations)
+- [反向代理性能优化与监控](/deployment/proxy-operations)
+- [systemd Docker Compose 与运维](/deployment/systemd-operations)
+
 ## 部署方式概览
 
-### 🚀 快速部署
-- **Docker 部署**：推荐的生产环境方案，无需安装 Rust
-- **预编译二进制**：下载即用，支持多平台
-- **源码编译**：需要 Rust 1.85+（Edition 2024），适合定制需求
+| 方式 | 适用场景 | 推荐程度 |
+|------|----------|----------|
+| Docker | 大多数生产环境 | ⭐⭐⭐⭐⭐ |
+| 预编译二进制 | 快速本地验证 / 轻量部署 | ⭐⭐⭐⭐ |
+| 源码编译 | 需要自定义构建特性 | ⭐⭐⭐ |
 
-### 🔧 生产环境
-- **反向代理**：Nginx、Caddy、Apache 配置
-- **系统服务**：systemd、Docker Compose 管理
-- **监控告警**：健康检查和日志管理
+## 前置准备
 
-## 环境要求
-
-### 系统要求
-- **操作系统**: Linux、macOS、Windows
-- **架构**: x86_64、ARM64
-
-### 源码编译要求
-- **Rust**: >= 1.85.0 (必需，Edition 2024)
-- **Git**: 用于克隆项目
-
-## 快速开始
-
-### Docker 部署（推荐）
-```bash
-# 准备最小启动配置（容器内默认从 /config.toml 读取）
-cat > config.toml << 'EOF'
-[server]
-host = "0.0.0.0"
-port = 8080
-
-[database]
-database_url = "sqlite:///data/shortlinker.db"
-EOF
-
-mkdir -p data
-
-# 启动
-docker run -d --name shortlinker \
-  -p 8080:8080 \
-  -v $(pwd)/config.toml:/config.toml:ro \
-  -v $(pwd)/data:/data \
-  e1saps/shortlinker
-```
-
-### 预编译二进制
-```bash
-# 下载并运行
-wget https://github.com/AptS-1547/shortlinker/releases/latest/download/shortlinker-linux-x64.tar.gz
-tar -xzf shortlinker-linux-x64.tar.gz
-./shortlinker
-```
-
-### 源码编译
-```bash
-# 克隆并编译
-git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker
-cargo build --release
-./target/release/shortlinker
-```
+- **操作系统**：Linux、macOS、Windows
+- **架构**：x86_64、ARM64
+- **源码编译额外要求**：Rust `>= 1.88.0`（Edition 2024）、Git
 
 ## 部署架构
 
@@ -91,10 +55,12 @@ cargo build --release
 
 ## 下一步
 
-选择适合您的部署方式：
+- 📦 [Docker 部署概览](/deployment/docker)
+- ⚡ [Docker 快速开始与 Compose](/deployment/docker-quickstart)
+- 🛠️ [Docker 运维与安全](/deployment/docker-operations)
+- 🔀 [反向代理概览](/deployment/proxy)
+- 📈 [反向代理性能优化与监控](/deployment/proxy-operations)
+- ⚙️ [systemd 服务概览](/deployment/systemd)
+- 🔧 [systemd Docker Compose 与运维](/deployment/systemd-operations)
 
-- 📦 [Docker 部署](/deployment/docker) - 容器化部署详细指南
-- 🔀 [反向代理](/deployment/proxy) - Nginx、Caddy 配置
-- ⚙️ [系统服务](/deployment/systemd) - systemd 和进程管理
-
-需要配置帮助？查看 [配置说明](/config/) 了解 `config.toml`（启动配置）与数据库运行时配置的设置方式。
+需要配置帮助？查看 [配置指南](/config/) 了解 `config.toml`（启动配置）与数据库运行时配置的设置方式。

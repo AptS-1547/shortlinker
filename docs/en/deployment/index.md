@@ -2,68 +2,32 @@
 
 Shortlinker supports multiple deployment methods, from simple local running to production containerized deployment.
 
-## Deployment Overview
+## Suggested Reading Order
 
-### 🚀 Quick Deployment
-- **Docker Deployment**: Recommended production solution, no Rust installation required
-- **Pre-compiled Binaries**: Download and run, supports multiple platforms
-- **Source Compilation**: Requires Rust 1.85+ (Edition 2024), suitable for custom needs
+1. [Docker Deployment Overview](/en/deployment/docker)
+2. [Docker Quick Start and Compose](/en/deployment/docker-quickstart)
+3. [Reverse Proxy Overview](/en/deployment/proxy)
+4. [Systemd Service Overview](/en/deployment/systemd)
 
-### 🔧 Production Environment
-- **Reverse Proxy**: Nginx, Caddy, Apache configuration
-- **System Service**: systemd, Docker Compose management
-- **Monitoring & Alerting**: Health checks and log management
+For production operations details:
 
-## System Requirements
+- [Docker Operations and Security](/en/deployment/docker-operations)
+- [Reverse Proxy Performance and Monitoring](/en/deployment/proxy-operations)
+- [Systemd Docker Compose and Operations](/en/deployment/systemd-operations)
 
-### System Requirements
-- **Operating System**: Linux, macOS, Windows
+## Deployment Options at a Glance
+
+| Option | Best For | Recommendation |
+|--------|----------|----------------|
+| Docker | Most production environments | ⭐⭐⭐⭐⭐ |
+| Prebuilt binary | Fast local validation / lightweight deploy | ⭐⭐⭐⭐ |
+| Source build | Custom build features | ⭐⭐⭐ |
+
+## Prerequisites
+
+- **OS**: Linux, macOS, Windows
 - **Architecture**: x86_64, ARM64
-
-### Source Compilation Requirements
-- **Rust**: >= 1.85.0 (required, Edition 2024)
-- **Git**: For cloning the project
-
-## Quick Start
-
-### Docker Deployment (Recommended)
-```bash
-# Prepare a minimal startup config (by default the container reads from /config.toml)
-cat > config.toml << 'EOF'
-[server]
-host = "0.0.0.0"
-port = 8080
-
-[database]
-database_url = "sqlite:///data/shortlinker.db"
-EOF
-
-mkdir -p data
-
-# Run
-docker run -d --name shortlinker \
-  -p 8080:8080 \
-  -v $(pwd)/config.toml:/config.toml:ro \
-  -v $(pwd)/data:/data \
-  e1saps/shortlinker
-```
-
-### Pre-compiled Binaries
-```bash
-# Download and run
-wget https://github.com/AptS-1547/shortlinker/releases/latest/download/shortlinker-linux-x64.tar.gz
-tar -xzf shortlinker-linux-x64.tar.gz
-./shortlinker
-```
-
-### Source Compilation
-```bash
-# Clone and compile
-git clone https://github.com/AptS-1547/shortlinker
-cd shortlinker
-cargo build --release
-./target/release/shortlinker
-```
+- **For source builds**: Rust `>= 1.88.0` (Edition 2024), Git
 
 ## Deployment Architecture
 
@@ -91,10 +55,12 @@ User Request → Reverse Proxy → Shortlinker Service → Data Storage
 
 ## Next Steps
 
-Choose the deployment method that suits you:
-
-- 📦 [Docker Deployment](/en/deployment/docker) - Detailed containerized deployment guide
-- 🔀 [Reverse Proxy](/en/deployment/proxy) - Nginx, Caddy configuration
-- ⚙️ [System Service](/en/deployment/systemd) - systemd and process management
+- 📦 [Docker Deployment Overview](/en/deployment/docker)
+- ⚡ [Docker Quick Start and Compose](/en/deployment/docker-quickstart)
+- 🛠️ [Docker Operations and Security](/en/deployment/docker-operations)
+- 🔀 [Reverse Proxy Overview](/en/deployment/proxy)
+- 📈 [Reverse Proxy Performance and Monitoring](/en/deployment/proxy-operations)
+- ⚙️ [Systemd Service Overview](/en/deployment/systemd)
+- 🔧 [Systemd Docker Compose and Operations](/en/deployment/systemd-operations)
 
 Need configuration help? Check [Configuration Guide](/en/config/) for `config.toml` (startup config) and DB-backed runtime config.

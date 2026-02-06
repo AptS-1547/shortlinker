@@ -1,4 +1,4 @@
-# CLI Command Line Tool
+# CLI Overview
 
 Shortlinker provides an intuitive and easy-to-use command line tool for managing short links.
 

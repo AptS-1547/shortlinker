@@ -1,58 +1,68 @@
 # CLI Command Reference
 
-Detailed command line tool usage instructions and parameter options.
+Detailed command-line usage and options for day-to-day management.
 
-## Basic Commands
+## Task-Oriented Navigation
+
+- **First-time usage**: `add` → `list` → `update` → `remove`
+- **Bulk migration**: `import` / `export`
+- **Operations**: `config` / `reset-password` / `generate-config`
+- **Interactive management**: `tui`
+
+> If you prefer visual management, start with the [TUI guide](/en/cli/tui).
+
+## Core Commands (Recommended Order)
 
 ### add - Add Short Link
 
 ```bash
-# Custom short code
 ./shortlinker add <short_code> <target_url> [options]
-
-# Random short code
-./shortlinker add <target_url> [options]
+./shortlinker add <target_url> [options]  # random short code
 ```
 
 > Note: short codes must satisfy constraints (length ≤ 128, allowed chars `[a-zA-Z0-9_.-/]`) and must not conflict with reserved route prefixes (default `admin`/`health`/`panel`, from `routes.*_prefix`).
 
 **Options**:
-- `--force`: Force overwrite existing short code
-- `--expire <time>`: Set expiration time
-- `--password <password>`: Set password protection (experimental)
+- `--force`: force overwrite existing short code
+- `--expire <time>`: set expiration time
+- `--password <password>`: set password protection (experimental)
 
 **Examples**:
 ```bash
-# Basic usage
 ./shortlinker add google https://www.google.com
-
-# Random short code
 ./shortlinker add https://www.example.com
-
-# Set expiration time
 ./shortlinker add daily https://example.com --expire 1d
-./shortlinker add sale https://shop.com --expire 2w3d
-
-# Force overwrite
 ./shortlinker add google https://www.google.com --force
-
-# Password protected link
 ./shortlinker add secret https://example.com --password mypass
 ```
 
-### export - Export Short Links
+### list - List Short Links
 
 ```bash
-./shortlinker export [file_path]
+./shortlinker list
 ```
+
+### update - Update Short Link
+
+```bash
+./shortlinker update <short_code> <new_target_url> [options]
+```
+
+**Options**:
+- `--expire <time>`: set new expiration time
+- `--password <password>`: set or update password
 
 **Examples**:
 ```bash
-# Default filename
-./shortlinker export
+./shortlinker update github https://new-github.com
+./shortlinker update github https://new-github.com --expire 30d
+./shortlinker update github https://new-github.com --password secret123
+```
 
-# Specify filename
-./shortlinker export backup.csv
+### remove - Delete Short Link
+
+```bash
+./shortlinker remove <short_code>
 ```
 
 ### import - Import Short Links
@@ -62,52 +72,65 @@ Detailed command line tool usage instructions and parameter options.
 ```
 
 **Options**:
-- `--force`: Force overwrite existing short codes
+- `--force`: force overwrite existing short codes
 
 **Examples**:
 ```bash
-# Import with default options
 ./shortlinker import backup.csv
-
-# Force overwrite existing codes
 ./shortlinker import backup.csv --force
 ```
 
-> CSV is the default format. `.json` is supported only for legacy compatibility (will be removed in v0.5.0).
+> CSV is the default format. `.json` is kept only for legacy compatibility (planned removal in v0.5.0).
 
-### remove - Delete Short Link
-
-```bash
-./shortlinker remove <short_code>
-```
-
-### list - List Short Links
+### export - Export Short Links
 
 ```bash
-./shortlinker list
+./shortlinker export [file_path]
 ```
 
-### help - Show command help
+**Examples**:
+```bash
+./shortlinker export
+./shortlinker export backup.csv
+```
+
+### help - Show Command Help
 
 ```bash
 ./shortlinker help
 ```
 
-### generate-config - Generate Configuration File
+## Operations Commands
+
+### config - Runtime Config Management (DB)
+
+The `config` subcommand manages runtime config stored in the database (same config system used by the web admin panel).
+
+> Note: `config` writes values into the database. To make a **running** server reload runtime config, call Admin API `POST /admin/v1/config/reload` or restart the service.  
+> Keys marked as “requires restart” (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload.
+
+Common subcommands:
 
 ```bash
-./shortlinker generate-config [output_path]
+# List configs (optional --category: auth/cookie/features/routes/cors/tracking)
+./shortlinker config list
+./shortlinker config list --category routes
+
+# Get one config (use --json for structured output)
+./shortlinker config get features.random_code_length
+./shortlinker config get api.cookie_same_site --json
+
+# Set/reset
+./shortlinker config set features.random_code_length 8
+./shortlinker config reset features.random_code_length
+
+# Export/import (JSON)
+./shortlinker config export config-backup.json
+./shortlinker config import config-backup.json
+./shortlinker config import config-backup.json --force
 ```
 
-Generate a **startup config** (`config.toml`) template, including `server` / `database` / `cache` / `logging` / `analytics`.  
-Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in the database and is not part of this file.
-
-**Examples**:
-```bash
-./shortlinker generate-config                 # Generate config.example.toml
-./shortlinker generate-config config.toml     # Generate/overwrite config.toml
-./shortlinker generate-config myconfig.toml   # Specify filename
-```
+> Security note: exported config files contain real sensitive values (e.g. `api.admin_token`, `api.jwt_secret`, `api.health_token`). Store them securely.
 
 ### reset-password - Reset Admin Password
 
@@ -115,9 +138,9 @@ Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in t
 ./shortlinker reset-password [options]
 ```
 
-Reset the admin API password. The new password will be hashed with Argon2id and stored in the database.
+Resets the admin API password. The new password is hashed with Argon2id before being stored.
 
-**Requirement**: Password must be at least 8 characters long.
+**Requirement**: password length must be at least 8 characters.
 
 **Examples**:
 ```bash
@@ -131,155 +154,98 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 ./shortlinker reset-password --password "my_new_secure_password"
 ```
 
-### config - Runtime config management (DB)
-
-The `config` subcommand manages runtime configuration values stored in the database (the same config system used by the web admin panel).
-
-> Note: `config` writes values into the database. To make a **running** server reload configs from the database, call Admin API `POST /admin/v1/config/reload` or restart the service.  
-> Keys marked as “requires restart” (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload; a restart is required.
-
-Common subcommands:
+### generate-config - Generate Configuration File
 
 ```bash
-# List configs (optional --category: auth/cookie/features/routes/cors/tracking)
-./shortlinker config list
-./shortlinker config list --category routes
-
-# Get a config (use --json for structured output)
-./shortlinker config get features.random_code_length
-./shortlinker config get api.cookie_same_site --json
-
-# Set/reset
-./shortlinker config set features.random_code_length 8
-./shortlinker config reset features.random_code_length
-
-# Export/import (JSON)
-./shortlinker config export config-backup.json
-./shortlinker config import config-backup.json
-./shortlinker config import config-backup.json --force   # skip interactive confirmation
+./shortlinker generate-config [output_path]
 ```
 
-> Security note: exported config files contain real sensitive values (e.g. `api.admin_token`, `api.jwt_secret`, `api.health_token`). Store them securely.
+Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics`.  
+Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in DB and not part of this file.
 
-### tui - Launch Terminal User Interface
+**Examples**:
+```bash
+./shortlinker generate-config                 # generate config.example.toml
+./shortlinker generate-config config.toml     # generate/overwrite config.toml
+./shortlinker generate-config myconfig.toml   # custom filename
+```
+
+## Interactive Interface
+
+### tui - Launch Terminal UI
 
 ```bash
 ./shortlinker tui
 ```
 
-**TUI Mode Features**:
-- Interactive visual interface
-- Real-time view of all short links
-- Keyboard navigation and operations
-- Display link details (click count, expiration time, etc.)
+**TUI features**:
+- interactive visual interface
+- real-time link list view
+- keyboard-based navigation and actions
+- link details (clicks, expiration, etc.)
 
-**Keyboard Shortcuts**:
-- `↑/↓` or `j/k`: Move selection up/down
-- `Enter` or `v`: View details
-- `/`: Search
-- `?` (or `h`): Help
-- `x`: Export / Import
-- `q`: Quit (`Esc` is commonly used for back/cancel/clear search)
+**Keyboard shortcuts**:
+- `↑/↓` or `j/k`: move selection
+- `Enter` or `v`: view details
+- `/`: search
+- `?` (or `h`): help
+- `x`: export/import
+- `q`: quit (`Esc` is commonly used for back/cancel/clear)
 
-> 💡 **Tip**: TUI mode is ideal for quick browsing and link management. For detailed usage, see [TUI User Guide](/en/cli/tui)
+> For full details, see the [TUI guide](/en/cli/tui).
 
-**Output Format**:
-```bash
-Short links list:
+## Advanced and Automation
 
-  google -> https://www.google.com
-  github -> https://github.com
-  temp -> https://example.com (expires: 2024-12-31 23:59:59 UTC)
-
-ℹ Total 3 short links
-```
-
-### update - Update Short Link
+### Expiration Time Formats
 
 ```bash
-./shortlinker update <short_code> <new_target_url> [options]
+1h      # 1 hour
+1d      # 1 day
+1w      # 1 week
+1M      # 1 month
+1y      # 1 year
+1d2h30m # combined format
+2024-12-31T23:59:59Z  # RFC3339
 ```
 
-**Examples**:
-```bash
-# Update target URL
-./shortlinker update github https://new-github.com
+### Import/Export Formats
 
-# Update URL and expiration time
-./shortlinker update github https://new-github.com --expire 30d
+**CSV (default)**
+
+Export includes header fields:
+`code,target,created_at,expires_at,password,click_count`
+
+```csv
+code,target,created_at,expires_at,password,click_count
+github,https://github.com,2024-12-15T14:30:22Z,,,
 ```
 
-## Expiration Time Formats
+**JSON (legacy, deprecated)**
 
-### Simple Format (Recommended)
+> `.json` is for legacy compatibility only (planned removal in v0.5.0).
 
-```bash
-1h    # 1 hour
-1d    # 1 day
-1w    # 1 week
-1M    # 1 month
-1y    # 1 year
+```json
+[
+  {
+    "code": "github",
+    "target": "https://github.com",
+    "created_at": "2024-12-15T14:30:22Z",
+    "expires_at": null,
+    "password": null,
+    "click": 0
+  }
+]
 ```
 
-### Combined Format
+### Reload Behavior
 
-```bash
-1d2h30m     # 1 day 2 hours 30 minutes
-2w3d        # 2 weeks 3 days
-1h30m15s    # 1 hour 30 minutes 15 seconds
-```
+Link-data commands (`add` / `update` / `remove` / `import`) notify the running service to refresh in-memory link caches.
 
-### RFC3339 Format (Compatible)
+> This is different from runtime config reload. For config changes made via `./shortlinker config set`, call Admin API `POST /admin/v1/config/reload` or restart.
 
-```bash
-2024-12-31T23:59:59Z
-2024-12-31T23:59:59+08:00
-```
+### Database Configuration
 
-> 💡 **Tip**: For more advanced time format options and detailed explanations, check the "Advanced Usage" section in the project documentation
-
-## Common Time Examples
-
-```bash
-# Short-term links
-./shortlinker add flash https://example.com --expire 1h      # 1 hour
-./shortlinker add daily https://example.com --expire 1d     # 1 day
-
-# Medium to long-term links  
-./shortlinker add weekly https://example.com --expire 1w    # 1 week
-./shortlinker add monthly https://example.com --expire 1M   # 1 month
-
-# Precise time
-./shortlinker add meeting https://zoom.us/j/123 --expire 2h30m
-./shortlinker add sale https://shop.com --expire 2w3d
-```
-
-## Hot Reload Mechanism
-
-After link-management operations (add/update/remove/import), CLI notifies the running server to reload short link data and rebuild in-memory caches:
-
-```bash
-# Unix/Linux systems - automatically send SIGUSR1 signal
-./shortlinker add new https://example.com
-# Output: ✓ Added short link: new -> https://example.com
-#        ℹ Server reload notification sent
-
-# Windows systems - automatically create trigger file
-./shortlinker add new https://example.com
-```
-
-> Note: this reload mechanism is about **link data / caches**, not runtime config. For runtime config changes done outside the server process (e.g. via `./shortlinker config set`), call Admin API `POST /admin/v1/config/reload` or restart the service.
-
-## Exit Codes
-
-| Exit Code | Meaning |
-|----------|---------|
-| 0 | Success |
-| 1 | Failed (validation/storage/command error) |
-
-## Configuration
-
-The CLI connects to the database using `config.toml` in the current working directory. To point it to a different database:
+CLI reads `config.toml` in the current working directory. To use a different DB:
 
 ```toml
 [database]
@@ -288,38 +254,14 @@ database_url = "sqlite://links.db"
 
 > See [Configuration Guide](/en/config/).
 
-## Script Integration
+### Batch Scripts
 
-### Batch Operations
 ```bash
-#!/bin/bash
-# Batch import links
+# Backup script
+./shortlinker export "backup_$(date +%Y%m%d).csv"
+
+# Batch import
 while IFS=',' read -r code url; do
     ./shortlinker add "$code" "$url"
 done < links.csv
 ```
-
-### Error Checking
-```bash
-if ./shortlinker add test https://example.com --expire 1d; then
-    echo "Added successfully"
-else
-    echo "Failed to add"
-    exit 1
-fi
-```
-
-## Process Management
-
-### Check Service Status
-```bash
-# Unix systems
-if [ -f shortlinker.pid ]; then
-    echo "Server PID: $(cat shortlinker.pid)"
-else
-    echo "Server not running"
-fi
-```
-
-### Container Environment
-In Docker containers, process management automatically handles container restarts without manual intervention.

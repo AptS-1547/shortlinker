@@ -11,7 +11,7 @@ Choose the installation method that suits you to quickly deploy Shortlinker.
 
 ### Source Compilation Environment
 
-- **Rust**: >= 1.85.0 (required, Edition 2024)
+- **Rust**: >= 1.88.0 (required, Edition 2024)
 - **Git**: For cloning the project
 
 ## Installation Methods
@@ -55,7 +55,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 
 # 2. Check version
-rustc --version  # Should be >= 1.85.0
+rustc --version  # Should be >= 1.88.0
 
 # 3. Clone and compile
 git clone https://github.com/AptS-1547/shortlinker.git

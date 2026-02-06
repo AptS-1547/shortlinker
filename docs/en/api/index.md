@@ -6,6 +6,17 @@ Shortlinker provides a simple HTTP API interface for short link redirection.
 
 Shortlinker mainly provides a redirection interface that supports GET and HEAD methods.
 
+## Navigation by Topic
+
+- Redirection endpoint (this page): `GET/HEAD /{path...}`
+- [Admin API Overview](/en/api/admin)
+- [Admin API: Links and Batch Operations](/en/api/admin-links)
+- [Admin API: Runtime Config and Automation](/en/api/admin-config)
+- [Admin API: Analytics](/en/api/admin-analytics)
+- [Health Check API Overview](/en/api/health)
+- [Health Check API: Endpoints and Status Codes](/en/api/health-endpoints)
+- [Health Check API: Monitoring and Troubleshooting](/en/api/health-monitoring)
+
 ## Basic Information
 
 - **Base URL**: `http://your-domain:port/`

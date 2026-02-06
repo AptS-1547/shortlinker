@@ -72,7 +72,7 @@ Rust 原生性能保障，SQLite 提供生产级数据库性能，异步并发�
 ## 快速体验
 
 ```bash
-# Docker 快速启动（需要挂载 config.toml，确保容器内 server.host=0.0.0.0）
+# Docker 快速开始（需要挂载 config.toml，确保容器内 server.host=0.0.0.0）
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/config.toml:/config.toml:ro \

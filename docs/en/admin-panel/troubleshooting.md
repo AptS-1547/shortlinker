@@ -96,5 +96,5 @@ If the above methods don't solve your problem:
 
 ## Related Links
 
-- 📖 [Feature Overview](./index)
+- 📖 [Web Admin Panel](./index)
 - 🛠️ [Development Guide](./development)

@@ -6,6 +6,17 @@ Shortlinker 提供简洁的 HTTP API 接口用于短链接重定向。
 
 Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 
+## 分区导航
+
+- 重定向接口（本页）：`GET/HEAD /{path...}`
+- [Admin API 概览](/api/admin)
+- [Admin API：链接与批量操作](/api/admin-links)
+- [Admin API：运行时配置与自动化示例](/api/admin-config)
+- [Admin API：Analytics 统计分析](/api/admin-analytics)
+- [健康检查 API 概览](/api/health)
+- [健康检查 API：端点与状态码](/api/health-endpoints)
+- [健康检查 API：监控集成与故障排除](/api/health-monitoring)
+
 ## 基础信息
 
 - **Base URL**: `http://your-domain:port/`
