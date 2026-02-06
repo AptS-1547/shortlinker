@@ -54,9 +54,18 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
 
     async fn clear(&self, count: usize, fp_rate: f64) -> Result<()> {
         let mut bloom = self.inner.write();
-        // 预留 20% 空间，但至少预留 1000
-        let reserve = (count / 5).max(1000);
-        let capacity = count + reserve;
+        // 分段预留策略：
+        // - < 5000: 预留 50%（小规模需要更多余量）
+        // - 5000-100000: 预留 20%
+        // - > 100000: 预留 10%（最多 100 万）
+        let reserve = if count < 5000 {
+            count / 2
+        } else if count < 100000 {
+            count / 5
+        } else {
+            (count / 10).min(1_000_000)
+        };
+        let capacity = count + reserve.max(1000); // 最少预留 1000
         *bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
             ShortlinkerError::cache_connection(format!("Failed to clear bloom filter: {e}"))
         })?;

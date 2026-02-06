@@ -165,8 +165,9 @@ impl RollupManager {
             return Ok(0);
         }
 
-        // 按 short_code 聚合
-        let mut aggregated: HashMap<String, ClickAggregation> = HashMap::new();
+        // 按 short_code 聚合（预分配容量）
+        let mut aggregated: HashMap<String, ClickAggregation> =
+            HashMap::with_capacity(hourly_records.len());
 
         for record in &hourly_records {
             let agg = aggregated
@@ -195,21 +196,31 @@ impl RollupManager {
         }
 
         // 写入天汇总
-        let mut processed = 0u64;
-        for (code, agg) in aggregated {
+        // 先批量查询现有记录，避免 N+1 查询
+        let codes: Vec<&String> = aggregated.keys().collect();
+        let existing_records = click_stats_daily::Entity::find()
+            .filter(click_stats_daily::Column::ShortCode.is_in(codes.iter().map(|s| s.as_str())))
+            .filter(click_stats_daily::Column::DayBucket.eq(target_date))
+            .all(db)
+            .await?;
+
+        let existing_map: HashMap<String, click_stats_daily::Model> = existing_records
+            .into_iter()
+            .map(|r| (r.short_code.clone(), r))
+            .collect();
+
+        // 分离需要插入和更新的记录
+        let mut to_insert: Vec<click_stats_daily::ActiveModel> = Vec::new();
+        let mut to_update: Vec<click_stats_daily::ActiveModel> = Vec::new();
+
+        for (code, agg) in &aggregated {
             let top_referrers = Self::get_top_n(&agg.referrers, 10);
             let top_countries = Self::get_top_n(&agg.countries, 10);
             let top_sources = Self::get_top_n(&agg.sources, 10);
 
-            // 查找或创建天汇总记录
-            let existing = click_stats_daily::Entity::find()
-                .filter(click_stats_daily::Column::ShortCode.eq(&code))
-                .filter(click_stats_daily::Column::DayBucket.eq(target_date))
-                .one(db)
-                .await?;
-
-            if let Some(record) = existing {
-                let mut active: click_stats_daily::ActiveModel = record.into();
+            // 从 HashMap 查找现有记录
+            if let Some(record) = existing_map.get(code) {
+                let mut active: click_stats_daily::ActiveModel = record.clone().into();
                 if let Set(old_count) = active.click_count {
                     active.click_count = Set(old_count + agg.count as i64);
                 }
@@ -219,16 +230,10 @@ impl RollupManager {
                 active.top_referrers = Set(Some(serde_json::to_string(&top_referrers)?));
                 active.top_countries = Set(Some(serde_json::to_string(&top_countries)?));
                 active.top_sources = Set(Some(serde_json::to_string(&top_sources)?));
-
-                retry::with_retry("rollup_update_daily", self.retry_config, || async {
-                    click_stats_daily::Entity::update(active.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
+                to_update.push(active);
             } else {
                 let model = click_stats_daily::ActiveModel {
-                    short_code: Set(code),
+                    short_code: Set(code.clone()),
                     day_bucket: Set(target_date),
                     click_count: Set(agg.count as i64),
                     unique_referrers: Set(Some(agg.referrers.len() as i32)),
@@ -239,15 +244,32 @@ impl RollupManager {
                     top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
                     ..Default::default()
                 };
-                retry::with_retry("rollup_insert_daily", self.retry_config, || async {
-                    click_stats_daily::Entity::insert(model.clone())
-                        .exec(db)
-                        .await
-                })
-                .await?;
+                to_insert.push(model);
             }
+        }
 
-            processed += 1;
+        let processed = aggregated.len() as u64;
+
+        // 批量插入新记录
+        if !to_insert.is_empty() {
+            let insert_count = to_insert.len();
+            retry::with_retry("rollup_insert_daily_batch", self.retry_config, || async {
+                click_stats_daily::Entity::insert_many(to_insert.clone())
+                    .exec(db)
+                    .await
+            })
+            .await?;
+            debug!("Batch inserted {} daily rollup records", insert_count);
+        }
+
+        // 更新现有记录（SeaORM 不支持批量更新，但更新数量通常较少）
+        for active in to_update {
+            retry::with_retry("rollup_update_daily", self.retry_config, || async {
+                click_stats_daily::Entity::update(active.clone())
+                    .exec(db)
+                    .await
+            })
+            .await?;
         }
 
         info!(

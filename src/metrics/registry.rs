@@ -49,6 +49,8 @@ pub struct Metrics {
     pub clicks_buffer_entries: Gauge,
     /// 点击刷盘次数
     pub clicks_flush_total: CounterVec,
+    /// 详细点击事件丢弃次数（channel 满或断开）
+    pub clicks_channel_dropped: CounterVec,
 
     // ===== 认证指标 (P2) =====
     /// 认证失败次数
@@ -179,6 +181,15 @@ impl Metrics {
         )
         .expect("Failed to create clicks_flush_total metric");
 
+        let clicks_channel_dropped = CounterVec::new(
+            Opts::new(
+                "shortlinker_clicks_channel_dropped",
+                "Total number of detailed click events dropped due to channel full or disconnected",
+            ),
+            &["reason"],
+        )
+        .expect("Failed to create clicks_channel_dropped metric");
+
         // ===== 认证指标 =====
         let auth_failures_total = CounterVec::new(
             Opts::new(
@@ -244,6 +255,7 @@ impl Metrics {
         register!(redirects_total);
         register!(clicks_buffer_entries);
         register!(clicks_flush_total);
+        register!(clicks_channel_dropped);
         register!(auth_failures_total);
         register!(bloom_filter_false_positives_total);
         register!(uptime_seconds);
@@ -270,6 +282,7 @@ impl Metrics {
             redirects_total,
             clicks_buffer_entries,
             clicks_flush_total,
+            clicks_channel_dropped,
             auth_failures_total,
             bloom_filter_false_positives_total,
             uptime_seconds,

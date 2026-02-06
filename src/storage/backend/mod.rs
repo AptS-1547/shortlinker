@@ -112,7 +112,7 @@ impl SeaOrmStorage {
             backend_name: backend_name.to_string(),
             count_cache: Cache::builder()
                 .time_to_live(Duration::from_secs(30))
-                .max_capacity(100)
+                .max_capacity(1000)
                 .build(),
             retry_config,
         };

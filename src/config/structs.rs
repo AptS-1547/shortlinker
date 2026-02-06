@@ -313,7 +313,7 @@ fn default_database_url() -> String {
 }
 
 fn default_database_pool_size() -> u32 {
-    10
+    20
 }
 
 fn default_database_timeout() -> u64 {

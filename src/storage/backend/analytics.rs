@@ -599,8 +599,7 @@ impl super::SeaOrmStorage {
     ///
     /// 使用 `source_counts` 字段（utm_source 参数、ref:{domain} 或 direct）
     ///
-    /// 注意：此方法在内存中聚合 JSON 字段，大时间范围查询可能影响性能。
-    /// 建议时间范围不超过 30 天。
+    /// 注意：此方法在内存中聚合 JSON 字段，时间范围限制为 90 天。
     pub async fn get_link_referrers_from_rollup(
         &self,
         code: &str,
@@ -608,8 +607,16 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: usize,
     ) -> anyhow::Result<Vec<ReferrerRow>> {
-        // 时间范围检查
+        // 时间范围硬性限制
+        const MAX_QUERY_DAYS: i64 = 90;
         let duration = end - start;
+        if duration.num_days() > MAX_QUERY_DAYS {
+            return Err(anyhow::anyhow!(
+                "Time range exceeds {} days limit, please use a smaller range",
+                MAX_QUERY_DAYS
+            ));
+        }
+
         if duration.num_days() > 30 {
             warn!(
                 "get_link_referrers_from_rollup: Large time range ({} days) may cause memory issues",
@@ -635,16 +642,27 @@ impl super::SeaOrmStorage {
             );
         }
 
-        // 聚合所有记录的 source 统计
+        // 聚合所有记录的 source 统计（限制 key 数量防止 OOM）
+        const MAX_AGGREGATED_KEYS: usize = 1000;
         let mut aggregated: HashMap<String, i64> = HashMap::new();
         for record in records {
             if let Some(ref json_str) = record.source_counts
                 && let Ok(counts) = serde_json::from_str::<HashMap<String, i64>>(json_str)
             {
                 for (k, v) in counts {
+                    if aggregated.len() >= MAX_AGGREGATED_KEYS && !aggregated.contains_key(&k) {
+                        continue; // 达到限制，跳过新 key
+                    }
                     *aggregated.entry(k).or_insert(0) += v;
                 }
             }
+        }
+
+        if aggregated.len() >= MAX_AGGREGATED_KEYS {
+            warn!(
+                "get_link_referrers_from_rollup: Aggregated keys limit reached ({}), results truncated",
+                MAX_AGGREGATED_KEYS
+            );
         }
 
         // 排序并取 top N
@@ -664,7 +682,7 @@ impl super::SeaOrmStorage {
     /// 从小时汇总表获取地理分布
     ///
     /// 注意：此方法在内存中聚合 JSON 字段，大时间范围查询可能影响性能。
-    /// 建议时间范围不超过 30 天。
+    /// 注意：此方法在内存中聚合 JSON 字段，时间范围限制为 90 天。
     pub async fn get_link_geo_from_rollup(
         &self,
         code: &str,
@@ -672,8 +690,16 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         limit: usize,
     ) -> anyhow::Result<Vec<GeoRow>> {
-        // 时间范围检查
+        // 时间范围硬性限制
+        const MAX_QUERY_DAYS: i64 = 90;
         let duration = end - start;
+        if duration.num_days() > MAX_QUERY_DAYS {
+            return Err(anyhow::anyhow!(
+                "Time range exceeds {} days limit, please use a smaller range",
+                MAX_QUERY_DAYS
+            ));
+        }
+
         if duration.num_days() > 30 {
             warn!(
                 "get_link_geo_from_rollup: Large time range ({} days) may cause memory issues",
@@ -699,16 +725,27 @@ impl super::SeaOrmStorage {
             );
         }
 
-        // 聚合所有记录的 country 统计
+        // 聚合所有记录的 country 统计（限制 key 数量防止 OOM）
+        const MAX_AGGREGATED_KEYS: usize = 1000;
         let mut aggregated: HashMap<String, i64> = HashMap::new();
         for record in records {
             if let Some(ref json_str) = record.country_counts
                 && let Ok(counts) = serde_json::from_str::<HashMap<String, i64>>(json_str)
             {
                 for (k, v) in counts {
+                    if aggregated.len() >= MAX_AGGREGATED_KEYS && !aggregated.contains_key(&k) {
+                        continue; // 达到限制，跳过新 key
+                    }
                     *aggregated.entry(k).or_insert(0) += v;
                 }
             }
+        }
+
+        if aggregated.len() >= MAX_AGGREGATED_KEYS {
+            warn!(
+                "get_link_geo_from_rollup: Aggregated keys limit reached ({}), results truncated",
+                MAX_AGGREGATED_KEYS
+            );
         }
 
         // 排序并取 top N

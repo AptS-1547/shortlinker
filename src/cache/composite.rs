@@ -41,8 +41,9 @@ impl CompositeCache {
         let filter_plugin = filter_plugin_ctor().await?;
         let object_cache = object_cache_ctor().await?;
 
-        // 创建 Negative Cache（使用默认配置，后续可扩展为配置项）
-        let negative_cache: Arc<dyn NegativeCache> = Arc::new(MokaNegativeCache::new(10000, 60));
+        // 创建 Negative Cache
+        // 容量 100000，TTL 60 秒 - 应对 DDoS 扫描不存在短码的场景
+        let negative_cache: Arc<dyn NegativeCache> = Arc::new(MokaNegativeCache::new(100000, 60));
 
         Ok(Arc::new(Self {
             filter_plugin: Arc::from(filter_plugin),

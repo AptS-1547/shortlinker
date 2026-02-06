@@ -298,7 +298,7 @@ impl DataRetentionTask {
             }
 
             // 短暂暂停，避免对数据库造成过大压力
-            tokio::time::sleep(StdDuration::from_millis(100)).await;
+            tokio::time::sleep(StdDuration::from_millis(500)).await;
         }
 
         Ok(total_deleted)

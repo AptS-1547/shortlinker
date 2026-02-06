@@ -54,18 +54,38 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
 
 /// 执行所有关闭任务（在超时内调用）
 async fn perform_shutdown_tasks(db: &DatabaseConnection) {
-    // 刷新点击计数
+    // 刷新点击计数（带重试）
     if let Some(manager) = get_click_manager() {
-        match timeout(Duration::from_secs(TASK_TIMEOUT_SECS), manager.flush()).await {
-            Ok(()) => {
-                info!("ClickManager flushed successfully");
+        const MAX_RETRIES: u32 = 3;
+        let mut success = false;
+
+        for attempt in 1..=MAX_RETRIES {
+            match timeout(Duration::from_secs(TASK_TIMEOUT_SECS), manager.flush()).await {
+                Ok(()) => {
+                    info!(
+                        "ClickManager flushed successfully (attempt {})",
+                        attempt
+                    );
+                    success = true;
+                    break;
+                }
+                Err(_) if attempt < MAX_RETRIES => {
+                    warn!(
+                        "ClickManager flush attempt {} timed out, retrying...",
+                        attempt
+                    );
+                }
+                Err(_) => {
+                    error!(
+                        "ClickManager flush failed after {} attempts (timed out)",
+                        MAX_RETRIES
+                    );
+                }
             }
-            Err(_) => {
-                error!(
-                    "ClickManager flush timed out after {} seconds",
-                    TASK_TIMEOUT_SECS
-                );
-            }
+        }
+
+        if !success {
+            error!("ClickManager: data may be lost due to flush failure");
         }
     } else {
         info!("ClickManager is not initialized, skipping flush");

@@ -42,20 +42,15 @@ impl ClickBuffer {
     }
 
     /// 增加点击计数
+    ///
+    /// 使用 DashMap 的 entry API 实现原子性增加，无 TOCTOU 窗口。
+    /// 每次新 key 都会分配 Arc，但代码更简洁且完全无竞态。
     fn increment(&self, key: &str) -> usize {
-        // 优化：先尝试 get_mut 更新已存在的 key（无 Arc 分配）
-        // 高并发下大多数请求是热点 key，可显著减少分配开销
-        if let Some(mut entry) = self.data.get_mut(key) {
-            *entry += 1;
-        } else {
-            // 只有新 key 才需要分配 Arc
-            // 注意：这里有 TOCTOU 窗口，但在点击统计场景下可接受
-            // 最坏情况只是多分配一次 Arc
-            self.data
-                .entry(Arc::from(key))
-                .and_modify(|v| *v += 1)
-                .or_insert(1);
-        }
+        self.data
+            .entry(Arc::from(key))
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+
         trace!("ClickBuffer: Incremented key: {}", key);
 
         self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
@@ -281,11 +276,19 @@ impl ClickManager {
             match tx.try_send(event) {
                 Ok(()) => true,
                 Err(TrySendError::Full(_)) => {
-                    trace!("ClickManager: Event channel full, dropping event");
+                    warn!("ClickManager: Event channel full, dropping event");
+                    inc_counter!(
+                        crate::metrics::METRICS.clicks_channel_dropped,
+                        &["full"]
+                    );
                     false
                 }
                 Err(TrySendError::Disconnected(_)) => {
                     warn!("ClickManager: Event channel disconnected");
+                    inc_counter!(
+                        crate::metrics::METRICS.clicks_channel_dropped,
+                        &["disconnected"]
+                    );
                     false
                 }
             }
@@ -317,12 +320,18 @@ impl ClickManager {
                 let buffer = Arc::clone(&self.buffer);
                 let sink = Arc::clone(&self.sink);
                 tokio::spawn(async move {
-                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                        Self::flush_buffer_with_trigger(&buffer, &sink, "threshold").await;
+                    let success = if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                        Self::flush_buffer_with_trigger(&buffer, &sink, "threshold").await
                     } else {
                         trace!("ClickManager: flush already in progress, skipping");
+                        true // 跳过也算成功，不需要退避
+                    };
+
+                    // 失败时延迟 5 秒再重置标志，实现退避
+                    if !success {
+                        trace!("ClickManager: flush failed, backing off for 5 seconds");
+                        sleep(Duration::from_secs(5)).await;
                     }
-                    // 无论成功与否都重置标志，允许下次触发
                     buffer.flush_pending.store(false, Ordering::Release);
                 });
             }
@@ -397,8 +406,8 @@ impl ClickManager {
                     }
                 }
                 Err(crossbeam_channel::TryRecvError::Empty) => {
-                    // Channel 空，短暂休眠避免忙等
-                    tokio::time::sleep(Duration::from_micros(100)).await;
+                    // Channel 空，短暂休眠避免忙等（1ms 平衡延迟和 CPU）
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
                 Err(crossbeam_channel::TryRecvError::Disconnected) => {
                     debug!("ClickManager: Event channel disconnected, stopping processor");
@@ -426,17 +435,19 @@ impl ClickManager {
     }
 
     /// 执行实际的刷盘操作
-    async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) {
-        Self::flush_buffer_with_trigger(buffer, sink, "interval").await;
+    async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) -> bool {
+        Self::flush_buffer_with_trigger(buffer, sink, "interval").await
     }
 
     /// 执行实际的刷盘操作（带触发类型标记）
+    ///
+    /// 返回 true 表示成功，false 表示失败
     #[allow(unused_variables)]
     async fn flush_buffer_with_trigger(
         buffer: &ClickBuffer,
         sink: &Arc<dyn ClickSink>,
         trigger: &str,
-    ) {
+    ) -> bool {
         let updates = buffer.drain();
 
         // Update buffer size gauge after drain
@@ -447,7 +458,7 @@ impl ClickManager {
 
         if updates.is_empty() {
             trace!("ClickManager: No clicks to flush");
-            return;
+            return true; // 没有数据也算成功
         }
 
         let count = updates.len();
@@ -458,6 +469,7 @@ impl ClickManager {
                     crate::metrics::METRICS.clicks_flush_total,
                     &[trigger, "success"]
                 );
+                true
             }
             Err(e) => {
                 // 刷盘失败，恢复数据到 buffer
@@ -475,6 +487,7 @@ impl ClickManager {
                     crate::metrics::METRICS.clicks_buffer_entries,
                     buffer.data.len() as f64
                 );
+                false
             }
         }
     }

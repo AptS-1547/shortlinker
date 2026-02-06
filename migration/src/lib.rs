@@ -11,6 +11,8 @@ mod m20260207_000001_user_agents_table;
 mod m20260207_000002_user_agents_parsed;
 mod m20260208_000001_utm_source;
 mod m20260208_000002_drop_user_agent;
+mod m20260209_000001_source_geo_indexes;
+mod m20260209_000002_analytics_indexes_v2;
 
 pub struct Migrator;
 
@@ -28,6 +30,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260207_000002_user_agents_parsed::Migration),
             Box::new(m20260208_000001_utm_source::Migration),
             Box::new(m20260208_000002_drop_user_agent::Migration),
+            Box::new(m20260209_000001_source_geo_indexes::Migration),
+            Box::new(m20260209_000002_analytics_indexes_v2::Migration),
         ]
     }
 }
