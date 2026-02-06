@@ -23,6 +23,8 @@ pub struct Popup<'a> {
     border_color: Color,
     /// 尺寸配置
     size: PopupSize,
+    /// 内边距
+    margin: Margin,
 }
 
 impl<'a> Popup<'a> {
@@ -33,6 +35,7 @@ impl<'a> Popup<'a> {
             title_color: Color::Cyan,
             border_color: Color::Cyan,
             size,
+            margin: Margin::new(2, 1),
         }
     }
 
@@ -52,6 +55,12 @@ impl<'a> Popup<'a> {
     pub fn theme_color(mut self, color: Color) -> Self {
         self.title_color = color;
         self.border_color = color;
+        self
+    }
+
+    /// 设置内边距
+    pub fn margin(mut self, margin: Margin) -> Self {
+        self.margin = margin;
         self
     }
 
@@ -83,7 +92,7 @@ impl<'a> Popup<'a> {
         frame.render_widget(block, popup_area);
 
         // 返回内部区域
-        popup_area.inner(Margin::new(2, 1))
+        popup_area.inner(self.margin)
     }
 }
 
@@ -111,6 +120,7 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 /// 使用 PopupSize 创建居中矩形
+#[allow(dead_code)]
 pub fn centered_rect_from_size(size: PopupSize, r: Rect) -> Rect {
     centered_rect(size.width, size.height, r)
 }

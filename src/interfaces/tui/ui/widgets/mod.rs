@@ -6,4 +6,6 @@ mod input_field;
 mod popup;
 mod status_indicator;
 
+pub use input_field::InputField;
+pub use popup::{Popup, centered_rect};
 pub use status_indicator::StatusIndicator;

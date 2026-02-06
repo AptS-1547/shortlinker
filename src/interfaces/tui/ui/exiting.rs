@@ -3,29 +3,17 @@ use ratatui::{
     layout::{Margin, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::Paragraph,
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_exiting_screen(frame: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(55, 30, area);
-
-    // Shadow effect
-    let shadow = Block::default().style(Style::default().bg(Color::Black));
-    frame.render_widget(shadow, popup_area);
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title("Exit Confirmation")
-        .title_style(Style::default().fg(Color::Magenta).bold())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(Color::Magenta));
-    frame.render_widget(block, popup_area);
-
-    let inner_area = popup_area.inner(Margin::new(2, 2));
+    let inner_area = Popup::new("Exit Confirmation", popup::EXITING)
+        .theme_color(Color::Magenta)
+        .margin(Margin::new(2, 2))
+        .render(frame, area);
 
     let text = vec![
         Line::from(""),

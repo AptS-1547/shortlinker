@@ -852,7 +852,7 @@ mod edge_cases {
     async fn test_relative_time_formats() {
         let (service, _temp) = create_test_service().await;
 
-        let test_cases = vec![
+        let test_cases = [
             ("1h", 1),   // 1 hour
             ("24h", 24), // 24 hours
             ("1d", 24),  // 1 day

@@ -3,31 +3,25 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::Paragraph,
 };
 
-use super::common::centered_rect;
+use super::widgets::{InputField, Popup};
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_export_filename_screen(frame: &mut Frame, app: &App, area: Rect) {
-    let popup_area = centered_rect(60, 30, area);
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title(" Export Links ")
-        .title_style(Style::default().fg(Color::Cyan).bold())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(Color::Green));
-    frame.render_widget(block, popup_area);
-
-    let inner_area = popup_area.inner(Margin::new(2, 2));
+    let inner_area = Popup::new(" Export Links ", popup::EXPORT_FILENAME)
+        .title_color(Color::Cyan)
+        .border_color(Color::Green)
+        .margin(Margin::new(2, 2))
+        .render(frame, area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Instructions
-            Constraint::Length(3), // Filename input
+            Constraint::Length(2), // Instructions
+            Constraint::Length(4), // Filename input + error space
             Constraint::Length(2), // Preview
             Constraint::Min(1),    // Empty space
         ])
@@ -41,14 +35,10 @@ pub fn draw_export_filename_screen(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(instructions, chunks[0]);
 
     // Filename input
-    let filename_input = Paragraph::new(&*app.export_filename_input).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .title("Filename")
-            .border_style(Style::default().fg(Color::Yellow).bold()),
-    );
-    frame.render_widget(filename_input, chunks[1]);
+    InputField::new("Filename", &app.export_filename_input)
+        .active(true)
+        .placeholder("e.g. my_links")
+        .render(frame, chunks[1]);
 
     // Preview
     let preview_text = if app.export_filename_input.is_empty() {

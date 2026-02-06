@@ -3,31 +3,19 @@ use ratatui::{
     layout::{Margin, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_delete_confirm_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some(link) = app.get_selected_link() {
-        let popup_area = centered_rect(65, 45, area);
-
-        // Shadow effect
-        let shadow = Block::default().style(Style::default().bg(Color::Black));
-        frame.render_widget(shadow, popup_area);
-
-        frame.render_widget(Clear, popup_area);
-
-        let block = Block::default()
-            .title("Confirm Delete")
-            .title_style(Style::default().fg(Color::Red).bold())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Double)
-            .border_style(Style::default().fg(Color::Red));
-        frame.render_widget(block, popup_area);
-
-        let inner_area = popup_area.inner(Margin::new(2, 2));
+        let inner_area = Popup::new("Confirm Delete", popup::DELETE_CONFIRM)
+            .theme_color(Color::Red)
+            .margin(Margin::new(2, 2))
+            .render(frame, area);
 
         let text = vec![
             Line::from(""),

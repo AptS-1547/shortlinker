@@ -4,7 +4,7 @@
 
 use ratatui::crossterm::event::KeyCode;
 
-use crate::interfaces::tui::app::{App, CurrentScreen, CurrentlyEditing};
+use crate::interfaces::tui::app::{App, CurrentScreen, EditingField};
 use crate::interfaces::tui::input_handler::{
     handle_backspace, handle_space_toggle, handle_tab_navigation, handle_text_input,
 };
@@ -45,13 +45,13 @@ pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<b
         }
         KeyCode::Char('a') | KeyCode::Char('A') => {
             app.current_screen = CurrentScreen::AddLink;
-            app.currently_editing = Some(CurrentlyEditing::ShortCode);
+            app.form.currently_editing = Some(EditingField::ShortCode);
             app.clear_inputs();
         }
         KeyCode::Char('e') | KeyCode::Char('E') => {
             if !app.links.is_empty() {
                 app.current_screen = CurrentScreen::EditLink;
-                app.currently_editing = Some(CurrentlyEditing::TargetUrl);
+                app.form.currently_editing = Some(EditingField::TargetUrl);
                 app.clear_inputs();
             }
         }
@@ -170,7 +170,7 @@ pub async fn handle_edit_link_screen(app: &mut App, key_code: KeyCode) -> std::i
         }
         KeyCode::Backspace => {
             // Only handle backspace for editable fields (not ShortCode)
-            if !matches!(app.currently_editing, Some(CurrentlyEditing::ShortCode)) {
+            if !matches!(app.form.currently_editing, Some(EditingField::ShortCode)) {
                 handle_backspace(app);
             }
         }
@@ -181,7 +181,7 @@ pub async fn handle_edit_link_screen(app: &mut App, key_code: KeyCode) -> std::i
         KeyCode::Tab => handle_tab_navigation(app),
         KeyCode::Char(c) => {
             // Only handle input for editable fields (not ShortCode)
-            if !matches!(app.currently_editing, Some(CurrentlyEditing::ShortCode)) {
+            if !matches!(app.form.currently_editing, Some(EditingField::ShortCode)) {
                 handle_text_input(app, c);
             }
         }

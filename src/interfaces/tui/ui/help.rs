@@ -1,31 +1,18 @@
 use ratatui::{
     Frame,
-    layout::{Margin, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::Paragraph,
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(80, 90, area);
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title("Help - Keyboard Shortcuts")
-        .title_style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(Color::Cyan));
-    frame.render_widget(block, popup_area);
-
-    let inner_area = popup_area.inner(Margin::new(2, 1));
+    let inner_area = Popup::new("Help - Keyboard Shortcuts", popup::HELP)
+        .theme_color(Color::Cyan)
+        .render(frame, area);
 
     let help_text = vec![
         Line::from(""),

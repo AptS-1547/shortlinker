@@ -8,7 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use super::common::centered_rect;
+use super::widgets::centered_rect;
 use crate::interfaces::tui::app::App;
 
 /// Draw the batch delete confirmation popup

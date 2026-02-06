@@ -154,7 +154,7 @@ mod result_type_tests {
     fn test_result_ok() {
         let result: Result<String> = Ok("success".to_string());
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "success");
+        assert_eq!(result.as_ref().unwrap(), "success");
     }
 
     #[test]
@@ -162,7 +162,7 @@ mod result_type_tests {
         let result: Result<String> = Err(ShortlinkerError::validation("failed"));
         assert!(result.is_err());
 
-        let error = result.unwrap_err();
+        let error = result.as_ref().unwrap_err();
         assert!(matches!(error, ShortlinkerError::Validation(_)));
     }
 

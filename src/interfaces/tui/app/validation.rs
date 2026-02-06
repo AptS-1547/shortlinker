@@ -1,6 +1,6 @@
 //! Input validation logic
 
-use super::state::{App, CurrentScreen};
+use super::state::{App, CurrentScreen, EditingField};
 use crate::interfaces::tui::constants::MAX_SHORT_CODE_LENGTH;
 use crate::utils::TimeParser;
 use crate::utils::url_validator::validate_url;
@@ -8,55 +8,54 @@ use crate::utils::url_validator::validate_url;
 impl App {
     /// Validate current input and update validation_errors
     pub fn validate_inputs(&mut self) {
-        self.validation_errors.clear();
+        self.form.clear_errors();
 
         // Validate short code
-        if !self.short_code_input.is_empty() {
-            if self.short_code_input.len() > MAX_SHORT_CODE_LENGTH {
-                self.validation_errors.insert(
-                    "short_code".to_string(),
+        if !self.form.short_code.is_empty() {
+            if self.form.short_code.len() > MAX_SHORT_CODE_LENGTH {
+                self.form.set_error(
+                    EditingField::ShortCode,
                     format!("Code too long (max {} chars)", MAX_SHORT_CODE_LENGTH),
                 );
             }
             // Check for invalid characters: [a-zA-Z0-9_.-/]
             if !self
-                .short_code_input
+                .form
+                .short_code
                 .chars()
                 .all(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
             {
-                self.validation_errors.insert(
-                    "short_code".to_string(),
+                self.form.set_error(
+                    EditingField::ShortCode,
                     "Only alphanumeric, dash, underscore, dot and slash allowed".to_string(),
                 );
             }
         }
 
         // Validate URL
-        if !self.target_url_input.is_empty() {
-            if let Err(e) = validate_url(&self.target_url_input) {
-                self.validation_errors
-                    .insert("target_url".to_string(), e.to_string());
+        if !self.form.target_url.is_empty() {
+            if let Err(e) = validate_url(&self.form.target_url) {
+                self.form.set_error(EditingField::TargetUrl, e.to_string());
             }
         } else if matches!(
             self.current_screen,
             CurrentScreen::AddLink | CurrentScreen::EditLink
         ) {
-            self.validation_errors
-                .insert("target_url".to_string(), "URL is required".to_string());
+            self.form
+                .set_error(EditingField::TargetUrl, "URL is required".to_string());
         }
 
         // Validate expire time format
-        if !self.expire_time_input.is_empty()
-            && let Err(e) = TimeParser::parse_expire_time(&self.expire_time_input)
+        if !self.form.expire_time.is_empty()
+            && let Err(e) = TimeParser::parse_expire_time(&self.form.expire_time)
         {
-            self.validation_errors
-                .insert("expire_time".to_string(), format!("Invalid format: {}", e));
+            self.form
+                .set_error(EditingField::ExpireTime, format!("Invalid format: {}", e));
         }
     }
 
     /// Check if current form has any validation errors
-    #[allow(dead_code)]
     pub fn has_validation_errors(&self) -> bool {
-        !self.validation_errors.is_empty()
+        self.form.has_errors()
     }
 }

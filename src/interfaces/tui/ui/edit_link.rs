@@ -1,123 +1,72 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Margin, Rect},
-    style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    layout::{Constraint, Direction, Layout, Rect},
+    style::Color,
 };
 
-use super::common::centered_rect;
-use crate::interfaces::tui::app::{App, CurrentlyEditing};
+use super::widgets::{InputField, Popup};
+use crate::interfaces::tui::app::{App, EditingField};
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_edit_link_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     if let Some(link) = app.get_selected_link() {
-        let popup_area = centered_rect(80, 70, area);
-
-        // Shadow effect
-        let shadow = Block::default().style(Style::default().bg(Color::Black));
-        frame.render_widget(shadow, popup_area);
-
-        frame.render_widget(Clear, popup_area);
-
-        let block = Block::default()
-            .title(format!("Edit Link: {}", link.code))
-            .title_style(Style::default().fg(Color::Yellow).bold())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Double)
-            .border_style(Style::default().fg(Color::Yellow));
-        frame.render_widget(block, popup_area);
-
-        let inner_area = popup_area.inner(Margin::new(2, 1));
+        let inner_area = Popup::new(&format!("Edit Link: {}", link.code), popup::EDIT_LINK)
+            .theme_color(Color::Yellow)
+            .render(frame, area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3), // Short code (read-only)
-                Constraint::Length(3), // Target URL
-                Constraint::Length(3), // Expire time
-                Constraint::Length(3), // Password
+                Constraint::Length(4), // Short code (read-only) + space
+                Constraint::Length(4), // Target URL + error
+                Constraint::Length(4), // Expire time + error
+                Constraint::Length(4), // Password + error
             ])
             .split(inner_area);
 
         // Short code (read-only)
-        let short_code = Paragraph::new(link.code.as_str()).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title("Short Code (read-only)")
-                .border_style(Style::default().fg(Color::DarkGray)),
-        );
-        frame.render_widget(short_code, chunks[0]);
+        InputField::new("Short Code", &link.code)
+            .readonly()
+            .render(frame, chunks[0]);
 
         // Target URL input
-        let target_style = if matches!(app.currently_editing, Some(CurrentlyEditing::TargetUrl)) {
-            Style::default().fg(Color::Black).bg(Color::Yellow).bold()
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        let target_text = if matches!(app.currently_editing, Some(CurrentlyEditing::TargetUrl)) {
-            &app.target_url_input
+        let is_editing_target = matches!(app.form.currently_editing, Some(EditingField::TargetUrl));
+        let target_value = if is_editing_target {
+            &app.form.target_url
         } else {
             &link.target
         };
-
-        let target = Paragraph::new(target_text.as_str()).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title("Target URL")
-                .border_style(target_style),
-        );
-        frame.render_widget(target, chunks[1]);
+        InputField::new("Target URL", target_value)
+            .active(is_editing_target)
+            .render(frame, chunks[1]);
 
         // Expire time input
-        let expire_style = if matches!(app.currently_editing, Some(CurrentlyEditing::ExpireTime)) {
-            Style::default().fg(Color::Black).bg(Color::Yellow).bold()
+        let is_editing_expire =
+            matches!(app.form.currently_editing, Some(EditingField::ExpireTime));
+        let expire_display = if is_editing_expire {
+            app.form.expire_time.clone()
         } else {
-            Style::default().fg(Color::White)
+            link.expires_at.map_or(String::new(), |dt| dt.to_rfc3339())
         };
-
-        let expire_text = if matches!(app.currently_editing, Some(CurrentlyEditing::ExpireTime)) {
-            &app.expire_time_input
-        } else {
-            &link.expires_at.map_or(String::new(), |dt| dt.to_rfc3339())
-        };
-
-        let expire = Paragraph::new(expire_text.as_str()).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title("Expire Time")
-                .border_style(expire_style),
-        );
-        frame.render_widget(expire, chunks[2]);
+        InputField::new("Expire Time", &expire_display)
+            .active(is_editing_expire)
+            .render(frame, chunks[2]);
 
         // Password input
-        let password_style = if matches!(app.currently_editing, Some(CurrentlyEditing::Password)) {
-            Style::default().fg(Color::Black).bg(Color::Yellow).bold()
-        } else {
-            Style::default().fg(Color::White)
-        };
-
-        let password_text = if matches!(app.currently_editing, Some(CurrentlyEditing::Password)) {
-            if app.password_input.is_empty() {
-                String::new()
-            } else {
-                "*".repeat(app.password_input.len())
-            }
+        let is_editing_password =
+            matches!(app.form.currently_editing, Some(EditingField::Password));
+        let password_display = if is_editing_password {
+            app.form.password.clone()
         } else if link.password.is_some() {
             "[REDACTED]".to_string()
         } else {
             String::new()
         };
-
-        let password = Paragraph::new(password_text).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title("Password (empty = keep current)")
-                .border_style(password_style),
-        );
-        frame.render_widget(password, chunks[3]);
+        InputField::new("Password", &password_display)
+            .active(is_editing_password)
+            .placeholder("empty = keep current")
+            .masked()
+            .char_count(false) // 不显示字符计数，因为 [REDACTED] 会被误算
+            .render(frame, chunks[3]);
     }
 }

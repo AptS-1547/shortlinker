@@ -109,6 +109,7 @@ impl<'a> InputField<'a> {
     }
 
     /// 计算所需的高度（输入框 + 错误行）
+    #[allow(dead_code)]
     pub fn height(&self) -> u16 {
         if self.error.is_some() {
             4 // 3 for input + 1 for error

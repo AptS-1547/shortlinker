@@ -1,27 +1,22 @@
 use ratatui::{
     Frame,
-    layout::{Margin, Rect},
+    layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem},
+    widgets::{Block, BorderType, Borders, List, ListItem},
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_file_browser_screen(frame: &mut Frame, app: &mut App, area: Rect) {
-    let popup_area = centered_rect(80, 80, area);
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title(format!(" File Browser - {} ", app.current_dir.display()))
-        .title_style(Style::default().fg(Color::Cyan).bold())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(Color::Cyan));
-    frame.render_widget(block, popup_area);
-
-    let inner_area = popup_area.inner(Margin::new(2, 1));
+    let inner_area = Popup::new(
+        &format!(" File Browser - {} ", app.current_dir.display()),
+        popup::FILE_BROWSER,
+    )
+    .theme_color(Color::Cyan)
+    .render(frame, area);
 
     // Create file list items
     let items: Vec<ListItem> = app

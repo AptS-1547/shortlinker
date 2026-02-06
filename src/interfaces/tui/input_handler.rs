@@ -2,17 +2,12 @@
 //!
 //! Provides unified input handling for text fields across different screens
 
-use super::app::{App, CurrentlyEditing};
+use super::app::App;
 
 /// Handle text character input
 pub fn handle_text_input(app: &mut App, c: char) {
-    if let Some(editing) = &app.currently_editing {
-        match editing {
-            CurrentlyEditing::ShortCode => app.short_code_input.push(c),
-            CurrentlyEditing::TargetUrl => app.target_url_input.push(c),
-            CurrentlyEditing::ExpireTime => app.expire_time_input.push(c),
-            CurrentlyEditing::Password => app.password_input.push(c),
-        }
+    if app.form.currently_editing.is_some() {
+        app.form.push_char(c);
         // Trigger real-time validation
         app.validate_inputs();
     }
@@ -20,21 +15,8 @@ pub fn handle_text_input(app: &mut App, c: char) {
 
 /// Handle backspace input
 pub fn handle_backspace(app: &mut App) {
-    if let Some(editing) = &app.currently_editing {
-        match editing {
-            CurrentlyEditing::ShortCode => {
-                app.short_code_input.pop();
-            }
-            CurrentlyEditing::TargetUrl => {
-                app.target_url_input.pop();
-            }
-            CurrentlyEditing::ExpireTime => {
-                app.expire_time_input.pop();
-            }
-            CurrentlyEditing::Password => {
-                app.password_input.pop();
-            }
-        }
+    if app.form.currently_editing.is_some() {
+        app.form.pop_char();
         // Trigger real-time validation
         app.validate_inputs();
     }
@@ -47,7 +29,5 @@ pub fn handle_tab_navigation(app: &mut App) {
 
 /// Handle space key for toggles (currently used for force_overwrite checkbox)
 pub fn handle_space_toggle(app: &mut App) {
-    if matches!(app.currently_editing, Some(CurrentlyEditing::ShortCode)) {
-        app.force_overwrite = !app.force_overwrite;
-    }
+    app.form.toggle_overwrite();
 }
