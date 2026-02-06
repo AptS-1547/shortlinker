@@ -53,16 +53,20 @@ impl JwtService {
     }
 
     /// Create JwtService from config
+    ///
+    /// Note: JWT secret is initialized in database by `ensure_defaults()` at startup,
+    /// so the fallback to random token should never trigger in normal operation.
     pub fn from_config() -> Self {
         let rt = crate::config::get_runtime_config();
 
-        // 获取 JWT secret，如果为空则生成一个安全的随机值
+        // 从数据库获取 JWT secret（启动时已由 ensure_defaults 初始化）
+        // 理论上不会走到 fallback 分支，除非数据库异常
         let jwt_secret = rt
             .get(crate::config::keys::API_JWT_SECRET)
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| {
                 use tracing::warn;
-                warn!("JWT secret not configured or empty, generating secure random token");
+                warn!("JWT secret not configured or empty, generating secure random token (this should not happen)");
                 crate::utils::generate_secure_token(32)
             });
 

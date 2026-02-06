@@ -87,7 +87,7 @@ pub fn login_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
         .burst_size(5) // 突发最多 5 次请求
         .key_extractor(LoginKeyExtractor)
         .finish()
-        .expect("Invalid rate limit config");
+        .expect("Invalid login rate limit config: seconds_per_request=1, burst_size=5");
 
     debug!("Login rate limiter created: 1 req/s, burst 5");
     Governor::new(&config)
@@ -104,7 +104,7 @@ pub fn refresh_rate_limiter() -> Governor<LoginKeyExtractor, NoOpMiddleware> {
         .burst_size(10) // 突发最多 10 次请求
         .key_extractor(LoginKeyExtractor)
         .finish()
-        .expect("Invalid rate limit config");
+        .expect("Invalid refresh rate limit config: seconds_per_request=10, burst_size=10");
 
     debug!("Refresh rate limiter created: 1 req/10s, burst 10");
     Governor::new(&config)

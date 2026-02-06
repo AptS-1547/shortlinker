@@ -11,7 +11,7 @@ use subtle::ConstantTimeEq;
 use tracing::{info, trace};
 
 use crate::api::constants;
-use crate::api::jwt::JwtService;
+use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
 
@@ -65,8 +65,7 @@ where
     fn validate_jwt_cookie(req: &ServiceRequest, cookie_name: &str) -> bool {
         let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
         if let Some(token) = cookie_token {
-            // 每次验证都从最新配置读取 jwt_secret
-            let jwt_service = JwtService::from_config();
+            let jwt_service = get_jwt_service();
             if jwt_service.validate_access_token(&token).is_ok() {
                 trace!("Health JWT validation successful");
                 return true;

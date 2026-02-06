@@ -182,13 +182,17 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             .await?;
         }
 
-        // 批量更新现有记录
+        // 批量更新现有记录（分批处理，避免超出 SQL 变量限制）
         if !to_update.is_empty() {
-            let op_name = format!("{}_update_hourly_detailed", op_prefix);
-            retry::with_retry(&op_name, self.retry_config, || async {
-                self.batch_update_detailed(&to_update, backend).await
-            })
-            .await?;
+            const UPDATE_BATCH_SIZE: usize = 100;
+            for chunk in to_update.chunks(UPDATE_BATCH_SIZE) {
+                let op_name = format!("{}_update_hourly_detailed", op_prefix);
+                let chunk_vec = chunk.to_vec();
+                retry::with_retry(&op_name, self.retry_config, || async {
+                    self.batch_update_detailed(&chunk_vec, backend).await
+                })
+                .await?;
+            }
         }
 
         debug!(

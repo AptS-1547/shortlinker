@@ -53,7 +53,8 @@ impl ClickBuffer {
 
         trace!("ClickBuffer: Incremented key: {}", key);
 
-        self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
+        // 使用 AcqRel 确保与其他线程的操作正确同步
+        self.total_clicks.fetch_add(1, Ordering::AcqRel) + 1
     }
 
     /// 收集所有更新并清空缓冲区（逐个 remove 避免竞态）
@@ -71,10 +72,10 @@ impl ClickBuffer {
             }
         }
 
-        // 3. 更新总计数
+        // 3. 更新总计数（使用 AcqRel 确保一致性）
         if total_removed > 0 {
             self.total_clicks
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |current| {
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                     Some(current.saturating_sub(total_removed))
                 })
                 .ok();
@@ -91,12 +92,12 @@ impl ClickBuffer {
             restored_total += v;
         }
         self.total_clicks
-            .fetch_add(restored_total, Ordering::Relaxed);
+            .fetch_add(restored_total, Ordering::AcqRel);
     }
 
     /// 获取当前缓冲区总点击数
     fn total(&self) -> usize {
-        self.total_clicks.load(Ordering::Relaxed)
+        self.total_clicks.load(Ordering::Acquire)
     }
 }
 
@@ -127,9 +128,9 @@ impl DetailedBuffer {
 
     /// 添加详细点击日志，返回当前缓冲区大小
     fn push(&self, detail: ClickDetail) -> usize {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.next_id.fetch_add(1, Ordering::AcqRel);
         self.data.insert(id, detail);
-        self.entry_count.fetch_add(1, Ordering::Relaxed) + 1
+        self.entry_count.fetch_add(1, Ordering::AcqRel) + 1
     }
 
     /// 收集所有日志并清空缓冲区
@@ -141,8 +142,8 @@ impl DetailedBuffer {
                 details.push(detail);
             }
         }
-        // 重置计数器
-        self.entry_count.store(0, Ordering::Relaxed);
+        // 重置计数器（使用 Release 确保其他线程看到正确的值）
+        self.entry_count.store(0, Ordering::Release);
         details
     }
 
@@ -150,10 +151,10 @@ impl DetailedBuffer {
     fn restore(&self, details: Vec<ClickDetail>) {
         let count = details.len();
         for detail in details {
-            let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+            let id = self.next_id.fetch_add(1, Ordering::AcqRel);
             self.data.insert(id, detail);
         }
-        self.entry_count.fetch_add(count, Ordering::Relaxed);
+        self.entry_count.fetch_add(count, Ordering::AcqRel);
     }
 
 }

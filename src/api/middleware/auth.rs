@@ -10,7 +10,7 @@ use std::rc::Rc;
 use tracing::{debug, info, trace};
 
 use crate::api::constants;
-use crate::api::jwt::JwtService;
+use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
 
@@ -104,7 +104,7 @@ where
 
     /// 验证 Bearer token（使用 JWT）
     fn validate_bearer_token(token: &str) -> bool {
-        let jwt_service = JwtService::from_config();
+        let jwt_service = get_jwt_service();
         match jwt_service.validate_access_token(token) {
             Ok(_claims) => {
                 trace!("Bearer token validation successful");
@@ -124,8 +124,7 @@ where
         let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
 
         if let Some(token) = cookie_token {
-            // 每次验证都从最新配置读取 jwt_secret
-            let jwt_service = JwtService::from_config();
+            let jwt_service = get_jwt_service();
             match jwt_service.validate_access_token(&token) {
                 Ok(_claims) => {
                     trace!("JWT validation successful");
