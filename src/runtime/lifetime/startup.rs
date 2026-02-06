@@ -214,8 +214,16 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     crate::system::ipc::handler::init_start_time();
     #[cfg(any(feature = "cli", feature = "tui"))]
     {
-        crate::system::ipc::server::start_ipc_server().await;
-        debug!("IPC server started");
+        let config = crate::config::get_config();
+        if config.ipc.enabled {
+            crate::system::ipc::server::start_ipc_server().await;
+            debug!(
+                "IPC server started on {}",
+                config.ipc.effective_socket_path()
+            );
+        } else {
+            warn!("IPC server is disabled by configuration");
+        }
     }
 
     // 提取路由配置（从 RuntimeConfig 读取）

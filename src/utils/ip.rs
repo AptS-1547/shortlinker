@@ -11,7 +11,9 @@ use actix_web::HttpRequest;
 use actix_web::dev::ConnectionInfo;
 use tracing::debug;
 
-use crate::config::{get_config, get_runtime_config, keys};
+#[cfg(unix)]
+use crate::config::get_config;
+use crate::config::{get_runtime_config, keys};
 
 /// 检查 IP 是否为私有地址或 localhost
 pub fn is_private_or_local(ip: &IpAddr) -> bool {
@@ -111,14 +113,16 @@ pub fn extract_client_ip_from_conn_info<F>(
 where
     F: FnOnce() -> Option<String>,
 {
-    let config = get_config();
     let rt = get_runtime_config();
 
     // 步骤 1: 检查是否配置了 Unix Socket 模式
     #[cfg(unix)]
-    if config.server.unix_socket.is_some() {
-        // Unix Socket 模式：必须使用 X-Forwarded-For
-        return get_forwarded_ip();
+    {
+        let config = get_config();
+        if config.server.unix_socket.is_some() {
+            // Unix Socket 模式：必须使用 X-Forwarded-For
+            return get_forwarded_ip();
+        }
     }
 
     // 步骤 2: 获取 peer_addr

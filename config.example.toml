@@ -146,3 +146,33 @@ enable_rotation = true
 # Use {ip} as placeholder for the IP address
 # Default uses ip-api.com free tier (limited to 45 requests/minute)
 geoip_api_url = "http://ip-api.com/json/{ip}?fields=status,countryCode,city"
+
+# ==============================================================================
+# IPC Configuration
+# ==============================================================================
+[ipc]
+# Enable IPC server for CLI/TUI communication
+# When disabled, CLI commands like `status`, `reload` will not work
+enabled = true
+
+# Socket path (Unix) or named pipe path (Windows)
+# Default values:
+#   Unix:    "./shortlinker.sock"
+#   Windows: "\\.\pipe\shortlinker"
+# Uncomment and modify to use a custom path:
+# socket_path = "./shortlinker.sock"
+
+# Maximum message size in bytes
+# Increase if you need to transfer large payloads (e.g., bulk import/export)
+max_message_size = 65536
+
+# Default timeout for IPC operations (seconds)
+timeout = 5
+
+# Reload operation timeout (seconds)
+# Reload can take longer as it may involve cache/data refresh
+reload_timeout = 30
+
+# Import/export operation timeout (seconds)
+# Bulk operations may take longer for large datasets
+bulk_timeout = 60

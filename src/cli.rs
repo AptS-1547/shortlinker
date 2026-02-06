@@ -10,6 +10,10 @@ use clap::{Parser, Subcommand};
 #[command(version)]
 #[command(about = "A high-performance URL shortener service", long_about = None)]
 pub struct Cli {
+    /// Override IPC socket path (Unix) or named pipe path (Windows)
+    #[arg(long, short = 's', global = true)]
+    pub socket: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

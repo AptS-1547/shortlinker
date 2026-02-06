@@ -9,7 +9,9 @@ use rand::Rng;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::get_jwt_service;
-use crate::config::{get_config, get_runtime_config, keys};
+#[cfg(unix)]
+use crate::config::get_config;
+use crate::config::{get_runtime_config, keys};
 use crate::utils::ip::{
     extract_client_ip, extract_client_ip_from_conn_info, extract_forwarded_ip_from_headers,
 };
@@ -44,22 +46,24 @@ impl KeyExtractor for LoginKeyExtractor {
 
     fn extract(&self, req: &ServiceRequest) -> Result<Self::Key, Self::KeyExtractionError> {
         let conn_info = req.connection_info();
-        let config = get_config();
 
         // Unix Socket 模式特殊处理：必须有 X-Forwarded-For
         #[cfg(unix)]
-        if config.server.unix_socket.is_some() {
-            if let Some(real_ip) = conn_info.realip_remote_addr() {
-                debug!("Unix Socket mode: using X-Forwarded-For: {}", real_ip);
-                return Ok(real_ip.to_string());
-            } else {
-                error!(
-                    "Unix Socket mode enabled but X-Forwarded-For header missing. \
-                     Ensure nginx/proxy sets: proxy_set_header X-Forwarded-For $remote_addr;"
-                );
-                return Err(SimpleKeyExtractionError::new(
-                    "Unix Socket mode requires X-Forwarded-For header",
-                ));
+        {
+            let config = get_config();
+            if config.server.unix_socket.is_some() {
+                if let Some(real_ip) = conn_info.realip_remote_addr() {
+                    debug!("Unix Socket mode: using X-Forwarded-For: {}", real_ip);
+                    return Ok(real_ip.to_string());
+                } else {
+                    error!(
+                        "Unix Socket mode enabled but X-Forwarded-For header missing. \
+                         Ensure nginx/proxy sets: proxy_set_header X-Forwarded-For $remote_addr;"
+                    );
+                    return Err(SimpleKeyExtractionError::new(
+                        "Unix Socket mode requires X-Forwarded-For header",
+                    ));
+                }
             }
         }
 

@@ -214,6 +214,7 @@ pub async fn run_server() -> Result<()> {
     validate_cors_config(&cors_config);
 
     // Check and log proxy detection mode + Unix Socket mode
+    #[allow(unused_mut)]
     let mut is_tcp_mode = true;
     #[cfg(unix)]
     if let Some(ref socket_path) = config.server.unix_socket {

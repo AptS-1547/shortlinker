@@ -11,7 +11,7 @@ use tokio::net::windows::named_pipe::{
 };
 
 use super::IpcPlatform;
-use crate::system::ipc::types::PIPE_NAME_WINDOWS;
+use crate::config::get_config;
 
 /// Windows IPC implementation using Named Pipes
 pub struct WindowsIpc;
@@ -75,8 +75,8 @@ impl IpcPlatform for WindowsIpc {
     type Stream = PipeStream;
     type Listener = PipeListener;
 
-    fn socket_path() -> &'static str {
-        PIPE_NAME_WINDOWS
+    fn socket_path() -> String {
+        get_config().ipc.effective_socket_path()
     }
 
     fn is_server_running() -> bool {
@@ -84,7 +84,8 @@ impl IpcPlatform for WindowsIpc {
         // ERROR_FILE_NOT_FOUND (2): Pipe does not exist
         const ERROR_PIPE_BUSY: i32 = 231;
 
-        match ClientOptions::new().open(PIPE_NAME_WINDOWS) {
+        let pipe_name = Self::socket_path();
+        match ClientOptions::new().open(&pipe_name) {
             Ok(_) => true,
             Err(e) => {
                 // PIPE_BUSY means server is running (just busy)
@@ -94,9 +95,10 @@ impl IpcPlatform for WindowsIpc {
     }
 
     async fn bind() -> io::Result<Self::Listener> {
+        let pipe_name = Self::socket_path();
         let server = ServerOptions::new()
             .first_pipe_instance(true)
-            .create(PIPE_NAME_WINDOWS)?;
+            .create(&pipe_name)?;
 
         Ok(PipeListener {
             server: Some(server),
@@ -113,9 +115,10 @@ impl IpcPlatform for WindowsIpc {
         server.connect().await?;
 
         // Create a new server instance for the next connection
+        let pipe_name = Self::socket_path();
         let next_server = ServerOptions::new()
             .first_pipe_instance(false)
-            .create(PIPE_NAME_WINDOWS)?;
+            .create(&pipe_name)?;
         listener.server = Some(next_server);
 
         // Return the connected stream
@@ -134,8 +137,10 @@ impl IpcPlatform for WindowsIpc {
         const MAX_RETRIES: u32 = 100;
         const RETRY_DELAY_MS: u64 = 50;
 
+        let pipe_name = Self::socket_path();
+
         for attempt in 0..MAX_RETRIES {
-            match ClientOptions::new().open(PIPE_NAME_WINDOWS) {
+            match ClientOptions::new().open(&pipe_name) {
                 Ok(client) => {
                     return Ok(PipeStream {
                         inner: PipeStreamInner::Client(client),

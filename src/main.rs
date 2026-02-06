@@ -47,6 +47,11 @@ async fn main() -> anyhow::Result<()> {
     shortlinker::config::init_config();
     let config = shortlinker::config::get_config();
 
+    // Apply CLI socket override if specified
+    if let Some(socket_path) = cli.socket {
+        shortlinker::config::set_ipc_socket_override(socket_path);
+    }
+
     // Run appropriate mode based on command
     match cli.command {
         #[cfg(feature = "tui")]

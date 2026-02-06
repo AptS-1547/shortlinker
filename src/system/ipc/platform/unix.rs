@@ -7,7 +7,7 @@ use std::path::Path;
 use tokio::net::{UnixListener, UnixStream};
 
 use super::IpcPlatform;
-use crate::system::ipc::types::SOCKET_PATH_UNIX;
+use crate::config::get_config;
 
 /// Unix IPC implementation using Unix Domain Sockets
 pub struct UnixIpc;
@@ -16,12 +16,13 @@ impl IpcPlatform for UnixIpc {
     type Stream = UnixStream;
     type Listener = UnixListener;
 
-    fn socket_path() -> &'static str {
-        SOCKET_PATH_UNIX
+    fn socket_path() -> String {
+        get_config().ipc.effective_socket_path()
     }
 
     fn is_server_running() -> bool {
-        let path = Path::new(SOCKET_PATH_UNIX);
+        let path_str = Self::socket_path();
+        let path = Path::new(&path_str);
         if !path.exists() {
             return false;
         }
@@ -41,14 +42,15 @@ impl IpcPlatform for UnixIpc {
         // Clean up any existing stale socket file first
         Self::cleanup();
 
-        let listener = UnixListener::bind(SOCKET_PATH_UNIX)?;
+        let path_str = Self::socket_path();
+        let listener = UnixListener::bind(&path_str)?;
 
-        // 设置 socket 文件权限为 0600（仅属主可读写）
+        // 设置 socket 文件权限为 0o600（仅属主可读写）
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
 
-            let socket_path = Path::new(SOCKET_PATH_UNIX);
+            let socket_path = Path::new(&path_str);
             if let Ok(metadata) = std::fs::metadata(socket_path) {
                 let mut permissions = metadata.permissions();
                 permissions.set_mode(0o600);
@@ -66,10 +68,10 @@ impl IpcPlatform for UnixIpc {
     }
 
     async fn connect() -> io::Result<Self::Stream> {
-        UnixStream::connect(SOCKET_PATH_UNIX).await
+        UnixStream::connect(&Self::socket_path()).await
     }
 
     fn cleanup() {
-        let _ = std::fs::remove_file(SOCKET_PATH_UNIX);
+        let _ = std::fs::remove_file(Self::socket_path());
     }
 }
