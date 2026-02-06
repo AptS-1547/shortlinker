@@ -8,6 +8,18 @@ use ts_rs::TS;
 /// 输出目录常量
 pub const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
 
+/// 配置 Action 类型枚举
+///
+/// 用于标识配置项可执行的操作（如生成 token）。
+/// 这是一个与 ValueType 正交的概念 - 任何类型的配置都可以有可选的 action。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionType {
+    /// 生成安全随机 token（32 字节 hex）
+    GenerateToken,
+}
+
 /// 配置值类型枚举
 ///
 /// 用于标识配置项在数据库和前端的类型。
@@ -143,7 +155,8 @@ mod tests {
     #[test]
     fn export_typescript_types() {
         let cfg = ts_rs::Config::default();
+        ActionType::export_all(&cfg).expect("Failed to export ActionType");
         ValueType::export_all(&cfg).expect("Failed to export ValueType");
-        println!("ValueType exported to {}", TS_EXPORT_PATH);
+        println!("ActionType and ValueType exported to {}", TS_EXPORT_PATH);
     }
 }

@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use ts_rs::TS;
 
 use super::definitions::{ALL_CONFIGS, ConfigDef};
-use super::types::{RustType, TS_EXPORT_PATH};
+use super::types::{ActionType, RustType, TS_EXPORT_PATH};
 use super::{HttpMethod, SameSitePolicy, ValueType};
 
 /// Schema 缓存
@@ -49,6 +49,9 @@ pub struct ConfigSchema {
     pub editable: bool,
     /// 排序顺序（基于 definitions.rs 中 ALL_CONFIGS 的索引）
     pub order: usize,
+    /// 可执行的 action（如生成 token）
+    #[ts(optional)]
+    pub action: Option<ActionType>,
 }
 
 /// 获取所有配置的 schema
@@ -70,6 +73,7 @@ pub fn get_all_schemas() -> &'static Vec<ConfigSchema> {
                 requires_restart: def.requires_restart,
                 editable: def.editable,
                 order: idx,
+                action: def.action,
             })
             .collect()
     })

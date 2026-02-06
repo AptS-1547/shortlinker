@@ -63,6 +63,8 @@ curl -sS -b cookies.txt \
 
 > **注意**：敏感配置（如 `api.admin_token`、`api.jwt_secret`）在 API 响应中会自动掩码为 `[REDACTED]`。
 
+> **配置 Action 说明**：当前仅 `api.jwt_secret` 支持 `generate_token` Action。
+
 
 ## 动态配置参数
 
@@ -125,9 +127,12 @@ curl -sS -b cookies.txt \
 | `analytics.daily_retention_days` | Integer | `365` | 否 | 天汇总保留天数（清理 `click_stats_daily`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.enable_ip_logging` | Boolean | `true` | 否 | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | Boolean | `false` | 否 | 是否启用地理位置解析 |
+| `analytics.sample_rate` | Float | `1.0` | 否 | 详细日志采样率（0.0-1.0；1.0=记录全部点击，0.1=记录约 10% 点击） |
+| `analytics.max_log_rows` | Integer | `0` | 否 | `click_logs` 最大行数（0=不限制） |
+| `analytics.max_rows_action` | Enum | `cleanup` | 否 | 超过 `max_log_rows` 时的动作：`cleanup`（删除最旧数据）或 `stop`（停止详细日志） |
 
 > **注意**：
-> - 启用 `analytics.enable_detailed_logging` 后（执行 `POST /admin/v1/config/reload` 或重启后生效），每次点击都会记录详细信息到 `click_logs` 表（时间、来源、`user_agent_hash` 等）。User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联（用于设备/浏览器统计）。
+> - `analytics.enable_detailed_logging` 标记为“需要重启”：修改后需重启服务才会生效。启用后每次点击都会记录详细信息到 `click_logs` 表（时间、来源、`user_agent_hash` 等）。User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联（用于设备/浏览器统计）。
 > - 若同时开启 `analytics.enable_ip_logging` 才会记录 IP；开启 `analytics.enable_geo_lookup` 才会进行 GeoIP 解析（并使用启动配置 `[analytics]` 选择 provider）。这些数据用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
 > - `click_logs.source` 的推导规则为：优先读取请求 Query 中的 `utm_source`；若不存在则尝试从 `Referer` 提取域名并记录为 `ref:{domain}`；两者都没有则记录为 `direct`。
 > - 数据清理任务由 `analytics.enable_auto_rollup` 控制：启用后会按 `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days` 定期清理过期数据。

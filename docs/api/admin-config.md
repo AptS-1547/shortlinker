@@ -55,12 +55,40 @@ curl -sS -X POST -b cookies.txt \
   http://localhost:8080/admin/v1/config/reload
 ```
 
+### POST /config/{key}/action - 执行配置 Action（不保存）
+
+执行配置项支持的 Action，并返回执行结果，但**不会**写回数据库。
+
+```bash
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"generate_token"}' \
+  http://localhost:8080/admin/v1/config/api.jwt_secret/action
+```
+
+### POST /config/{key}/execute-and-save - 执行并保存 Action
+
+执行 Action 并将结果直接保存到配置中（响应不会返回敏感值本体）。
+
+```bash
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"generate_token"}' \
+  http://localhost:8080/admin/v1/config/api.jwt_secret/execute-and-save
+```
+
+> 当前仅 `api.jwt_secret` 支持 `generate_token` Action。
+
 ## 认证接口补充说明
 
 - `POST /auth/login`：无需 Cookie；验证管理员密码（`api.admin_token` 的明文）成功后下发 Cookie
 - `POST /auth/refresh`：无需 Access Cookie，但需要 Refresh Cookie
 - `POST /auth/logout`：无需 Cookie；用于清理 Cookie
-- `GET /auth/verify`：需要 Access Cookie（中间件校验通过即有效）
+- `GET /auth/verify`：需要有效 Access 凭证（Access Cookie 或 Bearer Access Token）
 
 ## Python 客户端示例（requests）
 
@@ -108,4 +136,3 @@ class ShortlinkerAdmin:
 admin = ShortlinkerAdmin("http://localhost:8080", "your_admin_token")
 print(admin.get_all_links())
 ```
-

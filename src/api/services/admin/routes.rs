@@ -11,8 +11,8 @@ use super::auth::{
 };
 use super::batch_ops::{batch_create_links, batch_delete_links, batch_update_links};
 use super::config_ops::{
-    get_all_configs, get_config, get_config_history, get_config_schema, reload_config,
-    update_config,
+    execute_and_save_config_action, execute_config_action, get_all_configs, get_config,
+    get_config_history, get_config_schema, reload_config, update_config,
 };
 use super::export_import::{export_links, import_links};
 use super::link_crud::{delete_link, get_all_links, get_link, get_stats, post_link, update_link};
@@ -86,6 +86,8 @@ pub fn auth_routes() -> actix_web::Scope {
 /// - GET /config - 获取所有配置
 /// - POST /config/reload - 重载配置
 /// - GET /config/schema - 获取配置 schema
+/// - POST /config/{key}/action - 执行配置 action（如生成 token）
+/// - POST /config/{key}/execute-and-save - 执行 action 并保存（安全版本）
 /// - GET /config/{key}/history - 获取配置历史
 /// - GET /config/{key} - 获取单个配置
 /// - PUT /config/{key} - 更新配置
@@ -94,6 +96,13 @@ pub fn config_routes() -> actix_web::Scope {
         .route("", web::get().to(get_all_configs))
         .route("/reload", web::post().to(reload_config))
         .route("/schema", web::get().to(get_config_schema))
+        // {key:.*}/execute-and-save must be before {key:.*}
+        .route(
+            "/{key:.*}/execute-and-save",
+            web::post().to(execute_and_save_config_action),
+        )
+        // {key:.*}/action must be before {key:.*}
+        .route("/{key:.*}/action", web::post().to(execute_config_action))
         // {key:.*}/history must be before {key:.*}
         .route("/{key:.*}/history", web::get().to(get_config_history))
         .route("/{key:.*}", web::get().to(get_config))

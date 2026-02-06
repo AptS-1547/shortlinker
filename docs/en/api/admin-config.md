@@ -50,12 +50,40 @@ curl -sS -X POST -b cookies.txt \
   http://localhost:8080/admin/v1/config/reload
 ```
 
+### POST /config/{key}/action
+
+Execute a config action and return the result, but **do not persist** it to the database.
+
+```bash
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"generate_token"}' \
+  http://localhost:8080/admin/v1/config/api.jwt_secret/action
+```
+
+### POST /config/{key}/execute-and-save
+
+Execute a config action and persist the generated value immediately (sensitive values are not returned in plaintext).
+
+```bash
+curl -sS -X POST \
+  -b cookies.txt \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"generate_token"}' \
+  http://localhost:8080/admin/v1/config/api.jwt_secret/execute-and-save
+```
+
+> Currently, only `api.jwt_secret` supports the `generate_token` action.
+
 ## Auth endpoints notes
 
 - `POST /auth/login`: no cookies required; validates the admin password (plaintext for `api.admin_token`) and sets cookies
 - `POST /auth/refresh`: no access cookie required, but refresh cookie is required
 - `POST /auth/logout`: no cookies required; clears cookies
-- `GET /auth/verify`: requires access cookie
+- `GET /auth/verify`: requires a valid access credential (access cookie or Bearer access token)
 
 ## Python example (requests)
 

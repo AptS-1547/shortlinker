@@ -50,6 +50,8 @@ curl -sS -b cookies.txt \
 
 > Sensitive values (e.g. `api.admin_token`, `api.jwt_secret`) are masked as `[REDACTED]` in API responses.
 
+> **Config action note**: currently only `api.jwt_secret` supports the `generate_token` action.
+
 
 ## Runtime Config Keys
 
@@ -112,9 +114,12 @@ These settings are stored in the database and can be changed at runtime via the 
 | `analytics.daily_retention_days` | Integer | `365` | No | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | Boolean | `true` | No | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | Boolean | `false` | No | Whether to enable geo-IP lookup |
+| `analytics.sample_rate` | Float | `1.0` | No | Detailed logging sample rate (0.0-1.0; 1.0 = log all clicks, 0.1 = log ~10% of clicks) |
+| `analytics.max_log_rows` | Integer | `0` | No | Maximum rows in `click_logs` (0 = unlimited) |
+| `analytics.max_rows_action` | Enum | `cleanup` | No | Behavior when `max_log_rows` is exceeded: `cleanup` (delete oldest rows) or `stop` (stop detailed logging) |
 
 > **Note**:
-> - `analytics.enable_detailed_logging` takes effect after `POST /admin/v1/config/reload` or a server restart. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, `user_agent_hash`, etc). User-Agent strings are deduplicated into the `user_agents` table and linked by hash (used by device/browser analytics).
+> - `analytics.enable_detailed_logging` is marked as restart-required. After changing it, restart the server for the setting to take effect. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, `user_agent_hash`, etc). User-Agent strings are deduplicated into the `user_agents` table and linked by hash (used by device/browser analytics).
 > - IPs are only recorded when `analytics.enable_ip_logging` is enabled, and geo lookup only happens when `analytics.enable_geo_lookup` is enabled (using the startup `[analytics]` provider settings). This data powers Analytics API features like trend analysis, referrer stats, geographic distribution, and device analytics.
 > - `click_logs.source` is derived by this order: use `utm_source` from request query first; if absent, extract domain from `Referer` and store `ref:{domain}`; if both are missing, store `direct`.
 > - Data retention/cleanup is controlled by `analytics.enable_auto_rollup`: when enabled, it periodically cleans expired data according to `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days`.
