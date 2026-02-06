@@ -16,6 +16,9 @@ pub struct Model {
     pub top_referrers: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub top_countries: Option<String>,
+    pub unique_sources: Option<i32>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub top_sources: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

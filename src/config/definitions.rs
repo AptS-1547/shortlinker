@@ -83,6 +83,9 @@ pub mod keys {
     pub const ANALYTICS_DAILY_RETENTION_DAYS: &str = "analytics.daily_retention_days";
     pub const ANALYTICS_ENABLE_AUTO_ROLLUP: &str = "analytics.enable_auto_rollup";
 
+    // UTM 追踪
+    pub const UTM_ENABLE_PASSTHROUGH: &str = "utm.enable_passthrough";
+
     // 路由配置
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
     pub const ROUTES_HEALTH_PREFIX: &str = "routes.health_prefix";
@@ -216,6 +219,10 @@ fn default_analytics_daily_retention_days() -> String {
 
 fn default_analytics_enable_auto_rollup() -> String {
     "true".to_string()
+}
+
+fn default_utm_enable_passthrough() -> String {
+    "false".to_string()
 }
 
 /// 所有配置定义（单一数据源）
@@ -567,6 +574,18 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable automatic rollup aggregation and data cleanup",
+    },
+    // ========== UTM 追踪 (analytics) ==========
+    ConfigDef {
+        key: keys::UTM_ENABLE_PASSTHROUGH,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_utm_enable_passthrough,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable UTM parameter passthrough to target URL (utm_source/medium/campaign/term/content)",
     },
 ];
 

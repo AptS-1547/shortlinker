@@ -24,6 +24,8 @@ pub struct ClickAggregation {
     pub referrers: HashMap<String, usize>,
     /// 国家统计 (country -> count)
     pub countries: HashMap<String, usize>,
+    /// 流量来源统计 (source -> count)
+    pub sources: HashMap<String, usize>,
 }
 
 impl ClickAggregation {
@@ -32,6 +34,7 @@ impl ClickAggregation {
             count,
             referrers: HashMap::new(),
             countries: HashMap::new(),
+            sources: HashMap::new(),
         }
     }
 
@@ -42,6 +45,9 @@ impl ClickAggregation {
         }
         for (k, v) in &other.countries {
             *self.countries.entry(k.clone()).or_insert(0) += v;
+        }
+        for (k, v) in &other.sources {
+            *self.sources.entry(k.clone()).or_insert(0) += v;
         }
     }
 }
@@ -180,6 +186,12 @@ impl RollupManager {
             for (k, v) in countries {
                 *agg.countries.entry(k).or_insert(0) += v;
             }
+
+            // 合并 source 统计
+            let sources = super::parse_json_counts(&record.source_counts);
+            for (k, v) in sources {
+                *agg.sources.entry(k).or_insert(0) += v;
+            }
         }
 
         // 写入天汇总
@@ -187,6 +199,7 @@ impl RollupManager {
         for (code, agg) in aggregated {
             let top_referrers = Self::get_top_n(&agg.referrers, 10);
             let top_countries = Self::get_top_n(&agg.countries, 10);
+            let top_sources = Self::get_top_n(&agg.sources, 10);
 
             // 查找或创建天汇总记录
             let existing = click_stats_daily::Entity::find()
@@ -202,8 +215,10 @@ impl RollupManager {
                 }
                 active.unique_referrers = Set(Some(agg.referrers.len() as i32));
                 active.unique_countries = Set(Some(agg.countries.len() as i32));
+                active.unique_sources = Set(Some(agg.sources.len() as i32));
                 active.top_referrers = Set(Some(serde_json::to_string(&top_referrers)?));
                 active.top_countries = Set(Some(serde_json::to_string(&top_countries)?));
+                active.top_sources = Set(Some(serde_json::to_string(&top_sources)?));
 
                 retry::with_retry("rollup_update_daily", self.retry_config, || async {
                     click_stats_daily::Entity::update(active.clone())
@@ -218,8 +233,10 @@ impl RollupManager {
                     click_count: Set(agg.count as i64),
                     unique_referrers: Set(Some(agg.referrers.len() as i32)),
                     unique_countries: Set(Some(agg.countries.len() as i32)),
+                    unique_sources: Set(Some(agg.sources.len() as i32)),
                     top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
                     top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
+                    top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
                     ..Default::default()
                 };
                 retry::with_retry("rollup_insert_daily", self.retry_config, || async {
@@ -319,6 +336,13 @@ pub fn aggregate_click_details(
             *agg.countries.entry(country.clone()).or_insert(0) += 1;
         } else {
             *agg.countries.entry("Unknown".to_string()).or_insert(0) += 1;
+        }
+
+        // 聚合 source
+        if let Some(ref source) = detail.source {
+            *agg.sources.entry(source.clone()).or_insert(0) += 1;
+        } else {
+            *agg.sources.entry("direct".to_string()).or_insert(0) += 1;
         }
     }
 

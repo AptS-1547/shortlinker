@@ -71,6 +71,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                     click_count: Set(*count as i64),
                     referrer_counts: Set(None),
                     country_counts: Set(None),
+                    source_counts: Set(None),
                     ..Default::default()
                 };
                 let op_name = format!("{}_insert_hourly", op_prefix);
@@ -118,12 +119,16 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                 // 合并现有数据
                 let mut merged_referrers = parse_json_counts(&record.referrer_counts);
                 let mut merged_countries = parse_json_counts(&record.country_counts);
+                let mut merged_sources = parse_json_counts(&record.source_counts);
 
                 for (k, v) in &agg.referrers {
                     *merged_referrers.entry(k.clone()).or_insert(0) += v;
                 }
                 for (k, v) in &agg.countries {
                     *merged_countries.entry(k.clone()).or_insert(0) += v;
+                }
+                for (k, v) in &agg.sources {
+                    *merged_sources.entry(k.clone()).or_insert(0) += v;
                 }
 
                 let mut active: click_stats_hourly::ActiveModel = record.into();
@@ -132,6 +137,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                 }
                 active.referrer_counts = Set(Some(to_json_string(&merged_referrers)));
                 active.country_counts = Set(Some(to_json_string(&merged_countries)));
+                active.source_counts = Set(Some(to_json_string(&merged_sources)));
 
                 let op_name = format!("{}_update_hourly_detailed", op_prefix);
                 retry::with_retry(&op_name, self.retry_config, || async {
@@ -147,6 +153,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                     click_count: Set(agg.count as i64),
                     referrer_counts: Set(Some(to_json_string(&agg.referrers))),
                     country_counts: Set(Some(to_json_string(&agg.countries))),
+                    source_counts: Set(Some(to_json_string(&agg.sources))),
                     ..Default::default()
                 };
                 let op_name = format!("{}_insert_hourly_detailed", op_prefix);

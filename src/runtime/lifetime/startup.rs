@@ -67,31 +67,6 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         warn!("Failed to preload UserAgent hashes (non-fatal): {}", e);
     }
 
-    // 迁移历史 UserAgent 数据（首次启动时执行）
-    match ua_store.migrate_historical_data(&db).await {
-        Ok(stats) if stats.records_updated > 0 => {
-            info!(
-                "UserAgent historical migration: {} records updated, {} unique UAs",
-                stats.records_updated, stats.unique_uas_inserted
-            );
-        }
-        Err(e) => {
-            warn!("UserAgent historical migration failed (non-fatal): {}", e);
-        }
-        _ => {}
-    }
-
-    // 回填已有 UserAgent 记录的解析字段
-    match ua_store.backfill_parsed_fields(&db).await {
-        Ok(count) if count > 0 => {
-            info!("UserAgent parsed fields backfilled: {} records", count);
-        }
-        Err(e) => {
-            warn!("UserAgent backfill failed (non-fatal): {}", e);
-        }
-        _ => {}
-    }
-
     let known_count = ua_store.known_count();
     set_global_user_agent_store(ua_store);
     debug!(

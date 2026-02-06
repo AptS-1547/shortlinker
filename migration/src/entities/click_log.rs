@@ -11,11 +11,11 @@ pub struct Model {
     pub clicked_at: DateTimeUtc,
     #[sea_orm(column_type = "Text", nullable)]
     pub referrer: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub user_agent: Option<String>,
     pub ip_address: Option<String>,
     pub country: Option<String>,
     pub city: Option<String>,
+    /// Traffic source (utm_source param, ref:{domain}, or direct)
+    pub source: Option<String>,
     /// UserAgent hash (references user_agents.hash)
     pub user_agent_hash: Option<String>,
 }

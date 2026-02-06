@@ -384,7 +384,7 @@ pub async fn export_report(
         short_code: log.short_code,
         clicked_at: log.clicked_at.to_rfc3339(),
         referrer: log.referrer.unwrap_or_default(),
-        user_agent: log.user_agent.unwrap_or_default(),
+        source: log.source.unwrap_or_default(),
         ip_address: log.ip_address.unwrap_or_default(),
         country: log.country.unwrap_or_default(),
         city: log.city.unwrap_or_default(),

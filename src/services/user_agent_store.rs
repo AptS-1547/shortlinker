@@ -6,16 +6,13 @@
 
 use chrono::Utc;
 use dashmap::{DashMap, DashSet};
-use sea_orm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QuerySelect, sea_query::OnConflict,
-};
+use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, sea_query::OnConflict};
 use std::sync::OnceLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 use woothee::parser::Parser;
 use xxhash_rust::xxh64::xxh64;
 
-use migration::entities::{click_log, user_agent};
+use migration::entities::user_agent;
 
 /// Global UserAgentStore instance
 static GLOBAL_UA_STORE: OnceLock<UserAgentStore> = OnceLock::new();
@@ -212,188 +209,6 @@ impl UserAgentStore {
     pub fn known_count(&self) -> usize {
         self.known_hashes.len()
     }
-
-    /// Migrate existing click_logs user_agent data to the new hash-based system
-    ///
-    /// This should be called once during startup to migrate historical data.
-    /// It processes records in batches to avoid memory issues.
-    pub async fn migrate_historical_data(
-        &self,
-        db: &DatabaseConnection,
-    ) -> anyhow::Result<MigrationStats> {
-        let batch_size = 1000u64;
-        let mut stats = MigrationStats::default();
-
-        // Check if migration is needed by counting records with user_agent but no user_agent_hash
-        let pending_count = click_log::Entity::find()
-            .filter(click_log::Column::UserAgent.is_not_null())
-            .filter(click_log::Column::UserAgentHash.is_null())
-            .count(db)
-            .await?;
-
-        if pending_count == 0 {
-            debug!("No historical UserAgent data to migrate");
-            return Ok(stats);
-        }
-
-        info!(
-            "Starting UserAgent migration for {} click_logs records...",
-            pending_count
-        );
-
-        let now = Utc::now();
-
-        loop {
-            // Fetch batch of records needing migration
-            let records: Vec<click_log::Model> = click_log::Entity::find()
-                .filter(click_log::Column::UserAgent.is_not_null())
-                .filter(click_log::Column::UserAgentHash.is_null())
-                .limit(batch_size)
-                .all(db)
-                .await?;
-
-            if records.is_empty() {
-                break;
-            }
-
-            for record in &records {
-                if let Some(ref ua_string) = record.user_agent {
-                    if ua_string.is_empty() {
-                        continue;
-                    }
-
-                    let hash = Self::compute_hash(ua_string);
-
-                    // Insert into user_agents if not exists
-                    if !self.known_hashes.contains(&hash) {
-                        let existing = user_agent::Entity::find()
-                            .filter(user_agent::Column::Hash.eq(&hash))
-                            .one(db)
-                            .await?;
-
-                        if existing.is_none() {
-                            // Parse and insert with all fields
-                            let parsed = Self::parse_user_agent(ua_string, &hash);
-                            let ua_model = user_agent::ActiveModel {
-                                hash: Set(hash.clone()),
-                                user_agent_string: Set(ua_string.clone()),
-                                first_seen: Set(now),
-                                last_seen: Set(now),
-                                browser_name: Set(parsed.browser_name),
-                                browser_version: Set(parsed.browser_version),
-                                os_name: Set(parsed.os_name),
-                                os_version: Set(parsed.os_version),
-                                device_category: Set(parsed.device_category),
-                                device_vendor: Set(parsed.device_vendor),
-                                is_bot: Set(parsed.is_bot),
-                            };
-
-                            if user_agent::Entity::insert(ua_model).exec(db).await.is_ok() {
-                                stats.unique_uas_inserted += 1;
-                            }
-                        }
-
-                        self.known_hashes.insert(hash.clone());
-                    }
-
-                    // Update click_log with hash
-                    let mut active: click_log::ActiveModel = record.clone().into();
-                    active.user_agent_hash = Set(Some(hash));
-
-                    if click_log::Entity::update(active).exec(db).await.is_ok() {
-                        stats.records_updated += 1;
-                    }
-                }
-            }
-
-            stats.batches_processed += 1;
-
-            if records.len() < batch_size as usize {
-                break;
-            }
-        }
-
-        info!(
-            "UserAgent migration completed: {} records updated, {} unique UAs inserted",
-            stats.records_updated, stats.unique_uas_inserted
-        );
-
-        Ok(stats)
-    }
-
-    /// Backfill parsed fields for existing user_agents records that have NULL browser_name
-    ///
-    /// This handles records that were inserted before the parsing feature was added.
-    pub async fn backfill_parsed_fields(&self, db: &DatabaseConnection) -> anyhow::Result<usize> {
-        let batch_size = 500u64;
-        let mut backfilled = 0;
-
-        // Find records with user_agent_string but NULL browser_name (indicating unparsed)
-        let pending_count = user_agent::Entity::find()
-            .filter(user_agent::Column::BrowserName.is_null())
-            .count(db)
-            .await?;
-
-        if pending_count == 0 {
-            debug!("No UserAgent records need backfill");
-            return Ok(0);
-        }
-
-        info!(
-            "Backfilling parsed fields for {} existing UserAgent records...",
-            pending_count
-        );
-
-        loop {
-            let records: Vec<user_agent::Model> = user_agent::Entity::find()
-                .filter(user_agent::Column::BrowserName.is_null())
-                .limit(batch_size)
-                .all(db)
-                .await?;
-
-            if records.is_empty() {
-                break;
-            }
-
-            for record in &records {
-                let parsed = Self::parse_user_agent(&record.user_agent_string, &record.hash);
-
-                let mut active: user_agent::ActiveModel = record.clone().into();
-                active.browser_name = Set(parsed.browser_name);
-                active.browser_version = Set(parsed.browser_version);
-                active.os_name = Set(parsed.os_name);
-                active.os_version = Set(parsed.os_version);
-                active.device_category = Set(parsed.device_category);
-                active.device_vendor = Set(parsed.device_vendor);
-                active.is_bot = Set(parsed.is_bot);
-
-                if user_agent::Entity::update(active).exec(db).await.is_ok() {
-                    backfilled += 1;
-                }
-            }
-
-            if records.len() < batch_size as usize {
-                break;
-            }
-        }
-
-        if backfilled > 0 {
-            info!(
-                "Backfilled parsed fields for {} UserAgent records",
-                backfilled
-            );
-        }
-
-        Ok(backfilled)
-    }
-}
-
-/// Statistics from historical data migration
-#[derive(Debug, Default)]
-pub struct MigrationStats {
-    pub records_updated: usize,
-    pub unique_uas_inserted: usize,
-    pub batches_processed: usize,
 }
 
 impl Default for UserAgentStore {

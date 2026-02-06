@@ -14,6 +14,8 @@ pub struct Model {
     pub referrer_counts: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub country_counts: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub source_counts: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

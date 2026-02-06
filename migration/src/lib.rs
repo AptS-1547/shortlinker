@@ -9,6 +9,8 @@ mod m20260206_000001_click_rollups;
 mod m20260206_000002_analytics_indexes;
 mod m20260207_000001_user_agents_table;
 mod m20260207_000002_user_agents_parsed;
+mod m20260208_000001_utm_source;
+mod m20260208_000002_drop_user_agent;
 
 pub struct Migrator;
 
@@ -24,6 +26,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260206_000002_analytics_indexes::Migration),
             Box::new(m20260207_000001_user_agents_table::Migration),
             Box::new(m20260207_000002_user_agents_parsed::Migration),
+            Box::new(m20260208_000001_utm_source::Migration),
+            Box::new(m20260208_000002_drop_user_agent::Migration),
         ]
     }
 }

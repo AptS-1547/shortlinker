@@ -34,7 +34,7 @@ pub struct ClickLogCsvRow {
     pub short_code: String,
     pub clicked_at: String,
     pub referrer: String,
-    pub user_agent: String,
+    pub source: String,
     pub ip_address: String,
     pub country: String,
     pub city: String,

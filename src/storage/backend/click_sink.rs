@@ -112,11 +112,11 @@ impl DetailedClickSink for SeaOrmStorage {
                 short_code: Set(detail.code.clone()),
                 clicked_at: Set(detail.timestamp),
                 referrer: Set(detail.referrer.clone()),
-                user_agent: Set(detail.user_agent.clone()),
                 user_agent_hash: Set(detail.user_agent_hash.clone()),
                 ip_address: Set(detail.ip_address.clone()),
                 country: Set(detail.country.clone()),
                 city: Set(detail.city.clone()),
+                source: Set(detail.source.clone()),
                 ..Default::default()
             })
             .collect();

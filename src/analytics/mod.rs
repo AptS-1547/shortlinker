@@ -55,8 +55,6 @@ pub struct ClickDetail {
     pub timestamp: DateTime<Utc>,
     /// 来源页面 (Referer header)
     pub referrer: Option<String>,
-    /// 用户代理 (User-Agent header) - 兼容保留
-    pub user_agent: Option<String>,
     /// UserAgent hash (references user_agents.hash)
     pub user_agent_hash: Option<String>,
     /// 客户端 IP 地址
@@ -65,6 +63,8 @@ pub struct ClickDetail {
     pub country: Option<String>,
     /// 城市名称
     pub city: Option<String>,
+    /// 流量来源 (utm_source 参数值, ref:{domain}, 或 direct)
+    pub source: Option<String>,
 }
 
 impl ClickDetail {
@@ -74,11 +74,11 @@ impl ClickDetail {
             code,
             timestamp: Utc::now(),
             referrer: None,
-            user_agent: None,
             user_agent_hash: None,
             ip_address: None,
             country: None,
             city: None,
+            source: None,
         }
     }
 

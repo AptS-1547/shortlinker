@@ -54,7 +54,7 @@ impl RedirectService {
         match cache.get(&capture_path).await {
             CacheResult::Found(link) => {
                 Self::update_click(&capture_path, &req, geoip);
-                Self::finish_redirect(link)
+                Self::finish_redirect(&req, link)
             }
             CacheResult::Miss => {
                 trace!("Cache miss for path: {}", &capture_path);
@@ -68,7 +68,7 @@ impl RedirectService {
                         Some(ttl) => {
                             Self::update_click(&capture_path, &req, geoip);
                             cache.insert(&capture_path, link.clone(), Some(ttl)).await;
-                            Self::finish_redirect(link)
+                            Self::finish_redirect(&req, link)
                         }
                     },
                     Ok(None) => {
@@ -126,15 +126,23 @@ impl RedirectService {
         let user_agent_hash = user_agent_str
             .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
 
+        // 提取 referrer
+        let referrer = req
+            .headers()
+            .get("referer")
+            .and_then(|h| h.to_str().ok())
+            .map(String::from);
+
+        // 推导 source 值
+        // 规则：1. URL 有 utm_source 参数 → 直接使用其值
+        //       2. 无 utm_source，有 Referer header → ref:{domain}
+        //       3. 都没有 → direct
+        let source = Self::derive_source(req, &referrer);
+
         ClickDetail {
             code: code.to_string(),
             timestamp: chrono::Utc::now(),
-            referrer: req
-                .headers()
-                .get("referer")
-                .and_then(|h| h.to_str().ok())
-                .map(String::from),
-            user_agent: None, // 不再存储原始 UA
+            referrer,
             user_agent_hash,
             ip_address: if enable_ip_logging {
                 extract_client_ip(req)
@@ -143,6 +151,62 @@ impl RedirectService {
             },
             country: None,
             city: None,
+            source,
+        }
+    }
+
+    /// 从请求推导流量来源
+    fn derive_source(req: &HttpRequest, referrer: &Option<String>) -> Option<String> {
+        // 1. 检查 utm_source 参数
+        if let Some(query) = req.uri().query() {
+            if let Some(utm_source) = Self::extract_query_param(query, "utm_source") {
+                return Some(utm_source);
+            }
+        }
+
+        // 2. 有 Referer header → ref:{domain}
+        if let Some(referer_url) = referrer {
+            if let Some(domain) = Self::extract_domain(referer_url) {
+                return Some(format!("ref:{}", domain));
+            }
+        }
+
+        // 3. 都没有 → direct
+        Some("direct".to_string())
+    }
+
+    /// 从 query string 提取指定参数值
+    fn extract_query_param(query: &str, key: &str) -> Option<String> {
+        let prefix = format!("{}=", key);
+        for part in query.split('&') {
+            if let Some(value) = part.strip_prefix(&prefix) {
+                // 解码 URL 编码，截取到下一个 & 或结尾
+                let decoded = urlencoding::decode(value).ok()?;
+                return Some(decoded.into_owned());
+            }
+        }
+        None
+    }
+
+    /// 从 URL 提取域名
+    fn extract_domain(url: &str) -> Option<String> {
+        // 简单解析：找 :// 后的域名部分
+        let without_scheme = url
+            .strip_prefix("https://")
+            .or_else(|| url.strip_prefix("http://"))
+            .unwrap_or(url);
+
+        // 取到第一个 / 或 : 为止
+        let domain = without_scheme
+            .split('/')
+            .next()?
+            .split(':')
+            .next()?;
+
+        if domain.is_empty() {
+            None
+        } else {
+            Some(domain.to_string())
         }
     }
 
@@ -199,12 +263,51 @@ impl RedirectService {
         }
     }
 
-    fn finish_redirect(link: ShortLink) -> HttpResponse {
+    fn finish_redirect(req: &HttpRequest, link: ShortLink) -> HttpResponse {
         inc_counter!(crate::metrics::METRICS.redirects_total, &["307"]);
 
+        // 构建目标 URL，可能需要透传 UTM 参数
+        let target_url = Self::build_target_url(req, &link.target);
+
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
-            .insert_header(("Location", link.target))
+            .insert_header(("Location", target_url))
             .finish()
+    }
+
+    /// 构建目标 URL，根据配置决定是否透传 UTM 参数
+    fn build_target_url(req: &HttpRequest, target: &str) -> String {
+        let rt = get_runtime_config();
+        let enable_passthrough = rt.get_bool_or(keys::UTM_ENABLE_PASSTHROUGH, false);
+
+        if !enable_passthrough {
+            return target.to_string();
+        }
+
+        // 提取请求中的 UTM 参数
+        let Some(query) = req.uri().query() else {
+            return target.to_string();
+        };
+
+        let utm_params: Vec<(&str, String)> = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]
+            .iter()
+            .filter_map(|key| {
+                Self::extract_query_param(query, key).map(|v| (*key, v))
+            })
+            .collect();
+
+        if utm_params.is_empty() {
+            return target.to_string();
+        }
+
+        // 拼接 UTM 参数到目标 URL
+        let separator = if target.contains('?') { "&" } else { "?" };
+        let utm_query: String = utm_params
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        format!("{}{}{}", target, separator, utm_query)
     }
 }
 
