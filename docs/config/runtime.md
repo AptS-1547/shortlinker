@@ -74,9 +74,9 @@ curl -sS -b cookies.txt \
 |--------|------|--------|----------|------|
 | `api.admin_token` | String | *(自动生成)* | 否 | 管理员登录密码（用于 `POST /admin/v1/auth/login`） |
 | `api.health_token` | String | *(空)* | 否 | Health API 的 Bearer Token（`Authorization: Bearer ...`，适合监控/探针；为空则仅支持 JWT Cookie）。注意：当 `api.admin_token` 与 `api.health_token` 都为空时，Health 端点会返回 `404` 视为禁用 |
-| `api.jwt_secret` | String | *(自动生成)* | 否 | JWT 密钥 |
-| `api.access_token_minutes` | Integer | `15` | 否 | Access Token 有效期（分钟） |
-| `api.refresh_token_days` | Integer | `7` | 否 | Refresh Token 有效期（天） |
+| `api.jwt_secret` | String | *(自动生成)* | 是 | JWT 密钥 |
+| `api.access_token_minutes` | Integer | `15` | 是 | Access Token 有效期（分钟） |
+| `api.refresh_token_days` | Integer | `7` | 是 | Refresh Token 有效期（天） |
 | `api.cookie_secure` | Boolean | `true` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
 | `api.cookie_same_site` | String | `Lax` | 否 | Cookie SameSite 策略（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
@@ -86,6 +86,7 @@ curl -sS -b cookies.txt \
 > - Cookie 名称当前为固定值：`shortlinker_access` / `shortlinker_refresh` / `csrf_token`（不可配置）。
 > - `api.admin_token` 在数据库中存储为 Argon2 哈希；推荐使用 `./shortlinker reset-password` 重置管理员密码。
 > - 首次启动时会自动生成一个随机管理员密码并写入 `admin_token.txt`（若文件不存在；保存后请删除该文件）。
+> - 当前实现中，JWT 服务会在首次使用时读取配置并在进程内缓存（`OnceLock`）；`api.jwt_secret`、`api.access_token_minutes`、`api.refresh_token_days` 已标记为“需要重启”，修改后需重启服务才会用于后续签发/校验 Token。
 
 ### 路由配置
 
@@ -126,7 +127,7 @@ curl -sS -b cookies.txt \
 | `analytics.enable_geo_lookup` | Boolean | `false` | 否 | 是否启用地理位置解析 |
 
 > **注意**：
-> - 启用 `analytics.enable_detailed_logging` 后（需要重启生效），每次点击都会记录详细信息到 `click_logs` 表（时间、来源、`user_agent_hash` 等）。User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联（用于设备/浏览器统计）。
+> - 启用 `analytics.enable_detailed_logging` 后（执行 `POST /admin/v1/config/reload` 或重启后生效），每次点击都会记录详细信息到 `click_logs` 表（时间、来源、`user_agent_hash` 等）。User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联（用于设备/浏览器统计）。
 > - 若同时开启 `analytics.enable_ip_logging` 才会记录 IP；开启 `analytics.enable_geo_lookup` 才会进行 GeoIP 解析（并使用启动配置 `[analytics]` 选择 provider）。这些数据用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
 > - `click_logs.source` 的推导规则为：优先读取请求 Query 中的 `utm_source`；若不存在则尝试从 `Referer` 提取域名并记录为 `ref:{domain}`；两者都没有则记录为 `direct`。
 > - 数据清理任务由 `analytics.enable_auto_rollup` 控制：启用后会按 `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days` 定期清理过期数据。
@@ -141,7 +142,7 @@ curl -sS -b cookies.txt \
 > **说明**：
 > - 默认关闭。开启后，仅当请求 URL 中存在上述 UTM 参数时，才会附加到目标 URL。
 > - 目标 URL 已有 Query 时使用 `&` 追加；没有 Query 时使用 `?` 追加。
-> - 透传参数会进行 URL 解码后再编码，确保 `Location` 头中的 URL 合法。
+> - 当前实现会直接拼接请求中的原始 UTM 片段（不做额外的 URL 解码/重编码）。
 
 ### CORS 跨域配置
 

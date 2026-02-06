@@ -6,7 +6,7 @@
 
 Analytics API 提供详细的点击统计分析功能，包括点击趋势、热门链接、来源统计、地理位置分布等。
 
-> 需要先在运行时配置中启用 `analytics.enable_detailed_logging`（需要重启服务生效）才会记录详细的点击日志。
+> 需要先在运行时配置中启用 `analytics.enable_detailed_logging`（执行 `POST /admin/v1/config/reload` 或重启后生效）才会记录详细的点击日志。
 >
 > - 默认查询最近 30 天；若要指定范围，请**同时**提供 `start_date` 和 `end_date`（只提供一个会忽略并回退到默认范围；日期解析失败会回退到默认范围对应的起止值）。
 > - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`；注意：`YYYY-MM-DD` 会按当天 `00:00:00Z` 解析）。
@@ -246,7 +246,7 @@ curl -sS -b cookies.txt \
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `analytics.enable_detailed_logging` | bool | false | 启用详细日志记录（写入 click_logs 表；需要重启生效） |
+| `analytics.enable_detailed_logging` | bool | false | 启用详细日志记录（写入 click_logs 表；执行 `POST /admin/v1/config/reload` 或重启后生效） |
 | `analytics.enable_auto_rollup` | bool | true | 启用自动数据清理任务（需要重启生效；默认每 4 小时运行一次） |
 | `analytics.log_retention_days` | int | 30 | 原始点击日志保留天数（由后台任务自动清理；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.hourly_retention_days` | int | 7 | 小时汇总保留天数（清理 `click_stats_hourly` / `click_stats_global_hourly`；需要启用 `analytics.enable_auto_rollup`） |

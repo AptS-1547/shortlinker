@@ -6,7 +6,7 @@ This page covers trends, top links, referrers, geo, and device analytics endpoin
 
 Analytics API provides detailed click statistics, including click trends, top links, referrer stats, and geographic distribution.
 
-> You need to enable `analytics.enable_detailed_logging` in runtime config (restart required) to record detailed click logs.
+> You need to enable `analytics.enable_detailed_logging` in runtime config (effective after `POST /admin/v1/config/reload` or a restart) to record detailed click logs.
 >
 > - Default range: last 30 days. To set a custom range, provide **both** `start_date` and `end_date` (if only one is provided, it falls back to the default range; if parsing fails, it falls back to the default start/end values).
 > - Date formats: RFC3339 (e.g. `2024-01-01T00:00:00Z`) or `YYYY-MM-DD` (e.g. `2024-01-01`; note: `YYYY-MM-DD` is interpreted as `00:00:00Z` of that day).
@@ -246,7 +246,7 @@ These runtime config options control Analytics behavior:
 
 | Config key | Type | Default | Description |
 |------------|------|---------|-------------|
-| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table; restart required) |
+| `analytics.enable_detailed_logging` | bool | false | Enable detailed logging (writes to click_logs table; effective after `POST /admin/v1/config/reload` or restart) |
 | `analytics.enable_auto_rollup` | bool | true | Enable automatic data retention task (restart required; runs every 4 hours by default) |
 | `analytics.log_retention_days` | int | 30 | Raw click log retention in days (cleaned by background task; requires `analytics.enable_auto_rollup`) |
 | `analytics.hourly_retention_days` | int | 7 | Hourly rollup retention in days (cleans `click_stats_hourly` / `click_stats_global_hourly`; requires `analytics.enable_auto_rollup`) |

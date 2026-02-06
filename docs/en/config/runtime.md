@@ -61,9 +61,9 @@ These settings are stored in the database and can be changed at runtime via the 
 |-----|------|---------|---------|-------------|
 | `api.admin_token` | String | *(auto-generated)* | No | Admin login password for `POST /admin/v1/auth/login` |
 | `api.health_token` | String | *(empty)* | No | Bearer token for Health API (`Authorization: Bearer ...`, recommended for monitoring/probes; if empty, only JWT cookie auth is available). Note: health endpoints are treated as disabled only when both `api.admin_token` and `api.health_token` are empty (returns `404`) |
-| `api.jwt_secret` | String | *(auto-generated)* | No | JWT signing secret |
-| `api.access_token_minutes` | Integer | `15` | No | Access token TTL (minutes) |
-| `api.refresh_token_days` | Integer | `7` | No | Refresh token TTL (days) |
+| `api.jwt_secret` | String | *(auto-generated)* | Yes | JWT signing secret |
+| `api.access_token_minutes` | Integer | `15` | Yes | Access token TTL (minutes) |
+| `api.refresh_token_days` | Integer | `7` | Yes | Refresh token TTL (days) |
 | `api.cookie_secure` | Boolean | `true` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
 | `api.cookie_same_site` | String | `Lax` | No | SameSite policy (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
@@ -73,6 +73,7 @@ These settings are stored in the database and can be changed at runtime via the 
 > - Cookie names are fixed: `shortlinker_access` / `shortlinker_refresh` / `csrf_token` (not configurable).
 > - `api.admin_token` is stored as an Argon2 hash in the database. Use `./shortlinker reset-password` to rotate the admin password.
 > - On first startup, the server auto-generates an admin password and writes it to `admin_token.txt` (if the file doesn't already exist; save it and delete the file).
+> - Current implementation detail: JWT service reads config on first use and then caches it in-process (`OnceLock`). These keys are marked as requiring restart; after changing `api.jwt_secret`, `api.access_token_minutes`, or `api.refresh_token_days`, restart the service to affect newly issued/validated tokens.
 
 ### Routes
 
@@ -113,7 +114,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `analytics.enable_geo_lookup` | Boolean | `false` | No | Whether to enable geo-IP lookup |
 
 > **Note**:
-> - `analytics.enable_detailed_logging` requires a server restart to take effect. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, `user_agent_hash`, etc). User-Agent strings are deduplicated into the `user_agents` table and linked by hash (used by device/browser analytics).
+> - `analytics.enable_detailed_logging` takes effect after `POST /admin/v1/config/reload` or a server restart. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, `user_agent_hash`, etc). User-Agent strings are deduplicated into the `user_agents` table and linked by hash (used by device/browser analytics).
 > - IPs are only recorded when `analytics.enable_ip_logging` is enabled, and geo lookup only happens when `analytics.enable_geo_lookup` is enabled (using the startup `[analytics]` provider settings). This data powers Analytics API features like trend analysis, referrer stats, geographic distribution, and device analytics.
 > - `click_logs.source` is derived by this order: use `utm_source` from request query first; if absent, extract domain from `Referer` and store `ref:{domain}`; if both are missing, store `direct`.
 > - Data retention/cleanup is controlled by `analytics.enable_auto_rollup`: when enabled, it periodically cleans expired data according to `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days`.
@@ -128,7 +129,7 @@ These settings are stored in the database and can be changed at runtime via the 
 > **Notes**:
 > - Disabled by default. When enabled, UTM params are appended only if those keys exist in the incoming request URL.
 > - If target URL already has a query string, params are appended with `&`; otherwise with `?`.
-> - Values are URL-decoded then re-encoded before building `Location`, ensuring valid redirect URLs.
+> - Current implementation appends raw incoming UTM query fragments directly (no extra URL decode/re-encode step).
 
 ### CORS
 
