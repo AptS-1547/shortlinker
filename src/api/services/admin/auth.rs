@@ -131,7 +131,7 @@ pub async fn check_admin_token(
     };
 
     if !password_valid {
-        error!(
+        warn!(
             "Admin API: login failed - invalid token (from {})",
             client_ip
         );
@@ -196,7 +196,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let refresh_token = match req.cookie(cookie_builder.refresh_cookie_name()) {
         Some(cookie) => cookie.value().to_string(),
         None => {
-            warn!("Admin API: refresh token not found in cookie");
+            info!("Admin API: refresh token not found in cookie");
             return Ok(error_from_shortlinker(
                 &ShortlinkerError::auth_token_invalid("Refresh token not found"),
             ));
@@ -206,7 +206,7 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     // Validate refresh token using cached service
     let jwt_service = get_jwt_service();
     if let Err(e) = jwt_service.validate_refresh_token(&refresh_token) {
-        warn!("Admin API: invalid refresh token: {}", e);
+        info!("Admin API: invalid refresh token: {}", e);
         return Ok(error_from_shortlinker(
             &ShortlinkerError::auth_token_invalid("Invalid refresh token"),
         ));

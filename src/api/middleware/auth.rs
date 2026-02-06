@@ -7,7 +7,7 @@ use actix_web::{
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
-use tracing::{trace, warn};
+use tracing::{debug, info, trace};
 
 use crate::api::constants;
 use crate::api::jwt::JwtService;
@@ -69,7 +69,7 @@ where
 
     /// Handle requests when admin token is not configured
     fn handle_missing_token(req: ServiceRequest) -> ServiceResponse<EitherBody<B>> {
-        warn!("Admin token not configured - returning 404");
+        debug!("Admin token not configured - returning 404");
         req.into_response(
             HttpResponse::NotFound()
                 .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
@@ -80,7 +80,7 @@ where
 
     /// Handle unauthorized requests
     fn handle_unauthorized(req: ServiceRequest) -> ServiceResponse<EitherBody<B>> {
-        warn!("Admin authentication failed - invalid or missing token");
+        info!("Admin authentication failed - invalid or missing token");
         req.into_response(
             HttpResponse::Unauthorized()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
@@ -111,7 +111,7 @@ where
                 true
             }
             Err(e) => {
-                warn!("Bearer token validation failed: {}", e);
+                info!("Bearer token validation failed: {}", e);
                 inc_counter!(crate::metrics::METRICS.auth_failures_total, &["bearer"]);
                 false
             }
@@ -132,7 +132,7 @@ where
                     return true;
                 }
                 Err(e) => {
-                    warn!("JWT validation failed: {}", e);
+                    info!("JWT validation failed: {}", e);
                     inc_counter!(crate::metrics::METRICS.auth_failures_total, &["cookie"]);
                     return false;
                 }

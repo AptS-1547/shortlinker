@@ -49,7 +49,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     let storage = StorageFactory::create()
         .await
         .context("Failed to create storage backend")?;
-    warn!(
+    info!(
         "Using storage backend: {}",
         storage.get_backend_config().await.storage_type
     );
@@ -197,7 +197,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
                 config.ipc.effective_socket_path()
             );
         } else {
-            warn!("IPC server is disabled by configuration");
+            info!("IPC server is disabled by configuration");
         }
     }
 
@@ -244,30 +244,30 @@ fn check_component_enabled(route_config: &RouteConfig) {
     // 检查 Admin API 是否启用
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
     if admin_token.is_empty() {
-        warn!("Admin API is disabled (ADMIN_TOKEN not set)");
+        info!("Admin API is disabled (ADMIN_TOKEN not set)");
     } else {
-        warn!("Admin API available at: {}", route_config.admin_prefix);
+        info!("Admin API available at: {}", route_config.admin_prefix);
     }
 
     // 检查 Health API 是否启用
     let health_token = rt.get_or(keys::API_HEALTH_TOKEN, "");
     if health_token.is_empty() && admin_token.is_empty() {
-        warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
+        info!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
     } else {
-        warn!("Health API available at: {}", route_config.health_prefix);
+        info!("Health API available at: {}", route_config.health_prefix);
     }
 
     // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_ADMIN_PANEL 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
-        warn!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
+        info!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
     } else {
         // 检测自定义前端
         let custom_frontend = std::path::Path::new("./frontend-panel");
         if custom_frontend.exists() && custom_frontend.is_dir() {
             info!("Custom frontend detected at: ./frontend-panel");
         }
-        warn!(
+        info!(
             "Frontend routes available at: {}",
             route_config.frontend_prefix
         );

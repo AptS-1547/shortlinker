@@ -2,7 +2,7 @@ use sea_orm::DatabaseConnection;
 use std::time::Duration;
 use tokio::signal;
 use tokio::time::timeout;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use crate::analytics::global::get_click_manager;
 
@@ -16,7 +16,7 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
     // 等待 Ctrl+C 信号
     match signal::ctrl_c().await {
         Ok(()) => {
-            warn!("Shutdown signal received, flushing data...");
+            info!("Shutdown signal received, flushing data...");
         }
         Err(e) => {
             warn!(
@@ -35,7 +35,7 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
 
     match shutdown_result {
         Ok(()) => {
-            warn!("All shutdown tasks completed successfully");
+            info!("All shutdown tasks completed successfully");
         }
         Err(_) => {
             error!(
@@ -49,7 +49,7 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
     }
 
     crate::system::platform::cleanup_lockfile();
-    warn!("Lockfile cleaned up, shutting down...");
+    info!("Lockfile cleaned up, shutting down...");
 }
 
 /// 执行所有关闭任务（在超时内调用）
@@ -58,7 +58,7 @@ async fn perform_shutdown_tasks(db: &DatabaseConnection) {
     if let Some(manager) = get_click_manager() {
         match timeout(Duration::from_secs(TASK_TIMEOUT_SECS), manager.flush()).await {
             Ok(()) => {
-                warn!("ClickManager flushed successfully");
+                info!("ClickManager flushed successfully");
             }
             Err(_) => {
                 error!(
@@ -68,7 +68,7 @@ async fn perform_shutdown_tasks(db: &DatabaseConnection) {
             }
         }
     } else {
-        warn!("ClickManager is not initialized, skipping flush");
+        info!("ClickManager is not initialized, skipping flush");
     }
 
     // 刷新待写入的 UserAgent 数据
@@ -80,7 +80,7 @@ async fn perform_shutdown_tasks(db: &DatabaseConnection) {
         .await
         {
             Ok(Ok(count)) if count > 0 => {
-                warn!("Flushed {} pending UserAgents on shutdown", count);
+                info!("Flushed {} pending UserAgents on shutdown", count);
             }
             Ok(Err(e)) => {
                 error!("Failed to flush UserAgents on shutdown: {}", e);

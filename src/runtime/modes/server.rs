@@ -11,7 +11,7 @@ use actix_web::{
 };
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::api::middleware::{
     AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware, TimingMiddleware,
@@ -196,7 +196,7 @@ pub async fn run_server() -> Result<()> {
     };
 
     let cpu_count = config.server.cpu_count.min(32);
-    warn!("Using {} CPU cores for the server", cpu_count);
+    info!("Using {} CPU cores for the server", cpu_count);
 
     // GeoIP provider is startup-config driven and can be toggled at runtime via
     // `analytics.enable_geo_lookup` (runtime config). We always initialize it here so
@@ -218,7 +218,7 @@ pub async fn run_server() -> Result<()> {
     let mut is_tcp_mode = true;
     #[cfg(unix)]
     if let Some(ref socket_path) = config.server.unix_socket {
-        warn!(
+        info!(
             "Unix Socket mode enabled: {}. \
              Rate limiting requires nginx to set X-Forwarded-For header.",
             socket_path
@@ -239,13 +239,13 @@ pub async fn run_server() -> Result<()> {
             }
         };
         if trusted_proxies.is_empty() {
-            warn!(
+            info!(
                 "Login rate limiting: Auto-detect mode enabled. \
                  Connections from private IPs will use X-Forwarded-For. \
                  To disable, configure api.trusted_proxies explicitly."
             );
         } else {
-            warn!(
+            info!(
                 "Login rate limiting: Explicit trusted proxies configured: {:?}",
                 trusted_proxies
             );
@@ -306,7 +306,7 @@ pub async fn run_server() -> Result<()> {
         #[cfg(unix)]
         {
             if let Some(ref socket_path) = server_config.unix_socket_path {
-                warn!("Starting server on Unix socket: {}", socket_path);
+                info!("Starting server on Unix socket: {}", socket_path);
                 if std::path::Path::new(socket_path).exists() {
                     std::fs::remove_file(socket_path)?;
                 }
@@ -316,7 +316,7 @@ pub async fn run_server() -> Result<()> {
                     "{}:{}",
                     server_config.server_host, server_config.server_port
                 );
-                warn!("Starting server at http://{}", bind_address);
+                info!("Starting server at http://{}", bind_address);
                 Some(server.bind(bind_address)?)
             }
         }
@@ -327,7 +327,7 @@ pub async fn run_server() -> Result<()> {
                 "{}:{}",
                 server_config.server_host, server_config.server_port
             );
-            warn!("Starting server at http://{}", bind_address);
+            info!("Starting server at http://{}", bind_address);
             Some(server.bind(bind_address)?)
         }
     }
@@ -340,7 +340,7 @@ pub async fn run_server() -> Result<()> {
             res?;
         }
         _ = lifetime::shutdown::listen_for_shutdown(&db_for_shutdown) => {
-            warn!("Graceful shutdown: all tasks completed");
+            info!("Graceful shutdown: all tasks completed");
         }
     }
 

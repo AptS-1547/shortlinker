@@ -17,7 +17,7 @@ use actix_web::{
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
 use subtle::ConstantTimeEq;
-use tracing::{trace, warn};
+use tracing::{info, trace};
 
 use crate::api::constants;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
@@ -70,7 +70,7 @@ where
 {
     /// 返回 403 Forbidden 响应
     fn handle_csrf_error(req: ServiceRequest) -> ServiceResponse<EitherBody<B>> {
-        warn!("CSRF validation failed");
+        info!("CSRF validation failed");
         req.into_response(
             HttpResponse::Forbidden()
                 .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))
@@ -119,16 +119,16 @@ where
                 // 常量时间比较，防止时序攻击
                 let valid = Self::constant_time_compare(&cookie, &header);
                 if !valid {
-                    warn!("CSRF token mismatch");
+                    info!("CSRF token mismatch");
                 }
                 valid
             }
             (None, _) => {
-                warn!("CSRF cookie not found");
+                info!("CSRF cookie not found");
                 false
             }
             (_, None) => {
-                warn!("X-CSRF-Token header not found");
+                info!("X-CSRF-Token header not found");
                 false
             }
         }

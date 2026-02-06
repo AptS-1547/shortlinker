@@ -118,15 +118,17 @@ impl RedirectService {
     fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
         // 1. 检查 utm_source 参数
         if let Some(query) = query
-            && let Some(utm_source) = Self::extract_query_param(query, "utm_source") {
-                return Some(utm_source.into_owned());
-            }
+            && let Some(utm_source) = Self::extract_query_param(query, "utm_source")
+        {
+            return Some(utm_source.into_owned());
+        }
 
         // 2. 有 Referer header → ref:{domain}
         if let Some(referer_url) = referrer
-            && let Some(domain) = Self::extract_domain(referer_url) {
-                return Some(format!("ref:{}", domain));
-            }
+            && let Some(domain) = Self::extract_domain(referer_url)
+        {
+            return Some(format!("ref:{}", domain));
+        }
 
         // 3. 都没有 → direct
         Some("direct".to_string())
@@ -221,13 +223,14 @@ impl RedirectService {
             // GeoIP 查询（如果启用且有有效 IP）
             if enable_geo_lookup
                 && let Some(geoip) = geoip
-                    && let Some(ref ip_str) = ip
-                        && let Ok(ip_addr) = ip_str.parse::<IpAddr>()
-                            && !is_private_or_local(&ip_addr)
-                                && let Some(geo) = geoip.lookup(ip_str).await {
-                                    detail.country = geo.country;
-                                    detail.city = geo.city;
-                                }
+                && let Some(ref ip_str) = ip
+                && let Ok(ip_addr) = ip_str.parse::<IpAddr>()
+                && !is_private_or_local(&ip_addr)
+                && let Some(geo) = geoip.lookup(ip_str).await
+            {
+                detail.country = geo.country;
+                detail.city = geo.city;
+            }
 
             manager.record_detailed(detail);
         });
