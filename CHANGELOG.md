@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-beta.1] - 2026-02-06
+
+### 🎉 Release Highlights
+
+v0.5.0-beta.1 是一次功能增强与架构优化版本，主要亮点：
+
+- **UTM 来源追踪** - 自动从 utm_source 参数或 Referer 推导流量来源，异步处理不阻塞重定向
+- **IPC 配置化** - 新增 [ipc] 配置段，支持自定义 socket 路径、超时等参数
+- **TUI 状态管理重构** - 引入 FormState 状态机，表单验证逻辑统一
+- **文档结构重组** - 配置、部署、API 文档拆分为细粒度小文件
+
+### Added
+- **UTM 来源追踪系统** - 新增 `source` 字段记录流量来源
+  - 推导逻辑：优先 `utm_source` 参数 → Referer 域名（`ref:domain`）→ `direct`
+  - 数据库迁移：`click_logs.source`、`click_stats_hourly.source_counts`、`click_stats_daily.top_sources`
+  - 异步处理：URL 解析、域名提取不阻塞 307 响应
+- **IPC 配置段** - 新增 `[ipc]` 配置支持
+  - `enabled`：启用/禁用 IPC 服务器
+  - `socket_path`：自定义 socket 路径
+  - `timeout`/`reload_timeout`/`bulk_timeout`：各类操作超时配置
+  - `max_message_size`：最大消息大小（默认 64KB）
+- **CLI 全局参数** - `--socket` 参数覆盖配置文件中的 socket 路径
+
+### Changed
+- **CLI 命令重构** - `generate-config` 改为 `config generate`，统一子命令风格
+  - 新增 `--force` 参数强制覆盖现有配置文件
+
+### Improved
+- **重定向性能优化** - UTM 解析、GeoIP 查询全部移到后台 spawn，不阻塞 307 响应
+- **存储空间优化** - 删除 `click_logs.user_agent` 列，只保留 hash 引用
+
+### Refactored
+- **TUI 状态管理** - 引入 `FormState` 结构体和 `EditingField` 枚举，取代零散的输入状态字段
+  - 表单验证逻辑统一到 `validation.rs`
+  - UI 组件（`add_link.rs`、`edit_link.rs` 等）大幅简化
+- **Analytics 模块** - Rollup 汇总逻辑新增 `source_counts` 处理
+
+### Dependencies
+- 升级 `anyhow` 1.0.100 → 1.0.101
+- 新增 `urlencoding` 2.1.3（URL 参数解码）
+
+### Docs
+- **文档结构重组** - 配置、部署、API 文档拆分为细粒度文件
+  - 配置指南：`startup.md`、`runtime.md`、`security.md`、`examples.md`
+  - 部署指南：Docker/Proxy/Systemd 各拆分为快速入门和运维文档
+  - API 文档：Admin/Health 各拆分为端点详解
+- 新增事件系统文档（`events/README.md`）
+
+### Breaking Changes
+- **CLI 命令变更** - `generate-config` → `config generate`
+- **数据库 Schema 变更** - 新增 `source` 相关字段，删除 `click_logs.user_agent` 列
+- **API 响应变化** - `/admin/v1/stats` 的 `referrers` 现在返回 `source`（utm_source / ref:{domain} / direct）
+
 ## [v0.5.0-alpha.6] - 2026-02-06
 
 ### 🎉 Release Highlights
@@ -1349,7 +1402,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.6...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.1...HEAD
+[v0.5.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.6...v0.5.0-beta.1
 [v0.5.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...v0.5.0-alpha.6
 [v0.5.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...v0.5.0-alpha.5
 [v0.5.0-alpha.4]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.3...v0.5.0-alpha.4
