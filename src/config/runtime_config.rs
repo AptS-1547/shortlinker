@@ -144,8 +144,7 @@ impl RuntimeConfig {
 
     /// 获取 f64 配置
     pub fn get_f64(&self, key: &str) -> Option<f64> {
-        self.get(key)
-            .and_then(|s| s.parse().ok())
+        self.get(key).and_then(|s| s.parse().ok())
     }
 
     /// 获取带默认值的 f64 配置

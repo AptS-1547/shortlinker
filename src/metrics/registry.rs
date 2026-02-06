@@ -392,8 +392,6 @@ impl MetricsRecorder for Metrics {
     }
 
     fn inc_db_query(&self, operation: &str) {
-        self.db_queries_total
-            .with_label_values(&[operation])
-            .inc();
+        self.db_queries_total.with_label_values(&[operation]).inc();
     }
 }

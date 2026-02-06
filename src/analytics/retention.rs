@@ -142,7 +142,10 @@ impl DataRetentionTask {
 
         info!(
             "Data cleanup completed: raw logs {} (time-based), {} (row-limit), hourly rollups {}, daily rollups {}",
-            report.raw_logs_deleted, report.rows_limit_deleted, report.hourly_stats_deleted, report.daily_stats_deleted
+            report.raw_logs_deleted,
+            report.rows_limit_deleted,
+            report.hourly_stats_deleted,
+            report.daily_stats_deleted
         );
 
         Ok(report)

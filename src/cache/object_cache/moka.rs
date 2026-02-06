@@ -147,7 +147,11 @@ mod tests {
         // 应该是 3600 ± 10% (3240 - 3960)
         assert!(result.is_some());
         let ttl = result.unwrap().as_secs();
-        assert!(ttl >= 3240 && ttl <= 3960, "TTL {} not in expected range", ttl);
+        assert!(
+            (3240..=3960).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]
@@ -177,7 +181,11 @@ mod tests {
         // 剩余时间约 100 秒 ± 10% (90 - 110)
         assert!(result.is_some());
         let ttl = result.unwrap().as_secs();
-        assert!(ttl >= 88 && ttl <= 112, "TTL {} not in expected range", ttl);
+        assert!(
+            (88..=112).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]
@@ -194,7 +202,11 @@ mod tests {
         // 应该被限制在默认 TTL ± 10% (3240 - 3960)
         assert!(result.is_some());
         let ttl = result.unwrap().as_secs();
-        assert!(ttl >= 3240 && ttl <= 3960, "TTL {} not in expected range", ttl);
+        assert!(
+            (3240..=3960).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 use tracing::{trace, warn};
 
 use super::manager::ClickManager;

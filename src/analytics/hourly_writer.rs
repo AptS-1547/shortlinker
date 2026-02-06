@@ -11,7 +11,8 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    ActiveValue::Set, ConnectionTrait, DatabaseBackend, EntityTrait, ExprTrait,
+    ActiveValue::Set,
+    ConnectionTrait, DatabaseBackend, EntityTrait, ExprTrait,
     sea_query::{Expr, OnConflict, Query},
 };
 use tracing::debug;
@@ -218,7 +219,12 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         }
 
         // 提取所有 hour_bucket（通常只有一个）
-        let hour_buckets: Vec<_> = keys.iter().map(|(_, h)| *h).collect::<std::collections::HashSet<_>>().into_iter().collect();
+        let hour_buckets: Vec<_> = keys
+            .iter()
+            .map(|(_, h)| *h)
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
         let codes: Vec<_> = keys.iter().map(|(c, _)| c.as_str()).collect();
 
         let records = click_stats_hourly::Entity::find()
@@ -341,8 +347,10 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         }
 
         // 不匹配的保持原值
-        click_count_case = click_count_case.finally(Expr::col(click_stats_hourly::Column::ClickCount));
-        referrer_case = referrer_case.finally(Expr::col(click_stats_hourly::Column::ReferrerCounts));
+        click_count_case =
+            click_count_case.finally(Expr::col(click_stats_hourly::Column::ClickCount));
+        referrer_case =
+            referrer_case.finally(Expr::col(click_stats_hourly::Column::ReferrerCounts));
         country_case = country_case.finally(Expr::col(click_stats_hourly::Column::CountryCounts));
         source_case = source_case.finally(Expr::col(click_stats_hourly::Column::SourceCounts));
 
@@ -398,15 +406,13 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                     )
                     .to_owned()
             }
-            _ => {
-                OnConflict::column(click_stats_global_hourly::Column::HourBucket)
-                    .value(
-                        click_stats_global_hourly::Column::TotalClicks,
-                        Expr::col(click_stats_global_hourly::Column::TotalClicks)
-                            .add(Expr::cust("excluded.total_clicks")),
-                    )
-                    .to_owned()
-            }
+            _ => OnConflict::column(click_stats_global_hourly::Column::HourBucket)
+                .value(
+                    click_stats_global_hourly::Column::TotalClicks,
+                    Expr::col(click_stats_global_hourly::Column::TotalClicks)
+                        .add(Expr::cust("excluded.total_clicks")),
+                )
+                .to_owned(),
         };
 
         let op_name = format!("{}_upsert_global_hourly", op_prefix);

@@ -3,7 +3,10 @@ use crate::analytics::manager::ClickManager;
 use crate::analytics::{ClickDetail, DataRetentionTask, RawClickEvent, RollupManager};
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::{AnalyticsService, LinkService, UserAgentStore, set_global_user_agent_store, get_user_agent_store};
+use crate::services::{
+    AnalyticsService, LinkService, UserAgentStore, get_user_agent_store,
+    set_global_user_agent_store,
+};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -360,11 +363,7 @@ fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
         .as_ref()
         .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
 
-    let ip_address = if enable_ip_logging {
-        event.ip
-    } else {
-        None
-    };
+    let ip_address = if enable_ip_logging { event.ip } else { None };
 
     ClickDetail {
         code: event.code,
@@ -382,17 +381,17 @@ fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
 #[inline]
 fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
     // 1. 检查 utm_source 参数
-    if let Some(query) = query {
-        if let Some(utm_source) = extract_query_param(query, "utm_source") {
-            return Some(utm_source.into_owned());
-        }
+    if let Some(query) = query
+        && let Some(utm_source) = extract_query_param(query, "utm_source")
+    {
+        return Some(utm_source.into_owned());
     }
 
     // 2. 有 Referer → ref:{domain}
-    if let Some(referer_url) = referrer {
-        if let Some(domain) = extract_domain(referer_url) {
-            return Some(format!("ref:{}", domain));
-        }
+    if let Some(referer_url) = referrer
+        && let Some(domain) = extract_domain(referer_url)
+    {
+        return Some(format!("ref:{}", domain));
     }
 
     // 3. direct

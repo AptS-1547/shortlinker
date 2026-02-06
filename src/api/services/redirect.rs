@@ -217,7 +217,10 @@ impl RedirectService {
             rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
 
         // 检查是否应该停止详细日志（因行数限制）
-        if !enable_detailed_logging || !manager.is_detailed_logging_enabled() || is_detailed_logging_stopped() {
+        if !enable_detailed_logging
+            || !manager.is_detailed_logging_enabled()
+            || is_detailed_logging_stopped()
+        {
             // 快速路径：只增加 click_count
             manager.increment(code);
             return;
@@ -253,7 +256,11 @@ impl RedirectService {
     }
 
     #[cfg(feature = "metrics")]
-    fn finish_redirect(req: &HttpRequest, link: ShortLink, metrics: &Arc<dyn MetricsRecorder>) -> HttpResponse {
+    fn finish_redirect(
+        req: &HttpRequest,
+        link: ShortLink,
+        metrics: &Arc<dyn MetricsRecorder>,
+    ) -> HttpResponse {
         metrics.inc_redirect("307");
 
         // 构建目标 URL，可能需要透传 UTM 参数

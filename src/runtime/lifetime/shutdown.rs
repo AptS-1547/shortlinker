@@ -62,10 +62,7 @@ async fn perform_shutdown_tasks(db: &DatabaseConnection) {
         for attempt in 1..=MAX_RETRIES {
             match timeout(Duration::from_secs(TASK_TIMEOUT_SECS), manager.flush()).await {
                 Ok(()) => {
-                    info!(
-                        "ClickManager flushed successfully (attempt {})",
-                        attempt
-                    );
+                    info!("ClickManager flushed successfully (attempt {})", attempt);
                     success = true;
                     break;
                 }

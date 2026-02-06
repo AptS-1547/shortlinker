@@ -159,7 +159,6 @@ impl DetailedBuffer {
         }
         self.entry_count.fetch_add(count, Ordering::AcqRel);
     }
-
 }
 
 /// 点击管理器
@@ -295,23 +294,22 @@ impl ClickManager {
             );
 
             // 阈值触发刷盘
-            if current_size >= self.max_clicks_before_flush {
-                if buffer
+            if current_size >= self.max_clicks_before_flush
+                && buffer
                     .flush_pending
                     .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
                     .is_ok()
-                {
-                    let buffer = Arc::clone(buffer);
-                    let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
-                    tokio::spawn(async move {
-                        if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                            Self::flush_detailed_buffer(&buffer, &sink).await;
-                        } else {
-                            trace!("ClickManager: detailed flush already in progress, skipping");
-                        }
-                        buffer.flush_pending.store(false, Ordering::Release);
-                    });
-                }
+            {
+                let buffer = Arc::clone(buffer);
+                let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                tokio::spawn(async move {
+                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                        Self::flush_detailed_buffer(&buffer, &sink).await;
+                    } else {
+                        trace!("ClickManager: detailed flush already in progress, skipping");
+                    }
+                    buffer.flush_pending.store(false, Ordering::Release);
+                });
             }
         }
     }
@@ -427,11 +425,8 @@ impl ClickManager {
     /// 启动原始事件处理器（消费 crossbeam channel 并生成 ClickDetail）
     ///
     /// 需要传入事件处理函数，用于将 RawClickEvent 转换为 ClickDetail
-    pub async fn start_event_processor<F>(
-        &self,
-        rx: Receiver<RawClickEvent>,
-        process_fn: F,
-    ) where
+    pub async fn start_event_processor<F>(&self, rx: Receiver<RawClickEvent>, process_fn: F)
+    where
         F: Fn(RawClickEvent) -> ClickDetail + Send + 'static,
     {
         debug!("ClickManager: Starting event processor");
@@ -449,21 +444,20 @@ impl ClickManager {
                         let current_size = buffer.push(detail);
 
                         // 阈值触发刷盘
-                        if current_size >= self.max_clicks_before_flush {
-                            if buffer
+                        if current_size >= self.max_clicks_before_flush
+                            && buffer
                                 .flush_pending
                                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
                                 .is_ok()
-                            {
-                                let buffer = Arc::clone(buffer);
-                                let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
-                                tokio::spawn(async move {
-                                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                                        Self::flush_detailed_buffer(&buffer, &sink).await;
-                                    }
-                                    buffer.flush_pending.store(false, Ordering::Release);
-                                });
-                            }
+                        {
+                            let buffer = Arc::clone(buffer);
+                            let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                            tokio::spawn(async move {
+                                if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                                    Self::flush_detailed_buffer(&buffer, &sink).await;
+                                }
+                                buffer.flush_pending.store(false, Ordering::Release);
+                            });
                         }
                     }
                 }

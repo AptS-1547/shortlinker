@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use sea_orm::sea_query::{CaseStatement, Expr, SimpleExpr};
+use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use tracing::{debug, info};
 
 use super::HourlyRollupWriter;
@@ -363,8 +363,8 @@ impl RollupManager {
                         .case(id_cond.clone(), SimpleExpr::Value((*uc).into()));
                 }
                 if let Set(Some(us)) = &record.unique_sources {
-                    unique_sources_case = unique_sources_case
-                        .case(id_cond.clone(), SimpleExpr::Value((*us).into()));
+                    unique_sources_case =
+                        unique_sources_case.case(id_cond.clone(), SimpleExpr::Value((*us).into()));
                 }
                 if let Set(Some(tr)) = &record.top_referrers {
                     top_referrers_case = top_referrers_case

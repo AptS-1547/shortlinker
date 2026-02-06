@@ -47,6 +47,8 @@ pub struct ConfigSchema {
     pub enum_options: Option<Vec<EnumOption>>,
     pub requires_restart: bool,
     pub editable: bool,
+    /// 排序顺序（基于 definitions.rs 中 ALL_CONFIGS 的索引）
+    pub order: usize,
 }
 
 /// 获取所有配置的 schema
@@ -57,7 +59,8 @@ pub fn get_all_schemas() -> &'static Vec<ConfigSchema> {
     SCHEMA_CACHE.get_or_init(|| {
         ALL_CONFIGS
             .iter()
-            .map(|def| ConfigSchema {
+            .enumerate()
+            .map(|(idx, def)| ConfigSchema {
                 key: def.key.to_string(),
                 value_type: def.value_type,
                 default_value: (def.default_fn)(),
@@ -66,6 +69,7 @@ pub fn get_all_schemas() -> &'static Vec<ConfigSchema> {
                 enum_options: get_enum_options(def),
                 requires_restart: def.requires_restart,
                 editable: def.editable,
+                order: idx,
             })
             .collect()
     })

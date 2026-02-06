@@ -282,28 +282,28 @@ pub async fn run_server() -> Result<()> {
         let app = app.app_data(web::Data::new(metrics_for_server.clone()));
 
         app.wrap(
-                DefaultHeaders::new()
-                    .add(("Connection", "keep-alive"))
-                    .add(("Keep-Alive", "timeout=30, max=1000"))
-                    .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
-            )
-            .service(
-                web::scope(&admin_prefix)
-                    .wrap(CsrfGuard)
-                    .wrap(AdminAuth)
-                    .service(admin_v1_routes()),
-            )
-            .service(
-                web::scope(&health_prefix)
-                    .wrap(HealthAuth)
-                    .service(health_routes()),
-            )
-            .service(
-                web::scope(&frontend_prefix)
-                    .wrap(FrontendGuard)
-                    .service(frontend_routes()),
-            )
-            .service(redirect_routes())
+            DefaultHeaders::new()
+                .add(("Connection", "keep-alive"))
+                .add(("Keep-Alive", "timeout=30, max=1000"))
+                .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
+        )
+        .service(
+            web::scope(&admin_prefix)
+                .wrap(CsrfGuard)
+                .wrap(AdminAuth)
+                .service(admin_v1_routes()),
+        )
+        .service(
+            web::scope(&health_prefix)
+                .wrap(HealthAuth)
+                .service(health_routes()),
+        )
+        .service(
+            web::scope(&frontend_prefix)
+                .wrap(FrontendGuard)
+                .service(frontend_routes()),
+        )
+        .service(redirect_routes())
     })
     .keep_alive(std::time::Duration::from_secs(30))
     .client_request_timeout(std::time::Duration::from_millis(5000))
