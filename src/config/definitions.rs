@@ -82,6 +82,9 @@ pub mod keys {
     pub const ANALYTICS_HOURLY_RETENTION_DAYS: &str = "analytics.hourly_retention_days";
     pub const ANALYTICS_DAILY_RETENTION_DAYS: &str = "analytics.daily_retention_days";
     pub const ANALYTICS_ENABLE_AUTO_ROLLUP: &str = "analytics.enable_auto_rollup";
+    pub const ANALYTICS_SAMPLE_RATE: &str = "analytics.sample_rate";
+    pub const ANALYTICS_MAX_LOG_ROWS: &str = "analytics.max_log_rows";
+    pub const ANALYTICS_MAX_ROWS_ACTION: &str = "analytics.max_rows_action";
 
     // UTM 追踪
     pub const UTM_ENABLE_PASSTHROUGH: &str = "utm.enable_passthrough";
@@ -219,6 +222,18 @@ fn default_analytics_daily_retention_days() -> String {
 
 fn default_analytics_enable_auto_rollup() -> String {
     "true".to_string()
+}
+
+fn default_analytics_sample_rate() -> String {
+    "1.0".to_string() // 默认记录所有点击
+}
+
+fn default_analytics_max_log_rows() -> String {
+    "0".to_string() // 默认不限制
+}
+
+fn default_analytics_max_rows_action() -> String {
+    "cleanup".to_string() // 默认自动清理
 }
 
 fn default_utm_enable_passthrough() -> String {
@@ -574,6 +589,39 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable automatic rollup aggregation and data cleanup",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_SAMPLE_RATE,
+        value_type: ValueType::Float,
+        rust_type: RustType::F64,
+        default_fn: default_analytics_sample_rate,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Click log sampling rate (0.0-1.0). 1.0 = log all clicks, 0.1 = log 10% of clicks",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_MAX_LOG_ROWS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_max_log_rows,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Maximum rows in click_logs table. 0 = unlimited",
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_MAX_ROWS_ACTION,
+        value_type: ValueType::Enum,
+        rust_type: RustType::MaxRowsAction,
+        default_fn: default_analytics_max_rows_action,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Action when max_log_rows exceeded: 'cleanup' (delete oldest) or 'stop' (stop logging)",
     },
     // ========== UTM 追踪 (analytics) ==========
     ConfigDef {

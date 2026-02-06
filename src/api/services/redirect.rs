@@ -7,7 +7,7 @@ use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use std::sync::Arc;
 use tracing::{debug, error, trace};
 
-use crate::analytics::global::get_click_manager;
+use crate::analytics::global::{get_click_manager, is_detailed_logging_stopped};
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
@@ -122,8 +122,17 @@ impl RedirectService {
         let enable_detailed_logging =
             rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
 
-        if !enable_detailed_logging || !manager.is_detailed_logging_enabled() {
+        // 检查是否应该停止详细日志（因行数限制）
+        if !enable_detailed_logging || !manager.is_detailed_logging_enabled() || is_detailed_logging_stopped() {
             // 快速路径：只增加 click_count
+            manager.increment(code);
+            return;
+        }
+
+        // 采样率检查（在热路径做，避免不必要的字符串 clone）
+        let sample_rate = rt.get_f64_or(keys::ANALYTICS_SAMPLE_RATE, 1.0);
+        if sample_rate < 1.0 && rand::random::<f64>() >= sample_rate {
+            // 不采样，只增加 click_count
             manager.increment(code);
             return;
         }

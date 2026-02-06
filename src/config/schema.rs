@@ -84,6 +84,7 @@ fn get_enum_options(def: &ConfigDef) -> Option<Vec<EnumOption>> {
     match def.rust_type {
         RustType::SameSitePolicy => Some(same_site_options()),
         RustType::VecHttpMethod => Some(http_method_options()),
+        RustType::MaxRowsAction => Some(max_rows_action_options()),
         RustType::Bool => Some(bool_options()),
         _ => None,
     }
@@ -140,6 +141,25 @@ fn bool_options() -> Vec<EnumOption> {
             label_i18n_key: Some("common.disabled".to_string()),
             description: None,
             description_i18n_key: None,
+        },
+    ]
+}
+
+fn max_rows_action_options() -> Vec<EnumOption> {
+    vec![
+        EnumOption {
+            value: "cleanup".to_string(),
+            label: "Cleanup".to_string(),
+            label_i18n_key: Some("enums.maxRowsAction.cleanup.label".to_string()),
+            description: Some("Delete oldest records when limit exceeded".to_string()),
+            description_i18n_key: Some("enums.maxRowsAction.cleanup.description".to_string()),
+        },
+        EnumOption {
+            value: "stop".to_string(),
+            label: "Stop".to_string(),
+            label_i18n_key: Some("enums.maxRowsAction.stop.label".to_string()),
+            description: Some("Stop logging new clicks when limit exceeded".to_string()),
+            description_i18n_key: Some("enums.maxRowsAction.stop.description".to_string()),
         },
     ]
 }

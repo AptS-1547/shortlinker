@@ -142,6 +142,17 @@ impl RuntimeConfig {
         self.get_u64(key).unwrap_or(default)
     }
 
+    /// 获取 f64 配置
+    pub fn get_f64(&self, key: &str) -> Option<f64> {
+        self.get(key)
+            .and_then(|s| s.parse().ok())
+    }
+
+    /// 获取带默认值的 f64 配置
+    pub fn get_f64_or(&self, key: &str, default: f64) -> f64 {
+        self.get_f64(key).unwrap_or(default)
+    }
+
     /// 获取 JSON 类型配置并反序列化，解析失败时返回默认值
     ///
     /// 用于解析存储为 JSON 字符串的配置（如数组、对象等）
