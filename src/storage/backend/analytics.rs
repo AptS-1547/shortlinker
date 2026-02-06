@@ -124,6 +124,8 @@ impl super::SeaOrmStorage {
     }
 
     /// 获取链接来源统计
+    ///
+    /// 使用 `source` 字段（utm_source 参数、ref:{domain} 或 direct）
     pub async fn get_link_referrers(
         &self,
         code: &str,
@@ -134,12 +136,12 @@ impl super::SeaOrmStorage {
         let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
-            .column(click_log::Column::Referrer)
+            .column_as(click_log::Column::Source, "referrer")
             .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ShortCode.eq(code))
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
-            .group_by(click_log::Column::Referrer)
+            .group_by(click_log::Column::Source)
             .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<ReferrerRow>()
@@ -223,6 +225,8 @@ impl super::SeaOrmStorage {
     }
 
     /// 获取全局来源统计
+    ///
+    /// 使用 `source` 字段（utm_source 参数、ref:{domain} 或 direct）
     pub async fn get_global_referrers(
         &self,
         start: DateTime<Utc>,
@@ -232,11 +236,11 @@ impl super::SeaOrmStorage {
         let count_expr = click_log::Column::Id.count();
         click_log::Entity::find()
             .select_only()
-            .column(click_log::Column::Referrer)
+            .column_as(click_log::Column::Source, "referrer")
             .column_as(count_expr.clone(), "count")
             .filter(click_log::Column::ClickedAt.gte(start))
             .filter(click_log::Column::ClickedAt.lte(end))
-            .group_by(click_log::Column::Referrer)
+            .group_by(click_log::Column::Source)
             .order_by_desc(count_expr)
             .limit(limit)
             .into_model::<ReferrerRow>()
@@ -593,6 +597,8 @@ impl super::SeaOrmStorage {
 
     /// 从小时汇总表获取来源统计
     ///
+    /// 使用 `source_counts` 字段（utm_source 参数、ref:{domain} 或 direct）
+    ///
     /// 注意：此方法在内存中聚合 JSON 字段，大时间范围查询可能影响性能。
     /// 建议时间范围不超过 30 天。
     pub async fn get_link_referrers_from_rollup(
@@ -629,10 +635,10 @@ impl super::SeaOrmStorage {
             );
         }
 
-        // 聚合所有记录的 referrer 统计
+        // 聚合所有记录的 source 统计
         let mut aggregated: HashMap<String, i64> = HashMap::new();
         for record in records {
-            if let Some(ref json_str) = record.referrer_counts
+            if let Some(ref json_str) = record.source_counts
                 && let Ok(counts) = serde_json::from_str::<HashMap<String, i64>>(json_str)
             {
                 for (k, v) in counts {
@@ -648,12 +654,8 @@ impl super::SeaOrmStorage {
 
         Ok(items
             .into_iter()
-            .map(|(referrer, count)| ReferrerRow {
-                referrer: if referrer == "direct" {
-                    None
-                } else {
-                    Some(referrer)
-                },
+            .map(|(source, count)| ReferrerRow {
+                referrer: Some(source),
                 count,
             })
             .collect())

@@ -13,6 +13,7 @@ Analytics API provides detailed click statistics, including click trends, top li
 > - Geo distribution requires `analytics.enable_geo_lookup=true` (and `analytics.enable_ip_logging=true` to keep IPs). The GeoIP provider is configured via startup `[analytics]` (`analytics.maxminddb_path` / `analytics.geoip_api_url`).
 >   - When using the external API provider, it has a built-in cache (LRU 10,000, TTL 15 minutes, negative caching on failures, and singleflight for concurrent requests). HTTP timeout is 2 seconds.
 > - Device/browser distribution (`/analytics/devices`) is based on `user_agent_hash` (User-Agent strings are deduplicated into `user_agents` and linked by hash).
+> - `click_logs.source` derivation is: `utm_source` first; otherwise `ref:{domain}` (from `Referer`); otherwise `direct`.
 
 ## Common Query Parameters (Most Endpoints)
 
@@ -233,9 +234,11 @@ curl -sS -b cookies.txt \
 - `limit` is currently ignored; export includes all records within the date range (narrow date range to control output size)
 
 The exported CSV contains these columns:
-`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+`short_code,clicked_at,referrer,source,ip_address,country,city`
 
-Note: in the current version, the `user_agent` column may be empty (the server deduplicates User-Agent strings via `user_agent_hash` + the `user_agents` table for device analytics).
+Note:
+- The `source` column follows the redirect source derivation rule (`utm_source` → `ref:{domain}` → `direct`).
+- Export does not include raw `user_agent`; device analytics is built via `user_agent_hash` + `user_agents`.
 
 ### Analytics configuration
 
@@ -250,5 +253,6 @@ These runtime config options control Analytics behavior:
 | `analytics.daily_retention_days` | int | 365 | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |
+| `utm.enable_passthrough` | bool | false | Forward UTM params during redirect (`utm_source`/`utm_medium`/`utm_campaign`/`utm_term`/`utm_content`) |
 
 Note: in the current implementation, retention parameters are read when the background task starts; after changing retention days, you may need to restart the server for the cleanup task to pick up new values.

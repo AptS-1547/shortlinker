@@ -1,5 +1,6 @@
 // Rust 化完成
 
+use std::borrow::Cow;
 use std::net::IpAddr;
 
 use actix_web::http::StatusCode;
@@ -112,105 +113,54 @@ impl RedirectService {
             .body("Internal Server Error")
     }
 
-    /// 提取点击详细信息
-    fn extract_click_detail(code: &str, req: &HttpRequest) -> ClickDetail {
-        let rt = get_runtime_config();
-        let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
-
-        // 获取 UserAgent 字符串并计算 hash
-        let user_agent_str = req
-            .headers()
-            .get("user-agent")
-            .and_then(|h| h.to_str().ok());
-
-        let user_agent_hash = user_agent_str
-            .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
-
-        // 提取 referrer
-        let referrer = req
-            .headers()
-            .get("referer")
-            .and_then(|h| h.to_str().ok())
-            .map(String::from);
-
-        // 推导 source 值
-        // 规则：1. URL 有 utm_source 参数 → 直接使用其值
-        //       2. 无 utm_source，有 Referer header → ref:{domain}
-        //       3. 都没有 → direct
-        let source = Self::derive_source(req, &referrer);
-
-        ClickDetail {
-            code: code.to_string(),
-            timestamp: chrono::Utc::now(),
-            referrer,
-            user_agent_hash,
-            ip_address: if enable_ip_logging {
-                extract_client_ip(req)
-            } else {
-                None
-            },
-            country: None,
-            city: None,
-            source,
-        }
-    }
-
-    /// 从请求推导流量来源
-    fn derive_source(req: &HttpRequest, referrer: &Option<String>) -> Option<String> {
+    /// 从原始数据推导流量来源（用于异步处理）
+    #[inline]
+    fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
         // 1. 检查 utm_source 参数
-        if let Some(query) = req.uri().query() {
-            if let Some(utm_source) = Self::extract_query_param(query, "utm_source") {
-                return Some(utm_source);
+        if let Some(query) = query
+            && let Some(utm_source) = Self::extract_query_param(query, "utm_source") {
+                return Some(utm_source.into_owned());
             }
-        }
 
         // 2. 有 Referer header → ref:{domain}
-        if let Some(referer_url) = referrer {
-            if let Some(domain) = Self::extract_domain(referer_url) {
+        if let Some(referer_url) = referrer
+            && let Some(domain) = Self::extract_domain(referer_url) {
                 return Some(format!("ref:{}", domain));
             }
-        }
 
         // 3. 都没有 → direct
         Some("direct".to_string())
     }
 
     /// 从 query string 提取指定参数值
-    fn extract_query_param(query: &str, key: &str) -> Option<String> {
-        let prefix = format!("{}=", key);
+    #[inline]
+    fn extract_query_param<'a>(query: &'a str, key: &str) -> Option<Cow<'a, str>> {
         for part in query.split('&') {
-            if let Some(value) = part.strip_prefix(&prefix) {
-                // 解码 URL 编码，截取到下一个 & 或结尾
-                let decoded = urlencoding::decode(value).ok()?;
-                return Some(decoded.into_owned());
+            if let Some(value) = part.strip_prefix(key).and_then(|s| s.strip_prefix('=')) {
+                // urlencoding::decode 返回 Cow，未编码时零分配
+                return urlencoding::decode(value).ok();
             }
         }
         None
     }
 
     /// 从 URL 提取域名
-    fn extract_domain(url: &str) -> Option<String> {
+    #[inline]
+    fn extract_domain(url: &str) -> Option<&str> {
         // 简单解析：找 :// 后的域名部分
         let without_scheme = url
             .strip_prefix("https://")
             .or_else(|| url.strip_prefix("http://"))
             .unwrap_or(url);
 
-        // 取到第一个 / 或 : 为止
-        let domain = without_scheme
-            .split('/')
-            .next()?
-            .split(':')
-            .next()?;
-
-        if domain.is_empty() {
-            None
-        } else {
-            Some(domain.to_string())
-        }
+        // 取到第一个 / 或 : 或 ? 或 # 为止
+        without_scheme
+            .split(&['/', ':', '?', '#'][..])
+            .next()
+            .filter(|s| !s.is_empty())
     }
 
-    /// 更新点击计数（同步无锁操作，无需 spawn）
+    /// 更新点击计数（异步处理分析逻辑，不阻塞响应）
     #[inline]
     fn update_click(code: &str, req: &HttpRequest, geoip: Option<web::Data<Arc<GeoIpProvider>>>) {
         let Some(manager) = get_click_manager() else {
@@ -221,46 +171,66 @@ impl RedirectService {
         let enable_detailed_logging =
             rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
 
-        if enable_detailed_logging && manager.is_detailed_logging_enabled() {
-            let detail = Self::extract_click_detail(code, req);
-
-            // 异步 GeoIP 查询（不阻塞响应）
-            let enable_geo_lookup = rt.get_bool_or(keys::ANALYTICS_ENABLE_GEO_LOOKUP, false);
-            if enable_geo_lookup
-                && let Some(ref geoip_provider) = geoip
-                && let Some(ref ip) = detail.ip_address
-            {
-                // 私有/本地 IP 不查 GeoIP（查了也没意义）
-                if let Ok(ip_addr) = ip.parse::<IpAddr>()
-                    && is_private_or_local(&ip_addr)
-                {
-                    trace!("Skipping GeoIP lookup for private/local IP: {}", ip);
-                    manager.record_detailed(detail);
-                    return;
-                }
-
-                let ip = ip.clone();
-                let geoip = Arc::clone(geoip_provider.get_ref());
-                let manager = Arc::clone(manager);
-
-                // 异步处理 GeoIP 查询和记录
-                tokio::spawn(async move {
-                    let geo = geoip.lookup(&ip).await;
-                    let detail = detail.with_geo(
-                        geo.as_ref().and_then(|g| g.country.clone()),
-                        geo.as_ref().and_then(|g| g.city.clone()),
-                    );
-                    manager.record_detailed(detail);
-                });
-                return;
-            }
-
-            // 无需 GeoIP 查询，直接记录
-            manager.record_detailed(detail);
-        } else {
-            // 只增加 click_count（现有逻辑）
+        if !enable_detailed_logging || !manager.is_detailed_logging_enabled() {
+            // 快速路径：只增加 click_count
             manager.increment(code);
+            return;
         }
+
+        // 同步阶段：只提取原始字符串
+        let code = code.to_string();
+        let query = req.uri().query().map(String::from);
+        let referrer = req
+            .headers()
+            .get("referer")
+            .and_then(|h| h.to_str().ok())
+            .map(String::from);
+        let user_agent = req
+            .headers()
+            .get("user-agent")
+            .and_then(|h| h.to_str().ok())
+            .map(String::from);
+        let ip = extract_client_ip(req);
+        let geoip = geoip.map(|g| Arc::clone(g.get_ref()));
+        let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
+        let enable_geo_lookup = rt.get_bool_or(keys::ANALYTICS_ENABLE_GEO_LOOKUP, false);
+
+        // 异步阶段：所有计算都在后台任务执行
+        tokio::spawn(async move {
+            // derive_source
+            let source = Self::derive_source_from_raw(&query, &referrer);
+
+            // UA hash
+            let user_agent_hash = user_agent
+                .as_ref()
+                .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
+
+            let ip_address = if enable_ip_logging { ip.clone() } else { None };
+
+            let mut detail = ClickDetail {
+                code,
+                timestamp: chrono::Utc::now(),
+                referrer,
+                user_agent_hash,
+                ip_address,
+                country: None,
+                city: None,
+                source,
+            };
+
+            // GeoIP 查询（如果启用且有有效 IP）
+            if enable_geo_lookup
+                && let Some(geoip) = geoip
+                    && let Some(ref ip_str) = ip
+                        && let Ok(ip_addr) = ip_str.parse::<IpAddr>()
+                            && !is_private_or_local(&ip_addr)
+                                && let Some(geo) = geoip.lookup(ip_str).await {
+                                    detail.country = geo.country;
+                                    detail.city = geo.city;
+                                }
+
+            manager.record_detailed(detail);
+        });
     }
 
     fn finish_redirect(req: &HttpRequest, link: ShortLink) -> HttpResponse {
@@ -270,44 +240,58 @@ impl RedirectService {
         let target_url = Self::build_target_url(req, &link.target);
 
         HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
-            .insert_header(("Location", target_url))
+            .insert_header(("Location", target_url.as_ref()))
             .finish()
     }
 
     /// 构建目标 URL，根据配置决定是否透传 UTM 参数
-    fn build_target_url(req: &HttpRequest, target: &str) -> String {
+    #[inline]
+    fn build_target_url<'a>(req: &HttpRequest, target: &'a str) -> Cow<'a, str> {
         let rt = get_runtime_config();
         let enable_passthrough = rt.get_bool_or(keys::UTM_ENABLE_PASSTHROUGH, false);
 
         if !enable_passthrough {
-            return target.to_string();
+            return Cow::Borrowed(target);
         }
 
         // 提取请求中的 UTM 参数
         let Some(query) = req.uri().query() else {
-            return target.to_string();
+            return Cow::Borrowed(target);
         };
 
-        let utm_params: Vec<(&str, String)> = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]
-            .iter()
-            .filter_map(|key| {
-                Self::extract_query_param(query, key).map(|v| (*key, v))
-            })
-            .collect();
+        // 一次遍历提取所有 UTM 参数（返回原始片段）
+        let utm_params = Self::extract_utm_params_raw(query);
 
         if utm_params.is_empty() {
-            return target.to_string();
+            return Cow::Borrowed(target);
         }
 
-        // 拼接 UTM 参数到目标 URL
+        // 拼接 UTM 参数到目标 URL（直接使用原始片段，零编码开销）
         let separator = if target.contains('?') { "&" } else { "?" };
-        let utm_query: String = utm_params
-            .iter()
-            .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
-            .collect::<Vec<_>>()
-            .join("&");
+        let utm_query = utm_params.join("&");
 
-        format!("{}{}{}", target, separator, utm_query)
+        Cow::Owned(format!("{}{}{}", target, separator, utm_query))
+    }
+
+    /// 一次性提取所有 UTM 参数（返回原始片段，零编码开销）
+    #[inline]
+    fn extract_utm_params_raw(query: &str) -> Vec<&str> {
+        const UTM_KEYS: [&str; 5] = [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+        ];
+
+        query
+            .split('&')
+            .filter(|part| {
+                part.find('=')
+                    .map(|pos| UTM_KEYS.contains(&&part[..pos]))
+                    .unwrap_or(false)
+            })
+            .collect()
     }
 }
 

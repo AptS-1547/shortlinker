@@ -13,6 +13,7 @@ Analytics API 提供详细的点击统计分析功能，包括点击趋势、热
 > - 地理分布数据需要额外开启 `analytics.enable_geo_lookup=true`（并保留 `analytics.enable_ip_logging=true` 才能拿到 IP）；GeoIP provider 使用启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）。
 >   - 使用外部 API provider 时，内部带缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight 合并并发请求），单次请求超时 2 秒。
 > - 设备/浏览器分布（`/analytics/devices`）基于 `user_agent_hash`（User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联）。
+> - `click_logs.source` 的来源推导：优先 `utm_source`；否则 `ref:{domain}`（来自 `Referer`）；再否则 `direct`。
 
 ## 通用查询参数（多数接口）
 
@@ -233,9 +234,11 @@ curl -sS -b cookies.txt \
 - `limit` 当前会被忽略，导出时间范围内全部记录；如需控制大小请缩小日期范围
 
 导出的 CSV 包含以下字段：
-`short_code,clicked_at,referrer,user_agent,ip_address,country,city`
+`short_code,clicked_at,referrer,source,ip_address,country,city`
 
-说明：当前版本 `user_agent` 字段可能为空（服务端使用 `user_agent_hash` + `user_agents` 表进行 UA 去重与设备分析）。
+说明：
+- `source` 字段来自重定向时的来源推导规则（`utm_source` → `ref:{domain}` → `direct`）。
+- 导出不包含 `user_agent` 原文字段；设备分析通过 `user_agent_hash` 与 `user_agents` 表完成。
 
 ### Analytics 相关配置
 
@@ -250,5 +253,6 @@ curl -sS -b cookies.txt \
 | `analytics.daily_retention_days` | int | 365 | 天汇总保留天数（清理 `click_stats_daily`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | bool | false | 是否启用地理位置解析 |
+| `utm.enable_passthrough` | bool | false | 重定向时透传 UTM 参数到目标 URL（`utm_source`/`utm_medium`/`utm_campaign`/`utm_term`/`utm_content`） |
 
 说明：当前实现中，保留天数参数在后台任务启动时读取；修改保留天数后，可能需要重启服务才能让清理任务使用新值。

@@ -35,7 +35,7 @@ On first startup, runtime defaults are initialized into DB based on built-in def
 
 ## Configuration Priority
 
-1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*`
+1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` / `utm.*`
 2. **Environment variables (startup overrides)**: `SL__...`
 3. **`config.toml` (startup config; e.g. `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` / `[ipc]`)**
 4. **Program defaults**

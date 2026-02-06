@@ -52,6 +52,19 @@ Location: https://example.com
 Cache-Control: no-cache, no-store, must-revalidate
 ```
 
+> **Optional UTM passthrough**:
+> - When runtime config `utm.enable_passthrough=true`, the redirect appends these request params to the target URL: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`.
+> - Only these 5 keys are forwarded; other query params are not appended.
+
+Example:
+
+```http
+GET /promo?utm_source=newsletter&utm_campaign=spring HTTP/1.1
+
+HTTP/1.1 307 Temporary Redirect
+Location: https://example.com/landing?utm_source=newsletter&utm_campaign=spring
+```
+
 #### Short Code Not Found/Expired (404)
 ```http
 HTTP/1.1 404 Not Found
@@ -164,3 +177,11 @@ Log examples:
 [INFO] Redirect example -> https://www.example.com
 [INFO] Link expired: temp
 ```
+
+## UTM Source Derivation (Detailed Logs)
+
+When `analytics.enable_detailed_logging=true`, each click stores `click_logs.source` with this priority:
+
+1. If request URL has `utm_source`, use it directly.
+2. Otherwise, if `Referer` exists, store `ref:{domain}` (e.g. `ref:google.com`).
+3. Otherwise, store `direct`.

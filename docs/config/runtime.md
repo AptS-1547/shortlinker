@@ -128,8 +128,20 @@ curl -sS -b cookies.txt \
 > **注意**：
 > - 启用 `analytics.enable_detailed_logging` 后（需要重启生效），每次点击都会记录详细信息到 `click_logs` 表（时间、来源、`user_agent_hash` 等）。User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联（用于设备/浏览器统计）。
 > - 若同时开启 `analytics.enable_ip_logging` 才会记录 IP；开启 `analytics.enable_geo_lookup` 才会进行 GeoIP 解析（并使用启动配置 `[analytics]` 选择 provider）。这些数据用于 Analytics API 的趋势分析、来源统计和地理分布等功能。
+> - `click_logs.source` 的推导规则为：优先读取请求 Query 中的 `utm_source`；若不存在则尝试从 `Referer` 提取域名并记录为 `ref:{domain}`；两者都没有则记录为 `direct`。
 > - 数据清理任务由 `analytics.enable_auto_rollup` 控制：启用后会按 `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days` 定期清理过期数据。
 > - 当前实现中，保留天数参数在后台任务启动时读取；修改保留天数后，可能需要重启服务才能让清理任务使用新值。
+
+### UTM 参数透传配置
+
+| 配置键 | 类型 | 默认值 | 需要重启 | 说明 |
+|--------|------|--------|----------|------|
+| `utm.enable_passthrough` | Boolean | `false` | 否 | 启用重定向时 UTM 参数透传（仅透传 `utm_source` / `utm_medium` / `utm_campaign` / `utm_term` / `utm_content`） |
+
+> **说明**：
+> - 默认关闭。开启后，仅当请求 URL 中存在上述 UTM 参数时，才会附加到目标 URL。
+> - 目标 URL 已有 Query 时使用 `&` 追加；没有 Query 时使用 `?` 追加。
+> - 透传参数会进行 URL 解码后再编码，确保 `Location` 头中的 URL 合法。
 
 ### CORS 跨域配置
 

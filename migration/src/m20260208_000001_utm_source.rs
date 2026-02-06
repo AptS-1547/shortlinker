@@ -48,7 +48,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ClickStatsDaily::Table)
-                    .add_column(ColumnDef::new(ClickStatsDaily::UniqueSources).integer().null())
+                    .add_column(
+                        ColumnDef::new(ClickStatsDaily::UniqueSources)
+                            .integer()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;

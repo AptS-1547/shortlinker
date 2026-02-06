@@ -115,8 +115,20 @@ These settings are stored in the database and can be changed at runtime via the 
 > **Note**:
 > - `analytics.enable_detailed_logging` requires a server restart to take effect. When enabled, each click is recorded to the `click_logs` table with detailed fields (timestamp, referrer, `user_agent_hash`, etc). User-Agent strings are deduplicated into the `user_agents` table and linked by hash (used by device/browser analytics).
 > - IPs are only recorded when `analytics.enable_ip_logging` is enabled, and geo lookup only happens when `analytics.enable_geo_lookup` is enabled (using the startup `[analytics]` provider settings). This data powers Analytics API features like trend analysis, referrer stats, geographic distribution, and device analytics.
+> - `click_logs.source` is derived by this order: use `utm_source` from request query first; if absent, extract domain from `Referer` and store `ref:{domain}`; if both are missing, store `direct`.
 > - Data retention/cleanup is controlled by `analytics.enable_auto_rollup`: when enabled, it periodically cleans expired data according to `analytics.log_retention_days` / `analytics.hourly_retention_days` / `analytics.daily_retention_days`.
 > - In the current implementation, retention parameters are read when the background task starts; after changing retention days, you may need to restart the server for the cleanup task to pick up new values.
+
+### UTM passthrough
+
+| Key | Type | Default | Restart | Description |
+|-----|------|---------|---------|-------------|
+| `utm.enable_passthrough` | Boolean | `false` | No | Enable UTM passthrough during redirect (only `utm_source` / `utm_medium` / `utm_campaign` / `utm_term` / `utm_content`) |
+
+> **Notes**:
+> - Disabled by default. When enabled, UTM params are appended only if those keys exist in the incoming request URL.
+> - If target URL already has a query string, params are appended with `&`; otherwise with `?`.
+> - Values are URL-decoded then re-encoded before building `Location`, ensuring valid redirect URLs.
 
 ### CORS
 

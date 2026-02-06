@@ -43,7 +43,7 @@ RuntimeConfig (运行时配置缓存，内存)
 
 ## 配置优先级
 
-1. **数据库（运行时配置）**：`api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*`
+1. **数据库（运行时配置）**：`api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` / `utm.*`
 2. **环境变量（启动配置覆盖）**：`SL__...`
 3. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` / `[ipc]`
 4. **程序默认值**

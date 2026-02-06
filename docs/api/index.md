@@ -52,6 +52,19 @@ Location: https://example.com
 Cache-Control: no-cache, no-store, must-revalidate
 ```
 
+> **UTM 透传（可选）**：
+> - 当运行时配置 `utm.enable_passthrough=true` 时，会把请求中的以下参数透传到目标 URL：`utm_source`、`utm_medium`、`utm_campaign`、`utm_term`、`utm_content`。
+> - 仅透传这 5 个键，其它 Query 参数不会追加到目标 URL。
+
+示例：
+
+```http
+GET /promo?utm_source=newsletter&utm_campaign=spring HTTP/1.1
+
+HTTP/1.1 307 Temporary Redirect
+Location: https://example.com/landing?utm_source=newsletter&utm_campaign=spring
+```
+
 #### 短码不存在/已过期 (404)
 ```http
 HTTP/1.1 404 Not Found
@@ -166,3 +179,11 @@ def check_short_link(base_url, short_code):
 [INFO] 重定向 example -> https://www.example.com
 [INFO] 链接已过期: temp
 ```
+
+## UTM 来源解析（详细日志）
+
+当 `analytics.enable_detailed_logging=true` 时，每次点击会写入 `click_logs.source`，来源推导规则如下：
+
+1. 请求 URL 存在 `utm_source`：直接使用该值；
+2. 否则若请求头有 `Referer`：记录为 `ref:{domain}`（例如 `ref:google.com`）；
+3. 否则记录为 `direct`。
