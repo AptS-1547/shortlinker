@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-beta.2] - 2026-02-06
+
+### 🎉 Release Highlights
+
+v0.5.0-beta.2 是一次性能优化与架构改进版本，主要亮点：
+
+- **Analytics 异步处理架构** - 使用 crossbeam-channel 将详细日志处理从热路径移出，减少重定向延迟
+- **点击日志采样率控制** - 新增 `analytics.sample_rate` 和 `analytics.max_log_rows` 配置，按需控制日志量
+- **数据库索引优化** - 新增 4 个索引优化分析查询性能
+- **链接导出游标分页** - 大数据量导出性能提升 10-100 倍
+
+### Added
+- **点击日志采样率控制** - 新增运行时配置
+  - `analytics.sample_rate` (float, 默认 1.0) - 点击日志采样率，支持 0.0-1.0
+  - `analytics.max_log_rows` (int, 默认 0) - `click_logs` 表最大行数限制，0 表示无限制
+  - `analytics.max_rows_action` (enum, `cleanup`/`stop`) - 超过限制时的行为
+- **数据库索引优化** - 新增两个迁移文件
+  - `idx_click_logs_source_time`: `(source, clicked_at)` 复合索引
+  - `idx_click_logs_geo`: `(country, city, clicked_at)` 复合索引
+  - `idx_stats_hourly_code`: `click_stats_hourly.short_code` 索引
+  - `idx_user_agents_is_bot`: `user_agents.is_bot` 索引
+- **链接导出游标分页** - 使用 `short_code` 作为游标替代 OFFSET 分页
+- **新增 Metrics** - `shortlinker_clicks_channel_dropped` 统计详细点击事件丢弃次数
+
+### Improved
+- **Analytics 异步处理** - 引入 crossbeam-channel 事件队列
+  - 热路径只发送原始数据到 channel（无 spawn 开销）
+  - 单独的 event_processor 协程消费 channel，批量处理详细日志
+- **小时汇总批量 Upsert** - 使用 `ON CONFLICT DO UPDATE` 单次数据库交互完成所有汇总写入
+- **Moka 缓存 TTL 抖动** - 为所有 TTL 添加 ±10% 随机抖动，避免缓存雪崩
+- **Bloom Filter 预留策略** - 分段预留（小规模 50%，中等 20%，大规模 10%）
+- **数据库连接池优化** - SQLite 最大连接数 5→10，通用后端 pool_size 10→20
+- **分析查询内存保护** - 时间范围限制 90 天，聚合 key 限制 1000
+
+### Refactored
+- **Metrics 依赖注入** - 引入 `MetricsRecorder` trait 解耦指标收集
+  - 测试时可使用 `NoopMetrics`
+  - 模块不再依赖全局单例
+- **日志级别调整** - 多处 `warn!` 调整为 `info!`，减少正常运行时的 WARNING 噪音
+- **重试逻辑增强** - 新增死锁和锁超时检测（MySQL/PostgreSQL/SQLite）
+
+### Fixed
+- **点击刷盘 SQLite 变量限制** - 分批处理，每批最多 400 条记录
+- **关闭时刷盘重试** - 增加 3 次重试机制，每次 30 秒超时
+
+### Dependencies
+- 新增 `crossbeam-channel` 0.5 用于 Analytics 事件队列
+
+### Docs
+- 更新配置文档，新增采样率相关配置说明
+- Cloudflare Worker 文档状态调整为"实验中"
+- Docker 文档示例版本号改为占位符
+
+### Breaking Changes
+- **Metrics Feature API 签名变化** - `SeaOrmStorage::new`、`CompositeCache::create`、`ClickManager::new` 需要传入 `metrics` 参数
+- **JWT 配置需重启** - `api.jwt_secret`、`api.access_token_minutes`、`api.refresh_token_days` 现在需要重启生效
+
 ## [v0.5.0-beta.1] - 2026-02-06
 
 ### 🎉 Release Highlights
@@ -1402,7 +1459,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.1...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.2...HEAD
+[v0.5.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.1...v0.5.0-beta.2
 [v0.5.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.6...v0.5.0-beta.1
 [v0.5.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...v0.5.0-alpha.6
 [v0.5.0-alpha.5]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.4...v0.5.0-alpha.5
