@@ -15,6 +15,7 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 ```bash
 ./shortlinker                          # 启动 HTTP 服务器（默认）
 ./shortlinker <command> [args] [opts]  # 运行 CLI 命令
+./shortlinker --socket <路径> <command> # 覆盖 IPC socket 路径（Unix）/命名管道（Windows）
 ```
 
 ## 命令概览
@@ -30,7 +31,8 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 | `list` | 列出所有链接 | `./shortlinker list` |
 | `export` | 导出数据 | `./shortlinker export backup.csv` |
 | `import` | 导入数据 | `./shortlinker import backup.csv --force` |
-| `generate-config` | 生成配置模板 | `./shortlinker generate-config` |
+| `status` | 查看服务状态（IPC） | `./shortlinker status` |
+| `config generate` | 生成配置模板 | `./shortlinker config generate` |
 | `reset-password` | 重置管理员密码 | `./shortlinker reset-password` |
 | `config` | 运行时配置管理（数据库） | `./shortlinker config list` |
 | `tui` | 启动 TUI 界面（需编译启用） | `./shortlinker tui` |

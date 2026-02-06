@@ -36,6 +36,9 @@ curl -sS -X PUT \
   http://localhost:8080/admin/v1/config/features.random_code_length
 
 # 5) Reload config
+# Note: CLI `config set/reset/import` already auto-attempts this via IPC.
+# If IPC is unreachable (server not running, ipc.enabled=false, socket mismatch, etc.),
+# call this endpoint manually.
 curl -sS -X POST -b cookies.txt \
   -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload

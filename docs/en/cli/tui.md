@@ -123,7 +123,9 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 
 ### 6. Auto Server Notification
 
-After create/update/delete (and import), TUI automatically notifies the server to reload **short link data / caches** (Unix: SIGUSR1; Windows: trigger file).
+After create/update/delete (and import), TUI notifies the server via IPC to run `ReloadTarget::Data`, refreshing short-link data and caches.
+
+> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), the notification is skipped and local TUI operations still complete.
 
 ## Color Scheme
 

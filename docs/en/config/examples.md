@@ -73,15 +73,19 @@ Runtime config (stored in the DB) can be set via the built-in CLI; configs marke
 
 ## Hot Reload
 
-Shortlinker has two kinds of “hot reload / hot apply”:
+Shortlinker has two kinds of hot reload / hot apply:
 
-1. **Short link data hot reload**: reload links from the storage backend and rebuild in-memory caches (useful after CLI/TUI writes directly to the database).
-2. **Runtime config hot apply**: when you update a “no restart” config via the Admin API, it is synced into memory and takes effect immediately.
+1. **Short-link data sync / hot reload**:
+   - CLI link commands (`add/update/remove/import/export/list`) execute through IPC in the server process when IPC is reachable.
+   - TUI writes to DB locally, then triggers `ReloadTarget::Data` via IPC to refresh caches.
+2. **Runtime config hot apply**:
+   - No-restart keys usually apply immediately when updated through Admin API.
+   - CLI `config set/reset/import` writes to DB and then automatically attempts `ReloadTarget::Config` via IPC.
 
 ### Supported
 
-- ✅ Short link data (cache rebuild)
-- ✅ Runtime configs marked as “no restart” (applies immediately when updated via Admin API)
+- ✅ Short-link data (cache rebuild)
+- ✅ Runtime configs marked as no-restart (Admin API or CLI+IPC path)
 - ✅ Cookie settings (`api.cookie_*`): affect newly issued cookies; re-login to get updated cookies
 
 ### Not supported
@@ -91,19 +95,17 @@ Shortlinker has two kinds of “hot reload / hot apply”:
 - ❌ Cache type
 - ❌ Route prefixes
 
-### Reload methods
+### Check and manual reload
 
 ```bash
-# 1) Reload short link data / caches (Unix: send SIGUSR1)
-# Note: SIGUSR1 only reloads link data/caches; it does NOT reload runtime config.
-kill -USR1 $(cat shortlinker.pid)
+# 1) Check IPC connectivity (CLI/TUI <-> server sync)
+./shortlinker status
+# If you use a custom socket/pipe path:
+./shortlinker --socket /tmp/shortlinker.sock status
 
-# 2) Reload runtime config from DB (Admin API; requires cookies)
-# Notes:
-# - If you update a “no restart” config via Admin API (PUT /admin/v1/config/{key}),
-#   it usually applies immediately and you don't need this.
-# - If you changed configs directly in the database (e.g. via `./shortlinker config set`),
-#   call this endpoint to let the server re-load configs from DB.
+# 2) Manually reload runtime config from DB (Admin API; requires cookies)
+# Use this when IPC is unreachable (server not running, ipc.enabled=false,
+# socket mismatch, etc.) and CLI config commands cannot notify the running server.
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -c cookies.txt \
@@ -116,4 +118,3 @@ curl -sS -X POST -b cookies.txt \
   -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   http://localhost:8080/admin/v1/config/reload
 ```
-

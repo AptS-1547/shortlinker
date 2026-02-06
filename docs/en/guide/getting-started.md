@@ -10,10 +10,10 @@ Please complete any installation method from the [Installation Guide](/en/guide/
 
 ### Method 1: Using TOML Configuration File (Recommended)
 
-Use the `generate-config` command to generate a configuration file:
+Use the `config generate` command to generate a configuration file:
 
 ```bash
-./shortlinker generate-config config.toml
+./shortlinker config generate config.toml
 # Generates a startup config template (server/database/cache/logging/analytics)
 ```
 
@@ -95,10 +95,16 @@ curl -I http://localhost:8080/github
 # Method 2: Send signal
 kill $(cat shortlinker.pid)
 
-# Reload short link data / caches (Unix systems)
-# Note: SIGUSR1 only reloads link data/caches; it does NOT reload runtime config.
-# Reload runtime config via Admin API `/admin/v1/config/reload` or restart the service.
-kill -USR1 $(cat shortlinker.pid)
+# Check server status (IPC)
+./shortlinker status
+
+# If you use a custom IPC path, override with --socket
+./shortlinker --socket /tmp/shortlinker.sock status
+
+# Runtime config changes (config set/reset/import) automatically attempt
+# an IPC config reload. If IPC is unreachable (server not running,
+# ipc.enabled=false, socket mismatch, etc.), call Admin API
+# `/admin/v1/config/reload` manually or restart the service.
 ```
 
 ## Production Environment Quick Configuration

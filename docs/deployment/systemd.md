@@ -33,14 +33,15 @@ TimeoutStopSec=5
 # 启动配置文件（必须）：
 # - Shortlinker 会从 WorkingDirectory 读取 ./config.toml（相对路径）
 # - 建议放在：/opt/shortlinker/config.toml
-# - 需要配置的典型项：server.host/port、server.unix_socket、database.database_url、logging.*
+# - 需要配置的典型项：server.host/port、server.unix_socket、database.database_url、logging.*、ipc.*
 
 # 安全配置
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# 需要写入：shortlinker.pid、./shortlinker.sock（IPC）、admin_token.txt（首次启动可选）、数据库文件等
+# 需要写入：shortlinker.pid、IPC socket（默认 ./shortlinker.sock，若自定义 ipc.socket_path 需同步放行）、
+#          admin_token.txt（首次启动可选）、数据库文件等
 ReadWritePaths=/opt/shortlinker
 
 [Install]

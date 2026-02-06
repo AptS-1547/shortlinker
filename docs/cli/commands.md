@@ -11,6 +11,14 @@
 
 > 如果你只想快速可视化管理，建议直接使用 [TUI 界面](/cli/tui)。
 
+## 全局参数
+
+所有 CLI 子命令都支持以下全局参数：
+
+- `-s, --socket <路径>`：覆盖 IPC socket 路径（Unix）或命名管道路径（Windows）
+
+> 优先级：CLI `--socket` > `config.toml` 的 `ipc.socket_path` > 平台默认值。
+
 ## 核心命令（推荐阅读顺序）
 
 ### add - 添加短链接
@@ -100,6 +108,16 @@
 ./shortlinker help
 ```
 
+### status - 查看服务状态（IPC）
+
+```bash
+./shortlinker status
+./shortlinker --socket /tmp/custom.sock status
+```
+
+当服务可达时，会显示：版本、运行时长、是否正在重载、最近一次数据/配置重载时间、链接总数。
+如果 IPC 不可达（服务未启动、`ipc.enabled=false`、路径不一致等），会提示“Server is not running”。
+
 ## 运维命令
 
 ### config - 配置管理
@@ -131,7 +149,8 @@
 
 以下子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
 
-> 提示：`config` 命令会把值写入数据库。若要让**正在运行**的服务重新从数据库加载配置，可调用 Admin API `POST /admin/v1/config/reload`，或重启服务。
+> 提示：`config set/reset/import` 会在写库后**自动尝试**通过 IPC 触发 `Config` 重载（仅对“无需重启”的配置热生效）。
+> 若 IPC 不可达（服务未运行、`ipc.enabled=false`、socket 路径不一致等），请手动调用 Admin API `POST /admin/v1/config/reload` 或重启服务。
 > 标记为"需要重启"的配置（如 `routes.*`、`click.*`、`cors.*`）即使 reload 也不会热生效，仍需要重启。
 
 常用子命令：
@@ -248,9 +267,11 @@ github,https://github.com,2024-12-15T14:30:22Z,,,
 
 ### 热重载说明
 
-链接数据变更命令（如 `add` / `update` / `remove` / `import`）会尝试通知运行中的服务刷新内存缓存。
+当服务正在运行且 IPC 可达时，链接管理命令会优先通过 IPC 在服务进程内执行，避免“DB 已写入但服务缓存未更新”的窗口。
 
-> 注意：这不等同于运行时配置热更新。通过 `./shortlinker config set` 改动配置后，请调用 Admin API `POST /admin/v1/config/reload` 或重启服务。
+若 IPC 不可达，CLI 会回退为本地数据库操作（适合离线维护）；此时如果线上服务仍在运行，需要你手动让服务刷新数据（通常重启服务）。
+
+> 注意：运行时配置改动与链接数据改动是两条路径。`config set/reset/import` 只会尝试 `Config` 重载；“需要重启”的键仍必须重启。
 
 ### 数据库配置
 

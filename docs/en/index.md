@@ -67,7 +67,7 @@ Command line tool management, TOML startup config + DB runtime config, one-click
 - **Cross-platform Support**: Windows, Linux, macOS, smart process locking to prevent duplicate startup
 - **Container Optimization**: Docker image deployment with container restart detection support
 - **TUI Interface**: Terminal user interface for interactive management and monitoring
-- **TOML Configuration**: Startup config (server/database/cache/logging/geoip) + DB runtime config (auth/routes/features, etc.)
+- **TOML Configuration**: Startup config (server/database/cache/logging/analytics/ipc) + DB runtime config (auth/routes/features, etc.)
 
 ## Quick Experience
 

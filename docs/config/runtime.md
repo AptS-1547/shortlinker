@@ -32,6 +32,8 @@ curl -X PUT \
      http://localhost:8080/admin/v1/config/features.random_code_length
 
 # 重载配置
+# 说明：CLI `config set/reset/import` 已会自动尝试通过 IPC 触发重载；
+# 若 IPC 不可达（服务未运行、ipc.enabled=false、socket 路径不一致等），可手动调用该接口。
 curl -X POST \
      -b cookies.txt \
      -H "X-CSRF-Token: ${CSRF_TOKEN}" \

@@ -49,6 +49,22 @@
 
 > 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置设置（例如 `logging.format`、`logging.file`）。
 
+### IPC 配置
+
+| TOML 键 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `ipc.enabled` | Boolean | `true` | 是否启用 IPC 服务端（CLI/TUI 与运行中服务通信依赖它） |
+| `ipc.socket_path` | String | *(平台默认)* | 自定义 IPC 路径（Unix socket / Windows named pipe） |
+| `ipc.max_message_size` | Integer | `65536` | IPC 消息最大字节数 |
+| `ipc.timeout` | Integer | `5` | 常规 IPC 操作超时（秒） |
+| `ipc.reload_timeout` | Integer | `30` | 配置/数据重载类 IPC 超时（秒） |
+| `ipc.bulk_timeout` | Integer | `60` | 批量导入导出 IPC 超时（秒） |
+
+> 说明：
+> - 路径优先级：CLI `--socket` > `ipc.socket_path` > 平台默认值。默认值为 Unix `./shortlinker.sock`，Windows `\\.\\pipe\\shortlinker`。
+> - Unix 下 IPC socket 文件权限固定为 `0600`（仅属主读写）。
+> - 若 `ipc.enabled=false`，`./shortlinker status` 与 CLI/TUI 的 IPC 同步能力不可用；运行时配置需通过 Admin API `POST /admin/v1/config/reload` 或重启生效。
+
 ### GeoIP（分析）配置
 
 | TOML 键 | 类型 | 默认值 | 说明 |
@@ -59,4 +75,3 @@
 > 说明：
 > - Provider 选择：`analytics.maxminddb_path` 可读时使用本地 MaxMind；否则使用外部 API（`analytics.geoip_api_url`）。
 > - 外部 API Provider 内置缓存（不可配置）：LRU 最大 10000 条，TTL 15 分钟（包含失败的负缓存）；同一 IP 的并发查询会合并为一次请求；单次请求超时 2 秒。
-

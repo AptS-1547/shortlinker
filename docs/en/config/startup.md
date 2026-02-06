@@ -47,6 +47,22 @@ See [Storage Backends](/en/config/storage) for URL formats.
 | `logging.enable_rotation` | Boolean | `true` | Enable rotation (currently daily rotation) |
 | `logging.max_size` | Integer | `100` | *(currently unused; rotation is time-based)* |
 
+### IPC
+
+| TOML key | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ipc.enabled` | Boolean | `true` | Enable IPC server (required for CLI/TUI communication with a running server) |
+| `ipc.socket_path` | String | *(platform default)* | Custom IPC path (Unix socket / Windows named pipe) |
+| `ipc.max_message_size` | Integer | `65536` | Max IPC message size in bytes |
+| `ipc.timeout` | Integer | `5` | Default IPC timeout (seconds) |
+| `ipc.reload_timeout` | Integer | `30` | Timeout for reload-type IPC operations (seconds) |
+| `ipc.bulk_timeout` | Integer | `60` | Timeout for import/export IPC operations (seconds) |
+
+> Notes:
+> - Path priority: CLI `--socket` > `ipc.socket_path` > platform default. Defaults are Unix `./shortlinker.sock`, Windows `\\.\\pipe\\shortlinker`.
+> - On Unix, the IPC socket file permission is fixed to `0600` (owner-only read/write).
+> - If `ipc.enabled=false`, `./shortlinker status` and CLI/TUI IPC sync are unavailable; use Admin API `POST /admin/v1/config/reload` or restart to apply runtime config changes.
+
 ### GeoIP (startup)
 
 | TOML key | Type | Default | Description |
@@ -57,4 +73,3 @@ See [Storage Backends](/en/config/storage) for URL formats.
 > Notes:
 > - Provider selection: when `analytics.maxminddb_path` is set and readable, MaxMind is used; otherwise it falls back to the external API (`analytics.geoip_api_url`).
 > - The external API provider has a built-in cache (not configurable): LRU max 10,000 entries, TTL 15 minutes (including negative caching on failures). Concurrent lookups for the same IP are singleflighted into one request. HTTP timeout is 2 seconds.
-

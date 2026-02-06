@@ -44,7 +44,7 @@ curl -X PUT -b cookies.txt \
 
 ### IPC Socket 权限
 
-Unix socket 文件（`./shortlinker.sock`）权限已自动设置为 `0600`（仅属主可访问），防止本地其他用户绕过 Admin API。
+Unix 下 IPC socket 文件（默认为 `./shortlinker.sock`，也可能是你配置的 `ipc.socket_path` 或 CLI `--socket` 覆盖路径）权限会被自动设置为 `0600`（仅属主可访问），防止本地其他用户绕过 Admin API。
 
 如果需要允许特定用户访问 CLI：
 ```bash
@@ -55,4 +55,3 @@ setfacl -m u:username:rw ./shortlinker.sock
 chgrp shortlinker-users ./shortlinker.sock
 chmod 660 ./shortlinker.sock
 ```
-

@@ -33,14 +33,15 @@ TimeoutStopSec=5
 # Startup config file (required):
 # - Shortlinker reads ./config.toml from WorkingDirectory (relative path)
 # - Recommended location: /opt/shortlinker/config.toml
-# - Typical keys: server.host/port, server.unix_socket, database.database_url, logging.*
+# - Typical keys: server.host/port, server.unix_socket, database.database_url, logging.*, ipc.*
 
 # Security configuration
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# Needs write access for: shortlinker.pid, ./shortlinker.sock (IPC), admin_token.txt (first startup), DB file, etc.
+# Needs write access for: shortlinker.pid, IPC socket (default ./shortlinker.sock;
+# custom ipc.socket_path also needs to be writable), admin_token.txt (first startup), DB file, etc.
 ReadWritePaths=/opt/shortlinker
 
 [Install]

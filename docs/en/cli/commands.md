@@ -11,6 +11,14 @@ Detailed command-line usage and options for day-to-day management.
 
 > If you prefer visual management, start with the [TUI guide](/en/cli/tui).
 
+## Global Options
+
+All CLI subcommands support:
+
+- `-s, --socket <path>`: override IPC socket path (Unix) or named pipe path (Windows)
+
+> Priority: CLI `--socket` > `ipc.socket_path` in `config.toml` > platform default.
+
 ## Core Commands (Recommended Order)
 
 ### add - Add Short Link
@@ -100,6 +108,16 @@ Detailed command-line usage and options for day-to-day management.
 ./shortlinker help
 ```
 
+### status - Show Server Status (IPC)
+
+```bash
+./shortlinker status
+./shortlinker --socket /tmp/custom.sock status
+```
+
+When reachable, it shows version, uptime, reload-in-progress status, last data/config reload time, and total link count.
+If IPC is unreachable (server not running, `ipc.enabled=false`, socket path mismatch, etc.), it reports "Server is not running".
+
 ## Operations Commands
 
 ### config - Configuration Management
@@ -131,7 +149,8 @@ Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in D
 
 The following subcommands manage runtime config stored in the database (same config system used by the web admin panel).
 
-> Note: `config` writes values into the database. To make a **running** server reload runtime config, call Admin API `POST /admin/v1/config/reload` or restart the service.
+> Note: `config set/reset/import` automatically **attempt** an IPC `Config` reload after writing to DB (hot-apply for keys marked as "no restart").
+> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), trigger Admin API `POST /admin/v1/config/reload` manually or restart the service.
 > Keys marked as "requires restart" (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload.
 
 Common subcommands:
@@ -248,9 +267,11 @@ github,https://github.com,2024-12-15T14:30:22Z,,,
 
 ### Reload Behavior
 
-Link-data commands (`add` / `update` / `remove` / `import`) notify the running service to refresh in-memory link caches.
+When the server is running and IPC is reachable, link-management commands execute through IPC in the server process to keep storage/cache state aligned.
 
-> This is different from runtime config reload. For config changes made via `./shortlinker config set`, call Admin API `POST /admin/v1/config/reload` or restart.
+If IPC is unreachable, CLI falls back to direct DB operations (good for offline maintenance). If an online server is still running, you should manually refresh data (typically by restarting the service).
+
+> Runtime config changes are a separate path. `config set/reset/import` only attempt `Config` reload; keys marked "requires restart" still require restart.
 
 ### Database Configuration
 

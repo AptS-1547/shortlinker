@@ -45,7 +45,7 @@ RuntimeConfig (运行时配置缓存，内存)
 
 1. **数据库（运行时配置）**：`api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*`
 2. **环境变量（启动配置覆盖）**：`SL__...`
-3. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]`
+3. **`config.toml`（启动配置）**：`[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` / `[ipc]`
 4. **程序默认值**
 
 > 说明：环境变量只影响**启动配置**；当前版本不会自动把环境变量或 `config.toml` 迁移到运行时配置。

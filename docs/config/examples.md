@@ -76,13 +76,17 @@ database_url = "sqlite:///data/links.db"
 
 Shortlinker 的“热重载/热生效”主要分两类：
 
-1. **短链接数据热重载**：让服务重新从存储加载短链接并重建缓存（适用于 CLI/TUI 直接写数据库后通知服务刷新缓存）。
-2. **运行时配置热生效**：通过 Admin API 更新“无需重启”的配置时，会直接同步到内存配置并立即生效。
+1. **短链接数据同步/热重载**：
+   - CLI 链接命令（`add/update/remove/import/export/list`）在服务运行且 IPC 可达时，会通过 IPC 在服务进程内执行。
+   - TUI 在本地写库后，会通过 IPC 触发 `ReloadTarget::Data` 刷新缓存。
+2. **运行时配置热生效**：
+   - Admin API 直接更新“无需重启”的配置时，通常会立即生效。
+   - CLI `config set/reset/import` 写库后，会自动尝试通过 IPC 触发 `ReloadTarget::Config`。
 
 ### 支持热生效/热重载的内容
 
 - ✅ 短链接数据（缓存重建）
-- ✅ 标记为“无需重启”的运行时配置（通过 Admin API 更新时立即生效）
+- ✅ 标记为“无需重启”的运行时配置（Admin API 或 CLI+IPC）
 - ✅ Cookie 配置（`api.cookie_*`）：对新下发的 Cookie 生效，修改后建议重新登录获取新 Cookie
 
 ### 不支持热重载的配置
@@ -92,17 +96,17 @@ Shortlinker 的“热重载/热生效”主要分两类：
 - ❌ 缓存类型
 - ❌ 路由前缀
 
-### 重载方法
+### 检查与手动重载
 
 ```bash
-# 1) 重载短链接数据/缓存（Unix 系统 - 发送 SIGUSR1 信号）
-# 注意：SIGUSR1 只会触发短链接数据/缓存重载，不会重载运行时配置
-kill -USR1 $(cat shortlinker.pid)
+# 1) 检查 IPC 通信是否正常（用于 CLI/TUI 与服务同步）
+./shortlinker status
+# 如果你使用了自定义路径：
+./shortlinker --socket /tmp/shortlinker.sock status
 
-# 2) 重载运行时配置（通过 Admin API）
-# 说明：如果你是通过 Admin API 直接更新配置（PUT /admin/v1/config/{key}），
-#       且该配置“无需重启”，一般不需要额外 reload。
-#       如果你是直接改数据库（例如使用 `./shortlinker config set`），可以调用该接口让服务重新从 DB 加载配置。
+# 2) 手动重载运行时配置（Admin API）
+# 说明：当 IPC 不可达（服务未运行、ipc.enabled=false、socket 路径不一致等）时，
+#       CLI config 命令无法通知正在运行的服务，可用该接口手动触发。
 #
 # 先登录获取 cookies（如已存在 cookies.txt 可跳过）
 curl -sS -X POST \
@@ -118,4 +122,3 @@ curl -X POST \
      -H "X-CSRF-Token: ${CSRF_TOKEN}" \
      http://localhost:8080/admin/v1/config/reload
 ```
-
