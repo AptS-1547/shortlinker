@@ -4544,6 +4544,7 @@ dependencies = [
  "colored",
  "config",
  "criterion",
+ "crossbeam-channel",
  "crossterm",
  "csv",
  "ctor",

@@ -46,6 +46,21 @@ pub(crate) fn to_json_string(map: &HashMap<String, usize>) -> String {
     serde_json::to_string(map).unwrap_or_else(|_| "{}".to_string())
 }
 
+/// 原始点击事件（用于 channel 传输，避免在热路径做计算）
+#[derive(Debug)]
+pub struct RawClickEvent {
+    /// 短链接代码
+    pub code: String,
+    /// 原始 query string
+    pub query: Option<String>,
+    /// Referer header
+    pub referrer: Option<String>,
+    /// User-Agent header
+    pub user_agent: Option<String>,
+    /// 客户端 IP
+    pub ip: Option<String>,
+}
+
 /// 详细点击信息
 #[derive(Debug, Clone)]
 pub struct ClickDetail {

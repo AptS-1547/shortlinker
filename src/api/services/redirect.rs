@@ -1,21 +1,19 @@
 // Rust 化完成
 
 use std::borrow::Cow;
-use std::net::IpAddr;
 
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use std::sync::Arc;
 use tracing::{debug, error, trace};
 
-use crate::analytics::ClickDetail;
 use crate::analytics::global::get_click_manager;
 use crate::cache::CacheResult;
 use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
-use crate::services::{GeoIpProvider, get_user_agent_store};
+use crate::services::GeoIpProvider;
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::utils::ip::{extract_client_ip, is_private_or_local};
+use crate::utils::ip::extract_client_ip;
 use crate::utils::is_valid_short_code;
 
 pub struct RedirectService {}
@@ -113,58 +111,9 @@ impl RedirectService {
             .body("Internal Server Error")
     }
 
-    /// 从原始数据推导流量来源（用于异步处理）
+    /// 更新点击计数（通过 channel 异步处理分析逻辑，不阻塞响应）
     #[inline]
-    fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
-        // 1. 检查 utm_source 参数
-        if let Some(query) = query
-            && let Some(utm_source) = Self::extract_query_param(query, "utm_source")
-        {
-            return Some(utm_source.into_owned());
-        }
-
-        // 2. 有 Referer header → ref:{domain}
-        if let Some(referer_url) = referrer
-            && let Some(domain) = Self::extract_domain(referer_url)
-        {
-            return Some(format!("ref:{}", domain));
-        }
-
-        // 3. 都没有 → direct
-        Some("direct".to_string())
-    }
-
-    /// 从 query string 提取指定参数值
-    #[inline]
-    fn extract_query_param<'a>(query: &'a str, key: &str) -> Option<Cow<'a, str>> {
-        for part in query.split('&') {
-            if let Some(value) = part.strip_prefix(key).and_then(|s| s.strip_prefix('=')) {
-                // urlencoding::decode 返回 Cow，未编码时零分配
-                return urlencoding::decode(value).ok();
-            }
-        }
-        None
-    }
-
-    /// 从 URL 提取域名
-    #[inline]
-    fn extract_domain(url: &str) -> Option<&str> {
-        // 简单解析：找 :// 后的域名部分
-        let without_scheme = url
-            .strip_prefix("https://")
-            .or_else(|| url.strip_prefix("http://"))
-            .unwrap_or(url);
-
-        // 取到第一个 / 或 : 或 ? 或 # 为止
-        without_scheme
-            .split(&['/', ':', '?', '#'][..])
-            .next()
-            .filter(|s| !s.is_empty())
-    }
-
-    /// 更新点击计数（异步处理分析逻辑，不阻塞响应）
-    #[inline]
-    fn update_click(code: &str, req: &HttpRequest, geoip: Option<web::Data<Arc<GeoIpProvider>>>) {
+    fn update_click(code: &str, req: &HttpRequest, _geoip: Option<web::Data<Arc<GeoIpProvider>>>) {
         let Some(manager) = get_click_manager() else {
             return;
         };
@@ -179,61 +128,25 @@ impl RedirectService {
             return;
         }
 
-        // 同步阶段：只提取原始字符串
-        let code = code.to_string();
-        let query = req.uri().query().map(String::from);
-        let referrer = req
-            .headers()
-            .get("referer")
-            .and_then(|h| h.to_str().ok())
-            .map(String::from);
-        let user_agent = req
-            .headers()
-            .get("user-agent")
-            .and_then(|h| h.to_str().ok())
-            .map(String::from);
-        let ip = extract_client_ip(req);
-        let geoip = geoip.map(|g| Arc::clone(g.get_ref()));
-        let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
-        let enable_geo_lookup = rt.get_bool_or(keys::ANALYTICS_ENABLE_GEO_LOOKUP, false);
+        // 提取原始数据并发送到 channel（配置读取移到消费者端）
+        let event = crate::analytics::RawClickEvent {
+            code: code.to_string(),
+            query: req.uri().query().map(String::from),
+            referrer: req
+                .headers()
+                .get("referer")
+                .and_then(|h| h.to_str().ok())
+                .map(String::from),
+            user_agent: req
+                .headers()
+                .get("user-agent")
+                .and_then(|h| h.to_str().ok())
+                .map(String::from),
+            ip: extract_client_ip(req),
+        };
 
-        // 异步阶段：所有计算都在后台任务执行
-        tokio::spawn(async move {
-            // derive_source
-            let source = Self::derive_source_from_raw(&query, &referrer);
-
-            // UA hash
-            let user_agent_hash = user_agent
-                .as_ref()
-                .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
-
-            let ip_address = if enable_ip_logging { ip.clone() } else { None };
-
-            let mut detail = ClickDetail {
-                code,
-                timestamp: chrono::Utc::now(),
-                referrer,
-                user_agent_hash,
-                ip_address,
-                country: None,
-                city: None,
-                source,
-            };
-
-            // GeoIP 查询（如果启用且有有效 IP）
-            if enable_geo_lookup
-                && let Some(geoip) = geoip
-                && let Some(ref ip_str) = ip
-                && let Ok(ip_addr) = ip_str.parse::<IpAddr>()
-                && !is_private_or_local(&ip_addr)
-                && let Some(geo) = geoip.lookup(ip_str).await
-            {
-                detail.country = geo.country;
-                detail.city = geo.city;
-            }
-
-            manager.record_detailed(detail);
-        });
+        // send_raw_event 内部会调用 increment
+        manager.send_raw_event(event);
     }
 
     fn finish_redirect(req: &HttpRequest, link: ShortLink) -> HttpResponse {

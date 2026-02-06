@@ -5,7 +5,9 @@
 //! - 定时刷盘到存储后端
 //! - 阈值触发刷盘
 //! - 详细点击日志记录（可选）
+//! - Channel 异步处理（避免热路径 spawn）
 
+use crossbeam_channel::{Receiver, Sender, TrySendError};
 use dashmap::DashMap;
 use std::sync::{
     Arc,
@@ -15,7 +17,7 @@ use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};
 
-use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
+use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink, RawClickEvent};
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -109,8 +111,12 @@ struct DetailedBuffer {
     data: DashMap<u64, ClickDetail>,
     /// 下一个 ID
     next_id: AtomicU64,
+    /// 当前条目数（用于阈值判断）
+    entry_count: AtomicUsize,
     /// 刷盘锁
     flush_lock: Mutex<()>,
+    /// 是否有 flush 任务待处理（防止重复 spawn）
+    flush_pending: AtomicBool,
 }
 
 impl DetailedBuffer {
@@ -118,14 +124,17 @@ impl DetailedBuffer {
         Self {
             data: DashMap::new(),
             next_id: AtomicU64::new(0),
+            entry_count: AtomicUsize::new(0),
             flush_lock: Mutex::new(()),
+            flush_pending: AtomicBool::new(false),
         }
     }
 
-    /// 添加详细点击日志
-    fn push(&self, detail: ClickDetail) {
+    /// 添加详细点击日志，返回当前缓冲区大小
+    fn push(&self, detail: ClickDetail) -> usize {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.data.insert(id, detail);
+        self.entry_count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// 收集所有日志并清空缓冲区
@@ -137,20 +146,21 @@ impl DetailedBuffer {
                 details.push(detail);
             }
         }
+        // 重置计数器
+        self.entry_count.store(0, Ordering::Relaxed);
         details
     }
 
-    /// 恢复数据到缓冲区
+    /// 恢复数据到缓冲区（不调用 push 避免重复计数）
     fn restore(&self, details: Vec<ClickDetail>) {
+        let count = details.len();
         for detail in details {
-            self.push(detail);
+            let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+            self.data.insert(id, detail);
         }
+        self.entry_count.fetch_add(count, Ordering::Relaxed);
     }
 
-    /// 获取当前缓冲区大小
-    fn len(&self) -> usize {
-        self.data.len()
-    }
 }
 
 /// 点击管理器
@@ -171,6 +181,8 @@ pub struct ClickManager {
     detailed_buffer: Option<Arc<DetailedBuffer>>,
     /// 详细日志 Sink（可选）
     detailed_sink: Option<Arc<dyn DetailedClickSink>>,
+    /// 原始事件 channel sender（用于异步处理详细日志，使用 crossbeam 高性能 channel）
+    raw_event_tx: Option<Sender<RawClickEvent>>,
 }
 
 impl ClickManager {
@@ -186,24 +198,32 @@ impl ClickManager {
             max_clicks_before_flush,
             detailed_buffer: None,
             detailed_sink: None,
+            raw_event_tx: None,
         }
     }
 
     /// 创建带详细日志支持的点击管理器
+    /// 返回 (ClickManager, Receiver) 以便启动后台处理任务
     pub fn with_detailed_logging(
         sink: Arc<dyn ClickSink>,
         detailed_sink: Arc<dyn DetailedClickSink>,
         flush_interval: Duration,
         max_clicks_before_flush: usize,
-    ) -> Self {
-        Self {
+    ) -> (Self, Receiver<RawClickEvent>) {
+        // 使用 crossbeam bounded channel，容量 10000
+        let (tx, rx) = crossbeam_channel::bounded(10000);
+
+        let manager = Self {
             buffer: Arc::new(ClickBuffer::new()),
             sink,
             flush_interval,
             max_clicks_before_flush,
             detailed_buffer: Some(Arc::new(DetailedBuffer::new())),
             detailed_sink: Some(detailed_sink),
-        }
+            raw_event_tx: Some(tx),
+        };
+
+        (manager, rx)
     }
 
     /// 检查是否启用了详细日志
@@ -220,12 +240,63 @@ impl ClickManager {
 
         // 2. 如果启用详细日志，写入 detailed_buffer
         if let Some(ref buffer) = self.detailed_buffer {
-            buffer.push(detail);
+            let current_size = buffer.push(detail);
             trace!(
                 "ClickManager: Detailed log recorded, buffer size: {}",
-                buffer.len()
+                current_size
             );
+
+            // 阈值触发刷盘
+            if current_size >= self.max_clicks_before_flush {
+                if buffer
+                    .flush_pending
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    let buffer = Arc::clone(buffer);
+                    let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                    tokio::spawn(async move {
+                        if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                            Self::flush_detailed_buffer(&buffer, &sink).await;
+                        } else {
+                            trace!("ClickManager: detailed flush already in progress, skipping");
+                        }
+                        buffer.flush_pending.store(false, Ordering::Release);
+                    });
+                }
+            }
         }
+    }
+
+    /// 发送原始点击事件到 channel（热路径调用，非阻塞）
+    ///
+    /// 返回 true 表示发送成功，false 表示 channel 已满或未启用
+    #[inline]
+    pub fn send_raw_event(&self, event: RawClickEvent) -> bool {
+        // 始终增加 click_count
+        self.increment(&event.code);
+
+        // 尝试发送到 channel（crossbeam try_send）
+        if let Some(ref tx) = self.raw_event_tx {
+            match tx.try_send(event) {
+                Ok(()) => true,
+                Err(TrySendError::Full(_)) => {
+                    trace!("ClickManager: Event channel full, dropping event");
+                    false
+                }
+                Err(TrySendError::Disconnected(_)) => {
+                    warn!("ClickManager: Event channel disconnected");
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    /// 获取 channel sender 的克隆（用于外部直接发送）
+    pub fn get_event_sender(&self) -> Option<Sender<RawClickEvent>> {
+        self.raw_event_tx.clone()
     }
 
     /// 增加点击计数（线程安全，无锁）
@@ -280,6 +351,63 @@ impl ClickManager {
                 Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
             }
         }
+    }
+
+    /// 启动原始事件处理器（消费 crossbeam channel 并生成 ClickDetail）
+    ///
+    /// 需要传入事件处理函数，用于将 RawClickEvent 转换为 ClickDetail
+    pub async fn start_event_processor<F>(
+        &self,
+        rx: Receiver<RawClickEvent>,
+        process_fn: F,
+    ) where
+        F: Fn(RawClickEvent) -> ClickDetail + Send + 'static,
+    {
+        debug!("ClickManager: Starting event processor");
+
+        // crossbeam channel 的 recv 是阻塞的，需要在 blocking task 中运行
+        // 或者用 try_recv + yield
+        loop {
+            // 使用 try_recv 避免阻塞 tokio runtime
+            match rx.try_recv() {
+                Ok(event) => {
+                    let detail = process_fn(event);
+
+                    // 直接写入 detailed_buffer（不再调用 record_detailed 避免重复 increment）
+                    if let Some(ref buffer) = self.detailed_buffer {
+                        let current_size = buffer.push(detail);
+
+                        // 阈值触发刷盘
+                        if current_size >= self.max_clicks_before_flush {
+                            if buffer
+                                .flush_pending
+                                .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                                .is_ok()
+                            {
+                                let buffer = Arc::clone(buffer);
+                                let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                                tokio::spawn(async move {
+                                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                                        Self::flush_detailed_buffer(&buffer, &sink).await;
+                                    }
+                                    buffer.flush_pending.store(false, Ordering::Release);
+                                });
+                            }
+                        }
+                    }
+                }
+                Err(crossbeam_channel::TryRecvError::Empty) => {
+                    // Channel 空，短暂休眠避免忙等
+                    tokio::time::sleep(Duration::from_micros(100)).await;
+                }
+                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                    debug!("ClickManager: Event channel disconnected, stopping processor");
+                    break;
+                }
+            }
+        }
+
+        debug!("ClickManager: Event processor stopped (channel closed)");
     }
 
     /// 手动触发刷盘（阻塞直到完成）
@@ -351,7 +479,7 @@ impl ClickManager {
         }
     }
 
-    /// 执行详细日志刷盘操作
+    /// 执行详细日志刷盘操作（分批插入，避免超出 SQL 变量限制）
     async fn flush_detailed_buffer(buffer: &DetailedBuffer, sink: &Arc<dyn DetailedClickSink>) {
         let details = buffer.drain();
 
@@ -360,22 +488,41 @@ impl ClickManager {
             return;
         }
 
-        let count = details.len();
-        match sink.log_clicks_batch(details.clone()).await {
-            Ok(_) => {
-                debug!(
-                    "ClickManager: Successfully flushed {} detailed log entries",
-                    count
-                );
+        let total_count = details.len();
+        const BATCH_SIZE: usize = 500;
+        let mut failed = Vec::new();
+        let mut success_count = 0;
+
+        for chunk in details.chunks(BATCH_SIZE) {
+            match sink.log_clicks_batch(chunk.to_vec()).await {
+                Ok(_) => {
+                    success_count += chunk.len();
+                }
+                Err(e) => {
+                    warn!(
+                        "ClickManager: log_clicks_batch failed: {}, {} entries will be restored",
+                        e,
+                        chunk.len()
+                    );
+                    failed.extend(chunk.iter().cloned());
+                }
             }
-            Err(e) => {
-                // 刷盘失败，恢复数据到 buffer
-                buffer.restore(details);
-                warn!(
-                    "ClickManager: log_clicks_batch failed: {}, {} entries restored to buffer",
-                    e, count
-                );
-            }
+        }
+
+        if success_count > 0 {
+            debug!(
+                "ClickManager: Successfully flushed {} detailed log entries",
+                success_count
+            );
+        }
+
+        if !failed.is_empty() {
+            warn!(
+                "ClickManager: {} of {} entries failed, restoring to buffer",
+                failed.len(),
+                total_count
+            );
+            buffer.restore(failed);
         }
     }
 

@@ -67,6 +67,7 @@ tokio = { version = "1.49.0", default-features = false, features = ["rt-multi-th
 bytes = "1.11"
 tracing = { version = "0.1.44", default-features = false }
 dashmap = "6.1.0"
+crossbeam-channel = "0.5"
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["env-filter", "fmt", "ansi", "json"] }
 tracing-appender = "0.2.4"
 moka = { version = "0.12.13", default-features = false, features = ["future", "sync"] }

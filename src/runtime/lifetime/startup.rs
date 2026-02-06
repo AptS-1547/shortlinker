@@ -1,11 +1,12 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
-use crate::analytics::{DataRetentionTask, RollupManager};
+use crate::analytics::{ClickDetail, DataRetentionTask, RawClickEvent, RollupManager};
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::{AnalyticsService, LinkService, UserAgentStore, set_global_user_agent_store};
+use crate::services::{AnalyticsService, LinkService, UserAgentStore, set_global_user_agent_store, get_user_agent_store};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
+use chrono::Utc;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
@@ -103,12 +104,23 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
                 // SeaOrmStorage 实现了 DetailedClickSink trait
                 let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
                 info!("Detailed click logging enabled, initializing with DetailedClickSink");
-                Arc::new(ClickManager::with_detailed_logging(
+                let (manager, rx) = ClickManager::with_detailed_logging(
                     sink,
                     detailed_sink,
                     Duration::from_secs(flush_interval),
                     max_clicks_before_flush as usize,
-                ))
+                );
+                let mgr = Arc::new(manager);
+
+                // 启动事件处理器
+                let mgr_for_processor = mgr.clone();
+                tokio::spawn(async move {
+                    mgr_for_processor
+                        .start_event_processor(rx, process_raw_click_event)
+                        .await;
+                });
+
+                mgr
             } else {
                 Arc::new(ClickManager::new(
                     sink,
@@ -291,4 +303,80 @@ fn check_jwt_secret_security(rt: &crate::config::RuntimeConfig) {
     if !admin_token.is_empty() && admin_token.len() < 8 {
         warn!("WARNING: Admin Token is very short. Consider using a stronger token.");
     }
+}
+
+/// 将原始点击事件转换为详细点击信息
+fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
+    // 在消费者端读取配置（不在热路径读取）
+    let rt = get_runtime_config();
+    let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
+
+    // derive_source: utm_source > ref:{domain} > direct
+    let source = derive_source_from_raw(&event.query, &event.referrer);
+
+    // UA hash
+    let user_agent_hash = event
+        .user_agent
+        .as_ref()
+        .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
+
+    let ip_address = if enable_ip_logging {
+        event.ip
+    } else {
+        None
+    };
+
+    ClickDetail {
+        code: event.code,
+        timestamp: Utc::now(),
+        referrer: event.referrer,
+        user_agent_hash,
+        ip_address,
+        country: None, // GeoIP 查询暂不在 channel 处理器中做
+        city: None,
+        source,
+    }
+}
+
+/// 从原始数据推导流量来源
+#[inline]
+fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
+    // 1. 检查 utm_source 参数
+    if let Some(query) = query {
+        if let Some(utm_source) = extract_query_param(query, "utm_source") {
+            return Some(utm_source.into_owned());
+        }
+    }
+
+    // 2. 有 Referer → ref:{domain}
+    if let Some(referer_url) = referrer {
+        if let Some(domain) = extract_domain(referer_url) {
+            return Some(format!("ref:{}", domain));
+        }
+    }
+
+    // 3. direct
+    Some("direct".to_string())
+}
+
+/// 提取 URL 中的指定查询参数值
+#[inline]
+fn extract_query_param<'a>(query: &'a str, key: &str) -> Option<std::borrow::Cow<'a, str>> {
+    let prefix = format!("{}=", key);
+    for part in query.split('&') {
+        if let Some(value) = part.strip_prefix(&prefix) {
+            return urlencoding::decode(value).ok();
+        }
+    }
+    None
+}
+
+/// 从 URL 提取域名
+#[inline]
+fn extract_domain(url: &str) -> Option<&str> {
+    url.strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .and_then(|rest| rest.split('/').next())
+        .and_then(|host| host.split(':').next())
+        .filter(|s| !s.is_empty())
 }
