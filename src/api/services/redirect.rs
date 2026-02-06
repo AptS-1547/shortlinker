@@ -16,9 +16,39 @@ use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::ip::extract_client_ip;
 use crate::utils::is_valid_short_code;
 
+#[cfg(feature = "metrics")]
+use crate::metrics::MetricsRecorder;
+
 pub struct RedirectService {}
 
 impl RedirectService {
+    #[cfg(feature = "metrics")]
+    pub async fn handle_redirect(
+        req: HttpRequest,
+        path: web::Path<String>,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        storage: web::Data<Arc<SeaOrmStorage>>,
+        geoip: Option<web::Data<Arc<GeoIpProvider>>>,
+        metrics: web::Data<Arc<dyn MetricsRecorder>>,
+    ) -> impl Responder {
+        let captured_path = path.into_inner();
+
+        if captured_path.is_empty() {
+            let rt = get_runtime_config();
+            let default_url = rt.get_or(keys::FEATURES_DEFAULT_URL, "https://esap.cc/repo");
+            HttpResponse::TemporaryRedirect()
+                .insert_header(("Location", default_url))
+                .finish()
+        } else if !is_valid_short_code(&captured_path) {
+            // 非法短码，直接 404（不进缓存、不进 DashMap）
+            trace!("Invalid short code rejected: {}", &captured_path);
+            Self::not_found_response(&metrics)
+        } else {
+            Self::process_redirect(captured_path, req, cache, storage, geoip, metrics).await
+        }
+    }
+
+    #[cfg(not(feature = "metrics"))]
     pub async fn handle_redirect(
         req: HttpRequest,
         path: web::Path<String>,
@@ -35,7 +65,6 @@ impl RedirectService {
                 .insert_header(("Location", default_url))
                 .finish()
         } else if !is_valid_short_code(&captured_path) {
-            // 非法短码，直接 404（不进缓存、不进 DashMap）
             trace!("Invalid short code rejected: {}", &captured_path);
             Self::not_found_response()
         } else {
@@ -43,6 +72,56 @@ impl RedirectService {
         }
     }
 
+    #[cfg(feature = "metrics")]
+    async fn process_redirect(
+        capture_path: String,
+        req: HttpRequest,
+        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        storage: web::Data<Arc<SeaOrmStorage>>,
+        geoip: Option<web::Data<Arc<GeoIpProvider>>>,
+        metrics: web::Data<Arc<dyn MetricsRecorder>>,
+    ) -> HttpResponse {
+        match cache.get(&capture_path).await {
+            CacheResult::Found(link) => {
+                Self::update_click(&capture_path, &req, geoip);
+                Self::finish_redirect(&req, link, &metrics)
+            }
+            CacheResult::Miss => {
+                trace!("Cache miss for path: {}", &capture_path);
+                match storage.get(&capture_path).await {
+                    Ok(Some(link)) => match link.cache_ttl(get_config().cache.default_ttl) {
+                        None => {
+                            debug!("Expired link from storage: {}", &capture_path);
+                            cache.mark_not_found(&capture_path).await;
+                            Self::not_found_response(&metrics)
+                        }
+                        Some(ttl) => {
+                            Self::update_click(&capture_path, &req, geoip);
+                            cache.insert(&capture_path, link.clone(), Some(ttl)).await;
+                            Self::finish_redirect(&req, link, &metrics)
+                        }
+                    },
+                    Ok(None) => {
+                        debug!("Redirect link not found in database: {}", &capture_path);
+                        // Bloom filter false positive: bloom said "maybe exists" but DB says no
+                        metrics.inc_bloom_false_positive();
+                        cache.mark_not_found(&capture_path).await;
+                        Self::not_found_response(&metrics)
+                    }
+                    Err(e) => {
+                        error!("Database error during redirect lookup: {}", e);
+                        Self::error_response(&metrics)
+                    }
+                }
+            }
+            CacheResult::NotFound => {
+                debug!("Cache not found for path: {}", &capture_path);
+                Self::not_found_response(&metrics)
+            }
+        }
+    }
+
+    #[cfg(not(feature = "metrics"))]
     async fn process_redirect(
         capture_path: String,
         req: HttpRequest,
@@ -72,10 +151,6 @@ impl RedirectService {
                     },
                     Ok(None) => {
                         debug!("Redirect link not found in database: {}", &capture_path);
-                        // Bloom filter false positive: bloom said "maybe exists" but DB says no
-                        inc_plain_counter!(
-                            crate::metrics::METRICS.bloom_filter_false_positives_total
-                        );
                         cache.mark_not_found(&capture_path).await;
                         Self::not_found_response()
                     }
@@ -92,9 +167,10 @@ impl RedirectService {
         }
     }
 
+    #[cfg(feature = "metrics")]
     #[inline]
-    fn not_found_response() -> HttpResponse {
-        inc_counter!(crate::metrics::METRICS.redirects_total, &["404"]);
+    fn not_found_response(metrics: &Arc<dyn MetricsRecorder>) -> HttpResponse {
+        metrics.inc_redirect("404");
 
         HttpResponse::build(StatusCode::NOT_FOUND)
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
@@ -102,10 +178,28 @@ impl RedirectService {
             .body("Not Found")
     }
 
+    #[cfg(not(feature = "metrics"))]
+    #[inline]
+    fn not_found_response() -> HttpResponse {
+        HttpResponse::build(StatusCode::NOT_FOUND)
+            .insert_header(("Content-Type", "text/html; charset=utf-8"))
+            .insert_header(("Cache-Control", "public, max-age=60"))
+            .body("Not Found")
+    }
+
+    #[cfg(feature = "metrics")]
+    #[inline]
+    fn error_response(metrics: &Arc<dyn MetricsRecorder>) -> HttpResponse {
+        metrics.inc_redirect("500");
+
+        HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
+            .insert_header(("Content-Type", "text/html; charset=utf-8"))
+            .body("Internal Server Error")
+    }
+
+    #[cfg(not(feature = "metrics"))]
     #[inline]
     fn error_response() -> HttpResponse {
-        inc_counter!(crate::metrics::METRICS.redirects_total, &["500"]);
-
         HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
             .insert_header(("Content-Type", "text/html; charset=utf-8"))
             .body("Internal Server Error")
@@ -158,9 +252,20 @@ impl RedirectService {
         manager.send_raw_event(event);
     }
 
-    fn finish_redirect(req: &HttpRequest, link: ShortLink) -> HttpResponse {
-        inc_counter!(crate::metrics::METRICS.redirects_total, &["307"]);
+    #[cfg(feature = "metrics")]
+    fn finish_redirect(req: &HttpRequest, link: ShortLink, metrics: &Arc<dyn MetricsRecorder>) -> HttpResponse {
+        metrics.inc_redirect("307");
 
+        // 构建目标 URL，可能需要透传 UTM 参数
+        let target_url = Self::build_target_url(req, &link.target);
+
+        HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
+            .insert_header(("Location", target_url.as_ref()))
+            .finish()
+    }
+
+    #[cfg(not(feature = "metrics"))]
+    fn finish_redirect(req: &HttpRequest, link: ShortLink) -> HttpResponse {
         // 构建目标 URL，可能需要透传 UTM 参数
         let target_url = Self::build_target_url(req, &link.target);
 

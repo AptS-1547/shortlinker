@@ -8,6 +8,8 @@ use prometheus::{
     TextEncoder,
 };
 
+use super::traits::MetricsRecorder;
+
 /// Global metrics instance
 pub static METRICS: Lazy<Metrics> = Lazy::new(Metrics::new);
 
@@ -301,5 +303,97 @@ impl Metrics {
             .encode(&metric_families, &mut buffer)
             .map_err(|e| format!("Failed to encode metrics: {}", e))?;
         String::from_utf8(buffer).map_err(|e| format!("Metrics output is not valid UTF-8: {}", e))
+    }
+}
+
+impl MetricsRecorder for Metrics {
+    // ===== Analytics (ClickManager) =====
+
+    fn inc_clicks_channel_dropped(&self, reason: &str) {
+        self.clicks_channel_dropped
+            .with_label_values(&[reason])
+            .inc();
+    }
+
+    fn set_clicks_buffer_entries(&self, count: f64) {
+        self.clicks_buffer_entries.set(count);
+    }
+
+    fn inc_clicks_flush(&self, trigger: &str, status: &str) {
+        self.clicks_flush_total
+            .with_label_values(&[trigger, status])
+            .inc();
+    }
+
+    // ===== Cache =====
+
+    fn inc_cache_hit(&self, layer: &str) {
+        self.cache_hits_total.with_label_values(&[layer]).inc();
+    }
+
+    fn inc_cache_miss(&self, layer: &str) {
+        self.cache_misses_total.with_label_values(&[layer]).inc();
+    }
+
+    fn observe_cache_operation(&self, operation: &str, layer: &str, duration_secs: f64) {
+        self.cache_operation_duration_seconds
+            .with_label_values(&[operation, layer])
+            .observe(duration_secs);
+    }
+
+    fn set_cache_entries(&self, layer: &str, count: f64) {
+        self.cache_entries.with_label_values(&[layer]).set(count);
+    }
+
+    // ===== Redirect =====
+
+    fn inc_bloom_false_positive(&self) {
+        self.bloom_filter_false_positives_total.inc();
+    }
+
+    fn inc_redirect(&self, status: &str) {
+        self.redirects_total.with_label_values(&[status]).inc();
+    }
+
+    // ===== Auth =====
+
+    fn inc_auth_failure(&self, method: &str) {
+        self.auth_failures_total.with_label_values(&[method]).inc();
+    }
+
+    // ===== HTTP (timing middleware) =====
+
+    fn inc_active_connections(&self) {
+        self.http_active_connections.inc();
+    }
+
+    fn dec_active_connections(&self) {
+        self.http_active_connections.dec();
+    }
+
+    fn observe_http_request(&self, method: &str, endpoint: &str, status: &str, duration_secs: f64) {
+        self.http_request_duration_seconds
+            .with_label_values(&[method, endpoint, status])
+            .observe(duration_secs);
+    }
+
+    fn inc_http_request(&self, method: &str, endpoint: &str, status: &str) {
+        self.http_requests_total
+            .with_label_values(&[method, endpoint, status])
+            .inc();
+    }
+
+    // ===== Database =====
+
+    fn observe_db_query(&self, operation: &str, duration_secs: f64) {
+        self.db_query_duration_seconds
+            .with_label_values(&[operation])
+            .observe(duration_secs);
+    }
+
+    fn inc_db_query(&self, operation: &str) {
+        self.db_queries_total
+            .with_label_values(&[operation])
+            .inc();
     }
 }

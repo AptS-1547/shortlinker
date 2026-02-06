@@ -20,9 +20,6 @@
 //! - `runtime`: Application lifecycle and execution modes
 //! - `system`: Platform abstraction and system utilities
 
-#[macro_use]
-mod metrics_macros;
-
 pub mod analytics;
 pub mod api;
 pub mod cache;

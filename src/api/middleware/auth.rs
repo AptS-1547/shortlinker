@@ -13,6 +13,8 @@ use crate::api::constants;
 use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
+#[cfg(feature = "metrics")]
+use crate::metrics::MetricsRecorder;
 
 /// 认证方式标记，用于 CSRF 中间件判断是否跳过验证
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,7 +114,8 @@ where
             }
             Err(e) => {
                 info!("Bearer token validation failed: {}", e);
-                inc_counter!(crate::metrics::METRICS.auth_failures_total, &["bearer"]);
+                #[cfg(feature = "metrics")]
+                crate::metrics::METRICS.inc_auth_failure("bearer");
                 false
             }
         }
@@ -132,7 +135,8 @@ where
                 }
                 Err(e) => {
                     info!("JWT validation failed: {}", e);
-                    inc_counter!(crate::metrics::METRICS.auth_failures_total, &["cookie"]);
+                    #[cfg(feature = "metrics")]
+                    crate::metrics::METRICS.inc_auth_failure("cookie");
                     return false;
                 }
             }

@@ -19,6 +19,9 @@ use std::sync::Once;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 
+#[cfg(feature = "metrics")]
+use shortlinker::metrics::NoopMetrics;
+
 // =============================================================================
 // Test Setup
 // =============================================================================
@@ -114,6 +117,13 @@ async fn create_test_service() -> (LinkService, TempDir) {
     let db_path = temp_dir.path().join("test_service.db");
     let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
+    #[cfg(feature = "metrics")]
+    let storage = Arc::new(
+        SeaOrmStorage::new(&db_url, "sqlite", NoopMetrics::arc())
+            .await
+            .expect("Failed to create storage"),
+    );
+    #[cfg(not(feature = "metrics"))]
     let storage = Arc::new(
         SeaOrmStorage::new(&db_url, "sqlite")
             .await

@@ -7,6 +7,8 @@
 
 mod registry;
 mod system;
+mod traits;
 
 pub use registry::METRICS;
 pub use system::spawn_system_metrics_updater;
+pub use traits::{MetricsRecorder, NoopMetrics, PrometheusMetricsWrapper};

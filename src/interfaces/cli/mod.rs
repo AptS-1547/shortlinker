@@ -12,6 +12,9 @@ use commands::{
 };
 use std::fmt;
 
+#[cfg(feature = "metrics")]
+use crate::metrics::NoopMetrics;
+
 /// IPC fallback 宏，用于消除 CLI 命令中的 IPC 错误处理重复代码
 ///
 /// 用法:
@@ -124,6 +127,11 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
 
     // Handle reset-password command separately (needs DB connection)
     if let Commands::ResetPassword { password, stdin } = cmd {
+        #[cfg(feature = "metrics")]
+        let storage = StorageFactory::create(NoopMetrics::arc())
+            .await
+            .map_err(|e| CliError::StorageError(e.to_string()))?;
+        #[cfg(not(feature = "metrics"))]
         let storage = StorageFactory::create()
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
@@ -139,6 +147,11 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         }
 
         // Other config subcommands need DB connection
+        #[cfg(feature = "metrics")]
+        let storage = StorageFactory::create(NoopMetrics::arc())
+            .await
+            .map_err(|e| CliError::StorageError(e.to_string()))?;
+        #[cfg(not(feature = "metrics"))]
         let storage = StorageFactory::create()
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
@@ -146,6 +159,11 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
     }
 
     // Create storage for commands that need it
+    #[cfg(feature = "metrics")]
+    let storage = StorageFactory::create(NoopMetrics::arc())
+        .await
+        .map_err(|e| CliError::StorageError(e.to_string()))?;
+    #[cfg(not(feature = "metrics"))]
     let storage = StorageFactory::create()
         .await
         .map_err(|e| CliError::StorageError(e.to_string()))?;

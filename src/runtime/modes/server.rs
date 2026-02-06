@@ -178,6 +178,8 @@ pub async fn run_server() -> Result<()> {
     let link_service = startup.link_service.clone();
     let analytics_service = startup.analytics_service.clone();
     let route = startup.route_config.clone();
+    #[cfg(feature = "metrics")]
+    let metrics = startup.metrics.clone();
 
     let admin_prefix = route.admin_prefix;
     let health_prefix = route.health_prefix;
@@ -256,11 +258,14 @@ pub async fn run_server() -> Result<()> {
     let db_for_shutdown = storage.get_db().clone();
 
     // Configure HTTP server
+    #[cfg(feature = "metrics")]
+    let metrics_for_server = metrics.clone();
     let server = HttpServer::new(move || {
         // Build CORS middleware
         let cors = build_cors_middleware(&cors_config);
 
-        App::new()
+        #[allow(unused_mut)]
+        let mut app = App::new()
             .wrap(TimingMiddleware) // 最外层，记录请求延迟
             .wrap(RequestIdMiddleware) // 为每个请求生成 request_id
             .wrap(cors)
@@ -271,8 +276,12 @@ pub async fn run_server() -> Result<()> {
             .app_data(web::Data::new(analytics_service.clone()))
             .app_data(web::Data::new(geoip_provider.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
-            .app_data(web::PayloadConfig::new(1024 * 1024))
-            .wrap(
+            .app_data(web::PayloadConfig::new(1024 * 1024));
+
+        #[cfg(feature = "metrics")]
+        let app = app.app_data(web::Data::new(metrics_for_server.clone()));
+
+        app.wrap(
                 DefaultHeaders::new()
                     .add(("Connection", "keep-alive"))
                     .add(("Keep-Alive", "timeout=30, max=1000"))

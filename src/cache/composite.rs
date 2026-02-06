@@ -12,14 +12,20 @@ use std::sync::Arc;
 #[cfg(feature = "metrics")]
 use std::time::Instant;
 
+#[cfg(feature = "metrics")]
+use crate::metrics::MetricsRecorder;
+
 pub struct CompositeCache {
     filter_plugin: Arc<dyn ExistenceFilter>,
     object_cache: Arc<dyn ObjectCache>,
     negative_cache: Arc<dyn NegativeCache>,
+    #[cfg(feature = "metrics")]
+    metrics: Arc<dyn MetricsRecorder>,
 }
 
 impl CompositeCache {
-    pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>> {
+    #[cfg(feature = "metrics")]
+    pub async fn create(metrics: Arc<dyn MetricsRecorder>) -> Result<Arc<dyn CompositeCacheTrait>> {
         let config = crate::config::get_config();
 
         let filter_plugin_name = "bloom";
@@ -49,6 +55,39 @@ impl CompositeCache {
             filter_plugin: Arc::from(filter_plugin),
             object_cache: Arc::from(object_cache),
             negative_cache,
+            metrics,
+        }))
+    }
+
+    #[cfg(not(feature = "metrics"))]
+    pub async fn create() -> Result<Arc<dyn CompositeCacheTrait>> {
+        let config = crate::config::get_config();
+
+        let filter_plugin_name = "bloom";
+        let object_cache_name = &config.cache.cache_type;
+
+        let filter_plugin_ctor = get_filter_plugin(filter_plugin_name).ok_or_else(|| {
+            ShortlinkerError::cache_plugin_not_found(format!(
+                "Filter plugin not found: {}",
+                filter_plugin_name
+            ))
+        })?;
+        let object_cache_ctor = get_object_cache_plugin(object_cache_name).ok_or_else(|| {
+            ShortlinkerError::cache_plugin_not_found(format!(
+                "Object Cache plugin not found: {}",
+                object_cache_name
+            ))
+        })?;
+
+        let filter_plugin = filter_plugin_ctor().await?;
+        let object_cache = object_cache_ctor().await?;
+
+        let negative_cache: Arc<dyn NegativeCache> = Arc::new(MokaNegativeCache::new(100000, 60));
+
+        Ok(Arc::new(Self {
+            filter_plugin: Arc::from(filter_plugin),
+            object_cache: Arc::from(object_cache),
+            negative_cache,
         }))
     }
 }
@@ -64,12 +103,11 @@ impl CompositeCacheTrait for CompositeCache {
             #[cfg(feature = "metrics")]
             {
                 let duration = bloom_start.elapsed().as_secs_f64();
-                crate::metrics::METRICS
-                    .cache_operation_duration_seconds
-                    .with_label_values(&["get", "bloom_filter"])
-                    .observe(duration);
+                self.metrics
+                    .observe_cache_operation("get", "bloom_filter", duration);
             }
-            inc_counter!(crate::metrics::METRICS.cache_hits_total, &["bloom_filter"]);
+            #[cfg(feature = "metrics")]
+            self.metrics.inc_cache_hit("bloom_filter");
             return CacheResult::NotFound;
         }
 
@@ -81,15 +119,11 @@ impl CompositeCacheTrait for CompositeCache {
             #[cfg(feature = "metrics")]
             {
                 let duration = neg_start.elapsed().as_secs_f64();
-                crate::metrics::METRICS
-                    .cache_operation_duration_seconds
-                    .with_label_values(&["get", "negative_cache"])
-                    .observe(duration);
+                self.metrics
+                    .observe_cache_operation("get", "negative_cache", duration);
             }
-            inc_counter!(
-                crate::metrics::METRICS.cache_hits_total,
-                &["negative_cache"]
-            );
+            #[cfg(feature = "metrics")]
+            self.metrics.inc_cache_hit("negative_cache");
             return CacheResult::NotFound;
         }
 
@@ -102,21 +136,17 @@ impl CompositeCacheTrait for CompositeCache {
         #[cfg(feature = "metrics")]
         {
             let duration = obj_start.elapsed().as_secs_f64();
-            crate::metrics::METRICS
-                .cache_operation_duration_seconds
-                .with_label_values(&["get", "object_cache"])
-                .observe(duration);
+            self.metrics
+                .observe_cache_operation("get", "object_cache", duration);
         }
 
+        #[cfg(feature = "metrics")]
         match &result {
             CacheResult::Found(_) => {
-                inc_counter!(crate::metrics::METRICS.cache_hits_total, &["object_cache"]);
+                self.metrics.inc_cache_hit("object_cache");
             }
             CacheResult::Miss | CacheResult::NotFound => {
-                inc_counter!(
-                    crate::metrics::METRICS.cache_misses_total,
-                    &["object_cache"]
-                );
+                self.metrics.inc_cache_miss("object_cache");
             }
         }
 
@@ -139,10 +169,8 @@ impl CompositeCacheTrait for CompositeCache {
         #[cfg(feature = "metrics")]
         {
             let duration = start.elapsed().as_secs_f64();
-            crate::metrics::METRICS
-                .cache_operation_duration_seconds
-                .with_label_values(&["insert", "object_cache"])
-                .observe(duration);
+            self.metrics
+                .observe_cache_operation("insert", "object_cache", duration);
         }
     }
 
@@ -157,10 +185,8 @@ impl CompositeCacheTrait for CompositeCache {
         #[cfg(feature = "metrics")]
         {
             let duration = start.elapsed().as_secs_f64();
-            crate::metrics::METRICS
-                .cache_operation_duration_seconds
-                .with_label_values(&["remove", "object_cache"])
-                .observe(duration);
+            self.metrics
+                .observe_cache_operation("remove", "object_cache", duration);
         }
     }
 
@@ -207,12 +233,11 @@ impl CompositeCacheTrait for CompositeCache {
 
         // Update cache entry count metric
         #[cfg(feature = "metrics")]
-        let entry_count = self.object_cache.entry_count();
-        set_gauge!(
-            crate::metrics::METRICS.cache_entries,
-            &["object_cache"],
-            entry_count as f64
-        );
+        {
+            let entry_count = self.object_cache.entry_count();
+            self.metrics
+                .set_cache_entries("object_cache", entry_count as f64);
+        }
 
         // Bloom filter 和 Negative cache 在创建时就初始化了，如果能到这里就是健康的
         CacheHealthStatus {
@@ -230,6 +255,9 @@ mod tests {
     use super::*;
     use crate::cache::existence_filter::bloom::BloomExistenceFilterPlugin;
     use crate::cache::object_cache::null::NullObjectCache;
+
+    #[cfg(feature = "metrics")]
+    use crate::metrics::NoopMetrics;
 
     fn create_test_link(code: &str) -> ShortLink {
         ShortLink {
@@ -252,6 +280,8 @@ mod tests {
             filter_plugin: Arc::new(filter),
             object_cache: Arc::new(object_cache),
             negative_cache: Arc::new(negative_cache),
+            #[cfg(feature = "metrics")]
+            metrics: NoopMetrics::arc(),
         }
     }
 
