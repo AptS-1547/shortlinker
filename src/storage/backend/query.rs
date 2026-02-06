@@ -90,6 +90,10 @@ struct StatsResult {
     active_links: Option<i64>,
 }
 
+/// Links 游标分页返回类型: (数据, 下一个游标)
+pub type LinkCursorStream =
+    Pin<Box<dyn Stream<Item = Result<(Vec<ShortLink>, Option<String>)>> + Send + 'static>>;
+
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
         let start = Instant::now();
@@ -364,6 +368,68 @@ impl SeaOrmStorage {
                         // 查询失败时记录错误并终止 stream，避免跳过失败页继续下一页
                         tracing::error!("Paginated query failed at page {}: {}", page, e);
                         None
+                    }
+                }
+            },
+        ))
+    }
+
+    /// 流式导出链接（游标分页，性能更好）
+    ///
+    /// 使用 `short_code` 作为游标，避免 OFFSET 在大数据量下的性能问题。
+    /// 返回 `(Vec<ShortLink>, Option<String>)` 的流，其中游标是最后一条记录的 `short_code`。
+    pub fn stream_all_filtered_cursor(
+        &self,
+        filter: LinkFilter,
+        page_size: u64,
+    ) -> LinkCursorStream {
+        let db = self.db.clone();
+        let now = Utc::now();
+        let condition = build_filter_condition(&filter, now);
+
+        use futures_util::stream;
+
+        Box::pin(stream::unfold(
+            (None::<String>, db, condition, page_size, false),
+            |(cursor, db, condition, page_size, done)| async move {
+                if done {
+                    return None;
+                }
+
+                let mut query = short_link::Entity::find().filter(condition.clone());
+
+                // 如果有游标，从游标位置开始（不包含游标本身）
+                if let Some(ref last_code) = cursor {
+                    query = query.filter(short_link::Column::ShortCode.gt(last_code.clone()));
+                }
+
+                let models = query
+                    .order_by_asc(short_link::Column::ShortCode)
+                    .limit(page_size)
+                    .all(&db)
+                    .await;
+
+                match models {
+                    Ok(models) if models.is_empty() => None,
+                    Ok(models) => {
+                        let next_cursor = models.last().map(|m| m.short_code.clone());
+                        let is_last = (models.len() as u64) < page_size;
+                        let links: Vec<ShortLink> =
+                            models.into_iter().map(model_to_shortlink).collect();
+                        Some((
+                            Ok((links, next_cursor.clone())),
+                            (next_cursor, db, condition, page_size, is_last),
+                        ))
+                    }
+                    Err(e) => {
+                        tracing::error!("Cursor query failed: {}", e);
+                        Some((
+                            Err(ShortlinkerError::database_operation(format!(
+                                "Cursor query failed: {}",
+                                e
+                            ))),
+                            (cursor, db, condition, page_size, true),
+                        ))
                     }
                 }
             },
