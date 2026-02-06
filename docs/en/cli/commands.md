@@ -6,7 +6,7 @@ Detailed command-line usage and options for day-to-day management.
 
 - **First-time usage**: `add` → `list` → `update` → `remove`
 - **Bulk migration**: `import` / `export`
-- **Operations**: `config` / `reset-password` / `generate-config`
+- **Operations**: `config` / `reset-password`
 - **Interactive management**: `tui`
 
 > If you prefer visual management, start with the [TUI guide](/en/cli/tui).
@@ -102,12 +102,37 @@ Detailed command-line usage and options for day-to-day management.
 
 ## Operations Commands
 
-### config - Runtime Config Management (DB)
+### config - Configuration Management
 
-The `config` subcommand manages runtime config stored in the database (same config system used by the web admin panel).
+The `config` subcommand manages Shortlinker configuration.
 
-> Note: `config` writes values into the database. To make a **running** server reload runtime config, call Admin API `POST /admin/v1/config/reload` or restart the service.  
-> Keys marked as “requires restart” (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload.
+#### config generate - Generate Configuration File
+
+```bash
+./shortlinker config generate [output_path] [options]
+```
+
+Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics`.
+Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in DB and not part of this file.
+
+> Note: This command does not require a database connection and can be used during initial deployment.
+
+**Options**:
+- `--force`: skip confirmation and force overwrite existing file
+
+**Examples**:
+```bash
+./shortlinker config generate                       # generate config.example.toml
+./shortlinker config generate config.toml           # prompts for confirmation if file exists
+./shortlinker config generate config.toml --force   # force overwrite
+```
+
+#### config list/get/set/reset - Runtime Config Management (DB)
+
+The following subcommands manage runtime config stored in the database (same config system used by the web admin panel).
+
+> Note: `config` writes values into the database. To make a **running** server reload runtime config, call Admin API `POST /admin/v1/config/reload` or restart the service.
+> Keys marked as "requires restart" (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload.
 
 Common subcommands:
 
@@ -152,22 +177,6 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 
 # From CLI arg (not recommended: visible in shell history)
 ./shortlinker reset-password --password "my_new_secure_password"
-```
-
-### generate-config - Generate Configuration File
-
-```bash
-./shortlinker generate-config [output_path]
-```
-
-Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics`.  
-Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in DB and not part of this file.
-
-**Examples**:
-```bash
-./shortlinker generate-config                 # generate config.example.toml
-./shortlinker generate-config config.toml     # generate/overwrite config.toml
-./shortlinker generate-config myconfig.toml   # custom filename
 ```
 
 ## Interactive Interface

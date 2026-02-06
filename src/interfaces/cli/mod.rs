@@ -4,11 +4,11 @@
 
 pub mod commands;
 
-use crate::cli::Commands;
+use crate::cli::{Commands, ConfigCommands};
 use crate::storage::StorageFactory;
 use commands::{
-    add_link, config_management, export_links, generate_config, import_links, list_links,
-    remove_link, run_reset_password, server_status, update_link,
+    add_link, config_management, export_links, import_links, list_links, remove_link,
+    run_reset_password, server_status, update_link,
 };
 use std::fmt;
 
@@ -131,8 +131,14 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         return Ok(());
     }
 
-    // Handle config command separately (needs DB connection)
+    // Handle config command
     if let Commands::Config { action } = cmd {
+        // Generate doesn't need DB connection, handle it separately
+        if let ConfigCommands::Generate { output_path, force } = action {
+            return config_management::config_generate(output_path, force).await;
+        }
+
+        // Other config subcommands need DB connection
         let storage = StorageFactory::create()
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
@@ -169,8 +175,6 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::Export { file_path } => export_links(storage, file_path).await,
 
         Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
-
-        Commands::GenerateConfig { output_path } => generate_config(output_path).await,
 
         Commands::Status => unreachable!("handled above"),
 

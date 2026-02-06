@@ -86,12 +86,6 @@ pub enum Commands {
         force: bool,
     },
 
-    /// Generate example configuration file
-    GenerateConfig {
-        /// Output path (default: config.example.toml)
-        output_path: Option<String>,
-    },
-
     /// Show server status (via IPC)
     Status,
 
@@ -116,6 +110,16 @@ pub enum Commands {
 /// Configuration management commands
 #[derive(Subcommand)]
 pub enum ConfigCommands {
+    /// Generate example configuration file
+    Generate {
+        /// Output path (default: config.example.toml)
+        output_path: Option<String>,
+
+        /// Force overwrite without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+
     /// List all configurations
     List {
         /// Filter by category (auth, cookie, features, routes, cors, tracking)

@@ -6,7 +6,7 @@
 
 - **第一次上手**：`add` → `list` → `update` → `remove`
 - **批量迁移**：`import` / `export`
-- **运维管理**：`config` / `reset-password` / `generate-config`
+- **运维管理**：`config` / `reset-password`
 - **交互管理**：`tui`
 
 > 如果你只想快速可视化管理，建议直接使用 [TUI 界面](/cli/tui)。
@@ -102,12 +102,37 @@
 
 ## 运维命令
 
-### config - 运行时配置管理（数据库）
+### config - 配置管理
 
-`config` 子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
+`config` 子命令用于管理 Shortlinker 配置。
 
-> 提示：`config` 命令会把值写入数据库。若要让**正在运行**的服务重新从数据库加载配置，可调用 Admin API `POST /admin/v1/config/reload`，或重启服务。  
-> 标记为“需要重启”的配置（如 `routes.*`、`click.*`、`cors.*`）即使 reload 也不会热生效，仍需要重启。
+#### config generate - 生成配置文件
+
+```bash
+./shortlinker config generate [输出路径] [选项]
+```
+
+生成**启动配置**（`config.toml`）模板，包含 `server` / `database` / `cache` / `logging` / `analytics` 等配置项。
+运行时配置（如 `features.*`、`api.*`、`routes.*`、`cors.*`）存储在数据库中，不在该文件内。
+
+> 注意：此命令不需要数据库连接，可以在首次部署时直接使用。
+
+**选项**：
+- `--force`：跳过确认，强制覆盖已存在的文件
+
+**示例**：
+```bash
+./shortlinker config generate                       # 生成 config.example.toml
+./shortlinker config generate config.toml           # 文件存在时会交互确认
+./shortlinker config generate config.toml --force   # 强制覆盖
+```
+
+#### config list/get/set/reset - 运行时配置管理（数据库）
+
+以下子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
+
+> 提示：`config` 命令会把值写入数据库。若要让**正在运行**的服务重新从数据库加载配置，可调用 Admin API `POST /admin/v1/config/reload`，或重启服务。
+> 标记为"需要重启"的配置（如 `routes.*`、`click.*`、`cors.*`）即使 reload 也不会热生效，仍需要重启。
 
 常用子命令：
 
@@ -152,22 +177,6 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 
 # 通过参数传入（不推荐：会出现在 shell history）
 ./shortlinker reset-password --password "my_new_secure_password"
-```
-
-### generate-config - 生成配置文件
-
-```bash
-./shortlinker generate-config [输出路径]
-```
-
-生成**启动配置**（`config.toml`）模板，包含 `server` / `database` / `cache` / `logging` / `analytics` 等配置项。  
-运行时配置（如 `features.*`、`api.*`、`routes.*`、`cors.*`）存储在数据库中，不在该文件内。
-
-**示例**：
-```bash
-./shortlinker generate-config                 # 生成 config.example.toml
-./shortlinker generate-config config.toml     # 生成/覆盖 config.toml
-./shortlinker generate-config myconfig.toml   # 指定文件名
 ```
 
 ## 交互界面
