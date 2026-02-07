@@ -209,14 +209,8 @@ pub async fn export_links(
         only_active: query.only_active.unwrap_or(false),
     };
 
-    // 获取游标分页流式数据（性能优于 OFFSET 分页）
-    let cursor_stream = storage.stream_all_filtered_cursor(filter, EXPORT_BATCH_SIZE as u64);
-
-    // 适配游标流到普通批量流（丢弃游标信息，只保留数据）
-    use futures_util::StreamExt;
-    let batch_stream: std::pin::Pin<
-        Box<dyn futures_util::Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send>,
-    > = Box::pin(cursor_stream.map(|result| result.map(|(links, _cursor)| links)));
+    // 获取游标分页流式数据
+    let batch_stream = storage.stream_all_filtered_cursor(filter, EXPORT_BATCH_SIZE as u64);
 
     // 行映射：ShortLink → CsvLinkRow
     let row_mapper = |link: ShortLink| CsvLinkRow {

@@ -90,10 +90,6 @@ struct StatsResult {
     active_links: Option<i64>,
 }
 
-/// Links 游标分页返回类型: (数据, 下一个游标)
-pub type LinkCursorStream =
-    Pin<Box<dyn Stream<Item = Result<(Vec<ShortLink>, Option<String>)>> + Send + 'static>>;
-
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
         let start = Instant::now();
@@ -347,60 +343,14 @@ impl SeaOrmStorage {
             .collect())
     }
 
-    /// 分页流式加载所有符合条件的链接（用于导出等大数据量场景）
-    ///
-    /// 使用 SeaORM paginate API 分批查询，避免一次性加载全部数据到内存。
-    /// 返回 boxed stream 产生分批数据。
-    pub fn stream_all_filtered_paginated(
-        &self,
-        filter: LinkFilter,
-        page_size: u64,
-    ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
-        let now = Utc::now();
-        let condition = build_filter_condition(&filter, now);
-        let db = self.db.clone();
-
-        use futures_util::stream;
-
-        // 手动实现分页流
-        Box::pin(stream::unfold(
-            (0u64, db, condition, page_size),
-            |(page, db, condition, page_size)| async move {
-                // 构建查询
-                let models = short_link::Entity::find()
-                    .filter(condition.clone())
-                    .order_by_desc(short_link::Column::CreatedAt)
-                    .limit(page_size)
-                    .offset(page * page_size)
-                    .all(&db)
-                    .await;
-
-                match models {
-                    Ok(models) if models.is_empty() => None, // 没有更多数据
-                    Ok(models) => {
-                        let links: Vec<ShortLink> =
-                            models.into_iter().map(model_to_shortlink).collect();
-                        Some((Ok(links), (page + 1, db, condition, page_size)))
-                    }
-                    Err(e) => {
-                        // 查询失败时记录错误并终止 stream，避免跳过失败页继续下一页
-                        tracing::error!("Paginated query failed at page {}: {}", page, e);
-                        None
-                    }
-                }
-            },
-        ))
-    }
-
-    /// 流式导出链接（游标分页，性能更好）
+    /// 流式导出链接（游标分页）
     ///
     /// 使用 `short_code` 作为游标，避免 OFFSET 在大数据量下的性能问题。
-    /// 返回 `(Vec<ShortLink>, Option<String>)` 的流，其中游标是最后一条记录的 `short_code`。
     pub fn stream_all_filtered_cursor(
         &self,
         filter: LinkFilter,
         page_size: u64,
-    ) -> LinkCursorStream {
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
         let db = self.db.clone();
         let now = Utc::now();
         let condition = build_filter_condition(&filter, now);
@@ -416,7 +366,6 @@ impl SeaOrmStorage {
 
                 let mut query = short_link::Entity::find().filter(condition.clone());
 
-                // 如果有游标，从游标位置开始（不包含游标本身）
                 if let Some(ref last_code) = cursor {
                     query = query.filter(short_link::Column::ShortCode.gt(last_code.clone()));
                 }
@@ -434,10 +383,7 @@ impl SeaOrmStorage {
                         let is_last = (models.len() as u64) < page_size;
                         let links: Vec<ShortLink> =
                             models.into_iter().map(model_to_shortlink).collect();
-                        Some((
-                            Ok((links, next_cursor.clone())),
-                            (next_cursor, db, condition, page_size, is_last),
-                        ))
+                        Some((Ok(links), (next_cursor, db, condition, page_size, is_last)))
                     }
                     Err(e) => {
                         tracing::error!("Cursor query failed: {}", e);

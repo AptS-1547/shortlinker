@@ -336,9 +336,9 @@ pub async fn execute_config_action(
     let def = match get_def(&key) {
         Some(d) => d,
         None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::config_not_found(format!("Config key '{}' not found", key)),
-            ))
+            return Ok(error_from_shortlinker(&ShortlinkerError::config_not_found(
+                format!("Config key '{}' not found", key),
+            )));
         }
     };
 
@@ -386,9 +386,9 @@ pub async fn execute_and_save_config_action(
     let def = match get_def(&key) {
         Some(d) => d,
         None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::config_not_found(format!("Config key '{}' not found", key)),
-            ))
+            return Ok(error_from_shortlinker(&ShortlinkerError::config_not_found(
+                format!("Config key '{}' not found", key),
+            )));
         }
     };
 
@@ -408,7 +408,10 @@ pub async fn execute_and_save_config_action(
                     );
 
                     let message = if result.requires_restart {
-                        Some("Configuration saved. Server restart required to take effect.".to_string())
+                        Some(
+                            "Configuration saved. Server restart required to take effect."
+                                .to_string(),
+                        )
                     } else {
                         Some("Configuration saved successfully.".to_string())
                     };
@@ -421,9 +424,12 @@ pub async fn execute_and_save_config_action(
                 }
                 Err(e) => {
                     warn!("Failed to save config '{}': {}", key, e);
-                    Ok(error_from_shortlinker(&ShortlinkerError::config_update_failed(
-                        format!("Failed to save config: {}", e),
-                    )))
+                    Ok(error_from_shortlinker(
+                        &ShortlinkerError::config_update_failed(format!(
+                            "Failed to save config: {}",
+                            e
+                        )),
+                    ))
                 }
             }
         }

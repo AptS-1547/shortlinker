@@ -377,7 +377,7 @@ pub async fn export_report(
         AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());
 
     // 获取流式数据
-    let batch_stream = storage.stream_click_logs_paginated(start, end, EXPORT_BATCH_SIZE);
+    let batch_stream = storage.stream_click_logs_cursor(start, end, EXPORT_BATCH_SIZE);
 
     // 行映射：click_log::Model → ClickLogCsvRow
     let row_mapper = |log: migration::entities::click_log::Model| ClickLogCsvRow {

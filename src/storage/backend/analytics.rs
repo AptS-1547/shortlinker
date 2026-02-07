@@ -20,11 +20,6 @@ use migration::entities::{
     click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly, user_agent,
 };
 
-/// 游标分页的点击日志流类型
-type ClickLogStream = Pin<
-    Box<dyn Stream<Item = anyhow::Result<(Vec<click_log::Model>, Option<i64>)>> + Send + 'static>,
->;
-
 // ============ 查询结果类型 ============
 
 /// 趋势查询结果行
@@ -813,55 +808,15 @@ impl super::SeaOrmStorage {
             .map_err(Into::into)
     }
 
-    /// 流式导出点击日志（OFFSET 分页，兼容旧版）
-    pub fn stream_click_logs_paginated(
-        &self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        page_size: u64,
-    ) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<click_log::Model>>> + Send + 'static>> {
-        let db = self.db.clone();
-
-        use futures_util::stream;
-
-        Box::pin(stream::unfold(
-            (0u64, db, start, end, page_size),
-            |(page, db, start, end, page_size)| async move {
-                let models = click_log::Entity::find()
-                    .filter(click_log::Column::ClickedAt.gte(start))
-                    .filter(click_log::Column::ClickedAt.lte(end))
-                    .order_by_desc(click_log::Column::ClickedAt)
-                    .limit(page_size)
-                    .offset(page * page_size)
-                    .all(&db)
-                    .await;
-
-                match models {
-                    Ok(models) if models.is_empty() => None,
-                    Ok(models) => Some((Ok(models), (page + 1, db, start, end, page_size))),
-                    Err(e) => Some((
-                        Err(anyhow::anyhow!(
-                            "Paginated query failed (page={}): {}",
-                            page,
-                            e
-                        )),
-                        (page + 1, db, start, end, page_size),
-                    )),
-                }
-            },
-        ))
-    }
-
-    /// 流式导出点击日志（游标分页，性能更好）
+    /// 流式导出点击日志（游标分页）
     ///
     /// 使用 ID 作为游标，避免 OFFSET 在大数据量下的性能问题。
-    /// 返回 (数据, 下一个游标) 的流。
     pub fn stream_click_logs_cursor(
         &self,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
         page_size: u64,
-    ) -> ClickLogStream {
+    ) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<click_log::Model>>> + Send + 'static>> {
         let db = self.db.clone();
 
         use futures_util::stream;
@@ -877,7 +832,6 @@ impl super::SeaOrmStorage {
                     .filter(click_log::Column::ClickedAt.gte(start))
                     .filter(click_log::Column::ClickedAt.lte(end));
 
-                // 如果有游标，从游标位置开始
                 if let Some(last_id) = cursor {
                     query = query.filter(click_log::Column::Id.gt(last_id));
                 }
@@ -894,7 +848,7 @@ impl super::SeaOrmStorage {
                         let next_cursor = models.last().map(|m| m.id);
                         let is_last = (models.len() as u64) < page_size;
                         Some((
-                            Ok((models, next_cursor)),
+                            Ok(models),
                             (next_cursor, db, start, end, page_size, is_last),
                         ))
                     }
