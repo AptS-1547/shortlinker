@@ -43,11 +43,11 @@ pub fn show_help() {
         program_name.cyan()
     );
     println!(
-        "  {} export [file path]           # export links as JSON",
+        "  {} export [file path]           # export links as CSV",
         program_name.cyan()
     );
     println!(
-        "  {} import <file path> [options]     # import links from JSON",
+        "  {} import <file path> [options]     # import links from CSV",
         program_name.cyan()
     );
     println!(

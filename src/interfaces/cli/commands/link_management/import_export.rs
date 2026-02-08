@@ -2,14 +2,14 @@
 
 use colored::Colorize;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse, ShortLinkData};
-use crate::utils::csv_handler::{self, CsvLinkRow, FileFormat};
+use crate::utils::csv_handler::{self, CsvLinkRow};
 use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
@@ -174,30 +174,9 @@ pub async fn import_links(
         )));
     }
 
-    // Detect file format
-    let format = csv_handler::detect_format(&file_path);
-
-    // Read and parse the import file based on format
-    let imported_links: Vec<ShortLink> = match format {
-        FileFormat::Csv => {
-            // CSV format (new)
-            csv_handler::import_from_csv(&file_path)
-                .map_err(|e| CliError::CommandError(format!("Failed to import CSV: {}", e)))?
-        }
-        FileFormat::Json => {
-            // JSON format (deprecated, for backward compatibility)
-            println!(
-                "{} JSON format is deprecated and will be removed in v0.5.0, please use CSV format",
-                "⚠".bold().yellow()
-            );
-            let file = File::open(&file_path).map_err(|e| {
-                CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
-            })?;
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader)
-                .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?
-        }
-    };
+    // Read and parse the import file
+    let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&file_path)
+        .map_err(|e| CliError::CommandError(format!("Failed to import CSV: {}", e)))?;
 
     if imported_links.is_empty() {
         println!("{} Import file is empty", "ℹ".bold().blue());

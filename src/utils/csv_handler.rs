@@ -96,22 +96,6 @@ impl CsvLinkRow {
     }
 }
 
-/// 文件格式枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileFormat {
-    Csv,
-    Json,
-}
-
-/// 根据文件扩展名检测格式
-pub fn detect_format(path: &str) -> FileFormat {
-    if path.to_lowercase().ends_with(".json") {
-        FileFormat::Json
-    } else {
-        FileFormat::Csv // 默认 CSV
-    }
-}
-
 /// 导出链接到 CSV 文件
 pub fn export_to_csv<P: AsRef<Path>>(
     links: &[&ShortLink],
@@ -198,16 +182,6 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_detect_format() {
-        assert_eq!(detect_format("test.csv"), FileFormat::Csv);
-        assert_eq!(detect_format("test.CSV"), FileFormat::Csv);
-        assert_eq!(detect_format("test.json"), FileFormat::Json);
-        assert_eq!(detect_format("test.JSON"), FileFormat::Json);
-        assert_eq!(detect_format("test.txt"), FileFormat::Csv); // 默认 CSV
-        assert_eq!(detect_format("test"), FileFormat::Csv);
-    }
 
     #[test]
     fn test_csv_link_row_from_short_link() {

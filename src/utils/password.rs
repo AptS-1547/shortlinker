@@ -80,7 +80,7 @@ pub fn process_update_password(
 
 /// 处理导入数据的密码 - 已哈希则保留，明文则哈希
 ///
-/// 仅用于系统内部导入（CSV/JSON），不可用于用户输入路径
+/// 仅用于系统内部导入（CSV），不可用于用户输入路径
 pub fn process_imported_password(password: Option<&str>) -> Result<Option<String>, PasswordError> {
     match password {
         Some(pwd) if !pwd.is_empty() => {

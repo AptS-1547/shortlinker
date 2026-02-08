@@ -52,7 +52,7 @@ pub fn draw_file_browser_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title("Select JSON file to import (Up/Down to navigate, Enter to select)")
+            .title("Select CSV file to import (Up/Down to navigate, Enter to select)")
             .border_style(Style::default().fg(Color::Yellow)),
     );
 

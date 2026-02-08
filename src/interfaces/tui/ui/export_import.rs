@@ -34,7 +34,7 @@ pub fn draw_export_import_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             Span::styled("Press ", Style::default().fg(Color::DarkGray)),
             Span::styled("[e]", Style::default().fg(Color::Green).bold()),
             Span::styled(
-                " to export all links as JSON",
+                " to export all links as CSV",
                 Style::default().fg(Color::DarkGray),
             ),
         ]),
@@ -66,7 +66,7 @@ pub fn draw_export_import_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             Span::styled("Press ", Style::default().fg(Color::DarkGray)),
             Span::styled("[i]", Style::default().fg(Color::Yellow).bold()),
             Span::styled(
-                " to import links from JSON",
+                " to import links from CSV",
                 Style::default().fg(Color::DarkGray),
             ),
         ]),
