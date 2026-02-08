@@ -57,10 +57,9 @@ impl DefaultReloadCoordinator {
 
         // Reload storage backend
         self.storage.reload().await?;
-        let codes = self.storage.load_all_codes().await?;
 
-        // 原子重建所有缓存层（含 Bloom Filter）
-        self.cache.rebuild_all(&codes).await?;
+        // 原子重建所有缓存层（含 Bloom Filter，内部自行从 DB 加载短码）
+        self.cache.rebuild_all().await?;
 
         info!("Data reload process completed successfully");
         Ok(())

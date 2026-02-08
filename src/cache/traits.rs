@@ -43,7 +43,7 @@ pub trait CompositeCacheTrait: Send + Sync {
 
     /// 完整重置所有缓存层，包括原子重建 Bloom Filter。
     ///
-    /// 调用方需提供从数据库查询的完整短码列表。内部会：
+    /// 内部自行从数据库加载短码列表，然后：
     /// 1. 原子重建 Bloom Filter（无空窗期）
     /// 2. 清空 Object Cache
     /// 3. 清空 Negative Cache
@@ -51,7 +51,7 @@ pub trait CompositeCacheTrait: Send + Sync {
     /// // BUG: 在 `load_all_codes()` 到 Bloom swap 之间的极窄窗口内，并发 `create_link`
     /// // 写入的 key 可能不在新 Bloom 中，导致该链接短暂返回 404（直到下次 reload）。
     /// // 窗口为毫秒级，reload 为低频操作，影响可忽略。
-    async fn rebuild_all(&self, codes: &[String]) -> Result<()>;
+    async fn rebuild_all(&self) -> Result<()>;
 
     /// 标记 key 为不存在（写入 Negative Cache）
     async fn mark_not_found(&self, key: &str);

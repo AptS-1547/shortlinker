@@ -166,21 +166,16 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     }
 
     // 初始化缓存
-    let cache = cache::CompositeCache::create(metrics.clone())
+    let cache = cache::CompositeCache::create(metrics.clone(), storage.clone())
         .await
         .context("Failed to create cache")?;
 
-    // 只加载短码到 Bloom Filter（不加载完整数据到 Object Cache）
-    let codes = storage
-        .load_all_codes()
-        .await
-        .context("Failed to load codes for bloom filter")?;
-    let codes_count = codes.len();
+    // 加载短码到 Bloom Filter（内部自行从 DB 加载，不加载完整数据到 Object Cache）
     cache
-        .rebuild_all(&codes)
+        .rebuild_all()
         .await
         .context("Failed to initialize bloom filter")?;
-    debug!("Bloom filter initialized with {} codes", codes_count);
+    debug!("Bloom filter initialized");
 
     // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)
     crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
