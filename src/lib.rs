@@ -30,6 +30,7 @@ mod event;
 pub mod interfaces;
 #[cfg(feature = "metrics")]
 pub mod metrics;
+pub mod metrics_core;
 pub mod runtime;
 pub mod services;
 pub mod storage;

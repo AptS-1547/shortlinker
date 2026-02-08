@@ -9,8 +9,7 @@ pub use form_state::{EditingField, FormState};
 use crate::errors::ShortlinkerError;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
 
-#[cfg(feature = "metrics")]
-use crate::metrics::NoopMetrics;
+use crate::metrics_core::NoopMetrics;
 
 use ratatui::widgets::TableState;
 use std::collections::{HashMap, HashSet};
@@ -125,10 +124,7 @@ pub struct App {
 
 impl App {
     pub async fn new() -> Result<App, ShortlinkerError> {
-        #[cfg(feature = "metrics")]
         let storage = StorageFactory::create(NoopMetrics::arc()).await?;
-        #[cfg(not(feature = "metrics"))]
-        let storage = StorageFactory::create().await?;
         let links = storage.load_all().await?;
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));

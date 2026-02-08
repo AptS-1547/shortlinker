@@ -19,8 +19,7 @@ use std::sync::Once;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 
-#[cfg(feature = "metrics")]
-use shortlinker::metrics::NoopMetrics;
+use shortlinker::metrics_core::NoopMetrics;
 
 // =============================================================================
 // Test Setup
@@ -117,15 +116,8 @@ async fn create_test_service() -> (LinkService, TempDir) {
     let db_path = temp_dir.path().join("test_service.db");
     let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-    #[cfg(feature = "metrics")]
     let storage = Arc::new(
         SeaOrmStorage::new(&db_url, "sqlite", NoopMetrics::arc())
-            .await
-            .expect("Failed to create storage"),
-    );
-    #[cfg(not(feature = "metrics"))]
-    let storage = Arc::new(
-        SeaOrmStorage::new(&db_url, "sqlite")
             .await
             .expect("Failed to create storage"),
     );
@@ -839,10 +831,10 @@ mod edge_cases {
     }
 
     #[tokio::test]
-    async fn test_pre_hashed_password_preserved() {
+    async fn test_pre_hashed_password_not_preserved() {
         let (service, _temp) = create_test_service().await;
 
-        // Use an already hashed password
+        // Use an already hashed password - should be re-hashed, not preserved
         let hashed = "$argon2id$v=19$m=19456,t=2,p=1$somesalt$somehash";
         let req = CreateLinkRequest {
             code: Some("prehashed".to_string()),
@@ -854,8 +846,9 @@ mod edge_cases {
 
         let result = service.create_link(req).await.unwrap();
 
-        // Should be preserved as-is
-        assert_eq!(result.link.password, Some(hashed.to_string()));
+        // Should be re-hashed, not stored as-is
+        assert!(result.link.password.is_some());
+        assert_ne!(result.link.password, Some(hashed.to_string()));
     }
 
     #[tokio::test]

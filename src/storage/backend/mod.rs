@@ -26,8 +26,7 @@ use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::models::StorageConfig;
 
-#[cfg(feature = "metrics")]
-use crate::metrics::MetricsRecorder;
+use crate::metrics_core::MetricsRecorder;
 
 pub use connection::{connect_generic, connect_sqlite, run_migrations};
 pub use converters::{model_to_shortlink, shortlink_to_active_model};
@@ -86,12 +85,10 @@ pub struct SeaOrmStorage {
     /// 重试配置
     retry_config: retry::RetryConfig,
     /// Metrics recorder for dependency injection
-    #[cfg(feature = "metrics")]
     pub(crate) metrics: Arc<dyn MetricsRecorder>,
 }
 
 impl SeaOrmStorage {
-    #[cfg(feature = "metrics")]
     pub async fn new(
         database_url: &str,
         backend_name: &str,
@@ -130,46 +127,6 @@ impl SeaOrmStorage {
         };
 
         // 运行迁移
-        run_migrations(&storage.db).await?;
-
-        warn!(
-            "{} Storage initialized.",
-            storage.backend_name.to_uppercase()
-        );
-        Ok(storage)
-    }
-
-    #[cfg(not(feature = "metrics"))]
-    pub async fn new(database_url: &str, backend_name: &str) -> Result<Self> {
-        if database_url.is_empty() {
-            return Err(ShortlinkerError::database_config(
-                "DATABASE_URL is not set".to_string(),
-            ));
-        }
-
-        let config = crate::config::get_config();
-        let retry_config = retry::RetryConfig {
-            max_retries: config.database.retry_count,
-            base_delay_ms: config.database.retry_base_delay_ms,
-            max_delay_ms: config.database.retry_max_delay_ms,
-        };
-
-        let db = if backend_name == "sqlite" {
-            connect_sqlite(database_url).await?
-        } else {
-            connect_generic(database_url, backend_name).await?
-        };
-
-        let storage = SeaOrmStorage {
-            db,
-            backend_name: backend_name.to_string(),
-            count_cache: Cache::builder()
-                .time_to_live(Duration::from_secs(30))
-                .max_capacity(1000)
-                .build(),
-            retry_config,
-        };
-
         run_migrations(&storage.db).await?;
 
         warn!(

@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::time::Instant;
 
-#[cfg(feature = "metrics")]
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -26,19 +25,14 @@ use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
 
-#[cfg(feature = "metrics")]
-use crate::metrics::MetricsRecorder;
+use crate::metrics_core::MetricsRecorder;
 
 /// Record database query metrics
-#[cfg(feature = "metrics")]
 fn record_db_metrics(metrics: &Arc<dyn MetricsRecorder>, operation: &str, start: Instant) {
     let duration = start.elapsed().as_secs_f64();
     metrics.observe_db_query(operation, duration);
     metrics.inc_db_query(operation);
 }
-
-#[cfg(not(feature = "metrics"))]
-fn record_db_metrics(_operation: &str, _start: Instant) {}
 
 /// 根据 LinkFilter 构建 SeaORM 查询条件
 fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Condition {
@@ -107,10 +101,7 @@ impl SeaOrmStorage {
             ))
         })?;
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "get", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("get", start);
         Ok(result.map(model_to_shortlink))
     }
 
@@ -126,10 +117,7 @@ impl SeaOrmStorage {
                 ))
             })?;
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "load_all", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("load_all", start);
         let count = models.len();
         let links: HashMap<String, ShortLink> = models
             .into_iter()
@@ -158,10 +146,7 @@ impl SeaOrmStorage {
                 ))
             })?;
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "load_all_codes", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("load_all_codes", start);
         info!("Loaded {} short codes for Bloom filter", codes.len());
         Ok(codes)
     }
@@ -218,10 +203,7 @@ impl SeaOrmStorage {
         .await
         .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)));
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "count", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("count", start);
         result
     }
 
@@ -299,10 +281,7 @@ impl SeaOrmStorage {
         })?;
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "paginated_query", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("paginated_query", start);
         Ok((links, total))
     }
 
@@ -330,10 +309,7 @@ impl SeaOrmStorage {
             ))
         })?;
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "batch_get", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("batch_get", start);
         Ok(models
             .into_iter()
             .map(|m| {
@@ -430,10 +406,7 @@ impl SeaOrmStorage {
                 ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
             })?;
 
-        #[cfg(feature = "metrics")]
         record_db_metrics(&self.metrics, "get_stats", start);
-        #[cfg(not(feature = "metrics"))]
-        record_db_metrics("get_stats", start);
         match result {
             Some(stats) => Ok(LinkStats {
                 total_links: stats.total_links as usize,

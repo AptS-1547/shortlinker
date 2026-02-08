@@ -19,8 +19,7 @@ use tracing::{debug, trace, warn};
 
 use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink, RawClickEvent};
 
-#[cfg(feature = "metrics")]
-use crate::metrics::MetricsRecorder;
+use crate::metrics_core::MetricsRecorder;
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -182,12 +181,10 @@ pub struct ClickManager {
     /// 原始事件 channel sender（用于异步处理详细日志，使用 crossbeam 高性能 channel）
     raw_event_tx: Option<Sender<RawClickEvent>>,
     /// Metrics recorder for dependency injection
-    #[cfg(feature = "metrics")]
     metrics: Arc<dyn MetricsRecorder>,
 }
 
 impl ClickManager {
-    #[cfg(feature = "metrics")]
     pub fn new(
         sink: Arc<dyn ClickSink>,
         flush_interval: Duration,
@@ -203,29 +200,11 @@ impl ClickManager {
             detailed_sink: None,
             raw_event_tx: None,
             metrics,
-        }
-    }
-
-    #[cfg(not(feature = "metrics"))]
-    pub fn new(
-        sink: Arc<dyn ClickSink>,
-        flush_interval: Duration,
-        max_clicks_before_flush: usize,
-    ) -> Self {
-        Self {
-            buffer: Arc::new(ClickBuffer::new()),
-            sink,
-            flush_interval,
-            max_clicks_before_flush,
-            detailed_buffer: None,
-            detailed_sink: None,
-            raw_event_tx: None,
         }
     }
 
     /// 创建带详细日志支持的点击管理器
     /// 返回 (ClickManager, Receiver) 以便启动后台处理任务
-    #[cfg(feature = "metrics")]
     pub fn with_detailed_logging(
         sink: Arc<dyn ClickSink>,
         detailed_sink: Arc<dyn DetailedClickSink>,
@@ -245,29 +224,6 @@ impl ClickManager {
             detailed_sink: Some(detailed_sink),
             raw_event_tx: Some(tx),
             metrics,
-        };
-
-        (manager, rx)
-    }
-
-    #[cfg(not(feature = "metrics"))]
-    pub fn with_detailed_logging(
-        sink: Arc<dyn ClickSink>,
-        detailed_sink: Arc<dyn DetailedClickSink>,
-        flush_interval: Duration,
-        max_clicks_before_flush: usize,
-    ) -> (Self, Receiver<RawClickEvent>) {
-        // 使用 crossbeam bounded channel，容量 10000
-        let (tx, rx) = crossbeam_channel::bounded(10000);
-
-        let manager = Self {
-            buffer: Arc::new(ClickBuffer::new()),
-            sink,
-            flush_interval,
-            max_clicks_before_flush,
-            detailed_buffer: Some(Arc::new(DetailedBuffer::new())),
-            detailed_sink: Some(detailed_sink),
-            raw_event_tx: Some(tx),
         };
 
         (manager, rx)
@@ -328,13 +284,11 @@ impl ClickManager {
                 Ok(()) => true,
                 Err(TrySendError::Full(_)) => {
                     warn!("ClickManager: Event channel full, dropping event");
-                    #[cfg(feature = "metrics")]
                     self.metrics.inc_clicks_channel_dropped("full");
                     false
                 }
                 Err(TrySendError::Disconnected(_)) => {
                     warn!("ClickManager: Event channel disconnected");
-                    #[cfg(feature = "metrics")]
                     self.metrics.inc_clicks_channel_dropped("disconnected");
                     false
                 }
@@ -366,19 +320,10 @@ impl ClickManager {
             {
                 let buffer = Arc::clone(&self.buffer);
                 let sink = Arc::clone(&self.sink);
-                #[cfg(feature = "metrics")]
                 let metrics = Arc::clone(&self.metrics);
                 tokio::spawn(async move {
                     let success = if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                        #[cfg(feature = "metrics")]
-                        {
-                            Self::flush_buffer_with_trigger(&buffer, &sink, "threshold", &metrics)
-                                .await
-                        }
-                        #[cfg(not(feature = "metrics"))]
-                        {
-                            Self::flush_buffer_with_trigger(&buffer, &sink, "threshold").await
-                        }
+                        Self::flush_buffer_with_trigger(&buffer, &sink, "threshold", &metrics).await
                     } else {
                         trace!("ClickManager: flush already in progress, skipping");
                         true // 跳过也算成功，不需要退避
@@ -404,10 +349,7 @@ impl ClickManager {
             // 定期触发刷盘
             if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
                 trace!("ClickManager: Starting scheduled flush");
-                #[cfg(feature = "metrics")]
                 Self::flush_buffer(&self.buffer, &self.sink, &self.metrics).await;
-                #[cfg(not(feature = "metrics"))]
-                Self::flush_buffer(&self.buffer, &self.sink).await;
             } else {
                 trace!("ClickManager: flush already in progress, skipping scheduled flush");
             }
@@ -479,10 +421,7 @@ impl ClickManager {
     pub async fn flush(&self) {
         debug!("ClickManager: Manual flush triggered");
         let _guard = self.buffer.flush_lock.lock().await;
-        #[cfg(feature = "metrics")]
         Self::flush_buffer_with_trigger(&self.buffer, &self.sink, "manual", &self.metrics).await;
-        #[cfg(not(feature = "metrics"))]
-        Self::flush_buffer_with_trigger(&self.buffer, &self.sink, "manual").await;
 
         // 刷新详细日志
         if let (Some(detailed_buffer), Some(detailed_sink)) =
@@ -494,7 +433,6 @@ impl ClickManager {
     }
 
     /// 执行实际的刷盘操作
-    #[cfg(feature = "metrics")]
     async fn flush_buffer(
         buffer: &ClickBuffer,
         sink: &Arc<dyn ClickSink>,
@@ -503,15 +441,9 @@ impl ClickManager {
         Self::flush_buffer_with_trigger(buffer, sink, "interval", metrics).await
     }
 
-    #[cfg(not(feature = "metrics"))]
-    async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) -> bool {
-        Self::flush_buffer_with_trigger(buffer, sink, "interval").await
-    }
-
     /// 执行实际的刷盘操作（带触发类型标记）
     ///
     /// 返回 true 表示成功，false 表示失败
-    #[cfg(feature = "metrics")]
     async fn flush_buffer_with_trigger(
         buffer: &ClickBuffer,
         sink: &Arc<dyn ClickSink>,
@@ -545,37 +477,6 @@ impl ClickManager {
                 metrics.inc_clicks_flush(trigger, "failed");
                 // Update gauge again after restore
                 metrics.set_clicks_buffer_entries(buffer.data.len() as f64);
-                false
-            }
-        }
-    }
-
-    #[cfg(not(feature = "metrics"))]
-    #[allow(unused_variables)]
-    async fn flush_buffer_with_trigger(
-        buffer: &ClickBuffer,
-        sink: &Arc<dyn ClickSink>,
-        trigger: &str,
-    ) -> bool {
-        let updates = buffer.drain();
-
-        if updates.is_empty() {
-            trace!("ClickManager: No clicks to flush");
-            return true;
-        }
-
-        let count = updates.len();
-        match sink.flush_clicks(updates.clone()).await {
-            Ok(_) => {
-                debug!("ClickManager: Successfully flushed {} entries", count);
-                true
-            }
-            Err(e) => {
-                buffer.restore(updates);
-                warn!(
-                    "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
-                    e, count
-                );
                 false
             }
         }
@@ -639,8 +540,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
 
-    #[cfg(feature = "metrics")]
-    use crate::metrics::NoopMetrics;
+    use crate::metrics_core::NoopMetrics;
 
     struct MockSink {
         flushed: std::sync::Mutex<Vec<(String, usize)>>,
@@ -670,7 +570,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "metrics")]
     fn create_test_manager(sink: Arc<dyn ClickSink>, max_clicks: usize) -> ClickManager {
         ClickManager::new(
             sink,
@@ -678,11 +577,6 @@ mod tests {
             max_clicks,
             NoopMetrics::arc(),
         )
-    }
-
-    #[cfg(not(feature = "metrics"))]
-    fn create_test_manager(sink: Arc<dyn ClickSink>, max_clicks: usize) -> ClickManager {
-        ClickManager::new(sink, Duration::from_secs(60), max_clicks)
     }
 
     #[tokio::test]

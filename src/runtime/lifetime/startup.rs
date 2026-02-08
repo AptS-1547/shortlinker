@@ -15,7 +15,8 @@ use std::time::Duration;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "metrics")]
-use crate::metrics::{MetricsRecorder, PrometheusMetricsWrapper};
+use crate::metrics::PrometheusMetricsWrapper;
+use crate::metrics_core::MetricsRecorder;
 
 pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
@@ -23,7 +24,6 @@ pub struct StartupContext {
     pub link_service: Arc<LinkService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub route_config: RouteConfig,
-    #[cfg(feature = "metrics")]
     pub metrics: Arc<dyn MetricsRecorder>,
 }
 
@@ -56,16 +56,12 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         .map_err(|e| anyhow::anyhow!("Failed to install rustls crypto provider: {:?}", e))?;
 
     // Create metrics instance for dependency injection
-    // Use a reference to the global METRICS singleton wrapped in Arc
     #[cfg(feature = "metrics")]
     let metrics: Arc<dyn MetricsRecorder> = Arc::new(PrometheusMetricsWrapper);
-
-    #[cfg(feature = "metrics")]
-    let storage = StorageFactory::create(metrics.clone())
-        .await
-        .context("Failed to create storage backend")?;
     #[cfg(not(feature = "metrics"))]
-    let storage = StorageFactory::create()
+    let metrics: Arc<dyn MetricsRecorder> = crate::metrics_core::NoopMetrics::arc();
+
+    let storage = StorageFactory::create(metrics.clone())
         .await
         .context("Failed to create storage backend")?;
     info!(
@@ -122,20 +118,12 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
                 // SeaOrmStorage 实现了 DetailedClickSink trait
                 let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
                 info!("Detailed click logging enabled, initializing with DetailedClickSink");
-                #[cfg(feature = "metrics")]
                 let (manager, rx) = ClickManager::with_detailed_logging(
                     sink,
                     detailed_sink,
                     Duration::from_secs(flush_interval),
                     max_clicks_before_flush as usize,
                     metrics.clone(),
-                );
-                #[cfg(not(feature = "metrics"))]
-                let (manager, rx) = ClickManager::with_detailed_logging(
-                    sink,
-                    detailed_sink,
-                    Duration::from_secs(flush_interval),
-                    max_clicks_before_flush as usize,
                 );
                 let mgr = Arc::new(manager);
 
@@ -149,18 +137,11 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
                 mgr
             } else {
-                #[cfg(feature = "metrics")]
                 let manager = ClickManager::new(
                     sink,
                     Duration::from_secs(flush_interval),
                     max_clicks_before_flush as usize,
                     metrics.clone(),
-                );
-                #[cfg(not(feature = "metrics"))]
-                let manager = ClickManager::new(
-                    sink,
-                    Duration::from_secs(flush_interval),
-                    max_clicks_before_flush as usize,
                 );
                 Arc::new(manager)
             };
@@ -185,12 +166,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     }
 
     // 初始化缓存
-    #[cfg(feature = "metrics")]
     let cache = cache::CompositeCache::create(metrics.clone())
-        .await
-        .context("Failed to create cache")?;
-    #[cfg(not(feature = "metrics"))]
-    let cache = cache::CompositeCache::create()
         .await
         .context("Failed to create cache")?;
 
@@ -276,7 +252,6 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         link_service,
         analytics_service,
         route_config,
-        #[cfg(feature = "metrics")]
         metrics,
     })
 }

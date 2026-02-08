@@ -270,7 +270,8 @@ async fn import_links_direct(
         }
 
         // Process password (hash if plaintext, keep if already hashed)
-        let processed_password = match process_imported_password(imported_link.password.as_deref()) {
+        let processed_password = match process_imported_password(imported_link.password.as_deref())
+        {
             Ok(pwd) => pwd,
             Err(e) => {
                 println!(
