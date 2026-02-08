@@ -35,27 +35,3 @@ pub use coordinator::{DefaultReloadCoordinator, ReloadCoordinator};
 pub use global::{get_reload_coordinator, init_default_coordinator, init_reload_coordinator};
 pub use types::{ReloadEvent, ReloadResult, ReloadStatus, ReloadTarget};
 
-// Backward compatibility: keep the old reload_all function signature
-// but mark it as deprecated
-use crate::cache::CompositeCacheTrait;
-use crate::storage::SeaOrmStorage;
-use std::sync::Arc;
-
-/// Manually reload cache and storage
-///
-/// This function is deprecated. Use `ReloadCoordinator::reload(ReloadTarget::Data)` instead.
-///
-/// This function is kept for backward compatibility with existing code.
-#[deprecated(
-    since = "0.4.0",
-    note = "Use ReloadCoordinator::reload(ReloadTarget::Data) instead"
-)]
-pub async fn reload_all(
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
-) -> anyhow::Result<()> {
-    // Create a temporary coordinator to execute reload
-    let coordinator = DefaultReloadCoordinator::new(cache, storage);
-    coordinator.reload(ReloadTarget::Data).await?;
-    Ok(())
-}

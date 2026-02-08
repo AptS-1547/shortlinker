@@ -74,13 +74,13 @@ pub enum Commands {
     /// List all short links
     List,
 
-    /// Export links to JSON file
+    /// Export links to CSV file
     Export {
         /// Output file path (default: stdout)
         file_path: Option<String>,
     },
 
-    /// Import links from JSON file
+    /// Import links from CSV file
     Import {
         /// Input file path
         file_path: String,
