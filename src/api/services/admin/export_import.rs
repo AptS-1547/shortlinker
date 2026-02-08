@@ -17,7 +17,7 @@ use tracing::{debug, error, info, warn};
 use crate::cache::traits::CompositeCacheTrait;
 use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
-use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
 use super::error_code::ErrorCode;
@@ -481,28 +481,18 @@ pub async fn import_links(
             }
         });
 
-        // 处理密码字段
-        // 策略：如果是 Argon2 哈希则直接使用，否则进行哈希
-        let password = match &row.password {
-            Some(pwd) if !pwd.is_empty() => {
-                if is_argon2_hash(pwd) {
-                    Some(pwd.clone())
-                } else {
-                    match hash_password(pwd) {
-                        Ok(hash) => Some(hash),
-                        Err(e) => {
-                            failed_items.push(ImportFailedItem {
-                                row: row_num,
-                                code: row.code,
-                                error: format!("Password hash error: {}", e),
-                                error_code: Some(ErrorCode::LinkPasswordHashError as i32),
-                            });
-                            continue;
-                        }
-                    }
-                }
+        // 处理密码字段（导入路径：已哈希则保留，明文则哈希）
+        let password = match process_imported_password(row.password.as_deref()) {
+            Ok(pwd) => pwd,
+            Err(e) => {
+                failed_items.push(ImportFailedItem {
+                    row: row_num,
+                    code: row.code,
+                    error: format!("Password hash error: {}", e),
+                    error_code: Some(ErrorCode::LinkPasswordHashError as i32),
+                });
+                continue;
             }
-            _ => None,
         };
 
         let link = ShortLink {

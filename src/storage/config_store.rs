@@ -433,7 +433,7 @@ impl ConfigStore {
     /// 应在服务启动时调用，确保首次启动时配置表不为空。
     pub async fn ensure_defaults(&self) -> Result<usize> {
         use crate::config::definitions::{ALL_CONFIGS, keys};
-        use crate::utils::password::{hash_password, is_argon2_hash};
+        use crate::utils::password::{is_argon2_hash, process_imported_password};
         use tracing::{debug, info, warn};
 
         let mut inserted_count = 0;
@@ -447,14 +447,16 @@ impl ConfigStore {
                 && !default_value.is_empty()
                 && !is_argon2_hash(&default_value);
 
-            // 如果是新生成的 admin_token，先哈希（在插入数据库前）
-            let value_to_insert = if is_new_admin_token {
-                hash_password(&default_value).map_err(|e| {
-                    ShortlinkerError::database_operation(format!(
-                        "Failed to hash admin_token: {}",
-                        e
-                    ))
-                })?
+            // 如果是 admin_token，通过 process_imported_password 处理（已哈希则保留，明文则哈希）
+            let value_to_insert = if def.key == keys::API_ADMIN_TOKEN && !default_value.is_empty() {
+                process_imported_password(Some(&default_value))
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!(
+                            "Failed to hash admin_token: {}",
+                            e
+                        ))
+                    })?
+                    .unwrap_or_default()
             } else {
                 default_value.clone()
             };

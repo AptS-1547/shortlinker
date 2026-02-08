@@ -14,7 +14,7 @@ use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
-use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::password::{process_imported_password, process_new_password};
 use crate::utils::url_validator::validate_url;
 
 // ============ Request/Response DTOs ============
@@ -178,21 +178,12 @@ impl LinkService {
         get_config().cache.default_ttl
     }
 
-    /// Process password field - hash if needed
+    /// Process password field - always hash, never accept pre-hashed values
     fn process_password(&self, password: Option<&str>) -> Result<Option<String>, ShortlinkerError> {
-        match password {
-            Some(pwd) if !pwd.is_empty() => {
-                if is_argon2_hash(pwd) {
-                    Ok(Some(pwd.to_string()))
-                } else {
-                    hash_password(pwd).map(Some).map_err(|e| {
-                        error!("Failed to hash password: {}", e);
-                        ShortlinkerError::link_password_hash_error(e.to_string())
-                    })
-                }
-            }
-            _ => Ok(None),
-        }
+        process_new_password(password).map_err(|e| {
+            error!("Failed to hash password: {}", e);
+            ShortlinkerError::link_password_hash_error(e.to_string())
+        })
     }
 
     /// Parse expiration time from flexible format
@@ -494,8 +485,8 @@ impl LinkService {
                 }
             };
 
-            // Process password
-            let password = match self.process_password(item.password.as_deref()) {
+            // Process password (import path: preserve existing hashes)
+            let password = match process_imported_password(item.password.as_deref()) {
                 Ok(pwd) => pwd,
                 Err(_) => {
                     result.failed += 1;

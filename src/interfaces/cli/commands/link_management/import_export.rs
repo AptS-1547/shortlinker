@@ -10,7 +10,7 @@ use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
 use crate::utils::csv_handler::{self, CsvLinkRow, FileFormat};
-use crate::utils::password::process_new_password;
+use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn export_links(
@@ -270,7 +270,7 @@ async fn import_links_direct(
         }
 
         // Process password (hash if plaintext, keep if already hashed)
-        let processed_password = match process_new_password(imported_link.password.as_deref()) {
+        let processed_password = match process_imported_password(imported_link.password.as_deref()) {
             Ok(pwd) => pwd,
             Err(e) => {
                 println!(

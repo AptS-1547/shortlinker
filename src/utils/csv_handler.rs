@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
-use crate::utils::password::process_new_password;
+use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
 /// CSV 行数据结构（用于序列化/反序列化）
@@ -77,8 +77,8 @@ impl CsvLinkRow {
             }
         });
 
-        // 处理密码（明文则哈希，已哈希则保留）
-        let password = process_new_password(self.password.as_deref()).map_err(|e| {
+        // 处理密码（明文则哈希，已哈希则保留 - 导入场景）
+        let password = process_imported_password(self.password.as_deref()).map_err(|e| {
             ShortlinkerError::validation(format!(
                 "Failed to process password for code '{}': {}",
                 self.code, e
