@@ -17,7 +17,8 @@ use sea_orm::{
 use tracing::warn;
 
 use migration::entities::{
-    click_log, click_stats_daily, click_stats_global_hourly, click_stats_hourly, user_agent,
+    click_log, click_stats_daily, click_stats_global_daily, click_stats_global_hourly,
+    click_stats_hourly, user_agent,
 };
 
 // ============ 查询结果类型 ============
@@ -585,6 +586,28 @@ impl super::SeaOrmStorage {
             .into_iter()
             .map(|r| TrendRow {
                 label: r.hour_bucket.format("%Y-%m-%d %H:00").to_string(),
+                count: r.total_clicks,
+            })
+            .collect())
+    }
+
+    /// 从全局天汇总表获取趋势（Day 粒度）
+    pub async fn get_global_trend_from_daily(
+        &self,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> anyhow::Result<Vec<TrendRow>> {
+        let records = click_stats_global_daily::Entity::find()
+            .filter(click_stats_global_daily::Column::DayBucket.gte(start))
+            .filter(click_stats_global_daily::Column::DayBucket.lte(end))
+            .order_by_asc(click_stats_global_daily::Column::DayBucket)
+            .all(&self.db)
+            .await?;
+
+        Ok(records
+            .into_iter()
+            .map(|r| TrendRow {
+                label: r.day_bucket.format("%Y-%m-%d").to_string(),
                 count: r.total_clicks,
             })
             .collect())

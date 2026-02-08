@@ -14,7 +14,9 @@ use tracing::{debug, info};
 use super::HourlyRollupWriter;
 use crate::storage::backend::SeaOrmStorage;
 use crate::storage::backend::retry::{self, RetryConfig};
-use migration::entities::{click_stats_daily, click_stats_global_hourly, click_stats_hourly};
+use migration::entities::{
+    click_stats_daily, click_stats_global_daily, click_stats_global_hourly, click_stats_hourly,
+};
 
 /// 点击聚合数据
 #[derive(Debug, Clone, Default)]
@@ -275,6 +277,70 @@ impl RollupManager {
             debug!("Batch updated {} daily rollup records", to_update.len());
         }
 
+        // ---- 全局天汇总 ----
+        // 从已聚合的 per-code 数据中计算全局统计
+        let total_clicks: i64 = aggregated.values().map(|a| a.count as i64).sum();
+        let unique_links = aggregated.len() as i32;
+
+        let mut global_referrers: HashMap<String, usize> = HashMap::new();
+        let mut global_countries: HashMap<String, usize> = HashMap::new();
+        let mut global_sources: HashMap<String, usize> = HashMap::new();
+
+        for agg in aggregated.values() {
+            for (k, v) in &agg.referrers {
+                *global_referrers.entry(k.clone()).or_insert(0) += v;
+            }
+            for (k, v) in &agg.countries {
+                *global_countries.entry(k.clone()).or_insert(0) += v;
+            }
+            for (k, v) in &agg.sources {
+                *global_sources.entry(k.clone()).or_insert(0) += v;
+            }
+        }
+
+        let top_referrers_json = serde_json::to_string(&Self::get_top_n(&global_referrers, 10))?;
+        let top_countries_json = serde_json::to_string(&Self::get_top_n(&global_countries, 10))?;
+        let top_sources_json = serde_json::to_string(&Self::get_top_n(&global_sources, 10))?;
+
+        // 覆盖式 upsert（rollup 是从 hourly 完整重算的，应该幂等）
+        let existing_global = click_stats_global_daily::Entity::find()
+            .filter(click_stats_global_daily::Column::DayBucket.eq(target_date))
+            .one(db)
+            .await?;
+
+        if let Some(existing) = existing_global {
+            let mut active: click_stats_global_daily::ActiveModel = existing.into();
+            active.total_clicks = Set(total_clicks);
+            active.unique_links = Set(Some(unique_links));
+            active.top_referrers = Set(Some(top_referrers_json));
+            active.top_countries = Set(Some(top_countries_json));
+            active.top_sources = Set(Some(top_sources_json));
+
+            retry::with_retry("rollup_update_global_daily", self.retry_config, || async {
+                click_stats_global_daily::Entity::update(active.clone())
+                    .exec(db)
+                    .await
+            })
+            .await?;
+        } else {
+            let model = click_stats_global_daily::ActiveModel {
+                day_bucket: Set(target_date),
+                total_clicks: Set(total_clicks),
+                unique_links: Set(Some(unique_links)),
+                top_referrers: Set(Some(top_referrers_json)),
+                top_countries: Set(Some(top_countries_json)),
+                top_sources: Set(Some(top_sources_json)),
+                ..Default::default()
+            };
+
+            retry::with_retry("rollup_insert_global_daily", self.retry_config, || async {
+                click_stats_global_daily::Entity::insert(model.clone())
+                    .exec(db)
+                    .await
+            })
+            .await?;
+        }
+
         info!(
             "Hourly-to-daily rollup completed: {} links (date: {})",
             processed, target_date
@@ -310,6 +376,12 @@ impl RollupManager {
         // 清理过期的全局小时汇总
         click_stats_global_hourly::Entity::delete_many()
             .filter(click_stats_global_hourly::Column::HourBucket.lt(hourly_cutoff))
+            .exec(db)
+            .await?;
+
+        // 清理过期的全局天汇总
+        click_stats_global_daily::Entity::delete_many()
+            .filter(click_stats_global_daily::Column::DayBucket.lt(daily_cutoff))
             .exec(db)
             .await?;
 

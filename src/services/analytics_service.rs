@@ -630,11 +630,49 @@ impl AnalyticsService {
 
         let results = match group_by {
             GroupBy::Hour => self.storage.get_global_trend_from_hourly(start, end).await,
-            _ => {
-                // 对于 Day/Week/Month，暂时回退到原始查询
-                // TODO: 添加全局天汇总表后可优化
-                let date_expr = self.date_format_expr(group_by);
-                self.storage.get_global_trend(start, end, date_expr).await
+            GroupBy::Day => {
+                let start_date = start.date_naive();
+                let end_date = end.date_naive();
+                self.storage
+                    .get_global_trend_from_daily(start_date, end_date)
+                    .await
+            }
+            GroupBy::Week | GroupBy::Month => {
+                // 从天汇总读取，在 service 层做二次聚合
+                let start_date = start.date_naive();
+                let end_date = end.date_naive();
+                let daily_results = self
+                    .storage
+                    .get_global_trend_from_daily(start_date, end_date)
+                    .await
+                    .map_err(|e| {
+                        ShortlinkerError::analytics_query_failed(format!(
+                            "Daily trend query failed: {}",
+                            e
+                        ))
+                    })?;
+
+                let format_str = match group_by {
+                    GroupBy::Week => "%G-W%V",
+                    GroupBy::Month => "%Y-%m",
+                    _ => unreachable!(),
+                };
+
+                use std::collections::BTreeMap;
+                let mut grouped: BTreeMap<String, i64> = BTreeMap::new();
+                for row in &daily_results {
+                    if let Ok(date) = chrono::NaiveDate::parse_from_str(&row.label, "%Y-%m-%d") {
+                        let key = date.format(format_str).to_string();
+                        *grouped.entry(key).or_insert(0) += row.count;
+                    }
+                }
+
+                Ok(grouped
+                    .into_iter()
+                    .map(|(label, count)| {
+                        crate::storage::backend::TrendRow { label, count }
+                    })
+                    .collect())
             }
         }
         .map_err(|e| {

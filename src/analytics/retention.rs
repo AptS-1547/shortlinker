@@ -84,9 +84,34 @@ impl DataRetentionTask {
         self.max_log_rows
     }
 
+    /// 执行 hourly → daily rollup
+    ///
+    /// 对昨天和前天执行 rollup，防止时区边界遗漏
+    async fn run_daily_rollup(&self) {
+        let today = Utc::now().date_naive();
+        let yesterday = today - chrono::Duration::days(1);
+        let day_before = today - chrono::Duration::days(2);
+
+        for date in [day_before, yesterday] {
+            match self.rollup_manager.rollup_hourly_to_daily(date).await {
+                Ok(count) => {
+                    if count > 0 {
+                        info!("Daily rollup for {}: {} links processed", date, count);
+                    }
+                }
+                Err(e) => {
+                    error!("Daily rollup failed for {}: {}", date, e);
+                }
+            }
+        }
+    }
+
     /// 运行完整的清理流程
     pub async fn run_cleanup(&self) -> anyhow::Result<CleanupReport> {
         let mut report = CleanupReport::default();
+
+        // 0. 先执行 hourly → daily rollup（在清理之前，确保数据不丢失）
+        self.run_daily_rollup().await;
 
         // 1. 清理原始点击日志（按时间）
         match self.cleanup_raw_logs().await {
