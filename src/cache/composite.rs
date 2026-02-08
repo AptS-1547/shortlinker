@@ -135,8 +135,26 @@ impl CompositeCacheTrait for CompositeCache {
     }
 
     async fn invalidate_all(&self) {
+        // 注意：不清理 Bloom Filter。如需完整重置（含 Bloom 重建），使用 rebuild_all()。
         self.object_cache.invalidate_all().await;
         self.negative_cache.clear().await;
+    }
+
+    async fn rebuild_all(&self, codes: &[String]) -> Result<()> {
+        // BUG: 在调用方的 load_all_codes() 到下面 rebuild() 原子交换之间的极窄窗口内，
+        // 并发 create_link 写入的 key 可能不在新 Bloom 中，导致该链接短暂返回 404
+        // （因为 CacheResult::NotFound 在 redirect handler 中直接返回 404，不回源 DB）。
+        // 窗口为毫秒级，reload 为低频操作（手动触发或信号触发），影响可忽略。
+
+        // 1. 原子重建 Bloom Filter（无空窗期：读取端看到旧或新的完整 Bloom，不会看到空 Bloom）
+        self.filter_plugin
+            .rebuild(codes, codes.len(), 0.001)
+            .await?;
+        // 2. 清空 Object Cache（stale data 会在下次访问时从 DB 按需回填）
+        self.object_cache.invalidate_all().await;
+        // 3. 清空 Negative Cache（之前的 "not found" 状态可能已失效）
+        self.negative_cache.clear().await;
+        Ok(())
     }
 
     async fn load_cache(&self, links: HashMap<String, ShortLink>) {
@@ -304,6 +322,30 @@ mod tests {
         // Negative Cache 应该被清空
         assert!(!cache.negative_cache.contains("key1").await);
         assert!(!cache.negative_cache.contains("key2").await);
+    }
+
+    #[tokio::test]
+    async fn test_composite_rebuild_all() {
+        let cache = create_test_composite().await;
+
+        // 添加旧数据到各缓存层
+        cache.filter_plugin.set("old_bloom_key").await;
+        cache.mark_not_found("old_neg_key").await;
+
+        assert!(cache.filter_plugin.check("old_bloom_key").await);
+        assert!(cache.negative_cache.contains("old_neg_key").await);
+
+        // 用新 codes 执行 rebuild_all
+        let new_codes = vec!["new_key_1".to_string(), "new_key_2".to_string()];
+        cache.rebuild_all(&new_codes).await.unwrap();
+
+        // 旧 Bloom 条目应该被替换
+        assert!(!cache.filter_plugin.check("old_bloom_key").await);
+        // 新 codes 应该在 Bloom 中
+        assert!(cache.filter_plugin.check("new_key_1").await);
+        assert!(cache.filter_plugin.check("new_key_2").await);
+        // Negative Cache 应该被清空
+        assert!(!cache.negative_cache.contains("old_neg_key").await);
     }
 
     #[tokio::test]

@@ -177,13 +177,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         .context("Failed to load codes for bloom filter")?;
     let codes_count = codes.len();
     cache
-        .reconfigure(cache::traits::BloomConfig {
-            capacity: codes_count,
-            fp_rate: 0.001,
-        })
+        .rebuild_all(&codes)
         .await
-        .context("Failed to reconfigure cache")?;
-    cache.load_bloom(&codes).await;
+        .context("Failed to initialize bloom filter")?;
     debug!("Bloom filter initialized with {} codes", codes_count);
 
     // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)

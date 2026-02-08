@@ -22,7 +22,7 @@ impl Default for BloomExistenceFilterPlugin {
 
 impl BloomExistenceFilterPlugin {
     pub fn new() -> Result<Self> {
-        // 使用最小初始容量，因为 startup.rs 中的 reconfigure() 会立即用实际数量替换
+        // 使用最小初始容量，因为 startup.rs 中的 rebuild_all() 会立即用实际数量替换
         let bloom = Bloom::new_for_fp_rate(100, 0.001).map_err(|e| {
             ShortlinkerError::cache_connection(format!("Failed to create bloom filter: {e}"))
         })?;
@@ -30,6 +30,21 @@ impl BloomExistenceFilterPlugin {
             inner: Arc::new(RwLock::new(bloom)),
         })
     }
+}
+
+/// 分段预留策略，计算 Bloom Filter 实际容量
+/// - < 5000: 预留 50%（小规模需要更多余量）
+/// - 5000-100000: 预留 20%
+/// - > 100000: 预留 10%（最多 100 万）
+fn calculate_capacity(count: usize) -> usize {
+    let reserve = if count < 5000 {
+        count / 2
+    } else if count < 100000 {
+        count / 5
+    } else {
+        (count / 10).min(1_000_000)
+    };
+    count + reserve.max(1000) // 最少预留 1000
 }
 
 #[async_trait]
@@ -54,24 +69,39 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
 
     async fn clear(&self, count: usize, fp_rate: f64) -> Result<()> {
         let mut bloom = self.inner.write();
-        // 分段预留策略：
-        // - < 5000: 预留 50%（小规模需要更多余量）
-        // - 5000-100000: 预留 20%
-        // - > 100000: 预留 10%（最多 100 万）
-        let reserve = if count < 5000 {
-            count / 2
-        } else if count < 100000 {
-            count / 5
-        } else {
-            (count / 10).min(1_000_000)
-        };
-        let capacity = count + reserve.max(1000); // 最少预留 1000
+        let capacity = calculate_capacity(count);
         *bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
             ShortlinkerError::cache_connection(format!("Failed to clear bloom filter: {e}"))
         })?;
         debug!(
             "Bloom filter cleared with capacity: {} (count: {} + reserve: {}), fp_rate: {}",
-            capacity, count, reserve, fp_rate
+            capacity,
+            count,
+            capacity - count,
+            fp_rate
+        );
+        Ok(())
+    }
+
+    /// 在锁外构建完整的新 Bloom Filter，然后原子交换。
+    /// 读取端看到的要么是旧的完整 Bloom，要么是新的完整 Bloom，永远不会看到空 Bloom。
+    async fn rebuild(&self, keys: &[String], count: usize, fp_rate: f64) -> Result<()> {
+        let capacity = calculate_capacity(count);
+        let mut new_bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
+            ShortlinkerError::cache_connection(format!("Failed to rebuild bloom filter: {e}"))
+        })?;
+        for key in keys {
+            new_bloom.set(key.as_str());
+        }
+        // 原子交换：只持锁一瞬间
+        *self.inner.write() = new_bloom;
+        debug!(
+            "Bloom filter rebuilt atomically with {} keys, capacity: {} (count: {} + reserve: {}), fp_rate: {}",
+            keys.len(),
+            capacity,
+            count,
+            capacity - count,
+            fp_rate
         );
         Ok(())
     }
@@ -122,6 +152,31 @@ mod tests {
 
         // 清除后，之前的 key 应该不存在了
         assert!(!filter.check("test_key").await);
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_replaces_filter_atomically() {
+        let filter = BloomExistenceFilterPlugin::new().unwrap();
+
+        // 先插入一些旧 key
+        filter.set("old_key_1").await;
+        filter.set("old_key_2").await;
+        assert!(filter.check("old_key_1").await);
+
+        // 用新 key 列表 rebuild
+        let new_keys = vec!["new_key_a".to_string(), "new_key_b".to_string()];
+        filter
+            .rebuild(&new_keys, new_keys.len(), 0.001)
+            .await
+            .unwrap();
+
+        // 旧 key 应该不存在了
+        assert!(!filter.check("old_key_1").await);
+        assert!(!filter.check("old_key_2").await);
+
+        // 新 key 应该存在
+        assert!(filter.check("new_key_a").await);
+        assert!(filter.check("new_key_b").await);
     }
 
     #[tokio::test]

@@ -74,6 +74,12 @@ impl CompositeCacheTrait for MockCache {
         self.not_found.write().await.clear();
     }
 
+    async fn rebuild_all(&self, _codes: &[String]) -> shortlinker::errors::Result<()> {
+        self.data.write().await.clear();
+        self.not_found.write().await.clear();
+        Ok(())
+    }
+
     async fn mark_not_found(&self, key: &str) {
         self.not_found.write().await.insert(key.to_string());
     }
