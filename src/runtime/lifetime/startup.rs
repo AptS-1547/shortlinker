@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "metrics")]
 use crate::metrics::PrometheusMetricsWrapper;
@@ -180,6 +180,41 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)
     crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
     debug!("ReloadCoordinator initialized");
+
+    // 启动 Bloom Filter 定时重建任务
+    let bloom_rebuild_interval = rt.get_u64_or(keys::CACHE_BLOOM_REBUILD_INTERVAL, 14400);
+    if bloom_rebuild_interval > 0 {
+        if let Some(coordinator) = crate::system::reload::get_reload_coordinator() {
+            tokio::spawn(async move {
+                use crate::system::reload::ReloadTarget;
+                let interval = Duration::from_secs(bloom_rebuild_interval);
+                loop {
+                    tokio::time::sleep(interval).await;
+
+                    // 检查是否正在 reload，避免撞车
+                    if coordinator.status().is_reloading {
+                        info!("Skipping periodic bloom rebuild: reload in progress");
+                        continue;
+                    }
+
+                    info!("Starting periodic bloom filter rebuild...");
+                    match coordinator.reload(ReloadTarget::Data).await {
+                        Ok(result) => info!(
+                            "Periodic bloom rebuild completed in {}ms",
+                            result.duration_ms
+                        ),
+                        Err(e) => error!("Periodic bloom rebuild failed: {}", e),
+                    }
+                }
+            });
+            debug!(
+                "Bloom filter periodic rebuild task started (interval: {}s)",
+                bloom_rebuild_interval
+            );
+        }
+    } else {
+        debug!("Bloom filter periodic rebuild is disabled");
+    }
 
     // Create LinkService for unified link management
     let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));

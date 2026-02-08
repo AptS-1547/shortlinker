@@ -25,6 +25,7 @@ pub mod categories {
     pub const CORS: &str = "cors";
     pub const TRACKING: &str = "tracking";
     pub const ANALYTICS: &str = "analytics";
+    pub const CACHE: &str = "cache";
 }
 
 /// 配置项完整定义
@@ -103,6 +104,9 @@ pub mod keys {
     pub const CORS_ALLOWED_HEADERS: &str = "cors.allowed_headers";
     pub const CORS_MAX_AGE: &str = "cors.max_age";
     pub const CORS_ALLOW_CREDENTIALS: &str = "cors.allow_credentials";
+
+    // 缓存配置
+    pub const CACHE_BLOOM_REBUILD_INTERVAL: &str = "cache.bloom_rebuild_interval";
 }
 
 // 默认值函数
@@ -240,6 +244,10 @@ fn default_analytics_max_rows_action() -> String {
 
 fn default_utm_enable_passthrough() -> String {
     "false".to_string()
+}
+
+fn default_bloom_rebuild_interval() -> String {
+    "14400".to_string() // 4 hours, 0 = disabled
 }
 
 /// 所有配置定义（单一数据源）
@@ -670,6 +678,19 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable UTM parameter passthrough to target URL (utm_source/medium/campaign/term/content)",
+        action: None,
+    },
+    // ========== 缓存配置 (cache) ==========
+    ConfigDef {
+        key: keys::CACHE_BLOOM_REBUILD_INTERVAL,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_bloom_rebuild_interval,
+        requires_restart: true,
+        is_sensitive: false,
+        editable: true,
+        category: categories::CACHE,
+        description: "Bloom filter periodic rebuild interval in seconds (0 = disabled)",
         action: None,
     },
 ];
