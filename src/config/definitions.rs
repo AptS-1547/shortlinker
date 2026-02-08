@@ -111,7 +111,7 @@ fn default_empty() -> String {
 }
 
 fn default_admin_token() -> String {
-    crate::utils::generate_secure_token(32) // 使用加密安全的 OsRng
+    String::new() // 默认为空，用户需运行 reset-password 手动设置
 }
 
 fn default_jwt_secret() -> String {

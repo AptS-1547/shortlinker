@@ -432,9 +432,8 @@ impl ConfigStore {
     ///
     /// 应在服务启动时调用，确保首次启动时配置表不为空。
     pub async fn ensure_defaults(&self) -> Result<usize> {
-        use crate::config::definitions::{ALL_CONFIGS, keys};
-        use crate::utils::password::{is_argon2_hash, process_imported_password};
-        use tracing::{debug, info, warn};
+        use crate::config::definitions::ALL_CONFIGS;
+        use tracing::{debug, info};
 
         let mut inserted_count = 0;
 
@@ -442,30 +441,11 @@ impl ConfigStore {
             // 调用默认值函数生成值
             let default_value = (def.default_fn)();
 
-            // 特殊处理：api.admin_token 需要哈希
-            let is_new_admin_token = def.key == keys::API_ADMIN_TOKEN
-                && !default_value.is_empty()
-                && !is_argon2_hash(&default_value);
-
-            // 如果是 admin_token，通过 process_imported_password 处理（已哈希则保留，明文则哈希）
-            let value_to_insert = if def.key == keys::API_ADMIN_TOKEN && !default_value.is_empty() {
-                process_imported_password(Some(&default_value))
-                    .map_err(|e| {
-                        ShortlinkerError::database_operation(format!(
-                            "Failed to hash admin_token: {}",
-                            e
-                        ))
-                    })?
-                    .unwrap_or_default()
-            } else {
-                default_value.clone()
-            };
-
             // 尝试插入（如果不存在）
             let inserted = self
                 .insert_if_not_exists(
                     def.key,
-                    &value_to_insert,
+                    &default_value,
                     def.value_type,
                     def.requires_restart,
                     def.is_sensitive,
@@ -475,58 +455,6 @@ impl ConfigStore {
             if inserted {
                 debug!("Initialized config '{}' with default value", def.key);
                 inserted_count += 1;
-
-                // 如果是新生成的 admin_token，写入明文到文件（可选操作，失败不影响安全性）
-                if is_new_admin_token {
-                    let token_file = std::path::Path::new("admin_token.txt");
-
-                    // 安全修复：使用 create_new 防止 symlink 攻击
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-
-                    match OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(token_file)
-                    {
-                        Ok(mut file) => {
-                            // 设置文件权限 0600 (仅 Unix)
-                            #[cfg(unix)]
-                            {
-                                use std::os::unix::fs::PermissionsExt;
-                                let perms = std::fs::Permissions::from_mode(0o600);
-                                if let Err(e) = std::fs::set_permissions(token_file, perms) {
-                                    warn!("Failed to set permissions on admin_token.txt: {}", e);
-                                }
-                            }
-
-                            if let Err(e) = writeln!(
-                                file,
-                                "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}",
-                                default_value
-                            ) {
-                                warn!(
-                                    "Failed to write admin_token.txt: {}, but token is already hashed in database",
-                                    e
-                                );
-                            } else {
-                                info!(
-                                    "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
-                                );
-                            }
-                        }
-                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                            // 文件已存在，跳过
-                            debug!("admin_token.txt already exists, skipping");
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to create admin_token.txt: {}, but token is already hashed in database",
-                                e
-                            );
-                        }
-                    }
-                }
             } else {
                 // 配置已存在，同步元数据
                 if self

@@ -265,7 +265,7 @@ fn check_component_enabled(route_config: &RouteConfig) {
     // 检查 Admin API 是否启用
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
     if admin_token.is_empty() {
-        info!("Admin API is disabled (ADMIN_TOKEN not set)");
+        info!("Admin API is disabled. Run 'shortlinker reset-password' to set a password and enable it.");
     } else {
         info!("Admin API available at: {}", route_config.admin_prefix);
     }
@@ -273,15 +273,15 @@ fn check_component_enabled(route_config: &RouteConfig) {
     // 检查 Health API 是否启用
     let health_token = rt.get_or(keys::API_HEALTH_TOKEN, "");
     if health_token.is_empty() && admin_token.is_empty() {
-        info!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
+        info!("Health API is disabled (api.health_token not set and ADMIN_TOKEN is empty)");
     } else {
         info!("Health API available at: {}", route_config.health_prefix);
     }
 
-    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_ADMIN_PANEL 未设置为 true
+    // 检查前端路由是否启用，如果 api.admin_token 未设置 或者 features.enable_admin_panel 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
-        info!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
+        info!("Frontend routes are disabled (features.enable_admin_panel is false or api.admin_token not set)");
     } else {
         // 检测自定义前端
         let custom_frontend = std::path::Path::new("./frontend-panel");
