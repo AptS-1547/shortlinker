@@ -6,6 +6,7 @@ To improve navigation, configuration docs are now split into an overview plus fo
 
 - [Startup Parameters](/en/config/startup)
 - [Runtime Keys and API Workflow](/en/config/runtime)
+- [Security Best Practices](/en/config/security)
 - [Examples and Hot Reload](/en/config/examples)
 - [Storage Overview](/en/config/storage)
 - [Storage Backends](/en/config/storage-backends)
@@ -35,7 +36,7 @@ On first startup, runtime defaults are initialized into DB based on built-in def
 
 ## Configuration Priority
 
-1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` / `utm.*`
+1. **Database (runtime config)**: `api.*` / `routes.*` / `features.*` / `click.*` / `cors.*` / `analytics.*` / `utm.*` / `cache.*`
 2. **Environment variables (startup overrides)**: `SL__...`
 3. **`config.toml` (startup config; e.g. `[server]` / `[database]` / `[cache]` / `[logging]` / `[analytics]` / `[ipc]`)**
 4. **Program defaults**

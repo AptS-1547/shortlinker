@@ -267,6 +267,7 @@ export default {
             { text: 'Configuration Guide', link: '/en/config/' },
             { text: 'Startup Parameters', link: '/en/config/startup' },
             { text: 'Runtime Keys and API Workflow', link: '/en/config/runtime' },
+            { text: 'Security Best Practices', link: '/en/config/security' },
             { text: 'Examples and Hot Reload', link: '/en/config/examples' }
           ]
         },

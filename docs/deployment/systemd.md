@@ -41,7 +41,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 # 需要写入：shortlinker.pid、IPC socket（默认 ./shortlinker.sock，若自定义 ipc.socket_path 需同步放行）、
-#          admin_token.txt（首次启动可选）、数据库文件等
+#          数据库文件等
 ReadWritePaths=/opt/shortlinker
 
 [Install]

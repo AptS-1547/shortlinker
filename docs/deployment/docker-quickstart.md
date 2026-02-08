@@ -13,7 +13,7 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/shortlinker.db"
+database_url = "sqlite:///data/shortlinks.db"
 EOF
 
 mkdir -p data
@@ -41,7 +41,7 @@ cat > config.toml << 'EOF'
 unix_socket = "/sock/shortlinker.sock"
 
 [database]
-database_url = "sqlite:///data/shortlinker.db"
+database_url = "sqlite:///data/shortlinks.db"
 EOF
 
 docker run -d --name shortlinker \
@@ -56,8 +56,8 @@ docker run -d --name shortlinker \
 > 运行时配置存储在数据库中（如 `features.default_url`、`features.enable_admin_panel`、`api.health_token`），可通过容器内 CLI 或 Admin API 修改。详见 [配置指南](/config/)。
 
 ```bash
-# 获取首次启动生成的管理员密码（容器内通常为 /admin_token.txt）
-docker exec shortlinker cat /admin_token.txt
+# 首次部署：交互式设置管理员密码（写入运行时配置 api.admin_token）
+docker exec -it shortlinker /shortlinker reset-password
 
 # 设置根路径默认跳转（无需重启）
 docker exec shortlinker /shortlinker config set features.default_url https://example.com
@@ -129,4 +129,3 @@ docker-compose down
 # 更新镜像
 docker-compose pull && docker-compose up -d
 ```
-

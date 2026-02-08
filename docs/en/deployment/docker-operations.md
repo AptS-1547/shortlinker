@@ -59,9 +59,9 @@ CMD ["/shortlinker"]
 ### Data Directory Structure
 ```
 data/
-├── links.db            # SQLite database file
+├── shortlinks.db       # SQLite database file (default name)
 └── backup/            # Backup directory (optional)
-    └── links.db.20240101
+    └── shortlinks.db.20240101
 ```
 
 ### Backup Strategy
@@ -69,8 +69,9 @@ data/
 # Create backup script
 cat > backup.sh << 'EOF'
 #!/bin/bash
-docker exec shortlinker cp /data/links.db /data/backup/links.db.$(date +%Y%m%d_%H%M%S)
-find ./data/backup -name "links.db.*" -mtime +7 -delete
+DB_FILE="shortlinks.db"   # If you changed database.database_url in config.toml, update this too
+docker exec shortlinker cp "/data/${DB_FILE}" "/data/backup/${DB_FILE}.$(date +%Y%m%d_%H%M%S)"
+find ./data/backup -name "${DB_FILE}.*" -mtime +7 -delete
 EOF
 
 chmod +x backup.sh

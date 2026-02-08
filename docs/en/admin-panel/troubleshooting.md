@@ -7,11 +7,8 @@ This document covers common issues and solutions for the Web admin panel, along 
 ### Login Failed
 
 ```bash
-# Get/confirm the admin password (plaintext for runtime config `api.admin_token`)
-# - First startup usually creates `admin_token.txt` (if present)
-cat admin_token.txt
-
-# - Forgot the password? Rotate it (writes to DB)
+# Get/reset the admin login password (set via `reset-password`)
+# - Forgot the password, or initial deployment? Rotate it (writes to DB)
 ./shortlinker reset-password
 
 # Check (standalone) admin panel API URL configuration

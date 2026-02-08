@@ -76,7 +76,7 @@ pub enum Commands {
 
     /// Export links to CSV file
     Export {
-        /// Output file path (default: stdout)
+        /// Output file path (default: shortlinks_export_YYYYMMDD_HHMMSS.csv)
         file_path: Option<String>,
     },
 

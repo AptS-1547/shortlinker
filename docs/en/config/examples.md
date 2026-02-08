@@ -58,7 +58,7 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/links.db"
+database_url = "sqlite:///data/shortlinks.db"
 ```
 
 Runtime config (stored in the DB) can be set via the built-in CLI; configs marked as “restart required” need a restart to take effect:
@@ -80,7 +80,8 @@ Shortlinker has two kinds of hot reload / hot apply:
    - TUI writes to DB locally, then triggers `ReloadTarget::Data` via IPC to refresh caches.
 2. **Runtime config hot apply**:
    - No-restart keys usually apply immediately when updated through Admin API.
-   - CLI `config set/reset/import` writes to DB and then automatically attempts `ReloadTarget::Config` via IPC.
+   - CLI `config set/reset` auto-attempts `ReloadTarget::Config` via IPC only for no-restart keys.
+   - CLI `config import` performs one best-effort `ReloadTarget::Config` attempt after import.
 
 ### Supported
 

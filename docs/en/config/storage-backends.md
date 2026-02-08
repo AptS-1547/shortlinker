@@ -114,11 +114,11 @@ This page covers backend comparison, limitations, and backend-specific configura
 # config.toml
 [database]
 # Relative path
-# database_url = "sqlite://./shortlinker.db"
-database_url = "sqlite://./data/links.db"
+# database_url = "sqlite://./shortlinks.db"
+database_url = "sqlite://./data/shortlinks.db"
 
 # Absolute path
-# database_url = "sqlite:///var/lib/shortlinker/links.db"
+# database_url = "sqlite:///var/lib/shortlinker/shortlinks.db"
 
 # In-memory database (testing)
 # database_url = ":memory:"

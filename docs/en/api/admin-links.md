@@ -23,6 +23,10 @@ curl -sS -b cookies.txt \
 | `only_expired` | Boolean | only expired links | `?only_expired=true` |
 | `only_active` | Boolean | only active (not expired) | `?only_active=true` |
 
+> Defaults: `page=1`, `page_size=20`; `page_size` is clamped to `1-100`.
+>
+> `only_expired` and `only_active` cannot both be `true`; otherwise the API returns `400 Bad Request`.
+
 **Response**:
 ```json
 {
@@ -77,7 +81,8 @@ Notes:
 - `expires_at` optional (relative like `"7d"` or RFC3339)
 - `force` optional (default `false`); when `code` exists and `force=false`, returns `409 Conflict`
 - `password` experimental
-  - Admin API hashes plaintext passwords using Argon2 (if input already starts with `$argon2...`, it will be stored as-is)
+  - Admin API treats user input as plaintext and always hashes it with Argon2 (even if input starts with `$argon2...`, it is hashed again)
+  - If you need to preserve pre-hashed values, use the CSV import path (import logic keeps `$argon2...` as-is)
   - Redirect does not validate password in current version (stored only)
 
 ### GET /links/{code} - Get a link
@@ -114,7 +119,7 @@ Notes:
   - omitted => keep existing
   - empty string `""` => remove password
   - plaintext => hash with Argon2
-  - `$argon2...` => store as-is
+  - `$argon2...` => still treated as user input and hashed again
 
 ### DELETE /links/{code} - Delete a link
 
@@ -181,6 +186,10 @@ curl -sS -X DELETE \
 The exported CSV contains a header and these columns:
 `code,target,created_at,expires_at,password,click_count`
 
+Supported filters: `search`, `created_after`, `created_before`, `only_expired`, `only_active` (date params must be RFC3339).
+
+The default filename in `Content-Disposition` is: `shortlinks_export_YYYYMMDD_HHMMSS.csv`.
+
 ```bash
 curl -sS -b cookies.txt \
   -o shortlinks_export.csv \
@@ -190,8 +199,8 @@ curl -sS -b cookies.txt \
 ### POST /links/import - Import CSV
 
 Multipart form fields:
-- `file`: CSV file
-- `mode` (optional): `skip` (default) / `overwrite` / `error`
+- `file`: CSV file (max 10MB; oversized uploads return `400` + `FileTooLarge`)
+- `mode` (optional): `skip` (default) / `overwrite` / `error` (invalid values fall back to `skip`)
 
 ```bash
 curl -sS -X POST \

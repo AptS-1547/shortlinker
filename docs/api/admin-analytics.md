@@ -10,8 +10,8 @@ Analytics API 提供详细的点击统计分析功能，包括点击趋势、热
 >
 > - 默认查询最近 30 天；若要指定范围，请**同时**提供 `start_date` 和 `end_date`（只提供一个会忽略并回退到默认范围；日期解析失败会回退到默认范围对应的起止值）。
 > - 日期格式支持 RFC3339（如 `2024-01-01T00:00:00Z`）或 `YYYY-MM-DD`（如 `2024-01-01`；注意：`YYYY-MM-DD` 会按当天 `00:00:00Z` 解析）。
-> - 地理分布数据需要额外开启 `analytics.enable_geo_lookup=true`（并保留 `analytics.enable_ip_logging=true` 才能拿到 IP）；GeoIP provider 使用启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）。
->   - 使用外部 API provider 时，内部带缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight 合并并发请求），单次请求超时 2 秒。
+> - 当前实现中，点击写入链路尚未接入 GeoIP 查询（`click_logs.country/city` 默认空值），因此 `/analytics/geo` 与单链接 `geo_distribution` 可能为空数组（除非历史数据已包含地理字段）。
+> - 启动配置 `[analytics]`（`analytics.maxminddb_path` / `analytics.geoip_api_url`）已保留用于 GeoIP provider 选择；外部 API provider 具备内置缓存（LRU 10000、TTL 15 分钟、失败负缓存、singleflight，单次请求超时 2 秒）。
 > - 设备/浏览器分布（`/analytics/devices`）基于 `user_agent_hash`（User-Agent 原文会去重存储在 `user_agents` 表并通过 hash 关联）。
 > - `click_logs.source` 的来源推导：优先 `utm_source`；否则 `ref:{domain}`（来自 `Referer`）；再否则 `direct`。
 
@@ -114,10 +114,7 @@ curl -sS -b cookies.txt \
 {
   "code": 0,
   "message": "OK",
-  "data": [
-    {"country": "CN", "city": "Beijing", "count": 100},
-    {"country": "US", "city": "New York", "count": 80}
-  ]
+  "data": []
 }
 ```
 
@@ -180,9 +177,7 @@ curl -sS -b cookies.txt \
     "top_referrers": [
       {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
     ],
-    "geo_distribution": [
-      {"country": "CN", "city": "Beijing", "count": 50}
-    ]
+    "geo_distribution": []
   }
 }
 ```
@@ -236,6 +231,8 @@ curl -sS -b cookies.txt \
 导出的 CSV 包含以下字段：
 `short_code,clicked_at,referrer,source,ip_address,country,city`
 
+响应头 `Content-Disposition` 的文件名格式为：`analytics_YYYYMMDD_YYYYMMDD.csv`（基于解析后的起止日期）。
+
 说明：
 - `source` 字段来自重定向时的来源推导规则（`utm_source` → `ref:{domain}` → `direct`）。
 - 导出不包含 `user_agent` 原文字段；设备分析通过 `user_agent_hash` 与 `user_agents` 表完成。
@@ -252,7 +249,7 @@ curl -sS -b cookies.txt \
 | `analytics.hourly_retention_days` | int | 7 | 小时汇总保留天数（清理 `click_stats_hourly` / `click_stats_global_hourly`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.daily_retention_days` | int | 365 | 天汇总保留天数（清理 `click_stats_daily`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
-| `analytics.enable_geo_lookup` | bool | false | 是否启用地理位置解析 |
+| `analytics.enable_geo_lookup` | bool | false | GeoIP 预留开关（当前版本点击写入链路尚未消费该配置，`country/city` 默认空） |
 | `analytics.sample_rate` | float | 1.0 | 详细日志采样率（0.0-1.0；1.0=全量记录） |
 | `analytics.max_log_rows` | int | 0 | `click_logs` 最大行数（0=不限制） |
 | `analytics.max_rows_action` | enum | cleanup | 超过最大行数时动作：`cleanup`（删最旧）/`stop`（停止详细日志） |

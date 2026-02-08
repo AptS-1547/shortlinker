@@ -51,7 +51,7 @@ pub fn show_help() {
         program_name.cyan()
     );
     println!(
-        "  {} generate-config [output path]   # generate sample config file",
+        "  {} config generate [output path]   # generate sample config file",
         program_name.cyan()
     );
     println!();

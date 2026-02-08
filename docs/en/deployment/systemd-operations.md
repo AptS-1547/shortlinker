@@ -106,7 +106,7 @@ Create `/etc/logrotate.d/shortlinker`:
     missingok
     notifempty
     postrotate
-        systemctl reload shortlinker
+        systemctl restart shortlinker
     endscript
 }
 ```
@@ -129,8 +129,8 @@ sudo ufw allow from 10.0.0.100 to any port 8080
 # Set correct permissions
 sudo chown -R www-data:www-data /opt/shortlinker
 sudo chmod 755 /opt/shortlinker
-sudo chmod 600 /opt/shortlinker/data/links.db
-sudo chmod 644 /opt/shortlinker/shortlinker
+sudo chmod 600 /opt/shortlinker/data/shortlinks.db
+sudo chmod 755 /opt/shortlinker/shortlinker
 ```
 
 ## SysV Init (Compatibility)

@@ -113,6 +113,7 @@ curl -sS \
 | `shortlinker_redirects_total` | CounterVec | `status` | 重定向次数（按状态码统计，例如 `307`/`404`） |
 | `shortlinker_clicks_buffer_entries` | Gauge | - | 点击缓冲区条目数（唯一 short code 数量，不是总点击数） |
 | `shortlinker_clicks_flush_total` | CounterVec | `trigger`,`status` | 点击刷盘次数（按触发方式与结果统计） |
+| `shortlinker_clicks_channel_dropped` | CounterVec | `reason` | 详细点击事件在 channel 满/断开时的丢弃次数（`reason`: `full` / `disconnected`） |
 | `shortlinker_auth_failures_total` | CounterVec | `method` | 鉴权失败次数（当前主要来自 Admin API：`bearer`/`cookie`） |
 | `shortlinker_bloom_filter_false_positives_total` | Counter | - | Bloom Filter 误报次数 |
 | `shortlinker_uptime_seconds` | Gauge | - | 服务运行时间（秒） |
@@ -138,4 +139,3 @@ Labels 取值说明（常用）：
 | 503 | 服务不健康 |
 
 > 鉴权失败时（HTTP 401），响应体示例：`{"code":1001,"message":"Unauthorized: Invalid or missing token"}`
-

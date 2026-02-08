@@ -18,7 +18,7 @@ These settings live in `config.toml` and require restart to take effect.
 | TOML key | Type | Default | Description |
 |--------|------|---------|-------------|
 | `database.database_url` | String | `shortlinks.db` | Database URL or file path (backend type inferred from this value) |
-| `database.pool_size` | Integer | `10` | Pool size (MySQL/PostgreSQL only; SQLite uses built-in pool settings) |
+| `database.pool_size` | Integer | `20` | Pool size (MySQL/PostgreSQL only; SQLite uses built-in pool settings) |
 | `database.timeout` | Integer | `30` | *(currently unused; connect/acquire timeout is fixed at 8s)* |
 | `database.retry_count` | Integer | `3` | Retry count for some DB operations |
 | `database.retry_base_delay_ms` | Integer | `100` | Retry base delay (ms) |
@@ -73,3 +73,4 @@ See [Storage Backends](/en/config/storage) for URL formats.
 > Notes:
 > - Provider selection: when `analytics.maxminddb_path` is set and readable, MaxMind is used; otherwise it falls back to the external API (`analytics.geoip_api_url`).
 > - The external API provider has a built-in cache (not configurable): LRU max 10,000 entries, TTL 15 minutes (including negative caching on failures). Concurrent lookups for the same IP are singleflighted into one request. HTTP timeout is 2 seconds.
+> - The current version initializes a GeoIP provider, but GeoIP lookup is not yet executed in the click-write path, so `click_logs.country/city` remain null by default.

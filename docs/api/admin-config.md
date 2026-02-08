@@ -47,6 +47,9 @@ curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
 ```
 
+> `limit` 默认 `20`，服务端会将最大值限制为 `100`。
+
+
 ### POST /config/reload - 重新加载配置
 
 ```bash
@@ -58,6 +61,9 @@ curl -sS -X POST -b cookies.txt \
 ### POST /config/{key}/action - 执行配置 Action（不保存）
 
 执行配置项支持的 Action，并返回执行结果，但**不会**写回数据库。
+
+> 注意：该接口会在响应中返回 `data.value`（可能是敏感值，例如生成的 token）。如需“只保存不回显”，请使用 `/execute-and-save`。
+
 
 ```bash
 curl -sS -X POST \
@@ -85,7 +91,7 @@ curl -sS -X POST \
 
 ## 认证接口补充说明
 
-- `POST /auth/login`：无需 Cookie；验证管理员密码（`api.admin_token` 的明文）成功后下发 Cookie
+- `POST /auth/login`：无需 Cookie；验证管理员登录密码（与 `api.admin_token` 的 Argon2 哈希匹配）成功后下发 Cookie
 - `POST /auth/refresh`：无需 Access Cookie，但需要 Refresh Cookie
 - `POST /auth/logout`：无需 Cookie；用于清理 Cookie
 - `GET /auth/verify`：需要有效 Access 凭证（Access Cookie 或 Bearer Access Token）

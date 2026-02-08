@@ -10,7 +10,7 @@ Shortlinker 使用智能代理检测进行登录限流 IP 提取，兼顾安全�
 - 无需额外配置，公网 IP 不会信任 `X-Forwarded-For`，安全且自动
 
 **反向代理部署**（Nginx/Caddy/Docker）：
-- **自动检测**（推荐）：无需配置 `api.trusted_proxies`，连接来自私有 IP（10.x、172.16-31.x、192.168.x）或 localhost 时自动信任 `X-Forwarded-For`
+- **自动检测**（推荐）：无需配置 `api.trusted_proxies`，连接来自私有/本地地址时自动信任 `X-Forwarded-For`（IPv4：10.x、172.16-31.x、192.168.x、127.0.0.1；IPv6：`::1`、`fc00::/7`、`fe80::/10`）
 - **显式配置**：如需精确控制，可在管理面板配置 `api.trusted_proxies`，列出可信代理的 IP 或 CIDR
 
 **Unix Socket 连接**（nginx 同机器）：

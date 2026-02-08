@@ -8,7 +8,7 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 - 🔄 **Real-time Sync** - Commands take effect immediately  
 - ⚡ **Fast Response** - Supports SQLite, PostgreSQL, MySQL, MariaDB storage backends
 - 🛡️ **Error Handling** - Detailed error messages and suggestions
-- 📦 **Import/Export** - CSV format backup and migration support (JSON is legacy/deprecated)
+- 📦 **Import/Export** - Link import/export supports CSV only
 
 ## Basic Syntax
 

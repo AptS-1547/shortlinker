@@ -36,7 +36,8 @@ Shortlinker 提供了基于 React 19 + TypeScript 的现代化 Web 管理界面�
    启动 Shortlinker 后访问 `http://your-domain:8080/panel`
 
 > 提示：
-> - 管理员登录密码是运行时配置 `api.admin_token` 的明文值；首次启动会生成并写入 `admin_token.txt`（若文件不存在），也可用 `./shortlinker reset-password` 重置。
+> - 管理员登录时使用你通过 `./shortlinker reset-password` 设置的密码。`api.admin_token` 在后端以 Argon2 哈希形式存储（默认空，未设置时请先初始化）。
+> - `features.enable_admin_panel=true` 但 `api.admin_token` 仍为空时，前端面板路由会返回 `404 Not Found`。
 > - `routes.frontend_prefix` / `routes.admin_prefix` / `routes.health_prefix` 等路由前缀配置修改后需要重启生效。
 
 ## 自定义前端

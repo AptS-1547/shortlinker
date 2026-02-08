@@ -12,10 +12,11 @@ The Admin API docs are now split by topic so you can find what you need quickly 
 
 Admin API settings are **runtime config (stored in DB)**. See [Configuration Guide](/en/config/).
 
-- `api.admin_token`: admin login password (stored as Argon2 hash; first startup may generate `admin_token.txt`; remove it after saving; recommended reset method: `./shortlinker reset-password`)
+- `api.admin_token`: admin login password (stored as Argon2 hash; empty by default, set it via `./shortlinker reset-password` before first login)
 - `routes.admin_prefix`: route prefix (default `/admin`, restart required after change)
 
 > API paths always include `/v1`. Default login URL: `http://localhost:8080/admin/v1/auth/login`.
+> When `api.admin_token` is empty, Admin API returns `404 Not Found` (treated as disabled).
 
 ## Authentication (Important)
 
@@ -111,7 +112,7 @@ Most endpoints return JSON:
 
 ## Security notes
 
-1. Use a strong admin password (`api.admin_token`) and avoid default/generated values in production
+1. Use a strong admin password (`api.admin_token`) and set it during initial deployment
 2. Use HTTPS in production and set `api.cookie_secure=true`
 3. Expose Admin API only to trusted networks
 4. Rotate admin credentials regularly and re-login to refresh cookies

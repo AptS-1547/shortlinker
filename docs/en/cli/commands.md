@@ -88,7 +88,7 @@ All CLI subcommands support:
 ./shortlinker import backup.csv --force
 ```
 
-> CSV is the default format. `.json` is kept only for legacy compatibility (planned removal in v0.5.0).
+> Import supports CSV only; please use `.csv` files.
 
 ### export - Export Short Links
 
@@ -101,6 +101,8 @@ All CLI subcommands support:
 ./shortlinker export
 ./shortlinker export backup.csv
 ```
+
+> If file path is omitted, CLI generates `shortlinks_export_YYYYMMDD_HHMMSS.csv`.
 
 ### help - Show Command Help
 
@@ -130,8 +132,8 @@ The `config` subcommand manages Shortlinker configuration.
 ./shortlinker config generate [output_path] [options]
 ```
 
-Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics`.
-Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in DB and not part of this file.
+Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics` / `ipc`.
+Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `click.*`, `cors.*`, `analytics.*`, `utm.*`, `cache.*`) is stored in DB and not part of this file.
 
 > Note: This command does not require a database connection and can be used during initial deployment.
 
@@ -149,16 +151,19 @@ Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in D
 
 The following subcommands manage runtime config stored in the database (same config system used by the web admin panel).
 
-> Note: `config set/reset/import` automatically **attempt** an IPC `Config` reload after writing to DB (hot-apply for keys marked as "no restart").
-> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), trigger Admin API `POST /admin/v1/config/reload` manually or restart the service.
-> Keys marked as "requires restart" (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload.
+> Note: `config set/reset` automatically **attempt** IPC `Config` reload only for keys marked as no-restart.
+> `config import` performs one best-effort `Config` reload attempt after import.
+> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), trigger Admin API `POST /admin/v1/config/reload` manually.
+> Keys marked as "requires restart" (e.g. `routes.*`, `click.*`, `cors.*`, `cache.*`) will not hot-apply even after reload.
 
 Common subcommands:
 
 ```bash
-# List configs (optional --category: auth/cookie/features/routes/cors/tracking)
+# List configs (plain-text output groups only: auth/cookie/features/routes/cors/tracking)
 ./shortlinker config list
 ./shortlinker config list --category routes
+# Use --json to get the full key set (including analytics/utm/cache)
+./shortlinker config list --json
 
 # Get one config (use --json for structured output)
 ./shortlinker config get features.random_code_length
@@ -236,7 +241,7 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 2024-12-31T23:59:59Z  # RFC3339
 ```
 
-### Import/Export Formats
+### Import/Export Formats (links)
 
 **CSV (default)**
 
@@ -248,30 +253,13 @@ code,target,created_at,expires_at,password,click_count
 github,https://github.com,2024-12-15T14:30:22Z,,,
 ```
 
-**JSON (legacy, deprecated)**
-
-> `.json` is for legacy compatibility only (planned removal in v0.5.0).
-
-```json
-[
-  {
-    "code": "github",
-    "target": "https://github.com",
-    "created_at": "2024-12-15T14:30:22Z",
-    "expires_at": null,
-    "password": null,
-    "click": 0
-  }
-]
-```
-
 ### Reload Behavior
 
 When the server is running and IPC is reachable, link-management commands execute through IPC in the server process to keep storage/cache state aligned.
 
 If IPC is unreachable, CLI falls back to direct DB operations (good for offline maintenance). If an online server is still running, you should manually refresh data (typically by restarting the service).
 
-> Runtime config changes are a separate path. `config set/reset/import` only attempt `Config` reload; keys marked "requires restart" still require restart.
+> Runtime config changes are a separate path. `config set/reset` only attempt `Config` reload for no-restart keys; `config import` performs one best-effort `Config` reload after import; keys marked "requires restart" still require restart.
 
 ### Database Configuration
 
@@ -279,7 +267,7 @@ CLI reads `config.toml` in the current working directory. To use a different DB:
 
 ```toml
 [database]
-database_url = "sqlite://links.db"
+database_url = "sqlite://shortlinks.db"
 ```
 
 > See [Configuration Guide](/en/config/).

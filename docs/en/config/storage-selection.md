@@ -12,10 +12,10 @@ This page focuses on backend selection guidance and benchmark data.
 # config.toml ([database].database_url)
 [database]
 # Small scale (< 10,000 links)
-# database_url = "sqlite://./links.db"
+# database_url = "sqlite://./shortlinks.db"
 
 # Medium scale (10,000 - 100,000 links)
-# database_url = "sqlite://./links.db"
+# database_url = "sqlite://./shortlinks.db"
 # Or use MySQL/MariaDB
 # database_url = "mysql://user:pass@host:3306/db"
 
@@ -37,7 +37,7 @@ This page focuses on backend selection guidance and benchmark data.
 # database_url = ":memory:"
 
 # Production environment (single machine)
-# database_url = "sqlite:///data/links.db"
+# database_url = "sqlite:///data/shortlinks.db"
 
 # Production environment (cluster)
 # database_url = "postgresql://user:pass@cluster:5432/shortlinker"
@@ -49,10 +49,10 @@ This page focuses on backend selection guidance and benchmark data.
 # config.toml ([database].database_url)
 [database]
 # Low concurrency (< 100 QPS)
-# database_url = "sqlite://links.db"
+# database_url = "sqlite://shortlinks.db"
 
 # Medium concurrency (100-1000 QPS)
-# database_url = "sqlite://links.db"
+# database_url = "sqlite://shortlinks.db"
 # Or MySQL/MariaDB
 # database_url = "mysql://user:pass@host:3306/db"
 

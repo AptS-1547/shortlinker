@@ -115,15 +115,15 @@
 # config.toml
 [database]
 # 相对路径（自动创建）
-# database_url = "./shortlinker.db"
-# database_url = "data/links.db"
+# database_url = "./shortlinks.db"
+# database_url = "data/shortlinks.db"
 
 # 绝对路径
-# database_url = "/var/lib/shortlinker/links.db"
+# database_url = "/var/lib/shortlinker/shortlinks.db"
 
 # 显式 SQLite URL（推荐）
-database_url = "sqlite://./data/links.db"
-# database_url = "sqlite:///absolute/path/to/links.db"
+database_url = "sqlite://./data/shortlinks.db"
+# database_url = "sqlite:///absolute/path/to/shortlinks.db"
 
 # 内存数据库（测试用）
 # database_url = ":memory:"

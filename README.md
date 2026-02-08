@@ -56,8 +56,8 @@ cargo run
 ./shortlinker add temp https://example.com --expire 7d          # Expires in 7 days
 ./shortlinker list                              # List all links
 ./shortlinker remove github                     # Remove link
-./shortlinker export links.json                 # Export to JSON
-./shortlinker import links.json                 # Import from JSON
+./shortlinker export links.csv                  # Export to CSV
+./shortlinker import links.csv                  # Import from CSV
 ```
 
 ## Admin API
@@ -87,10 +87,10 @@ See [Admin API docs](docs/en/api/admin.md) for batch operations, runtime config,
 Generate a config file:
 
 ```bash
-./shortlinker generate-config
+./shortlinker config generate
 ```
 
-This creates `config.toml` with server, database, cache, and logging settings.
+This creates `config.example.toml` with `server`, `database`, `cache`, `logging`, `analytics`, and `ipc` settings.
 
 See [Configuration docs](docs/en/config/index.md) for all options.
 

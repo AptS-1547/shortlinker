@@ -88,7 +88,7 @@
 ./shortlinker import backup.csv --force
 ```
 
-> 默认使用 CSV 格式；`.json` 仅为兼容旧格式（将于 v0.5.0 移除）。
+> 仅支持 CSV 导入；请使用 `.csv` 文件。
 
 ### export - 导出短链接
 
@@ -101,6 +101,8 @@
 ./shortlinker export
 ./shortlinker export backup.csv
 ```
+
+> 不指定文件路径时，会生成 `shortlinks_export_YYYYMMDD_HHMMSS.csv`。
 
 ### help - 查看帮助
 
@@ -130,8 +132,8 @@
 ./shortlinker config generate [输出路径] [选项]
 ```
 
-生成**启动配置**（`config.toml`）模板，包含 `server` / `database` / `cache` / `logging` / `analytics` 等配置项。
-运行时配置（如 `features.*`、`api.*`、`routes.*`、`cors.*`）存储在数据库中，不在该文件内。
+生成**启动配置**（`config.toml`）模板，包含 `server` / `database` / `cache` / `logging` / `analytics` / `ipc` 等配置项。
+运行时配置（如 `features.*`、`api.*`、`routes.*`、`click.*`、`cors.*`、`analytics.*`、`utm.*`、`cache.*`）存储在数据库中，不在该文件内。
 
 > 注意：此命令不需要数据库连接，可以在首次部署时直接使用。
 
@@ -149,16 +151,19 @@
 
 以下子命令用于直接管理数据库中的运行时配置（与 Web 管理面板使用同一套配置系统）。
 
-> 提示：`config set/reset/import` 会在写库后**自动尝试**通过 IPC 触发 `Config` 重载（仅对“无需重启”的配置热生效）。
-> 若 IPC 不可达（服务未运行、`ipc.enabled=false`、socket 路径不一致等），请手动调用 Admin API `POST /admin/v1/config/reload` 或重启服务。
-> 标记为"需要重启"的配置（如 `routes.*`、`click.*`、`cors.*`）即使 reload 也不会热生效，仍需要重启。
+> 提示：`config set/reset` 仅在“无需重启”的键写库后**自动尝试**通过 IPC 触发 `Config` 重载。
+> `config import` 会在导入后统一进行一次 `Config` 重载尝试（best-effort）。
+> 若 IPC 不可达（服务未运行、`ipc.enabled=false`、socket 路径不一致等），请手动调用 Admin API `POST /admin/v1/config/reload`。
+> 标记为“需要重启”的配置（如 `routes.*`、`click.*`、`cors.*`、`cache.*`）即使 reload 也不会热生效，仍需要重启。
 
 常用子命令：
 
 ```bash
-# 列出所有配置（可选 --category 过滤分类：auth/cookie/features/routes/cors/tracking）
+# 列出配置（纯文本输出按 auth/cookie/features/routes/cors/tracking 分组）
 ./shortlinker config list
 ./shortlinker config list --category routes
+# 如需完整键集合（含 analytics/utm/cache），使用 --json
+./shortlinker config list --json
 
 # 获取单个配置（--json 输出结构化信息）
 ./shortlinker config get features.random_code_length
@@ -236,7 +241,7 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 2024-12-31T23:59:59Z  # RFC3339 格式
 ```
 
-### 导入导出格式
+### 导入/导出格式（links）
 
 **CSV（默认）**
 
@@ -248,30 +253,13 @@ code,target,created_at,expires_at,password,click_count
 github,https://github.com,2024-12-15T14:30:22Z,,,
 ```
 
-**JSON（兼容旧格式，已废弃）**
-
-> `.json` 仅为兼容旧格式（将于 v0.5.0 移除）。
-
-```json
-[
-  {
-    "code": "github",
-    "target": "https://github.com",
-    "created_at": "2024-12-15T14:30:22Z",
-    "expires_at": null,
-    "password": null,
-    "click": 0
-  }
-]
-```
-
 ### 热重载说明
 
 当服务正在运行且 IPC 可达时，链接管理命令会优先通过 IPC 在服务进程内执行，避免“DB 已写入但服务缓存未更新”的窗口。
 
 若 IPC 不可达，CLI 会回退为本地数据库操作（适合离线维护）；此时如果线上服务仍在运行，需要你手动让服务刷新数据（通常重启服务）。
 
-> 注意：运行时配置改动与链接数据改动是两条路径。`config set/reset/import` 只会尝试 `Config` 重载；“需要重启”的键仍必须重启。
+> 注意：运行时配置改动与链接数据改动是两条路径。`config set/reset` 仅对“无需重启”的键尝试 `Config` 重载；`config import` 导入后会统一尝试一次 `Config` 重载；“需要重启”的键仍必须重启。
 
 ### 数据库配置
 
@@ -279,7 +267,7 @@ CLI 会读取当前工作目录的 `config.toml` 来连接数据库。如需指�
 
 ```toml
 [database]
-database_url = "sqlite://links.db"
+database_url = "sqlite://shortlinks.db"
 ```
 
 > 更多配置见 [配置指南](/config/)。

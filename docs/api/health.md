@@ -61,7 +61,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> 首次启动时会自动生成一个随机管理员密码并写入 `admin_token.txt`（若文件不存在；保存后请删除该文件）。
+> 若尚未设置 `api.admin_token`，请先执行 `./shortlinker reset-password`，否则 Admin API 不可用。
 
 ## 下一步
 

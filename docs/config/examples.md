@@ -59,7 +59,7 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/links.db"
+database_url = "sqlite:///data/shortlinks.db"
 ```
 
 运行时配置（写入数据库）可在容器内用 CLI 设置；其中标记为“需要重启”的配置需要重启容器生效：
@@ -81,7 +81,8 @@ Shortlinker 的“热重载/热生效”主要分两类：
    - TUI 在本地写库后，会通过 IPC 触发 `ReloadTarget::Data` 刷新缓存。
 2. **运行时配置热生效**：
    - Admin API 直接更新“无需重启”的配置时，通常会立即生效。
-   - CLI `config set/reset/import` 写库后，会自动尝试通过 IPC 触发 `ReloadTarget::Config`。
+   - CLI `config set/reset` 仅在“无需重启”的配置上自动尝试通过 IPC 触发 `ReloadTarget::Config`。
+   - CLI `config import` 导入后会统一尝试一次 `ReloadTarget::Config`（best-effort）。
 
 ### 支持热生效/热重载的内容
 

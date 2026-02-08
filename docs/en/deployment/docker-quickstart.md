@@ -13,7 +13,7 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/shortlinker.db"
+database_url = "sqlite:///data/shortlinks.db"
 EOF
 
 mkdir -p data
@@ -41,7 +41,7 @@ cat > config.toml << 'EOF'
 unix_socket = "/sock/shortlinker.sock"
 
 [database]
-database_url = "sqlite:///data/shortlinker.db"
+database_url = "sqlite:///data/shortlinks.db"
 EOF
 
 docker run -d --name shortlinker \
@@ -56,8 +56,8 @@ docker run -d --name shortlinker \
 > Runtime config is stored in the database (e.g. `features.default_url`, `features.enable_admin_panel`, `api.health_token`). Update it via the in-container CLI or Admin API. See [Configuration Guide](/en/config/).
 
 ```bash
-# Read the auto-generated admin password (usually /admin_token.txt inside the container)
-docker exec shortlinker cat /admin_token.txt
+# Initial deployment: set admin password interactively (writes runtime config api.admin_token)
+docker exec -it shortlinker /shortlinker reset-password
 
 # Set root default redirect (no restart)
 docker exec shortlinker /shortlinker config set features.default_url https://example.com
@@ -129,4 +129,3 @@ docker-compose down
 # Update image
 docker-compose pull && docker-compose up -d
 ```
-

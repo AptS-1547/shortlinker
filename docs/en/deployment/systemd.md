@@ -41,7 +41,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 # Needs write access for: shortlinker.pid, IPC socket (default ./shortlinker.sock;
-# custom ipc.socket_path also needs to be writable), admin_token.txt (first startup), DB file, etc.
+# custom ipc.socket_path also needs to be writable), DB file, etc.
 ReadWritePaths=/opt/shortlinker
 
 [Install]

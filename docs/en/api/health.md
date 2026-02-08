@@ -61,7 +61,7 @@ curl -sS -b cookies.txt \
   http://localhost:8080/health
 ```
 
-> On first startup, the server may generate `admin_token.txt` (if missing). Store it securely, then delete the file.
+> If `api.admin_token` is not set yet, run `./shortlinker reset-password` first; otherwise Admin API remains unavailable.
 
 ## Next
 

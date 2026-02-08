@@ -13,22 +13,28 @@ The system automatically detects and migrates data without manual intervention.
 ### SQLite Issues
 
 ```bash
+# Confirm SQLite path from database.database_url (default: shortlinks.db)
+DB_FILE="shortlinks.db"
+
 # Check database integrity
-sqlite3 links.db "PRAGMA integrity_check;"
+sqlite3 "$DB_FILE" "PRAGMA integrity_check;"
 
 # Database corruption repair
-sqlite3 links.db ".dump" | sqlite3 new_links.db
+sqlite3 "$DB_FILE" ".dump" | sqlite3 "${DB_FILE%.db}_recovered.db"
 ```
 
 ### Permission Issues
 
 ```bash
+# Confirm SQLite path from database.database_url (default: shortlinks.db)
+DB_FILE="shortlinks.db"
+
 # Check file permissions
-ls -la links.*
+ls -la "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null
 
 # Fix permissions
-chown shortlinker:shortlinker links.*
-chmod 644 links.*
+chown shortlinker:shortlinker "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null || true
+chmod 600 "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null || true
 ```
 
 ## Monitoring Recommendations

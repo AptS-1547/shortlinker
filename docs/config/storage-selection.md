@@ -12,12 +12,12 @@
 # config.toml（设置 [database].database_url）
 [database]
 # 小规模部署（< 10,000 链接）
-# database_url = "./links.db"
+# database_url = "./shortlinks.db"
 # 或使用显式 URL
-# database_url = "sqlite://./links.db"
+# database_url = "sqlite://./shortlinks.db"
 
 # 中等规模（10,000 - 100,000 链接）
-# database_url = "sqlite://./links.db"
+# database_url = "sqlite://./shortlinks.db"
 # 或使用 MySQL/MariaDB
 # database_url = "mysql://user:pass@host:3306/db"
 
@@ -40,7 +40,7 @@
 # database_url = ":memory:"
 
 # 生产环境（单机）
-# database_url = "/data/links.db"
+# database_url = "/data/shortlinks.db"
 
 # 生产环境（集群）
 # database_url = "postgresql://user:pass@cluster:5432/shortlinker"
@@ -52,10 +52,10 @@
 # config.toml（设置 [database].database_url）
 [database]
 # 低并发（< 100 QPS）
-# database_url = "links.db"
+# database_url = "shortlinks.db"
 
 # 中等并发（100-1000 QPS）
-# database_url = "sqlite://links.db"
+# database_url = "sqlite://shortlinks.db"
 # database_url = "mysql://user:pass@host:3306/db"
 
 # 高并发（> 1000 QPS）

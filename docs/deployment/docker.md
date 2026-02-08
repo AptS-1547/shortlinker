@@ -44,7 +44,7 @@ docker pull ghcr.io/apts-1547/shortlinker:latest-metrics
 | `vX.Y.Z` | 特定版本（标准版，示例占位） |
 | `vX.Y.Z-metrics` | 特定版本（含 Prometheus 指标，示例占位） |
 
-> 使用具体版本时，请将 `vX.Y.Z` 替换为实际发布标签（例如 `v0.5.0-beta.1`）。
+> 使用具体版本时，请将 `vX.Y.Z` 替换为实际发布标签（例如 `v0.5.0-beta.2`）。
 
 ### 自构建镜像
 

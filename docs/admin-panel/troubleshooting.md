@@ -7,11 +7,8 @@
 ### 登录失败
 
 ```bash
-# 获取/确认管理员密码（运行时配置 `api.admin_token` 的明文值）
-# - 首次启动通常会生成 `admin_token.txt`（若存在）
-cat admin_token.txt
-
-# - 忘记密码可重置（写入数据库）
+# 获取/重置管理员登录密码（通过 `reset-password` 设置）
+# - 忘记密码或首次部署可重置（写入数据库）
 ./shortlinker reset-password
 
 # 检查（独立部署的）管理面板 API 地址配置

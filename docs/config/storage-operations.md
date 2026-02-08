@@ -27,7 +27,8 @@ v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
 # config.toml
 [database]
 # SQLite（推荐）
-# database_url = "sqlite://./data/links.db"
+# database_url = "shortlinks.db"                   # 默认值（当前工作目录）
+# database_url = "sqlite://./data/shortlinks.db"  # 显式 URL 写法
 
 # PostgreSQL
 # database_url = "postgres://user:pass@localhost:5432/shortlinker"
@@ -41,22 +42,28 @@ v0.2.0+ 版本迁移到 Sea-ORM，带来以下变化：
 ### SQLite 问题
 
 ```bash
+# 按 database.database_url 确认 SQLite 文件路径（默认 shortlinks.db）
+DB_FILE="shortlinks.db"
+
 # 检查数据库完整性
-sqlite3 links.db "PRAGMA integrity_check;"
+sqlite3 "$DB_FILE" "PRAGMA integrity_check;"
 
 # 数据库损坏修复
-sqlite3 links.db ".dump" | sqlite3 new_links.db
+sqlite3 "$DB_FILE" ".dump" | sqlite3 "${DB_FILE%.db}_recovered.db"
 ```
 
 ### 权限问题
 
 ```bash
+# 按 database.database_url 确认 SQLite 文件路径（默认 shortlinks.db）
+DB_FILE="shortlinks.db"
+
 # 检查文件权限
-ls -la links.*
+ls -la "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null
 
 # 修复权限
-chown shortlinker:shortlinker links.*
-chmod 644 links.*
+chown shortlinker:shortlinker "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null || true
+chmod 600 "$DB_FILE" "${DB_FILE}-wal" "${DB_FILE}-shm" 2>/dev/null || true
 ```
 
 ## 监控建议

@@ -74,6 +74,16 @@ Cache-Control: public, max-age=60
 Not Found
 ```
 
+#### Internal Server Error (500)
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Type: text/html; charset=utf-8
+
+Internal Server Error
+```
+
+> This usually indicates a storage/backend lookup failure (for example, temporary database unavailability). Check `error`-level server logs for details.
+
 ## Special Paths
 
 ### Root Path Redirect
@@ -167,16 +177,12 @@ def check_short_link(base_url, short_code):
 
 ## Monitoring and Logging
 
-The server logs the following information:
-- Redirect operation logs
-- 404 error logs
-- Expired link access logs
+In the current implementation, redirect handling logs only essential events by default (actual output depends on log level):
+- `trace`: fine-grained events such as invalid short-code rejection
+- `debug`: non-error branches like cache misses and link-not-found
+- `error`: database lookup failures (corresponding to HTTP `500`)
 
-Log examples:
-```
-[INFO] Redirect example -> https://www.example.com
-[INFO] Link expired: temp
-```
+If built with the `metrics` feature, you can monitor redirect status distribution via `shortlinker_redirects_total{status="307"|"404"|"500"}`.
 
 ## UTM Source Derivation (Detailed Logs)
 

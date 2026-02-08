@@ -18,10 +18,14 @@ curl -sS -b cookies.txt \
 | `page` | Integer | 页码（从 1 开始） | `?page=1` |
 | `page_size` | Integer | 每页数量（1-100） | `?page_size=20` |
 | `search` | String | 模糊搜索短码和目标 URL | `?search=github` |
-| `created_after` | RFC3339 | 创建时间过滤（晚于） | `?created_after=2024-01-01T00:00:00Z` |
-| `created_before` | RFC3339 | 创建时间过滤（早于） | `?created_before=2024-12-31T23:59:59Z` |
+| `created_after` | RFC3339 | 创建时间过滤（晚于等于） | `?created_after=2024-01-01T00:00:00Z` |
+| `created_before` | RFC3339 | 创建时间过滤（早于等于） | `?created_before=2024-12-31T23:59:59Z` |
 | `only_expired` | Boolean | 仅显示已过期 | `?only_expired=true` |
 | `only_active` | Boolean | 仅显示未过期 | `?only_active=true` |
+
+> 默认值：`page=1`、`page_size=20`；`page_size` 超出范围会被限制在 `1-100`。
+>
+> `only_expired` 与 `only_active` 不能同时为 `true`，否则返回 `400 Bad Request`。
 
 **响应格式**（分页）：
 ```json
@@ -77,7 +81,8 @@ curl -sS -X POST \
 - `expires_at`：过期时间（可选），支持相对时间（如 `"1d"`, `"7d"`, `"1w"`）或 RFC3339
 - `force`：当 `code` 已存在时，是否覆盖（可选，默认 `false`；未开启时会返回 `409 Conflict`）
 - `password`：密码保护字段（实验性）
-  - 通过 Admin API 写入时会自动使用 Argon2 哈希（若传入的字符串已是 `$argon2...` 格式则会原样保存）
+  - 通过 Admin API 写入时会将用户输入统一按明文处理并使用 Argon2 哈希（即使传入 `$argon2...` 字符串也会再次哈希）
+  - 若需要保留已哈希密码，请使用 CSV 导入路径（导入逻辑会识别 `$argon2...` 并原样保存）
   - 当前版本重定向时不验证密码，仅存储
 
 ### GET /links/{code} - 获取指定短链接
@@ -114,7 +119,7 @@ curl -sS -X PUT \
   - 不提供：保持原值
   - 传空字符串 `""`：清除密码
   - 传明文：自动 Argon2 哈希后保存
-  - 传 `$argon2...`：视为已哈希，原样保存
+  - 传 `$argon2...`：仍按用户输入处理并再次 Argon2 哈希
 
 ### DELETE /links/{code} - 删除短链接
 
@@ -194,6 +199,10 @@ curl -sS -X DELETE \
 导出会生成可直接用于导入的 CSV（包含 header），字段：
 `code,target,created_at,expires_at,password,click_count`
 
+支持过滤参数：`search`、`created_after`、`created_before`、`only_expired`、`only_active`（其中日期参数需使用 RFC3339 格式）。
+
+响应头 `Content-Disposition` 的默认文件名格式为：`shortlinks_export_YYYYMMDD_HHMMSS.csv`。
+
 ```bash
 curl -sS -b cookies.txt \
   -o shortlinks_export.csv \
@@ -203,8 +212,8 @@ curl -sS -b cookies.txt \
 ### POST /links/import - 从 CSV 导入
 
 上传 `multipart/form-data`：
-- `file`：CSV 文件
-- `mode`（可选）：冲突处理模式，`skip`（默认）/`overwrite`/`error`
+- `file`：CSV 文件（最大 10MB，超出会返回 `400` + `FileTooLarge`）
+- `mode`（可选）：冲突处理模式，`skip`（默认）/`overwrite`/`error`（无效值会回退为 `skip`）
 
 ```bash
 curl -sS -X POST \

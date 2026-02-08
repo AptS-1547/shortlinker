@@ -14,7 +14,7 @@ Use the `config generate` command to generate a configuration file:
 
 ```bash
 ./shortlinker config generate config.toml
-# Generates a startup config template (server/database/cache/logging/analytics)
+# Generates a startup config template (server/database/cache/logging/analytics/ipc)
 ```
 
 Then modify `config.toml` as needed:
@@ -45,7 +45,7 @@ If you don't create a configuration file, the program will run with built-in def
 
 # Success output:
 # [INFO] Starting server at http://127.0.0.1:8080
-# [INFO] SQLite storage initialized with 0 links
+# [INFO] Using storage backend: sqlite
 ```
 
 ## Step 3: Add Short Links
@@ -101,10 +101,11 @@ kill $(cat shortlinker.pid)
 # If you use a custom IPC path, override with --socket
 ./shortlinker --socket /tmp/shortlinker.sock status
 
-# Runtime config changes (config set/reset/import) automatically attempt
-# an IPC config reload. If IPC is unreachable (server not running,
+# Runtime config changes: `config set/reset` auto-attempt IPC `Config` reload
+# only for keys marked as no-restart; `config import` performs one best-effort
+# `Config` reload attempt after import. If IPC is unreachable (server not running,
 # ipc.enabled=false, socket mismatch, etc.), call Admin API
-# `/admin/v1/config/reload` manually or restart the service.
+# `/admin/v1/config/reload` manually; restart-required keys still need restart.
 ```
 
 ## Production Environment Quick Configuration
@@ -117,7 +118,7 @@ host = "127.0.0.1"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/links.db"
+database_url = "sqlite:///data/shortlinks.db"
 
 [logging]
 level = "info"

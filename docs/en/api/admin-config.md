@@ -43,6 +43,9 @@ curl -sS -b cookies.txt \
   "http://localhost:8080/admin/v1/config/features.random_code_length/history?limit=10"
 ```
 
+> `limit` defaults to `20` and is capped at `100` server-side.
+
+
 ### POST /config/reload
 ```bash
 curl -sS -X POST -b cookies.txt \
@@ -53,6 +56,9 @@ curl -sS -X POST -b cookies.txt \
 ### POST /config/{key}/action
 
 Execute a config action and return the result, but **do not persist** it to the database.
+
+> Note: this endpoint returns the generated value in `data.value` (which may be sensitive, e.g. generated tokens). Use `/execute-and-save` when you want save-without-echo.
+
 
 ```bash
 curl -sS -X POST \
@@ -80,7 +86,7 @@ curl -sS -X POST \
 
 ## Auth endpoints notes
 
-- `POST /auth/login`: no cookies required; validates the admin password (plaintext for `api.admin_token`) and sets cookies
+- `POST /auth/login`: no cookies required; validates the admin login password against the Argon2 hash stored in `api.admin_token`, then sets cookies
 - `POST /auth/refresh`: no access cookie required, but refresh cookie is required
 - `POST /auth/logout`: no cookies required; clears cookies
 - `GET /auth/verify`: requires a valid access credential (access cookie or Bearer access token)

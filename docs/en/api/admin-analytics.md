@@ -10,8 +10,8 @@ Analytics API provides detailed click statistics, including click trends, top li
 >
 > - Default range: last 30 days. To set a custom range, provide **both** `start_date` and `end_date` (if only one is provided, it falls back to the default range; if parsing fails, it falls back to the default start/end values).
 > - Date formats: RFC3339 (e.g. `2024-01-01T00:00:00Z`) or `YYYY-MM-DD` (e.g. `2024-01-01`; note: `YYYY-MM-DD` is interpreted as `00:00:00Z` of that day).
-> - Geo distribution requires `analytics.enable_geo_lookup=true` (and `analytics.enable_ip_logging=true` to keep IPs). The GeoIP provider is configured via startup `[analytics]` (`analytics.maxminddb_path` / `analytics.geoip_api_url`).
->   - When using the external API provider, it has a built-in cache (LRU 10,000, TTL 15 minutes, negative caching on failures, and singleflight for concurrent requests). HTTP timeout is 2 seconds.
+> - In the current implementation, GeoIP lookup is not yet wired into the click-write path (`click_logs.country/city` are null by default), so `/analytics/geo` and per-link `geo_distribution` may be empty unless historical data already contains geo fields.
+> - Startup `[analytics]` config (`analytics.maxminddb_path` / `analytics.geoip_api_url`) is retained for GeoIP provider selection; the external API provider has built-in caching (LRU 10,000, TTL 15 minutes, negative caching, singleflight, 2-second timeout).
 > - Device/browser distribution (`/analytics/devices`) is based on `user_agent_hash` (User-Agent strings are deduplicated into `user_agents` and linked by hash).
 > - `click_logs.source` derivation is: `utm_source` first; otherwise `ref:{domain}` (from `Referer`); otherwise `direct`.
 
@@ -114,10 +114,7 @@ curl -sS -b cookies.txt \
 {
   "code": 0,
   "message": "OK",
-  "data": [
-    {"country": "CN", "city": "Beijing", "count": 100},
-    {"country": "US", "city": "New York", "count": 80}
-  ]
+  "data": []
 }
 ```
 
@@ -180,9 +177,7 @@ curl -sS -b cookies.txt \
     "top_referrers": [
       {"referrer": "https://google.com", "count": 100, "percentage": 20.0}
     ],
-    "geo_distribution": [
-      {"country": "CN", "city": "Beijing", "count": 50}
-    ]
+    "geo_distribution": []
   }
 }
 ```
@@ -236,6 +231,8 @@ curl -sS -b cookies.txt \
 The exported CSV contains these columns:
 `short_code,clicked_at,referrer,source,ip_address,country,city`
 
+The `Content-Disposition` filename format is: `analytics_YYYYMMDD_YYYYMMDD.csv` (derived from the parsed date range).
+
 Note:
 - The `source` column follows the redirect source derivation rule (`utm_source` → `ref:{domain}` → `direct`).
 - Export does not include raw `user_agent`; device analytics is built via `user_agent_hash` + `user_agents`.
@@ -252,7 +249,7 @@ These runtime config options control Analytics behavior:
 | `analytics.hourly_retention_days` | int | 7 | Hourly rollup retention in days (cleans `click_stats_hourly` / `click_stats_global_hourly`; requires `analytics.enable_auto_rollup`) |
 | `analytics.daily_retention_days` | int | 365 | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
-| `analytics.enable_geo_lookup` | bool | false | Whether to enable geo-IP lookup |
+| `analytics.enable_geo_lookup` | bool | false | Reserved GeoIP switch (currently not consumed in click-write path; `country/city` remain null by default) |
 | `analytics.sample_rate` | float | 1.0 | Detailed logging sample rate (0.0-1.0; 1.0 = log all clicks) |
 | `analytics.max_log_rows` | int | 0 | Maximum rows in `click_logs` (0 = unlimited) |
 | `analytics.max_rows_action` | enum | cleanup | Action when max rows exceeded: `cleanup` (delete oldest) / `stop` (stop detailed logging) |

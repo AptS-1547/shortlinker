@@ -59,9 +59,9 @@ CMD ["/shortlinker"]
 ### 数据目录结构
 ```
 data/
-├── links.db            # SQLite 数据库文件
+├── shortlinks.db       # SQLite 数据库文件（默认名）
 └── backup/            # 备份目录（可选）
-    └── links.db.20240101
+    └── shortlinks.db.20240101
 ```
 
 ### 备份策略
@@ -69,8 +69,9 @@ data/
 # 创建备份脚本
 cat > backup.sh << 'EOF'
 #!/bin/bash
-docker exec shortlinker cp /data/links.db /data/backup/links.db.$(date +%Y%m%d_%H%M%S)
-find ./data/backup -name "links.db.*" -mtime +7 -delete
+DB_FILE="shortlinks.db"   # 如你在 config.toml 里改了 database.database_url，请同步修改
+docker exec shortlinker cp "/data/${DB_FILE}" "/data/backup/${DB_FILE}.$(date +%Y%m%d_%H%M%S)"
+find ./data/backup -name "${DB_FILE}.*" -mtime +7 -delete
 EOF
 
 chmod +x backup.sh

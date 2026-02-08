@@ -14,7 +14,7 @@
 
 ```bash
 ./shortlinker config generate config.toml
-# 生成启动配置模板（server/database/cache/logging/analytics）
+# 生成启动配置模板（server/database/cache/logging/analytics/ipc）
 ```
 
 然后根据需要修改 `config.toml`：
@@ -45,7 +45,7 @@ level = "info"
 
 # 看到以下输出表示成功：
 # [INFO] Starting server at http://127.0.0.1:8080
-# [INFO] SQLite storage initialized with 0 links
+# [INFO] Using storage backend: sqlite
 ```
 
 ## 第三步：添加短链接
@@ -101,9 +101,10 @@ kill $(cat shortlinker.pid)
 # 若使用自定义 IPC 路径，可用 --socket 覆盖
 ./shortlinker --socket /tmp/shortlinker.sock status
 
-# 运行时配置变更（config set/reset/import）会自动尝试通过 IPC 重载配置。
+# 运行时配置变更：`config set/reset` 仅在“无需重启”的键上自动尝试 IPC `Config` 重载；
+# `config import` 导入后会统一 best-effort 尝试一次 `Config` 重载。
 # 若 IPC 不可达（服务未运行、ipc.enabled=false、socket 路径不一致等），
-# 可手动调用 Admin API `/admin/v1/config/reload` 或直接重启服务。
+# 可手动调用 Admin API `/admin/v1/config/reload`；“需要重启”的键仍需重启服务。
 ```
 
 ## 生产环境快速配置
@@ -116,7 +117,7 @@ host = "127.0.0.1"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/links.db"
+database_url = "sqlite:///data/shortlinks.db"
 
 [logging]
 level = "info"

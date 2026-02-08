@@ -36,7 +36,8 @@ To enable the web admin panel in Shortlinker:
    After starting Shortlinker, visit `http://your-domain:8080/panel`
 
 > Notes:
-> - The admin login password is the plaintext value of runtime config `api.admin_token`. On first startup, a random password is generated and written to `admin_token.txt` (if missing). You can rotate it with `./shortlinker reset-password`.
+> - Sign in with the password you set via `./shortlinker reset-password`. Backend stores `api.admin_token` as an Argon2 hash (empty by default before initialization).
+> - If `features.enable_admin_panel=true` but `api.admin_token` is still empty, frontend panel routes return `404 Not Found`.
 > - Route prefix configs like `routes.frontend_prefix` / `routes.admin_prefix` / `routes.health_prefix` require restart.
 
 ## Custom Frontend

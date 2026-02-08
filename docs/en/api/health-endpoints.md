@@ -98,6 +98,7 @@ Returns Prometheus text format (`text/plain; version=0.0.4; charset=utf-8`). On 
 | `shortlinker_redirects_total` | CounterVec | `status` | Redirects by status code (e.g. `307`/`404`) |
 | `shortlinker_clicks_buffer_entries` | Gauge | - | Click buffer entries (unique short codes, not total clicks) |
 | `shortlinker_clicks_flush_total` | CounterVec | `trigger`,`status` | Click buffer flushes by trigger and result |
+| `shortlinker_clicks_channel_dropped` | CounterVec | `reason` | Dropped detailed-click events when channel is full/disconnected (`reason`: `full` / `disconnected`) |
 | `shortlinker_auth_failures_total` | CounterVec | `method` | Auth failures (currently mainly from Admin API: `bearer`/`cookie`) |
 | `shortlinker_bloom_filter_false_positives_total` | Counter | - | Bloom filter false positives |
 | `shortlinker_uptime_seconds` | Gauge | - | Server uptime (seconds) |
@@ -123,4 +124,3 @@ Label notes (common values):
 | 503 | Unhealthy |
 
 > Unauthorized body example (HTTP 401): `{"code":1001,"message":"Unauthorized: Invalid or missing token"}`
-

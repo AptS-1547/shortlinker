@@ -44,7 +44,7 @@ docker pull ghcr.io/apts-1547/shortlinker:latest-metrics
 | `vX.Y.Z` | Specific version (standard, placeholder example) |
 | `vX.Y.Z-metrics` | Specific version (with Prometheus metrics, placeholder example) |
 
-> For a pinned deployment, replace `vX.Y.Z` with an actual release tag (for example, `v0.5.0-beta.1`).
+> For a pinned deployment, replace `vX.Y.Z` with an actual release tag (for example, `v0.5.0-beta.2`).
 
 ### Build from Source
 

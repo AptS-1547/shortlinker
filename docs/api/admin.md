@@ -12,10 +12,11 @@ Shortlinker 的 Admin API 已按主题拆分，避免单页过长，便于按场
 
 Admin API 相关配置属于**运行时配置（数据库）**，详细配置见 [配置指南](/config/)。
 
-- `api.admin_token`：管理员登录密码（数据库中存储为 Argon2 哈希；首次启动会生成随机密码并写入 `admin_token.txt`，保存后请删除该文件；推荐用 `./shortlinker reset-password` 重置）
+- `api.admin_token`：管理员登录密码（数据库中存储为 Argon2 哈希；默认为空，请先用 `./shortlinker reset-password` 设置）
 - `routes.admin_prefix`：路由前缀（默认 `/admin`，修改后需要重启）
 
 > 实际接口路径固定包含 `/v1`，例如默认登录地址为 `http://localhost:8080/admin/v1/auth/login`。
+> `api.admin_token` 为空时，Admin API 会返回 `404 Not Found`（视为未启用）。
 
 ## 鉴权方式（重要）
 
@@ -109,7 +110,7 @@ curl -sS -X POST -b cookies.txt -c cookies.txt \
 
 ## 安全建议
 
-1. **强密码**：使用足够复杂的管理员密码（`api.admin_token`）（不要使用默认的自动生成值直接上生产）
+1. **强密码**：使用足够复杂的管理员密码（`api.admin_token`），并在首次部署时立即设置
 2. **HTTPS**：生产环境建议启用 HTTPS，并将 `api.cookie_secure=true`
 3. **网络隔离**：仅在受信任网络环境中暴露 Admin API
 4. **定期轮换**：定期更换管理员密码（`api.admin_token`）（并重新登录获取新 Cookie）
