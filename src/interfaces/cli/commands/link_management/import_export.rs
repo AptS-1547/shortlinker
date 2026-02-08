@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
+use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse, ShortLinkData};
 use crate::utils::csv_handler::{self, CsvLinkRow, FileFormat};
 use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
@@ -19,29 +19,62 @@ pub async fn export_links(
 ) -> Result<(), CliError> {
     // Try IPC first if server is running
     if ipc::is_server_running() {
-        match ipc::export_links().await {
-            Ok(IpcResponse::ExportResult { links }) => {
+        match export_links_via_ipc().await {
+            Ok(links) => {
                 return export_links_to_file(&links, file_path);
             }
-            Ok(IpcResponse::Error { code, message }) => {
-                return Err(CliError::CommandError(format!("{}: {}", code, message)));
-            }
-            Err(IpcError::ServerNotRunning) => {
+            Err(ExportIpcError::ServerNotRunning) => {
                 // Fall through to direct database operation
             }
-            Err(e) => {
-                return Err(CliError::CommandError(format!("IPC error: {}", e)));
-            }
-            _ => {
-                return Err(CliError::CommandError(
-                    "Unexpected response from server".to_string(),
-                ));
+            Err(ExportIpcError::Other(msg)) => {
+                return Err(CliError::CommandError(msg));
             }
         }
     }
 
     // Fallback: Direct database operation when server is not running
     export_links_direct(storage, file_path).await
+}
+
+/// Error type for paginated IPC export
+enum ExportIpcError {
+    ServerNotRunning,
+    Other(String),
+}
+
+/// Export links via IPC using paginated ListLinks to avoid message size limits
+async fn export_links_via_ipc() -> Result<Vec<ShortLinkData>, ExportIpcError> {
+    let page_size = 100;
+    let mut all_links = Vec::new();
+    let mut page = 1u64;
+
+    loop {
+        match ipc::list_links(page, page_size, None).await {
+            Ok(IpcResponse::LinkList { links, total, .. }) => {
+                all_links.extend(links);
+                if all_links.len() >= total {
+                    break;
+                }
+                page += 1;
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(ExportIpcError::Other(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                return Err(ExportIpcError::ServerNotRunning);
+            }
+            Err(e) => {
+                return Err(ExportIpcError::Other(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(ExportIpcError::Other(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(all_links)
 }
 
 /// Export links to file (shared logic for IPC and direct)
