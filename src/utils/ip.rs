@@ -145,10 +145,8 @@ where
     }
 
     // 步骤 4: 未配置 trusted_proxies → 智能检测
-    if let Ok(socket_addr) = peer_ip.parse::<SocketAddr>() {
-        let ip_addr = socket_addr.ip();
-
-        if is_private_or_local(&ip_addr) {
+    if let Ok(ip_addr) = peer_ip.parse::<IpAddr>()
+        && is_private_or_local(&ip_addr) {
             // 连接来自私有 IP/localhost → 假设有反向代理
             if let Some(real_ip) = get_forwarded_ip() {
                 debug!(
@@ -160,7 +158,6 @@ where
             // 私有 IP 但无 X-Forwarded-For（可能是内网直连）
             debug!("Private IP {} without X-Forwarded-For", peer_ip);
         }
-    }
 
     // 步骤 5: 默认使用连接 IP
     Some(peer_ip.to_string())
