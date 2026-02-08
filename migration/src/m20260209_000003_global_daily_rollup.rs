@@ -83,11 +83,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
         manager
-            .drop_table(
-                Table::drop()
-                    .table(ClickStatsGlobalDaily::Table)
-                    .to_owned(),
-            )
+            .drop_table(Table::drop().table(ClickStatsGlobalDaily::Table).to_owned())
             .await?;
         Ok(())
     }

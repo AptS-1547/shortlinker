@@ -50,10 +50,10 @@ impl App {
             let path = entry.path();
             if path.is_dir() {
                 dirs.push(path);
-            } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                if ext.eq_ignore_ascii_case("csv") {
-                    files.push(path);
-                }
+            } else if let Some(ext) = path.extension().and_then(|s| s.to_str())
+                && ext.eq_ignore_ascii_case("csv")
+            {
+                files.push(path);
             }
         }
 

@@ -34,4 +34,3 @@ mod types;
 pub use coordinator::{DefaultReloadCoordinator, ReloadCoordinator};
 pub use global::{get_reload_coordinator, init_default_coordinator, init_reload_coordinator};
 pub use types::{ReloadEvent, ReloadResult, ReloadStatus, ReloadTarget};
-

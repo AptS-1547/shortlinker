@@ -669,9 +669,7 @@ impl AnalyticsService {
 
                 Ok(grouped
                     .into_iter()
-                    .map(|(label, count)| {
-                        crate::storage::backend::TrendRow { label, count }
-                    })
+                    .map(|(label, count)| crate::storage::backend::TrendRow { label, count })
                     .collect())
             }
         }
