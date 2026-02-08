@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::time::{Duration, interval};
 
-use super::METRICS;
+use super::get_metrics;
 
 /// Cached system info for metrics collection
 static SYSTEM: Lazy<Mutex<System>> = Lazy::new(|| Mutex::new(System::new()));
@@ -31,6 +31,10 @@ pub fn spawn_system_metrics_updater() {
 
 /// Update system metrics (memory and CPU time)
 fn update_system_metrics() {
+    let Some(metrics) = get_metrics() else {
+        return;
+    };
+
     let pid = Pid::from_u32(std::process::id());
 
     let mut sys = match SYSTEM.lock() {
@@ -49,11 +53,11 @@ fn update_system_metrics() {
         let memory_bytes = process.memory();
         let virtual_memory_bytes = process.virtual_memory();
 
-        METRICS
+        metrics
             .process_memory_bytes
             .with_label_values(&["rss"])
             .set(memory_bytes as f64);
-        METRICS
+        metrics
             .process_memory_bytes
             .with_label_values(&["virtual"])
             .set(virtual_memory_bytes as f64);
@@ -61,6 +65,6 @@ fn update_system_metrics() {
         // CPU time (accumulated, in milliseconds -> convert to seconds)
         let cpu_time_ms = process.accumulated_cpu_time();
         let cpu_time_seconds = cpu_time_ms as f64 / 1000.0;
-        METRICS.process_cpu_seconds.set(cpu_time_seconds);
+        metrics.process_cpu_seconds.set(cpu_time_seconds);
     }
 }

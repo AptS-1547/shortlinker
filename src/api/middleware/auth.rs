@@ -115,7 +115,9 @@ where
             Err(e) => {
                 info!("Bearer token validation failed: {}", e);
                 #[cfg(feature = "metrics")]
-                crate::metrics::METRICS.inc_auth_failure("bearer");
+                if let Some(m) = crate::metrics::get_metrics() {
+                    m.inc_auth_failure("bearer");
+                }
                 false
             }
         }
@@ -136,7 +138,9 @@ where
                 Err(e) => {
                     info!("JWT validation failed: {}", e);
                     #[cfg(feature = "metrics")]
-                    crate::metrics::METRICS.inc_auth_failure("cookie");
+                    if let Some(m) = crate::metrics::get_metrics() {
+                        m.inc_auth_failure("cookie");
+                    }
                     return false;
                 }
             }

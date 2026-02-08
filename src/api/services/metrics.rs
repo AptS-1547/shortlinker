@@ -11,7 +11,7 @@ use actix_web::web;
 use super::AppStartTime;
 
 #[cfg(feature = "metrics")]
-use crate::metrics::METRICS;
+use crate::metrics::get_metrics;
 
 /// Metrics service handler
 pub struct MetricsService;
@@ -20,15 +20,21 @@ impl MetricsService {
     /// Handle metrics export request
     #[cfg(feature = "metrics")]
     pub async fn metrics(app_start_time: web::Data<AppStartTime>) -> impl Responder {
+        let Some(metrics) = get_metrics() else {
+            return HttpResponse::ServiceUnavailable()
+                .content_type("text/plain")
+                .body("Metrics not initialized");
+        };
+
         // Update uptime (cheap operation, fine to do on-demand)
         let now = chrono::Utc::now();
         let uptime = (now - app_start_time.start_datetime).num_seconds().max(0) as f64;
-        METRICS.uptime_seconds.set(uptime);
+        metrics.uptime_seconds.set(uptime);
 
         // System metrics (memory, CPU) are updated by a background task
 
         // Export metrics in Prometheus format
-        match METRICS.export() {
+        match metrics.export() {
             Ok(output) => HttpResponse::Ok()
                 .content_type("text/plain; version=0.0.4; charset=utf-8")
                 .body(output),

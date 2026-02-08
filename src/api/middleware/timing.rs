@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 #[cfg(feature = "metrics")]
-use crate::metrics::METRICS;
+use crate::metrics::get_metrics;
 
 /// Drop guard that decrements active connections when dropped.
 /// Ensures `dec()` runs even if the future panics.
@@ -23,7 +23,9 @@ struct ActiveConnectionGuard;
 #[cfg(feature = "metrics")]
 impl Drop for ActiveConnectionGuard {
     fn drop(&mut self) {
-        METRICS.http_active_connections.dec();
+        if let Some(m) = get_metrics() {
+            m.http_active_connections.dec();
+        }
     }
 }
 
@@ -82,27 +84,27 @@ where
         Box::pin(async move {
             // Guard ensures dec() runs even on panic
             #[cfg(feature = "metrics")]
-            METRICS.http_active_connections.inc();
+            if let Some(m) = get_metrics() {
+                m.http_active_connections.inc();
+            }
             #[cfg(feature = "metrics")]
             let _guard = ActiveConnectionGuard;
 
             let result = srv.call(req).await;
 
             #[cfg(feature = "metrics")]
-            {
+            if let Some(m) = get_metrics() {
                 let duration = start.elapsed().as_secs_f64();
                 let status = match &result {
                     Ok(response) => status_str(response.status()),
                     Err(_) => "500",
                 };
 
-                METRICS
-                    .http_request_duration_seconds
+                m.http_request_duration_seconds
                     .with_label_values(&[method, endpoint, status])
                     .observe(duration);
 
-                METRICS
-                    .http_requests_total
+                m.http_requests_total
                     .with_label_values(&[method, endpoint, status])
                     .inc();
             }

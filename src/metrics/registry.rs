@@ -2,16 +2,35 @@
 //!
 //! Defines all Prometheus metrics used in the application.
 
-use once_cell::sync::Lazy;
 use prometheus::{
     Counter, CounterVec, Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, Opts, Registry,
     TextEncoder,
 };
+use std::sync::OnceLock;
 
 use super::traits::MetricsRecorder;
 
-/// Global metrics instance
-pub static METRICS: Lazy<Metrics> = Lazy::new(Metrics::new);
+/// Global metrics instance (initialized explicitly via `init_metrics()`)
+static METRICS: OnceLock<Metrics> = OnceLock::new();
+
+/// Initialize the global metrics registry.
+///
+/// Returns `Ok(())` if metrics were successfully created and registered,
+/// or if they were already initialized. Returns `Err` on Prometheus errors.
+pub fn init_metrics() -> Result<(), prometheus::Error> {
+    if METRICS.get().is_some() {
+        return Ok(());
+    }
+    let metrics = Metrics::try_new()?;
+    // Another thread may have initialized between our check and here; that's fine.
+    let _ = METRICS.set(metrics);
+    Ok(())
+}
+
+/// Get a reference to the global metrics, if initialized.
+pub fn get_metrics() -> Option<&'static Metrics> {
+    METRICS.get()
+}
 
 /// Application metrics container
 pub struct Metrics {
@@ -74,7 +93,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    fn new() -> Self {
+    fn try_new() -> Result<Self, prometheus::Error> {
         let registry = Registry::new();
 
         // ===== HTTP 指标 =====
@@ -87,8 +106,7 @@ impl Metrics {
                 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0,
             ]),
             &["method", "endpoint", "status"],
-        )
-        .expect("Failed to create http_request_duration_seconds metric");
+        )?;
 
         let http_requests_total = CounterVec::new(
             Opts::new(
@@ -96,14 +114,12 @@ impl Metrics {
                 "Total number of HTTP requests",
             ),
             &["method", "endpoint", "status"],
-        )
-        .expect("Failed to create http_requests_total metric");
+        )?;
 
         let http_active_connections = Gauge::new(
             "shortlinker_http_active_connections",
             "Number of active HTTP connections",
-        )
-        .expect("Failed to create http_active_connections metric");
+        )?;
 
         // ===== 数据库指标 =====
         let db_query_duration_seconds = HistogramVec::new(
@@ -113,8 +129,7 @@ impl Metrics {
             )
             .buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]),
             &["operation"],
-        )
-        .expect("Failed to create db_query_duration_seconds metric");
+        )?;
 
         let db_queries_total = CounterVec::new(
             Opts::new(
@@ -122,8 +137,7 @@ impl Metrics {
                 "Total number of database queries",
             ),
             &["operation"],
-        )
-        .expect("Failed to create db_queries_total metric");
+        )?;
 
         // ===== 缓存指标 =====
         let cache_operation_duration_seconds = HistogramVec::new(
@@ -133,20 +147,17 @@ impl Metrics {
             )
             .buckets(vec![0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]),
             &["operation", "layer"],
-        )
-        .expect("Failed to create cache_operation_duration_seconds metric");
+        )?;
 
         let cache_entries = GaugeVec::new(
             Opts::new("shortlinker_cache_entries", "Number of entries in cache"),
             &["layer"],
-        )
-        .expect("Failed to create cache_entries metric");
+        )?;
 
         let cache_hits_total = CounterVec::new(
             Opts::new("shortlinker_cache_hits_total", "Total cache hits by layer"),
             &["layer"],
-        )
-        .expect("Failed to create cache_hits_total metric");
+        )?;
 
         let cache_misses_total = CounterVec::new(
             Opts::new(
@@ -154,8 +165,7 @@ impl Metrics {
                 "Total cache misses by layer",
             ),
             &["layer"],
-        )
-        .expect("Failed to create cache_misses_total metric");
+        )?;
 
         // ===== 重定向指标 =====
         let redirects_total = CounterVec::new(
@@ -164,15 +174,13 @@ impl Metrics {
                 "Total number of redirects by status",
             ),
             &["status"],
-        )
-        .expect("Failed to create redirects_total metric");
+        )?;
 
         // ===== 点击统计指标 =====
         let clicks_buffer_entries = Gauge::new(
             "shortlinker_clicks_buffer_entries",
             "Number of unique keys in the click buffer",
-        )
-        .expect("Failed to create clicks_buffer_entries metric");
+        )?;
 
         let clicks_flush_total = CounterVec::new(
             Opts::new(
@@ -180,8 +188,7 @@ impl Metrics {
                 "Total number of click buffer flushes",
             ),
             &["trigger", "status"],
-        )
-        .expect("Failed to create clicks_flush_total metric");
+        )?;
 
         let clicks_channel_dropped = CounterVec::new(
             Opts::new(
@@ -189,8 +196,7 @@ impl Metrics {
                 "Total number of detailed click events dropped due to channel full or disconnected",
             ),
             &["reason"],
-        )
-        .expect("Failed to create clicks_channel_dropped metric");
+        )?;
 
         // ===== 认证指标 =====
         let auth_failures_total = CounterVec::new(
@@ -199,19 +205,17 @@ impl Metrics {
                 "Total number of authentication failures",
             ),
             &["method"],
-        )
-        .expect("Failed to create auth_failures_total metric");
+        )?;
 
         // ===== Bloom Filter 指标 =====
         let bloom_filter_false_positives_total = Counter::new(
             "shortlinker_bloom_filter_false_positives_total",
             "Total number of Bloom filter false positives",
-        )
-        .expect("Failed to create bloom_filter_false_positives_total metric");
+        )?;
 
         // ===== 系统指标 =====
-        let uptime_seconds = Gauge::new("shortlinker_uptime_seconds", "Server uptime in seconds")
-            .expect("Failed to create uptime_seconds metric");
+        let uptime_seconds =
+            Gauge::new("shortlinker_uptime_seconds", "Server uptime in seconds")?;
 
         let process_memory_bytes = GaugeVec::new(
             Opts::new(
@@ -219,14 +223,12 @@ impl Metrics {
                 "Process memory usage in bytes",
             ),
             &["type"],
-        )
-        .expect("Failed to create process_memory_bytes metric");
+        )?;
 
         let process_cpu_seconds = Gauge::new(
             "shortlinker_process_cpu_seconds",
             "Total CPU time consumed by the process in seconds (user + system)",
-        )
-        .expect("Failed to create process_cpu_seconds metric");
+        )?;
 
         let build_info = GaugeVec::new(
             Opts::new(
@@ -234,43 +236,40 @@ impl Metrics {
                 "Build information about the running binary",
             ),
             &["version"],
-        )
-        .expect("Failed to create build_info metric");
+        )?;
 
         // Register all metrics
         macro_rules! register {
-            ($metric:ident) => {
-                registry
-                    .register(Box::new($metric.clone()))
-                    .expect(concat!("Failed to register ", stringify!($metric)));
+            ($registry:expr, $metric:ident) => {
+                $registry.register(Box::new($metric.clone()))?;
             };
         }
-        register!(http_request_duration_seconds);
-        register!(http_requests_total);
-        register!(http_active_connections);
-        register!(db_query_duration_seconds);
-        register!(db_queries_total);
-        register!(cache_operation_duration_seconds);
-        register!(cache_entries);
-        register!(cache_hits_total);
-        register!(cache_misses_total);
-        register!(redirects_total);
-        register!(clicks_buffer_entries);
-        register!(clicks_flush_total);
-        register!(clicks_channel_dropped);
-        register!(auth_failures_total);
-        register!(bloom_filter_false_positives_total);
-        register!(uptime_seconds);
-        register!(process_memory_bytes);
-        register!(process_cpu_seconds);
-        register!(build_info);
+        register!(registry, http_request_duration_seconds);
+        register!(registry, http_requests_total);
+        register!(registry, http_active_connections);
+        register!(registry, db_query_duration_seconds);
+        register!(registry, db_queries_total);
+        register!(registry, cache_operation_duration_seconds);
+        register!(registry, cache_entries);
+        register!(registry, cache_hits_total);
+        register!(registry, cache_misses_total);
+        register!(registry, redirects_total);
+        register!(registry, clicks_buffer_entries);
+        register!(registry, clicks_flush_total);
+        register!(registry, clicks_channel_dropped);
+        register!(registry, auth_failures_total);
+        register!(registry, bloom_filter_false_positives_total);
+        register!(registry, uptime_seconds);
+        register!(registry, process_memory_bytes);
+        register!(registry, process_cpu_seconds);
+        register!(registry, build_info);
 
         // Initialize build info (value 1.0 is Prometheus convention for info metrics)
         build_info
             .with_label_values(&[env!("CARGO_PKG_VERSION")])
             .set(1.0);
 
-        Self {
+        Ok(Self {
             registry,
             http_request_duration_seconds,
             http_requests_total,
@@ -291,7 +290,7 @@ impl Metrics {
             process_memory_bytes,
             process_cpu_seconds,
             build_info,
-        }
+        })
     }
 
     /// Export metrics in Prometheus text format

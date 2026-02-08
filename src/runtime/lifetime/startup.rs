@@ -57,7 +57,18 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     // Create metrics instance for dependency injection
     #[cfg(feature = "metrics")]
-    let metrics: Arc<dyn MetricsRecorder> = Arc::new(PrometheusMetricsWrapper);
+    let metrics: Arc<dyn MetricsRecorder> = {
+        match crate::metrics::init_metrics() {
+            Ok(()) => {
+                debug!("Prometheus metrics initialized");
+                Arc::new(PrometheusMetricsWrapper)
+            }
+            Err(e) => {
+                error!("Failed to initialize Prometheus metrics, degrading to NoopMetrics: {}", e);
+                crate::metrics_core::NoopMetrics::arc()
+            }
+        }
+    };
     #[cfg(not(feature = "metrics"))]
     let metrics: Arc<dyn MetricsRecorder> = crate::metrics_core::NoopMetrics::arc();
 
