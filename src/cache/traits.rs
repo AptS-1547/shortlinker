@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::pin::Pin;
 
 use crate::errors::Result;
 use crate::storage::ShortLink;
 use async_trait::async_trait;
+use futures_util::stream::Stream;
 
 pub struct BloomConfig {
     pub capacity: usize,
@@ -43,14 +45,10 @@ pub trait CompositeCacheTrait: Send + Sync {
 
     /// 完整重置所有缓存层，包括原子重建 Bloom Filter。
     ///
-    /// 内部自行从数据库加载短码列表，然后：
-    /// 1. 原子重建 Bloom Filter（无空窗期）
+    /// 内部自行从数据库流式加载短码列表，然后：
+    /// 1. 流式重建 Bloom Filter（原子交换，无空窗期，增量 buffer 捕获并发写入）
     /// 2. 清空 Object Cache
     /// 3. 清空 Negative Cache
-    ///
-    /// // BUG: 在 `load_all_codes()` 到 Bloom swap 之间的极窄窗口内，并发 `create_link`
-    /// // 写入的 key 可能不在新 Bloom 中，导致该链接短暂返回 404（直到下次 reload）。
-    /// // 窗口为毫秒级，reload 为低频操作，影响可忽略。
     async fn rebuild_all(&self) -> Result<()>;
 
     /// 标记 key 为不存在（写入 Negative Cache）
@@ -106,6 +104,25 @@ pub trait ExistenceFilter: Send + Sync {
         self.clear(count, fp_rate).await?;
         self.bulk_set(keys).await;
         Ok(())
+    }
+
+    /// 流式重建 Filter：先用 count 预分配，然后从 Stream 逐批加载 keys。
+    ///
+    /// 默认实现消费 stream 后调用 `clear`（适用于 no-op 的 NullExistenceFilterPlugin）。
+    /// Bloom Filter 实现会在锁外流式构建新实例后原子交换，内存 O(batch_size)。
+    async fn rebuild_streaming(
+        &self,
+        count: usize,
+        fp_rate: f64,
+        stream: Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send>>,
+    ) -> Result<()> {
+        use futures_util::StreamExt;
+        // 默认实现：消费 stream（确保数据库游标正常关闭）但不收集数据
+        let mut stream = stream;
+        while let Some(batch) = stream.next().await {
+            batch?; // 仅检查错误，丢弃数据
+        }
+        self.clear(count, fp_rate).await
     }
 }
 

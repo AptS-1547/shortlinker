@@ -319,6 +319,62 @@ impl SeaOrmStorage {
             .collect())
     }
 
+    /// 流式加载所有短码（游标分页，内存 O(page_size)）
+    ///
+    /// 使用 `short_code` 作为游标，每次只加载 `page_size` 条记录。
+    /// 用于 Bloom Filter 重建，避免全量 `Vec<String>` 导致 OOM。
+    pub fn stream_all_codes_cursor(
+        &self,
+        page_size: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send + 'static>> {
+        let db = self.db.clone();
+
+        use futures_util::stream;
+
+        Box::pin(stream::unfold(
+            (None::<String>, db, page_size, false),
+            |(cursor, db, page_size, done)| async move {
+                if done {
+                    return None;
+                }
+
+                let mut query = short_link::Entity::find()
+                    .select_only()
+                    .column(short_link::Column::ShortCode);
+
+                if let Some(ref last_code) = cursor {
+                    query = query.filter(short_link::Column::ShortCode.gt(last_code.clone()));
+                }
+
+                let codes = query
+                    .order_by_asc(short_link::Column::ShortCode)
+                    .limit(page_size)
+                    .into_tuple::<String>()
+                    .all(&db)
+                    .await;
+
+                match codes {
+                    Ok(codes) if codes.is_empty() => None,
+                    Ok(codes) => {
+                        let next_cursor = codes.last().cloned();
+                        let is_last = (codes.len() as u64) < page_size;
+                        Some((Ok(codes), (next_cursor, db, page_size, is_last)))
+                    }
+                    Err(e) => {
+                        tracing::error!("Cursor query for codes failed: {}", e);
+                        Some((
+                            Err(ShortlinkerError::database_operation(format!(
+                                "Cursor query for codes failed: {}",
+                                e
+                            ))),
+                            (cursor, db, page_size, true),
+                        ))
+                    }
+                }
+            },
+        ))
+    }
+
     /// 流式导出链接（游标分页）
     ///
     /// 使用 `short_code` 作为游标，避免 OFFSET 在大数据量下的性能问题。

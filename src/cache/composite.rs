@@ -146,19 +146,18 @@ impl CompositeCacheTrait for CompositeCache {
     }
 
     async fn rebuild_all(&self) -> Result<()> {
-        // BUG: 在 load_all_codes() 到下面 rebuild() 原子交换之间的极窄窗口内，
-        // 并发 create_link 写入的 key 可能不在新 Bloom 中，导致该链接短暂返回 404
-        // （因为 CacheResult::NotFound 在 redirect handler 中直接返回 404，不回源 DB）。
-        // 窗口为毫秒级，reload 为低频操作（手动触发或信号触发），影响可忽略。
-
-        let codes = self.storage.load_all_codes().await?;
-        // 1. 原子重建 Bloom Filter（无空窗期：读取端看到旧或新的完整 Bloom，不会看到空 Bloom）
+        // 1. 轻量 COUNT 查询获取总数（用于 Bloom 容量预分配）
+        let count = self.storage.count().await? as usize;
+        // 2. 流式游标加载短码（每批 10000 条，内存 O(batch_size)）
+        const BATCH_SIZE: u64 = 10000;
+        let code_stream = self.storage.stream_all_codes_cursor(BATCH_SIZE);
+        // 3. 流式重建 Bloom Filter（原子交换，无空窗期，增量 buffer 捕获并发写入）
         self.filter_plugin
-            .rebuild(&codes, codes.len(), 0.001)
+            .rebuild_streaming(count, 0.001, code_stream)
             .await?;
-        // 2. 清空 Object Cache（stale data 会在下次访问时从 DB 按需回填）
+        // 4. 清空 Object Cache（stale data 会在下次访问时从 DB 按需回填）
         self.object_cache.invalidate_all().await;
-        // 3. 清空 Negative Cache（之前的 "not found" 状态可能已失效）
+        // 5. 清空 Negative Cache（之前的 "not found" 状态可能已失效）
         self.negative_cache.clear().await;
         Ok(())
     }

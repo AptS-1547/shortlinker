@@ -1,17 +1,24 @@
 use async_trait::async_trait;
 use bloomfilter::Bloom;
-use parking_lot::RwLock;
+use futures_util::StreamExt;
+use parking_lot::{Mutex, RwLock};
+use std::pin::Pin;
 use std::sync::Arc;
 use tracing::debug;
 
 use crate::cache::ExistenceFilter;
 use crate::declare_existence_filter_plugin;
 use crate::errors::{Result, ShortlinkerError};
+use futures_util::stream::Stream;
 
 declare_existence_filter_plugin!("bloom", BloomExistenceFilterPlugin);
 
 pub struct BloomExistenceFilterPlugin {
     inner: Arc<RwLock<Bloom<str>>>,
+    /// rebuild 期间收集新增 key 的 buffer。
+    /// Some = 正在重建，set() 会同时写入 buffer
+    /// None = 未在重建
+    rebuild_buffer: Mutex<Option<Vec<String>>>,
 }
 
 impl Default for BloomExistenceFilterPlugin {
@@ -28,6 +35,7 @@ impl BloomExistenceFilterPlugin {
         })?;
         Ok(Self {
             inner: Arc::new(RwLock::new(bloom)),
+            rebuild_buffer: Mutex::new(None),
         })
     }
 }
@@ -55,8 +63,12 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
     }
 
     async fn set(&self, key: &str) {
-        let mut bloom = self.inner.write();
-        bloom.set(key);
+        // 锁顺序：buffer lock → inner write lock（与 rebuild_streaming 一致，防止死锁）
+        let mut buffer_guard = self.rebuild_buffer.lock();
+        self.inner.write().set(key);
+        if let Some(ref mut buffer) = *buffer_guard {
+            buffer.push(key.to_string());
+        }
     }
 
     async fn bulk_set(&self, keys: &[String]) {
@@ -85,19 +97,108 @@ impl ExistenceFilter for BloomExistenceFilterPlugin {
 
     /// 在锁外构建完整的新 Bloom Filter，然后原子交换。
     /// 读取端看到的要么是旧的完整 Bloom，要么是新的完整 Bloom，永远不会看到空 Bloom。
+    /// rebuild 期间通过 buffer 捕获并发 set() 写入的 key，确保零丢失。
     async fn rebuild(&self, keys: &[String], count: usize, fp_rate: f64) -> Result<()> {
+        // 启用 buffer，捕获 rebuild 期间的并发写入
+        *self.rebuild_buffer.lock() = Some(Vec::new());
+
         let capacity = calculate_capacity(count);
         let mut new_bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
+            // 构建失败时关闭 buffer
+            *self.rebuild_buffer.lock() = None;
             ShortlinkerError::cache_connection(format!("Failed to rebuild bloom filter: {e}"))
         })?;
         for key in keys {
             new_bloom.set(key.as_str());
         }
-        // 原子交换：只持锁一瞬间
-        *self.inner.write() = new_bloom;
+
+        // 持 buffer lock → drain buffer → 交换 → 关闭 buffer
+        let buffered_count;
+        {
+            let mut buffer_guard = self.rebuild_buffer.lock();
+            if let Some(ref pending) = *buffer_guard {
+                buffered_count = pending.len();
+                for key in pending {
+                    new_bloom.set(key.as_str());
+                }
+            } else {
+                buffered_count = 0;
+            }
+            *self.inner.write() = new_bloom;
+            *buffer_guard = None;
+        }
+
         debug!(
-            "Bloom filter rebuilt atomically with {} keys, capacity: {} (count: {} + reserve: {}), fp_rate: {}",
-            keys.len(),
+            "Bloom filter rebuilt atomically with {} keys ({} from buffer), capacity: {} (count: {} + reserve: {}), fp_rate: {}",
+            keys.len() + buffered_count,
+            buffered_count,
+            capacity,
+            count,
+            capacity - count,
+            fp_rate
+        );
+        Ok(())
+    }
+
+    /// 流式重建 Bloom Filter：用 count 预分配，从 Stream 逐批加载，最后原子交换。
+    /// 内存占用 O(batch_size) 而非 O(total_keys)，避免大数据量 OOM。
+    /// rebuild 期间通过 buffer 捕获并发 set() 写入的 key，确保零丢失。
+    async fn rebuild_streaming(
+        &self,
+        count: usize,
+        fp_rate: f64,
+        stream: Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send>>,
+    ) -> Result<()> {
+        // 启用 buffer，捕获 rebuild 期间的并发写入
+        *self.rebuild_buffer.lock() = Some(Vec::new());
+
+        let capacity = calculate_capacity(count);
+        let mut new_bloom = Bloom::new_for_fp_rate(capacity, fp_rate).map_err(|e| {
+            *self.rebuild_buffer.lock() = None;
+            ShortlinkerError::cache_connection(format!(
+                "Failed to create bloom filter for streaming rebuild: {e}"
+            ))
+        })?;
+
+        let mut loaded: usize = 0;
+        let mut stream = stream;
+
+        while let Some(batch_result) = stream.next().await {
+            match batch_result {
+                Ok(batch) => {
+                    for key in &batch {
+                        new_bloom.set(key.as_str());
+                    }
+                    loaded += batch.len();
+                }
+                Err(e) => {
+                    // 流式读取失败，关闭 buffer，旧 Bloom 保持不变
+                    *self.rebuild_buffer.lock() = None;
+                    return Err(e);
+                }
+            }
+        }
+
+        // 持 buffer lock → drain buffer → 交换 → 关闭 buffer
+        let buffered_count;
+        {
+            let mut buffer_guard = self.rebuild_buffer.lock();
+            if let Some(ref pending) = *buffer_guard {
+                buffered_count = pending.len();
+                for key in pending {
+                    new_bloom.set(key.as_str());
+                }
+            } else {
+                buffered_count = 0;
+            }
+            *self.inner.write() = new_bloom;
+            *buffer_guard = None;
+        }
+
+        debug!(
+            "Bloom filter rebuilt (streaming) with {} keys ({} from buffer), capacity: {} (count: {} + reserve: {}), fp_rate: {}",
+            loaded + buffered_count,
+            buffered_count,
             capacity,
             count,
             capacity - count,
