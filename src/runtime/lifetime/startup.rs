@@ -64,7 +64,10 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
                 Arc::new(PrometheusMetricsWrapper)
             }
             Err(e) => {
-                error!("Failed to initialize Prometheus metrics, degrading to NoopMetrics: {}", e);
+                error!(
+                    "Failed to initialize Prometheus metrics, degrading to NoopMetrics: {}",
+                    e
+                );
                 crate::metrics_core::NoopMetrics::arc()
             }
         }
@@ -311,7 +314,9 @@ fn check_component_enabled(route_config: &RouteConfig) {
     // 检查 Admin API 是否启用
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
     if admin_token.is_empty() {
-        info!("Admin API is disabled. Run 'shortlinker reset-password' to set a password and enable it.");
+        info!(
+            "Admin API is disabled. Run 'shortlinker reset-password' to set a password and enable it."
+        );
     } else {
         info!("Admin API available at: {}", route_config.admin_prefix);
     }
@@ -327,7 +332,9 @@ fn check_component_enabled(route_config: &RouteConfig) {
     // 检查前端路由是否启用，如果 api.admin_token 未设置 或者 features.enable_admin_panel 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
-        info!("Frontend routes are disabled (features.enable_admin_panel is false or api.admin_token not set)");
+        info!(
+            "Frontend routes are disabled (features.enable_admin_panel is false or api.admin_token not set)"
+        );
     } else {
         // 检测自定义前端
         let custom_frontend = std::path::Path::new("./frontend-panel");

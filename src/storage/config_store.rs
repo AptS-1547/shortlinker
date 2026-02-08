@@ -426,10 +426,6 @@ impl ConfigStore {
     /// 对于数据库中不存在的配置，调用其 `default_fn` 生成默认值并插入。
     /// 同时同步配置的元数据（value_type, requires_restart, is_sensitive）。
     ///
-    /// 特殊处理：
-    /// - `api.admin_token`: 如果是新生成的明文密码，会写入 `admin_token.txt` 让用户保存，
-    ///   然后哈希后再存入数据库。
-    ///
     /// 应在服务启动时调用，确保首次启动时配置表不为空。
     pub async fn ensure_defaults(&self) -> Result<usize> {
         use crate::config::definitions::ALL_CONFIGS;

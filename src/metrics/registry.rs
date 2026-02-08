@@ -214,8 +214,7 @@ impl Metrics {
         )?;
 
         // ===== 系统指标 =====
-        let uptime_seconds =
-            Gauge::new("shortlinker_uptime_seconds", "Server uptime in seconds")?;
+        let uptime_seconds = Gauge::new("shortlinker_uptime_seconds", "Server uptime in seconds")?;
 
         let process_memory_bytes = GaugeVec::new(
             Opts::new(
