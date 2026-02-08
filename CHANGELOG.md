@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0-rc.1] - 2026-02-09
+
+### 🎉 Release Highlights
+
+v0.5.0-rc.1 是一次架构优化与可靠性增强版本，主要亮点：
+
+- **全局天级点击统计汇总** - 新增 `click_stats_global_daily` 表，支持全局维度的天级趋势分析
+- **缓存原子重建机制** - Bloom Filter 重建期间零空窗期，增量 buffer 防止并发写入丢失
+- **Metrics 系统统一** - 移除大量条件编译，统一使用 trait 注入，代码更清晰
+- **配置 Action API** - 支持通过 API 生成 JWT Secret 等敏感配置
+
+### Added
+- **全局天级点击统计汇总** - 新增 `click_stats_global_daily` 表
+  - 每天一条全局记录：总点击数、唯一链接数、Top 10 referrers/countries/sources
+  - 在 hourly → daily rollup 时自动计算，支持覆盖式 upsert（幂等性）
+  - 过期数据随 daily retention 策略自动清理
+- **Bloom Filter 定时重建任务** - 新增 `cache.bloom_rebuild_interval` 配置项（默认 4 小时，0 = 禁用）
+  - 后台定期触发缓存重建，保持 Bloom Filter 与数据库同步
+- **缓存原子重建机制** - 新增 `rebuild_all()` 方法
+  - 在锁外构建新 Bloom Filter，然后原子交换，消除更新空窗期
+  - 增量 buffer 捕获重建期间的并发写入，最后一起合入新 Bloom
+  - 分段预留策略：小规模 50%、中等 20%、大规模 10%
+- **配置 Action API** - 新增两个端点
+  - `POST /admin/v1/config/{key}/action` - 执行 action 并返回生成的值
+  - `POST /admin/v1/config/{key}/execute-and-save` - 执行 action 并保存（不返回敏感值）
+  - 目前支持 `GenerateToken` action（生成 32 字节 hex token），应用于 `api.jwt_secret`
+- **分页 IPC 导出** - CLI 导出改为分页请求（每页 100 条），避免 IPC 消息大小限制
+
+### Improved
+- **IPC 服务检测增强** - 发送 Ping 命令验证服务器实际响应，1 秒超时避免僵死进程阻塞
+- **IP 解析逻辑简化** - 使用 `let-else` 模式减少嵌套，直接 parse 为 `IpAddr`
+
+### Refactored
+- **Metrics 系统统一** - 移除大量 `#[cfg(feature = "metrics")]` 条件编译
+  - 新增 `metrics_core.rs` 模块，定义 `MetricsRecorder` trait 和 `NoopMetrics`
+  - 所有模块无条件接受 `Arc<dyn MetricsRecorder>`，禁用时自动注入 `NoopMetrics`
+- **密码处理逻辑分离** - 区分用户输入与导入数据
+  - `process_new_password()` / `process_update_password()` 始终哈希，不接受预哈希值
+  - 新增 `process_imported_password()` 用于 CSV 导入（已哈希则保留，明文则哈希）
+- **移除 JSON 导入支持** - 统一使用 CSV 格式，移除已弃用的 JSON 导入逻辑
+- **缓存初始化简化** - 原来需要外部加载短码列表再传入，现在 `rebuild_all()` 内部自行从数据库流式加载
+- **存储后端统一** - 移除 metrics 条件编译的 `new()` 方法分支，统一为单一构造函数
+
+### Docs
+- 大规模更新中英文文档，涵盖安全实践、配置说明及 TUI 功能
+- 移除 v0.3.x 版本警告通知
+- 新增配置 Action API 文档
+
+### Breaking Changes
+- **Admin Token 默认值变更** - 默认为空字符串（原来自动生成），首次启动需运行 `reset-password` 手动设置
+- **缓存 API 变更** - `reconfigure()` 和 `load_bloom()` 合并为 `rebuild_all()`
+- **密码处理 API 变更** - `process_new_password()` 不再接受预哈希值，导入场景使用 `process_imported_password()`
+
+### Migration Notes
+
+**⚠️ 从 v0.5.0-beta.2 升级注意事项：**
+
+1. **数据库** - 自动运行迁移，新增 `click_stats_global_daily` 表
+2. **Admin Token** - 默认为空，需运行 `shortlinker reset-password` 设置密码
+3. **新增配置项** - `cache.bloom_rebuild_interval`（秒，默认 14400，0 = 禁用）
+
 ## [v0.5.0-beta.2] - 2026-02-06
 
 ### 🎉 Release Highlights
@@ -1459,7 +1520,8 @@ v0.3.0 是一个重大版本更新，包含大量安全增强、性能优化和�
 - Update README.md
 - Initial commit
 
-[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.2...HEAD
+[Unreleased]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-rc.1...HEAD
+[v0.5.0-rc.1]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.2...v0.5.0-rc.1
 [v0.5.0-beta.2]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-beta.1...v0.5.0-beta.2
 [v0.5.0-beta.1]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.6...v0.5.0-beta.1
 [v0.5.0-alpha.6]: https://github.com/AptS-1547/shortlinker/compare/v0.5.0-alpha.5...v0.5.0-alpha.6
