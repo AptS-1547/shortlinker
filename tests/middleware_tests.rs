@@ -5,7 +5,7 @@
 
 use actix_web::http::{Method, StatusCode};
 use actix_web::test::{self, TestRequest};
-use actix_web::{web, App, HttpResponse};
+use actix_web::{App, HttpResponse, web};
 use std::sync::Arc;
 
 use shortlinker::api::middleware::{AdminAuth, CsrfGuard};
@@ -45,9 +45,7 @@ async fn init_test_runtime_config() {
             let db = connect_sqlite(&db_url)
                 .await
                 .expect("Failed to connect to SQLite");
-            run_migrations(&db)
-                .await
-                .expect("Failed to run migrations");
+            run_migrations(&db).await.expect("Failed to run migrations");
             init_runtime_config(db)
                 .await
                 .expect("Failed to init runtime config");
@@ -86,7 +84,9 @@ async fn test_admin_auth_missing_token_returns_404() {
     // When admin token is empty, middleware returns 404
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -110,7 +110,9 @@ async fn test_admin_auth_allows_login_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -119,9 +121,7 @@ async fn test_admin_auth_allows_login_endpoint() {
     )
     .await;
 
-    let req = TestRequest::post()
-        .uri("/admin/v1/auth/login")
-        .to_request();
+    let req = TestRequest::post().uri("/admin/v1/auth/login").to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
@@ -135,7 +135,9 @@ async fn test_admin_auth_allows_refresh_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -160,7 +162,9 @@ async fn test_admin_auth_allows_logout_endpoint() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -185,7 +189,9 @@ async fn test_admin_auth_handles_options() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -211,7 +217,9 @@ async fn test_admin_auth_rejects_no_token() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -237,7 +245,9 @@ async fn test_admin_auth_valid_bearer_token() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -263,7 +273,9 @@ async fn test_admin_auth_invalid_bearer_token() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>))
+            .app_data(web::Data::new(
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+            ))
             .service(
                 web::scope("/admin")
                     .wrap(AdminAuth)
@@ -323,9 +335,7 @@ async fn test_csrf_skips_auth_endpoints() {
     )
     .await;
 
-    let req = TestRequest::post()
-        .uri("/admin/v1/auth/login")
-        .to_request();
+    let req = TestRequest::post().uri("/admin/v1/auth/login").to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }

@@ -11,10 +11,10 @@ use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
 use shortlinker::metrics_core::NoopMetrics;
 use shortlinker::services::LinkService;
-use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::storage::ShortLink;
+use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::system::ipc::handler::{handle_command, init_link_service, init_start_time};
-use shortlinker::system::ipc::types::{IpcCommand, IpcResponse, ImportLinkData};
+use shortlinker::system::ipc::types::{ImportLinkData, IpcCommand, IpcResponse};
 use std::sync::Once;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -153,7 +153,10 @@ async fn test_ping_command() {
 
     let resp = handle_command(IpcCommand::Ping).await;
     match resp {
-        IpcResponse::Pong { version, uptime_secs } => {
+        IpcResponse::Pong {
+            version,
+            uptime_secs,
+        } => {
             assert!(!version.is_empty());
             // uptime should be very small in tests
             assert!(uptime_secs < 3600);
@@ -188,7 +191,10 @@ async fn test_add_link_command() {
     .await;
 
     match resp {
-        IpcResponse::LinkCreated { link, generated_code } => {
+        IpcResponse::LinkCreated {
+            link,
+            generated_code,
+        } => {
             assert_eq!(link.code, "ipc-test1");
             assert_eq!(link.target, "https://example.com");
             assert!(!generated_code);
@@ -211,7 +217,10 @@ async fn test_add_link_auto_generate_code() {
     .await;
 
     match resp {
-        IpcResponse::LinkCreated { link, generated_code } => {
+        IpcResponse::LinkCreated {
+            link,
+            generated_code,
+        } => {
             assert!(!link.code.is_empty());
             assert_eq!(link.target, "https://example.com/auto");
             assert!(generated_code);
@@ -440,9 +449,7 @@ async fn test_import_links_command() {
 
     match resp {
         IpcResponse::ImportResult {
-            success,
-            failed,
-            ..
+            success, failed, ..
         } => {
             assert_eq!(success, 2);
             assert_eq!(failed, 0);
@@ -482,10 +489,7 @@ async fn test_get_stats_command() {
     let resp = handle_command(IpcCommand::GetLinkStats).await;
 
     match resp {
-        IpcResponse::StatsResult {
-            total_clicks,
-            ..
-        } => {
+        IpcResponse::StatsResult { total_clicks, .. } => {
             // Stats should be non-negative
             assert!(total_clicks >= 0);
         }

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use actix_web::http::StatusCode;
 use actix_web::test::{self, TestRequest};
-use actix_web::{web, App};
+use actix_web::{App, web};
 use async_trait::async_trait;
 use chrono::Utc;
 
@@ -17,8 +17,8 @@ use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
 use shortlinker::metrics_core::{MetricsRecorder, NoopMetrics};
-use shortlinker::storage::backend::{connect_sqlite, run_migrations, SeaOrmStorage};
 use shortlinker::storage::ShortLink;
+use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
 
 use std::sync::Once;
 use tempfile::TempDir;
@@ -242,9 +242,7 @@ async fn test_redirect_nonexistent_link() {
     let cache = Arc::new(MockCache::new());
     let app = redirect_app!(cache);
 
-    let req = TestRequest::get()
-        .uri("/nonexistent-code")
-        .to_request();
+    let req = TestRequest::get().uri("/nonexistent-code").to_request();
     let resp = test::call_service(&app, req).await;
 
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
