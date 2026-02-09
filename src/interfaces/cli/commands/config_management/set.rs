@@ -6,11 +6,64 @@ use crate::config::schema::get_schema;
 use crate::config::validators;
 use crate::interfaces::cli::CliError;
 use crate::storage::ConfigStore;
+use crate::try_ipc_or_fallback;
 use colored::Colorize;
 use sea_orm::DatabaseConnection;
 
-/// Set a configuration value
+/// Set a configuration value (IPC-first with direct-DB fallback)
 pub async fn config_set(
+    db: DatabaseConnection,
+    key: String,
+    value: String,
+) -> Result<(), CliError> {
+    try_ipc_or_fallback!(
+        crate::system::ipc::config_set(key.clone(), value.clone()),
+        IpcResponse::ConfigSetResult {
+            key,
+            value,
+            requires_restart,
+            is_sensitive,
+            old_value,
+            message,
+        } => {
+            // Print result
+            println!(
+                "{} Updated configuration: {} = {}",
+                "✓".bold().green(),
+                key.cyan(),
+                if is_sensitive {
+                    "*****".to_string()
+                } else {
+                    value
+                }
+            );
+
+            if let Some(old) = old_value
+                && !is_sensitive
+            {
+                println!("  {} {}", "Previous value:".dimmed(), old.dimmed());
+            }
+
+            if requires_restart {
+                println!(
+                    "{} This configuration requires a restart to take effect.",
+                    "⚠".bold().yellow()
+                );
+            }
+
+            if let Some(msg) = message {
+                println!("{} {}", "ℹ".bold().blue(), msg);
+            }
+
+            // Server already handled reload, no need to call notify_config_change
+            return Ok(());
+        },
+        @fallback config_set_direct(db, key, value).await
+    )
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn config_set_direct(
     db: DatabaseConnection,
     key: String,
     value: String,

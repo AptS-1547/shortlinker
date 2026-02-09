@@ -9,7 +9,7 @@ use tokio::time::timeout;
 
 use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
-use super::types::{ImportLinkData, IpcCommand, IpcError, IpcResponse};
+use super::types::{ConfigImportItem, ImportLinkData, IpcCommand, IpcError, IpcResponse};
 use crate::system::reload::ReloadTarget;
 
 /// Check if the server is running
@@ -189,4 +189,31 @@ pub async fn export_links() -> Result<IpcResponse, IpcError> {
 /// Get link statistics via IPC
 pub async fn get_link_stats() -> Result<IpcResponse, IpcError> {
     send_command(IpcCommand::GetLinkStats).await
+}
+
+// ============ Config Management Client Functions ============
+
+/// List all configurations via IPC
+pub async fn config_list(category: Option<String>) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ConfigList { category }).await
+}
+
+/// Get a single configuration via IPC
+pub async fn config_get(key: String) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ConfigGet { key }).await
+}
+
+/// Set a configuration value via IPC
+pub async fn config_set(key: String, value: String) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ConfigSet { key, value }).await
+}
+
+/// Reset a configuration to default via IPC
+pub async fn config_reset(key: String) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ConfigReset { key }).await
+}
+
+/// Batch import configurations via IPC
+pub async fn config_import(configs: Vec<ConfigImportItem>) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::ConfigImport { configs }).await
 }

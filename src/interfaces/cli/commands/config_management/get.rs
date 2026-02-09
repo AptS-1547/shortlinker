@@ -4,6 +4,8 @@ use crate::config::definitions::get_def;
 use crate::config::schema::get_schema;
 use crate::interfaces::cli::CliError;
 use crate::storage::ConfigStore;
+use crate::system::ipc::ConfigItemData;
+use crate::try_ipc_or_fallback;
 use colored::Colorize;
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
@@ -23,8 +25,75 @@ struct ConfigDetail {
     enum_options: Option<Vec<String>>,
 }
 
-/// Get a configuration value
+/// Get a configuration value (IPC-first with direct-DB fallback)
 pub async fn config_get(db: DatabaseConnection, key: String, json: bool) -> Result<(), CliError> {
+    try_ipc_or_fallback!(
+        crate::system::ipc::config_get(key.clone()),
+        IpcResponse::ConfigGetResult { config } => {
+            print_config_detail_ipc(&config, json)?;
+            return Ok(());
+        },
+        @fallback config_get_direct(db, key, json).await
+    )
+}
+
+/// Format and print config detail from IPC response
+fn print_config_detail_ipc(config: &ConfigItemData, json: bool) -> Result<(), CliError> {
+    let detail = ConfigDetail {
+        key: config.key.clone(),
+        value: config.value.clone(),
+        category: config.category.clone(),
+        value_type: config.value_type.clone(),
+        default_value: config.default_value.clone(),
+        requires_restart: config.requires_restart,
+        editable: config.editable,
+        sensitive: config.sensitive,
+        description: config.description.clone(),
+        enum_options: config.enum_options.clone(),
+    };
+
+    if json {
+        let json_str = serde_json::to_string_pretty(&detail)
+            .map_err(|e| CliError::CommandError(format!("Failed to serialize to JSON: {}", e)))?;
+        println!("{}", json_str);
+    } else {
+        println!();
+        println!("{}: {}", "Key".bold(), detail.key.green());
+        println!("{}: {}", "Value".bold(), detail.value.white());
+        println!("{}: {}", "Type".bold(), detail.value_type);
+        println!("{}: {}", "Category".bold(), detail.category);
+        println!("{}: {}", "Description".bold(), detail.description);
+
+        if detail.sensitive {
+            println!("{}: (masked)", "Default".bold());
+        } else {
+            println!("{}: {}", "Default".bold(), detail.default_value);
+        }
+
+        if detail.requires_restart {
+            println!("{}: {}", "Requires Restart".bold(), "Yes".yellow());
+        }
+
+        if !detail.editable {
+            println!("{}: {}", "Editable".bold(), "No (readonly)".red());
+        }
+
+        if let Some(opts) = &detail.enum_options {
+            println!("{}: {}", "Allowed Values".bold(), opts.join(", ").cyan());
+        }
+
+        println!();
+    }
+
+    Ok(())
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn config_get_direct(
+    db: DatabaseConnection,
+    key: String,
+    json: bool,
+) -> Result<(), CliError> {
     // Validate key exists
     let def = get_def(&key).ok_or_else(|| {
         CliError::CommandError(format!(

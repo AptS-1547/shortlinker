@@ -6,7 +6,9 @@ mod form_state;
 
 pub use form_state::{EditingField, FormState};
 
+use crate::cache::NullCompositeCache;
 use crate::errors::ShortlinkerError;
+use crate::services::LinkService;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
 
 use crate::metrics_core::NoopMetrics;
@@ -86,6 +88,7 @@ impl From<CurrentlyEditing> for EditingField {
 
 pub struct App {
     pub storage: Arc<SeaOrmStorage>,
+    pub link_service: Arc<LinkService>,
     pub links: HashMap<String, ShortLink>,
     pub current_screen: CurrentScreen,
 
@@ -127,6 +130,9 @@ impl App {
         let storage = StorageFactory::create(NoopMetrics::arc()).await?;
         let links = storage.load_all().await?;
 
+        let cache = NullCompositeCache::arc();
+        let link_service = Arc::new(LinkService::new(storage.clone(), cache));
+
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
         let mut table_state = TableState::default();
@@ -134,6 +140,7 @@ impl App {
 
         Ok(App {
             storage,
+            link_service,
             links,
             current_screen: CurrentScreen::Main,
             form: FormState::new(),

@@ -258,6 +258,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     // Initialize IPC handler with LinkService
     crate::system::ipc::handler::init_link_service(link_service.clone());
 
+    // Initialize IPC handler with ConfigService
+    crate::system::ipc::handler::init_config_service(config_service.clone());
+
     // Initialize IPC start time and start IPC server
     crate::system::ipc::handler::init_start_time();
     #[cfg(any(feature = "cli", feature = "tui"))]

@@ -47,8 +47,12 @@ pub mod server;
 pub mod types;
 
 pub use client::{
-    add_link, export_links, get_link, get_link_stats, import_links, is_server_running, list_links,
-    ping, reload, remove_link, send_command, update_link,
+    add_link, config_get, config_import, config_list, config_reset, config_set, export_links,
+    get_link, get_link_stats, import_links, is_server_running, list_links, ping, reload,
+    remove_link, send_command, update_link,
 };
 pub use platform::PlatformIpc;
-pub use types::{ImportLinkData, IpcCommand, IpcError, IpcResponse, ShortLinkData};
+pub use types::{
+    ConfigImportItem, ConfigItemData, ImportLinkData, IpcCommand, IpcError, IpcResponse,
+    ShortLinkData,
+};

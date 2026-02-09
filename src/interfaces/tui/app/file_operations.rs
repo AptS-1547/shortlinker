@@ -2,6 +2,7 @@
 
 use super::state::App;
 use crate::errors::ShortlinkerError;
+use crate::services::{ImportLinkItem, ImportMode};
 use crate::storage::ShortLink;
 use crate::utils::csv_handler;
 
@@ -18,9 +19,19 @@ impl App {
     pub async fn import_links(&mut self) -> Result<(), ShortlinkerError> {
         let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&self.import_path)?;
 
-        for link in imported_links {
-            self.storage.set(link).await?;
-        }
+        let items: Vec<ImportLinkItem> = imported_links
+            .into_iter()
+            .map(|link| ImportLinkItem {
+                code: link.code,
+                target: link.target,
+                expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
+                password: link.password,
+            })
+            .collect();
+
+        self.link_service
+            .import_links(items, ImportMode::Skip)
+            .await?;
 
         Ok(())
     }

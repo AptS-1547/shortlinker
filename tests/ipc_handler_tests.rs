@@ -9,12 +9,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
+use shortlinker::config::runtime_config::init_runtime_config;
 use shortlinker::metrics_core::NoopMetrics;
-use shortlinker::services::LinkService;
+use shortlinker::services::{ConfigService, LinkService};
 use shortlinker::storage::ShortLink;
-use shortlinker::storage::backend::SeaOrmStorage;
-use shortlinker::system::ipc::handler::{handle_command, init_link_service, init_start_time};
-use shortlinker::system::ipc::types::{ImportLinkData, IpcCommand, IpcResponse};
+use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
+use shortlinker::system::ipc::handler::{
+    handle_command, init_config_service, init_link_service, init_start_time,
+};
+use shortlinker::system::ipc::types::{ConfigImportItem, ImportLinkData, IpcCommand, IpcResponse};
 use std::sync::Once;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -126,6 +129,15 @@ async fn setup_ipc_handler() {
             let db_path = temp_dir.path().join("ipc_test.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
+            // Initialize RuntimeConfig (needed for ConfigService)
+            let db = connect_sqlite(&db_url)
+                .await
+                .expect("Failed to connect SQLite");
+            run_migrations(&db).await.expect("Failed to run migrations");
+            init_runtime_config(db)
+                .await
+                .expect("Failed to init RuntimeConfig");
+
             let storage = Arc::new(
                 SeaOrmStorage::new(&db_url, "sqlite", NoopMetrics::arc())
                     .await
@@ -136,6 +148,11 @@ async fn setup_ipc_handler() {
             let service = Arc::new(LinkService::new(storage, cache));
 
             init_link_service(service);
+
+            // Initialize ConfigService for config command tests
+            let config_service =
+                Arc::new(ConfigService::new().expect("Failed to create ConfigService"));
+            init_config_service(config_service);
 
             // Store TempDir in static to keep it alive
             let _ = IPC_TEST_DIR.set(temp_dir);
@@ -494,5 +511,258 @@ async fn test_get_stats_command() {
             assert!(total_clicks >= 0);
         }
         other => panic!("Expected StatsResult, got {:?}", other),
+    }
+}
+
+// =============================================================================
+// Config Management Tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_config_list_command() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigList { category: None }).await;
+
+    match resp {
+        IpcResponse::ConfigListResult { configs } => {
+            assert!(!configs.is_empty(), "Should return at least one config");
+            // Verify each config has required fields
+            for cfg in &configs {
+                assert!(!cfg.key.is_empty());
+                assert!(!cfg.category.is_empty());
+            }
+        }
+        other => panic!("Expected ConfigListResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_list_with_category_filter() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigList {
+        category: Some("features".to_string()),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigListResult { configs } => {
+            for cfg in &configs {
+                assert_eq!(cfg.category, "features");
+            }
+        }
+        other => panic!("Expected ConfigListResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_get_existing_key() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigGet {
+        key: "features.random_code_length".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigGetResult { config } => {
+            assert_eq!(config.key, "features.random_code_length");
+            assert_eq!(config.category, "features");
+            assert!(!config.sensitive);
+        }
+        other => panic!("Expected ConfigGetResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_get_unknown_key() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigGet {
+        key: "nonexistent.key.here".to_string(),
+    })
+    .await;
+
+    assert!(
+        matches!(resp, IpcResponse::Error { .. }),
+        "Expected Error for unknown key, got {:?}",
+        resp
+    );
+}
+
+#[tokio::test]
+async fn test_config_set_valid() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "features.random_code_length".to_string(),
+        value: "8".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigSetResult {
+            key,
+            requires_restart,
+            is_sensitive,
+            ..
+        } => {
+            assert_eq!(key, "features.random_code_length");
+            assert!(!requires_restart);
+            assert!(!is_sensitive);
+        }
+        other => panic!("Expected ConfigSetResult, got {:?}", other),
+    }
+
+    // Verify the value was actually set
+    let resp = handle_command(IpcCommand::ConfigGet {
+        key: "features.random_code_length".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigGetResult { config } => {
+            assert_eq!(config.value, "8");
+        }
+        other => panic!("Expected ConfigGetResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_set_unknown_key() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "nonexistent.key".to_string(),
+        value: "value".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::Error { code, .. } => {
+            assert_eq!(code, "CONFIG_NOT_FOUND");
+        }
+        other => panic!("Expected Error, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_set_invalid_value() {
+    setup_ipc_handler().await;
+
+    // cookie_same_site is an enum type, "invalid" is not a valid option
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "api.cookie_same_site".to_string(),
+        value: "invalid_value".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::Error { code, .. } => {
+            assert_eq!(code, "CONFIG_INVALID_VALUE");
+        }
+        other => panic!("Expected Error for invalid value, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_reset_command() {
+    setup_ipc_handler().await;
+
+    // First set a non-default value
+    handle_command(IpcCommand::ConfigSet {
+        key: "features.random_code_length".to_string(),
+        value: "10".to_string(),
+    })
+    .await;
+
+    // Reset to default
+    let resp = handle_command(IpcCommand::ConfigReset {
+        key: "features.random_code_length".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigResetResult {
+            key,
+            requires_restart,
+            ..
+        } => {
+            assert_eq!(key, "features.random_code_length");
+            assert!(!requires_restart);
+        }
+        other => panic!("Expected ConfigResetResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_reset_unknown_key() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigReset {
+        key: "nonexistent.key".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::Error { code, .. } => {
+            assert_eq!(code, "CONFIG_NOT_FOUND");
+        }
+        other => panic!("Expected Error, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_import_command() {
+    setup_ipc_handler().await;
+
+    let configs = vec![
+        ConfigImportItem {
+            key: "features.random_code_length".to_string(),
+            value: "7".to_string(),
+        },
+        ConfigImportItem {
+            key: "nonexistent.key".to_string(),
+            value: "ignored".to_string(),
+        },
+    ];
+
+    let resp = handle_command(IpcCommand::ConfigImport { configs }).await;
+
+    match resp {
+        IpcResponse::ConfigImportResult {
+            success,
+            skipped,
+            failed,
+            errors,
+        } => {
+            assert_eq!(success, 1);
+            assert_eq!(skipped, 1); // unknown key skipped
+            assert_eq!(failed, 0);
+            assert!(!errors.is_empty());
+        }
+        other => panic!("Expected ConfigImportResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_import_empty() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigImport { configs: vec![] }).await;
+
+    match resp {
+        IpcResponse::ConfigImportResult {
+            success,
+            skipped,
+            failed,
+            ..
+        } => {
+            assert_eq!(success, 0);
+            assert_eq!(skipped, 0);
+            assert_eq!(failed, 0);
+        }
+        other => panic!("Expected ConfigImportResult, got {:?}", other),
     }
 }

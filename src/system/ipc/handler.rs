@@ -7,10 +7,10 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
-use super::types::{ImportLinkData, IpcCommand, IpcResponse, ShortLinkData};
+use super::types::{ConfigItemData, ImportLinkData, IpcCommand, IpcResponse, ShortLinkData};
 use crate::errors::ShortlinkerError;
 use crate::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
+    ConfigService, CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, ShortLink};
 use crate::system::reload::get_reload_coordinator;
@@ -20,6 +20,9 @@ static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 /// LinkService instance for IPC handler
 static LINK_SERVICE: OnceLock<Arc<LinkService>> = OnceLock::new();
+
+/// ConfigService instance for IPC handler
+static CONFIG_SERVICE: OnceLock<Arc<ConfigService>> = OnceLock::new();
 
 /// Initialize the server start time
 ///
@@ -34,6 +37,14 @@ pub fn init_start_time() {
 pub fn init_link_service(service: Arc<LinkService>) {
     let _ = LINK_SERVICE.set(service);
     debug!("IPC handler LinkService initialized");
+}
+
+/// Initialize ConfigService for IPC handler
+///
+/// Should be called once during server startup, after RuntimeConfig is initialized.
+pub fn init_config_service(service: Arc<ConfigService>) {
+    let _ = CONFIG_SERVICE.set(service);
+    debug!("IPC handler ConfigService initialized");
 }
 
 /// Get server uptime in seconds
@@ -176,6 +187,17 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
         IpcCommand::ExportLinks => handle_export_links().await,
 
         IpcCommand::GetLinkStats => handle_get_stats().await,
+
+        // ============ Config Management Commands ============
+        IpcCommand::ConfigList { category } => handle_config_list(category).await,
+
+        IpcCommand::ConfigGet { key } => handle_config_get(key).await,
+
+        IpcCommand::ConfigSet { key, value } => handle_config_set(key, value).await,
+
+        IpcCommand::ConfigReset { key } => handle_config_reset(key).await,
+
+        IpcCommand::ConfigImport { configs } => handle_config_import(configs).await,
     }
 }
 
@@ -362,5 +384,229 @@ async fn handle_get_stats() -> IpcResponse {
             active_links: stats.active_links,
         },
         Err(e) => error_response(e),
+    }
+}
+
+// ============ Config Management Handlers ============
+
+use crate::config::definitions::get_def;
+use crate::config::schema::get_schema;
+use crate::config::validators;
+use crate::services::ConfigItemView;
+
+/// Build ConfigItemData from a ConfigItemView by enriching with definition metadata
+fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
+    let def = get_def(&view.key);
+    let schema = get_schema(&view.key);
+
+    let enum_options = schema.and_then(|s| {
+        s.enum_options
+            .map(|opts| opts.into_iter().map(|o| o.value).collect())
+    });
+
+    ConfigItemData {
+        key: view.key.clone(),
+        value: view.value,
+        category: def.map(|d| d.category.to_string()).unwrap_or_default(),
+        value_type: format!("{}", view.value_type),
+        default_value: def.map(|d| (d.default_fn)()).unwrap_or_default(),
+        requires_restart: view.requires_restart,
+        editable: def.map(|d| d.editable).unwrap_or(false),
+        sensitive: view.is_sensitive,
+        description: def.map(|d| d.description.to_string()).unwrap_or_default(),
+        enum_options,
+        updated_at: view.updated_at.to_rfc3339(),
+    }
+}
+
+async fn handle_config_list(category: Option<String>) -> IpcResponse {
+    let Some(service) = CONFIG_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ));
+    };
+
+    let all = service.get_all();
+    let configs: Vec<ConfigItemData> = all
+        .into_iter()
+        .filter(|item| {
+            if let Some(ref cat) = category {
+                get_def(&item.key)
+                    .map(|d| d.category == cat.as_str())
+                    .unwrap_or(false)
+            } else {
+                true
+            }
+        })
+        .map(to_config_item_data)
+        .collect();
+
+    IpcResponse::ConfigListResult { configs }
+}
+
+async fn handle_config_get(key: String) -> IpcResponse {
+    let Some(service) = CONFIG_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ));
+    };
+
+    match service.get(&key) {
+        Ok(view) => IpcResponse::ConfigGetResult {
+            config: to_config_item_data(view),
+        },
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_set(key: String, value: String) -> IpcResponse {
+    let Some(service) = CONFIG_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ));
+    };
+
+    // Validate key exists and is editable
+    let def = match get_def(&key) {
+        Some(d) => d,
+        None => {
+            return IpcResponse::Error {
+                code: "CONFIG_NOT_FOUND".to_string(),
+                message: format!("Unknown configuration key: '{}'", key),
+            };
+        }
+    };
+
+    if !def.editable {
+        return IpcResponse::Error {
+            code: "CONFIG_READONLY".to_string(),
+            message: format!("Configuration '{}' is read-only", key),
+        };
+    }
+
+    // Validate value
+    if let Err(e) = validators::validate_config_value(&key, &value) {
+        return IpcResponse::Error {
+            code: "CONFIG_INVALID_VALUE".to_string(),
+            message: format!("Invalid value for '{}': {}", key, e),
+        };
+    }
+
+    match service.update(&key, &value).await {
+        Ok(view) => {
+            info!("Config '{}' updated via IPC", key);
+            IpcResponse::ConfigSetResult {
+                key: view.key,
+                value: view.value,
+                requires_restart: view.requires_restart,
+                is_sensitive: view.is_sensitive,
+                old_value: None, // ConfigService doesn't expose old value
+                message: view.message,
+            }
+        }
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_reset(key: String) -> IpcResponse {
+    let Some(service) = CONFIG_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ));
+    };
+
+    let def = match get_def(&key) {
+        Some(d) => d,
+        None => {
+            return IpcResponse::Error {
+                code: "CONFIG_NOT_FOUND".to_string(),
+                message: format!("Unknown configuration key: '{}'", key),
+            };
+        }
+    };
+
+    if !def.editable {
+        return IpcResponse::Error {
+            code: "CONFIG_READONLY".to_string(),
+            message: format!("Configuration '{}' is read-only", key),
+        };
+    }
+
+    let default_value = (def.default_fn)();
+
+    match service.update(&key, &default_value).await {
+        Ok(view) => {
+            info!("Config '{}' reset to default via IPC", key);
+            IpcResponse::ConfigResetResult {
+                key: view.key,
+                value: view.value,
+                requires_restart: view.requires_restart,
+                is_sensitive: view.is_sensitive,
+                message: view.message,
+            }
+        }
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> IpcResponse {
+    let Some(service) = CONFIG_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ));
+    };
+
+    let mut success = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+    let mut errors = Vec::new();
+
+    for item in &configs {
+        // Validate key
+        let def = match get_def(&item.key) {
+            Some(d) => d,
+            None => {
+                skipped += 1;
+                errors.push(format!("{}: unknown key", item.key));
+                continue;
+            }
+        };
+
+        if !def.editable {
+            skipped += 1;
+            errors.push(format!("{}: read-only", item.key));
+            continue;
+        }
+
+        // Validate value
+        if let Err(e) = validators::validate_config_value(&item.key, &item.value) {
+            failed += 1;
+            errors.push(format!("{}: {}", item.key, e));
+            continue;
+        }
+
+        match service.update(&item.key, &item.value).await {
+            Ok(_) => {
+                success += 1;
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: {}", item.key, e));
+            }
+        }
+    }
+
+    if success > 0 {
+        info!(
+            "Config import via IPC: {} success, {} skipped, {} failed",
+            success, skipped, failed
+        );
+    }
+
+    IpcResponse::ConfigImportResult {
+        success,
+        skipped,
+        failed,
+        errors,
     }
 }

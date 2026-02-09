@@ -31,6 +31,29 @@ pub struct ImportLinkData {
     pub password: Option<String>,
 }
 
+/// Config item data for IPC transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigItemData {
+    pub key: String,
+    pub value: String,
+    pub category: String,
+    pub value_type: String,
+    pub default_value: String,
+    pub requires_restart: bool,
+    pub editable: bool,
+    pub sensitive: bool,
+    pub description: String,
+    pub enum_options: Option<Vec<String>>,
+    pub updated_at: String,
+}
+
+/// Config import item for batch import
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigImportItem {
+    pub key: String,
+    pub value: String,
+}
+
 /// IPC commands sent from client to server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcCommand {
@@ -88,6 +111,22 @@ pub enum IpcCommand {
 
     /// Get link statistics
     GetLinkStats,
+
+    // ============ Config Management Commands ============
+    /// List all configurations
+    ConfigList { category: Option<String> },
+
+    /// Get a single configuration
+    ConfigGet { key: String },
+
+    /// Set a configuration value
+    ConfigSet { key: String, value: String },
+
+    /// Reset a configuration to default
+    ConfigReset { key: String },
+
+    /// Batch import configurations
+    ConfigImport { configs: Vec<ConfigImportItem> },
 }
 
 /// IPC responses sent from server to client
@@ -181,6 +220,40 @@ pub enum IpcResponse {
         total_links: usize,
         total_clicks: i64,
         active_links: usize,
+    },
+
+    // ============ Config Management Responses ============
+    /// Config list result
+    ConfigListResult { configs: Vec<ConfigItemData> },
+
+    /// Config get result
+    ConfigGetResult { config: ConfigItemData },
+
+    /// Config set result
+    ConfigSetResult {
+        key: String,
+        value: String,
+        requires_restart: bool,
+        is_sensitive: bool,
+        old_value: Option<String>,
+        message: Option<String>,
+    },
+
+    /// Config reset result
+    ConfigResetResult {
+        key: String,
+        value: String,
+        requires_restart: bool,
+        is_sensitive: bool,
+        message: Option<String>,
+    },
+
+    /// Config import result
+    ConfigImportResult {
+        success: usize,
+        skipped: usize,
+        failed: usize,
+        errors: Vec<String>,
     },
 }
 
@@ -380,5 +453,123 @@ mod tests {
         let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.code, "test");
         assert_eq!(decoded.password, Some("secret".into()));
+    }
+
+    #[test]
+    fn test_config_item_data_serialization() {
+        let data = ConfigItemData {
+            key: "auth.admin_token".into(),
+            value: "[REDACTED]".into(),
+            category: "auth".into(),
+            value_type: "string".into(),
+            default_value: "".into(),
+            requires_restart: false,
+            editable: true,
+            sensitive: true,
+            description: "Admin token".into(),
+            enum_options: None,
+            updated_at: "2025-01-01T00:00:00Z".into(),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let decoded: ConfigItemData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.key, "auth.admin_token");
+        assert!(decoded.sensitive);
+        assert!(decoded.enum_options.is_none());
+    }
+
+    #[test]
+    fn test_config_import_item_serialization() {
+        let item = ConfigImportItem {
+            key: "features.random_code_length".into(),
+            value: "8".into(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let decoded: ConfigImportItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.key, "features.random_code_length");
+        assert_eq!(decoded.value, "8");
+    }
+
+    #[test]
+    fn test_config_command_serialization() {
+        // ConfigList
+        let cmd = IpcCommand::ConfigList {
+            category: Some("auth".into()),
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
+        if let IpcCommand::ConfigList { category } = decoded {
+            assert_eq!(category, Some("auth".into()));
+        } else {
+            panic!("Expected ConfigList");
+        }
+
+        // ConfigSet
+        let cmd = IpcCommand::ConfigSet {
+            key: "features.random_code_length".into(),
+            value: "8".into(),
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
+        if let IpcCommand::ConfigSet { key, value } = decoded {
+            assert_eq!(key, "features.random_code_length");
+            assert_eq!(value, "8");
+        } else {
+            panic!("Expected ConfigSet");
+        }
+
+        // ConfigImport
+        let cmd = IpcCommand::ConfigImport {
+            configs: vec![ConfigImportItem {
+                key: "k".into(),
+                value: "v".into(),
+            }],
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
+        if let IpcCommand::ConfigImport { configs } = decoded {
+            assert_eq!(configs.len(), 1);
+        } else {
+            panic!("Expected ConfigImport");
+        }
+    }
+
+    #[test]
+    fn test_config_response_serialization() {
+        // ConfigSetResult
+        let resp = IpcResponse::ConfigSetResult {
+            key: "k".into(),
+            value: "v".into(),
+            requires_restart: false,
+            is_sensitive: false,
+            old_value: Some("old".into()),
+            message: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
+        if let IpcResponse::ConfigSetResult { key, old_value, .. } = decoded {
+            assert_eq!(key, "k");
+            assert_eq!(old_value, Some("old".into()));
+        } else {
+            panic!("Expected ConfigSetResult");
+        }
+
+        // ConfigImportResult
+        let resp = IpcResponse::ConfigImportResult {
+            success: 5,
+            skipped: 1,
+            failed: 0,
+            errors: vec![],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
+        if let IpcResponse::ConfigImportResult {
+            success, skipped, ..
+        } = decoded
+        {
+            assert_eq!(success, 5);
+            assert_eq!(skipped, 1);
+        } else {
+            panic!("Expected ConfigImportResult");
+        }
     }
 }

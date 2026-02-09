@@ -4,11 +4,53 @@ use super::helpers::notify_config_change;
 use crate::config::definitions::get_def;
 use crate::interfaces::cli::CliError;
 use crate::storage::ConfigStore;
+use crate::try_ipc_or_fallback;
 use colored::Colorize;
 use sea_orm::DatabaseConnection;
 
-/// Reset a configuration to its default value
+/// Reset a configuration to its default value (IPC-first with direct-DB fallback)
 pub async fn config_reset(db: DatabaseConnection, key: String) -> Result<(), CliError> {
+    try_ipc_or_fallback!(
+        crate::system::ipc::config_reset(key.clone()),
+        IpcResponse::ConfigResetResult {
+            key,
+            value,
+            requires_restart,
+            is_sensitive,
+            message,
+        } => {
+            // Print result
+            println!(
+                "{} Reset configuration to default: {} = {}",
+                "✓".bold().green(),
+                key.cyan(),
+                if is_sensitive {
+                    "*****".to_string()
+                } else {
+                    value
+                }
+            );
+
+            if requires_restart {
+                println!(
+                    "{} This configuration requires a restart to take effect.",
+                    "⚠".bold().yellow()
+                );
+            }
+
+            if let Some(msg) = message {
+                println!("{} {}", "ℹ".bold().blue(), msg);
+            }
+
+            // Server already handled reload, no need to call notify_config_change
+            return Ok(());
+        },
+        @fallback config_reset_direct(db, key).await
+    )
+}
+
+/// Direct database operation (fallback when server is not running)
+async fn config_reset_direct(db: DatabaseConnection, key: String) -> Result<(), CliError> {
     // Validate key exists
     let def = get_def(&key).ok_or_else(|| {
         CliError::CommandError(format!(
