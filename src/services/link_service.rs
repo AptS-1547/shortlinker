@@ -3,10 +3,13 @@
 //! Provides unified business logic for link operations, shared between
 //! IPC handlers and HTTP handlers.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use tracing::{error, info};
+use ts_rs::TS;
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::config::{get_config, keys, try_get_runtime_config};
@@ -64,7 +67,9 @@ pub struct ImportLinkItem {
 }
 
 /// Import conflict resolution mode
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[serde(rename_all = "lowercase")]
 pub enum ImportMode {
     /// Skip existing links
     #[default]
@@ -546,6 +551,154 @@ impl LinkService {
         let links: Vec<ShortLink> = links_map.into_values().collect();
         info!("LinkService: exported {} links", links.len());
         Ok(links)
+    }
+
+    /// 批量导入链接（带 Bloom filter 优化）
+    ///
+    /// 相比现有 `import_links()`，增加 Bloom filter 预筛选：
+    /// - Skip/Error 模式：使用 Bloom 预筛选 + 精确查询（减少 DB 查询）
+    /// - Overwrite 模式：跳过 Bloom，直接批量插入
+    pub async fn import_links_with_bloom(
+        &self,
+        links: Vec<ImportLinkItem>,
+        mode: ImportMode,
+    ) -> Result<ImportResult, ShortlinkerError> {
+        let mut result = ImportResult::default();
+
+        // Step 1: 验证 URL 并收集 codes
+        let mut valid_items = Vec::new();
+        let mut codes_to_check = Vec::new();
+
+        for item in links {
+            if let Err(e) = validate_url(&item.target) {
+                result.failed += 1;
+                result.errors.push(ImportError {
+                    code: item.code,
+                    message: e.to_string(),
+                });
+                continue;
+            }
+            codes_to_check.push(item.code.clone());
+            valid_items.push(item);
+        }
+
+        // Step 2: 冲突检测（Bloom 优化）
+        let existing_codes: HashSet<String> = match mode {
+            ImportMode::Overwrite => HashSet::new(),
+            ImportMode::Skip | ImportMode::Error => {
+                // Bloom Filter 预筛选：false = 一定不存在，跳过 DB 查询
+                let mut maybe_exist = Vec::new();
+                for code in &codes_to_check {
+                    if self.cache.bloom_check(code).await {
+                        maybe_exist.push(code.clone());
+                    }
+                }
+
+                // 只对 Bloom 返回"可能存在"的 codes 精确查询
+                if maybe_exist.is_empty() {
+                    HashSet::new()
+                } else {
+                    self.storage
+                        .batch_check_codes_exist(&maybe_exist)
+                        .await
+                        .map_err(|e| {
+                            ShortlinkerError::database_operation(format!(
+                                "Failed to check existing codes: {}",
+                                e
+                            ))
+                        })?
+                }
+            }
+        };
+
+        // Step 3: 处理每个 item
+        let mut links_to_insert = Vec::new();
+        let mut processed_codes = HashSet::new();
+
+        for item in valid_items {
+            let exists =
+                existing_codes.contains(&item.code) || processed_codes.contains(&item.code);
+
+            if exists {
+                match mode {
+                    ImportMode::Skip => {
+                        result.skipped += 1;
+                        continue;
+                    }
+                    ImportMode::Error => {
+                        result.failed += 1;
+                        result.errors.push(ImportError {
+                            code: item.code,
+                            message: "Already exists".to_string(),
+                        });
+                        continue;
+                    }
+                    ImportMode::Overwrite => {
+                        // 继续处理
+                    }
+                }
+            }
+
+            // 解析 expires_at
+            let expires_at = match self.parse_expires_at(item.expires_at.as_deref()) {
+                Ok(dt) => dt,
+                Err(e) => {
+                    result.failed += 1;
+                    result.errors.push(ImportError {
+                        code: item.code,
+                        message: e.to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            // 处理密码
+            let password = match process_imported_password(item.password.as_deref()) {
+                Ok(pwd) => pwd,
+                Err(_) => {
+                    result.failed += 1;
+                    result.errors.push(ImportError {
+                        code: item.code,
+                        message: "Failed to hash password".to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            let new_link = ShortLink {
+                code: item.code.clone(),
+                target: item.target,
+                created_at: Utc::now(),
+                expires_at,
+                password,
+                click: 0,
+            };
+
+            processed_codes.insert(item.code.clone());
+            links_to_insert.push(new_link);
+        }
+
+        // Step 4: 批量插入 + 缓存更新
+        if !links_to_insert.is_empty() {
+            self.storage
+                .batch_set(links_to_insert.clone())
+                .await
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("Failed to batch insert: {}", e))
+                })?;
+
+            for link in &links_to_insert {
+                self.update_cache(link).await;
+            }
+            result.success = links_to_insert.len();
+        }
+
+        info!(
+            "LinkService: imported {} links, {} skipped, {} failed",
+            result.success, result.skipped, result.failed
+        );
+
+        Ok(result)
     }
 
     /// Batch create links

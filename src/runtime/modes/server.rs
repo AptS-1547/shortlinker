@@ -263,6 +263,16 @@ pub async fn run_server() -> Result<()> {
             .wrap(RequestIdMiddleware) // 为每个请求生成 request_id
             .wrap(Condition::new(cors_enabled, cors))
             .wrap(Compress::default())
+            // 依赖注入：同时注入 storage 和 services
+            //
+            // 设计原则：
+            // - 默认路径：Handler → Service → Storage
+            // - 例外路径：Handler → Storage（需文档化理由）
+            //
+            // 合理的例外场景：
+            // 1. 流式操作（export）：Storage 层已优化，Service 封装无价值
+            // 2. 热路径（redirect）：性能关键，避免额外抽象开销
+            // 3. 基础设施（health）：简单直接，快速响应
             .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(link_service.clone()))

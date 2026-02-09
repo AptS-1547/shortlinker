@@ -363,6 +363,12 @@ pub async fn get_device_stats(
 const EXPORT_BATCH_SIZE: u64 = 10000;
 
 /// GET /admin/v1/analytics/export - 导出报告（流式响应）
+///
+/// 注意：此 handler 直接调用 storage.stream_click_logs_cursor()，
+/// 这是合理的例外，因为：
+/// 1. 流式操作的性能优化在 Storage 层完成
+/// 2. Service 层封装流式方法只是简单转发，无业务价值
+/// 3. 对于小数据量场景，可使用 AnalyticsService::export_click_logs()
 pub async fn export_report(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,

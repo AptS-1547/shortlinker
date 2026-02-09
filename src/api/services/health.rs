@@ -20,6 +20,13 @@ pub struct AppStartTime {
     pub start_datetime: chrono::DateTime<chrono::Utc>,
 }
 
+/// Health Service
+///
+/// 注意：此 service 直接调用 storage 方法，不通过 LinkService。
+/// 这是合理的例外，因为：
+/// 1. 基础设施，需要简单直接（k8s probes 要求快速响应）
+/// 2. Storage 层方法已足够语义化（count, get_backend_config）
+/// 3. 健康检查不应依赖复杂的业务逻辑
 pub struct HealthService;
 
 impl HealthService {

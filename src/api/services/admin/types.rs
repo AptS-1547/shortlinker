@@ -279,16 +279,8 @@ pub struct ExportQuery {
     pub only_active: Option<bool>,
 }
 
-/// 导入模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
-#[serde(rename_all = "lowercase")]
-pub enum ImportMode {
-    #[default]
-    Skip, // 跳过已存在的
-    Overwrite, // 覆盖已存在的
-    Error,     // 遇到已存在的报错
-}
+// Re-export ImportMode from services layer for consistency
+pub use crate::services::ImportMode;
 
 /// 导入失败项
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]

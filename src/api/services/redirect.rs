@@ -17,6 +17,13 @@ use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::ip::extract_client_ip;
 use crate::utils::is_valid_short_code;
 
+/// Redirect Service
+///
+/// 注意：此 service 直接操作 cache 和 storage，不通过 LinkService。
+/// 这是合理的例外，因为：
+/// 1. 热路径，性能关键（每秒数千次请求）
+/// 2. 逻辑已高度优化（Bloom → Negative → Object → DB）
+/// 3. Service 层封装会增加函数调用开销，难以内联优化
 pub struct RedirectService {}
 
 impl RedirectService {
