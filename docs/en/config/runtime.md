@@ -125,7 +125,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `analytics.enable_auto_rollup` | Boolean | `true` | Yes | Enable automatic data retention / rollup-table cleanup task (runs every 4 hours by default) |
 | `analytics.log_retention_days` | Integer | `30` | No | Raw click log retention in days (cleaned by the background task; requires `analytics.enable_auto_rollup`) |
 | `analytics.hourly_retention_days` | Integer | `7` | No | Hourly rollup retention in days (cleans `click_stats_hourly` / `click_stats_global_hourly`; requires `analytics.enable_auto_rollup`) |
-| `analytics.daily_retention_days` | Integer | `365` | No | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
+| `analytics.daily_retention_days` | Integer | `365` | No | Daily rollup retention in days (cleans `click_stats_daily` / `click_stats_global_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | Boolean | `true` | No | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | Boolean | `false` | No | Reserved GeoIP switch (currently not consumed in click-write path; `country/city` remain null by default) |
 | `analytics.sample_rate` | Float | `1.0` | No | Detailed logging sample rate (0.0-1.0; 1.0 = log all clicks, 0.1 = log ~10% of clicks) |

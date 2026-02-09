@@ -247,7 +247,7 @@ These runtime config options control Analytics behavior:
 | `analytics.enable_auto_rollup` | bool | true | Enable automatic data retention task (restart required; runs every 4 hours by default) |
 | `analytics.log_retention_days` | int | 30 | Raw click log retention in days (cleaned by background task; requires `analytics.enable_auto_rollup`) |
 | `analytics.hourly_retention_days` | int | 7 | Hourly rollup retention in days (cleans `click_stats_hourly` / `click_stats_global_hourly`; requires `analytics.enable_auto_rollup`) |
-| `analytics.daily_retention_days` | int | 365 | Daily rollup retention in days (cleans `click_stats_daily`; requires `analytics.enable_auto_rollup`) |
+| `analytics.daily_retention_days` | int | 365 | Daily rollup retention in days (cleans `click_stats_daily` / `click_stats_global_daily`; requires `analytics.enable_auto_rollup`) |
 | `analytics.enable_ip_logging` | bool | true | Whether to record IP addresses |
 | `analytics.enable_geo_lookup` | bool | false | Reserved GeoIP switch (currently not consumed in click-write path; `country/city` remain null by default) |
 | `analytics.sample_rate` | float | 1.0 | Detailed logging sample rate (0.0-1.0; 1.0 = log all clicks) |

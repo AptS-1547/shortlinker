@@ -247,7 +247,7 @@ curl -sS -b cookies.txt \
 | `analytics.enable_auto_rollup` | bool | true | 启用自动数据清理任务（需要重启生效；默认每 4 小时运行一次） |
 | `analytics.log_retention_days` | int | 30 | 原始点击日志保留天数（由后台任务自动清理；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.hourly_retention_days` | int | 7 | 小时汇总保留天数（清理 `click_stats_hourly` / `click_stats_global_hourly`；需要启用 `analytics.enable_auto_rollup`） |
-| `analytics.daily_retention_days` | int | 365 | 天汇总保留天数（清理 `click_stats_daily`；需要启用 `analytics.enable_auto_rollup`） |
+| `analytics.daily_retention_days` | int | 365 | 天汇总保留天数（清理 `click_stats_daily` / `click_stats_global_daily`；需要启用 `analytics.enable_auto_rollup`） |
 | `analytics.enable_ip_logging` | bool | true | 是否记录 IP 地址 |
 | `analytics.enable_geo_lookup` | bool | false | GeoIP 预留开关（当前版本点击写入链路尚未消费该配置，`country/city` 默认空） |
 | `analytics.sample_rate` | float | 1.0 | 详细日志采样率（0.0-1.0；1.0=全量记录） |
