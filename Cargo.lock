@@ -4587,7 +4587,7 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
- "winapi",
+ "windows-sys 0.61.2",
  "woothee",
  "xxhash-rust",
 ]

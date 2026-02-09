@@ -1,7 +1,9 @@
 //! Windows Named Pipe IPC implementation
 //!
 //! Uses Named Pipes for IPC on Windows systems.
+//! Named pipes are created with owner-only ACL (equivalent to Unix 0o600).
 
+use std::ffi::c_void;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -12,6 +14,70 @@ use tokio::net::windows::named_pipe::{
 
 use super::IpcPlatform;
 use crate::config::get_config;
+
+/// RAII guard for security descriptor allocated via SDDL.
+/// Ensures `LocalFree` is called when the guard is dropped.
+struct SecurityDescriptorGuard {
+    sd: *mut c_void,
+}
+
+impl Drop for SecurityDescriptorGuard {
+    fn drop(&mut self) {
+        if !self.sd.is_null() {
+            unsafe {
+                windows_sys::Win32::Foundation::LocalFree(self.sd);
+            }
+        }
+    }
+}
+
+/// Create a Named Pipe with owner-only ACL.
+///
+/// Uses SDDL string `"D:(A;;GA;;;OW)"` to restrict access to the pipe owner,
+/// equivalent to Unix file permission `0o600`.
+fn create_pipe_with_acl(pipe_name: &str, first_instance: bool) -> io::Result<NamedPipeServer> {
+    use windows_sys::Win32::Security::Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW;
+    use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+
+    // SDDL: Only Owner has GENERIC_ALL access
+    let sddl: Vec<u16> = "D:(A;;GA;;;OW)\0".encode_utf16().collect();
+
+    let mut sd_ptr: *mut c_void = std::ptr::null_mut();
+
+    let ret = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            1, // SDDL_REVISION_1
+            &mut sd_ptr,
+            std::ptr::null_mut(),
+        )
+    };
+
+    if ret == 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    let _guard = SecurityDescriptorGuard { sd: sd_ptr };
+
+    let mut sa = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: sd_ptr,
+        bInheritHandle: 0,
+    };
+
+    let server = unsafe {
+        ServerOptions::new()
+            .first_pipe_instance(first_instance)
+            .create_with_security_attributes_raw(
+                pipe_name,
+                &mut sa as *mut SECURITY_ATTRIBUTES as *mut c_void,
+            )?
+    };
+
+    tracing::debug!("Named pipe created with owner-only ACL (SDDL: D:(A;;GA;;;OW))");
+
+    Ok(server)
+}
 
 /// Windows IPC implementation using Named Pipes
 pub struct WindowsIpc;
@@ -96,9 +162,7 @@ impl IpcPlatform for WindowsIpc {
 
     async fn bind() -> io::Result<Self::Listener> {
         let pipe_name = Self::socket_path();
-        let server = ServerOptions::new()
-            .first_pipe_instance(true)
-            .create(&pipe_name)?;
+        let server = create_pipe_with_acl(&pipe_name, true)?;
 
         Ok(PipeListener {
             server: Some(server),
@@ -116,9 +180,7 @@ impl IpcPlatform for WindowsIpc {
 
         // Create a new server instance for the next connection
         let pipe_name = Self::socket_path();
-        let next_server = ServerOptions::new()
-            .first_pipe_instance(false)
-            .create(&pipe_name)?;
+        let next_server = create_pipe_with_acl(&pipe_name, false)?;
         listener.server = Some(next_server);
 
         // Return the connected stream

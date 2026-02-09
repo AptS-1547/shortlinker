@@ -66,7 +66,7 @@ fn atty_check() -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::io::AsRawHandle;
-        use winapi::um::consoleapi::GetConsoleMode;
+        use windows_sys::Win32::System::Console::GetConsoleMode;
         let handle = io::stdin().as_raw_handle();
         let mut mode = 0;
         unsafe { GetConsoleMode(handle as *mut _, &mut mode) != 0 }
