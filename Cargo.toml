@@ -91,7 +91,7 @@ arboard = { version = "3.6", optional = true }
 nucleo-matcher = { version = "0.3", optional = true }
 prometheus = { version = "0.14", optional = true, default-features = false }
 sysinfo = { version = "0.38", optional = true, default-features = false, features = ["system"] }
-sea-orm = { version = "2.0.0-rc.30", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
+sea-orm = { version = "2.0.0-rc.31", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 arc-swap = "1"
 parking_lot = "0.12"

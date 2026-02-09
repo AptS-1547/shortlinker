@@ -1,31 +1,30 @@
 //! HTTP timing middleware
 //!
-//! Records HTTP request duration, request count, and active connections.
-//! Only active when the `metrics` feature is enabled.
+//! Records HTTP request duration, request count, and active connections
+//! via the `MetricsRecorder` trait (noop when metrics feature is disabled).
 
 use actix_service::{Service, Transform};
 use actix_web::{
     Error,
     dev::{ServiceRequest, ServiceResponse},
+    web,
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Instant;
 
-#[cfg(feature = "metrics")]
-use crate::metrics::get_metrics;
+use crate::metrics_core::MetricsRecorder;
 
 /// Drop guard that decrements active connections when dropped.
 /// Ensures `dec()` runs even if the future panics.
-#[cfg(feature = "metrics")]
-struct ActiveConnectionGuard;
+struct ActiveConnectionGuard {
+    metrics: Arc<dyn MetricsRecorder>,
+}
 
-#[cfg(feature = "metrics")]
 impl Drop for ActiveConnectionGuard {
     fn drop(&mut self) {
-        if let Some(m) = get_metrics() {
-            m.http_active_connections.dec();
-        }
+        self.metrics.dec_active_connections();
     }
 }
 
@@ -76,41 +75,32 @@ where
         let start = Instant::now();
 
         // Extract method and endpoint for labels (avoid String allocation)
-        #[cfg(feature = "metrics")]
         let method = method_str(req.method());
-        #[cfg(feature = "metrics")]
         let endpoint = classify_endpoint(req.path());
+
+        // Extract metrics from app data
+        let metrics: Arc<dyn MetricsRecorder> = req
+            .app_data::<web::Data<Arc<dyn MetricsRecorder>>>()
+            .map(|d| d.get_ref().clone())
+            .unwrap_or_else(|| crate::metrics_core::NoopMetrics::arc());
 
         Box::pin(async move {
             // Guard ensures dec() runs even on panic
-            #[cfg(feature = "metrics")]
-            if let Some(m) = get_metrics() {
-                m.http_active_connections.inc();
-            }
-            #[cfg(feature = "metrics")]
-            let _guard = ActiveConnectionGuard;
+            metrics.inc_active_connections();
+            let _guard = ActiveConnectionGuard {
+                metrics: metrics.clone(),
+            };
 
             let result = srv.call(req).await;
 
-            #[cfg(feature = "metrics")]
-            if let Some(m) = get_metrics() {
-                let duration = start.elapsed().as_secs_f64();
-                let status = match &result {
-                    Ok(response) => status_str(response.status()),
-                    Err(_) => "500",
-                };
+            let duration = start.elapsed().as_secs_f64();
+            let status = match &result {
+                Ok(response) => status_str(response.status()),
+                Err(_) => "500",
+            };
 
-                m.http_request_duration_seconds
-                    .with_label_values(&[method, endpoint, status])
-                    .observe(duration);
-
-                m.http_requests_total
-                    .with_label_values(&[method, endpoint, status])
-                    .inc();
-            }
-
-            #[cfg(not(feature = "metrics"))]
-            let _ = start; // Suppress unused warning
+            metrics.observe_http_request(method, endpoint, status, duration);
+            metrics.inc_http_request(method, endpoint, status);
 
             result
         })
@@ -118,7 +108,6 @@ where
 }
 
 /// Map HTTP method to a static string (avoids allocation).
-#[cfg(feature = "metrics")]
 fn method_str(method: &actix_web::http::Method) -> &'static str {
     match method.as_str() {
         "GET" => "GET",
@@ -133,7 +122,6 @@ fn method_str(method: &actix_web::http::Method) -> &'static str {
 }
 
 /// Map HTTP status code to a static string (avoids allocation for common codes).
-#[cfg(feature = "metrics")]
 fn status_str(status: actix_web::http::StatusCode) -> &'static str {
     match status.as_u16() {
         200 => "200",
@@ -155,17 +143,14 @@ fn status_str(status: actix_web::http::StatusCode) -> &'static str {
 
 /// Cached route prefixes for endpoint classification.
 /// Initialized once from runtime config (these keys require restart to change).
-#[cfg(feature = "metrics")]
 struct RoutePrefixes {
     admin: String,
     health: String,
     frontend: String,
 }
 
-#[cfg(feature = "metrics")]
 static ROUTE_PREFIXES: std::sync::OnceLock<RoutePrefixes> = std::sync::OnceLock::new();
 
-#[cfg(feature = "metrics")]
 fn get_route_prefixes() -> &'static RoutePrefixes {
     ROUTE_PREFIXES.get_or_init(|| {
         let rt = crate::config::get_runtime_config();
@@ -180,7 +165,6 @@ fn get_route_prefixes() -> &'static RoutePrefixes {
 /// Classify request path into endpoint category
 ///
 /// This prevents label cardinality explosion by grouping paths.
-#[cfg(feature = "metrics")]
 fn classify_endpoint(path: &str) -> &'static str {
     let prefixes = get_route_prefixes();
     if path.starts_with(&prefixes.admin) {

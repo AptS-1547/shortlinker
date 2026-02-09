@@ -15,31 +15,13 @@ impl ClickSink for NoopSink {
     }
 }
 
-/// 空 metrics recorder，用于测试
-#[cfg(feature = "metrics")]
-struct NoopMetrics;
-
-#[cfg(feature = "metrics")]
-impl shortlinker::metrics::MetricsRecorder for NoopMetrics {}
-
 fn create_manager() -> shortlinker::analytics::manager::ClickManager {
-    #[cfg(feature = "metrics")]
-    {
-        shortlinker::analytics::manager::ClickManager::new(
-            Arc::new(NoopSink) as Arc<dyn ClickSink>,
-            Duration::from_secs(3600), // 长间隔，避免自动刷盘
-            usize::MAX,                // 高阈值，避免阈值刷盘
-            Arc::new(NoopMetrics) as Arc<dyn shortlinker::metrics::MetricsRecorder>,
-        )
-    }
-    #[cfg(not(feature = "metrics"))]
-    {
-        shortlinker::analytics::manager::ClickManager::new(
-            Arc::new(NoopSink) as Arc<dyn ClickSink>,
-            Duration::from_secs(3600), // 长间隔，避免自动刷盘
-            usize::MAX,                // 高阈值，避免阈值刷盘
-        )
-    }
+    shortlinker::analytics::manager::ClickManager::new(
+        Arc::new(NoopSink) as Arc<dyn ClickSink>,
+        Duration::from_secs(3600), // 长间隔，避免自动刷盘
+        usize::MAX,                // 高阈值，避免阈值刷盘
+        shortlinker::metrics_core::NoopMetrics::arc(),
+    )
 }
 
 /// 单线程 increment 吞吐量
