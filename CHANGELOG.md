@@ -5,6 +5,137 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.0] - 2026-02-09
+
+### 🎉 Release Highlights
+
+**v0.5.0 正式版发布！** 这是一个里程碑版本，经过 6 个 alpha、2 个 beta、1 个 rc 的迭代打磨，带来了全面的功能增强与架构优化：
+
+- **详细点击分析系统** - GeoIP 地理位置、设备指纹、UTM 来源追踪，支持多维度数据分析
+- **高性能异步架构** - Analytics 事件队列、游标分页导出、缓存原子重建，大幅提升性能
+- **Prometheus 指标导出** - 18 项可观测性指标，涵盖 HTTP、数据库、缓存等维度
+- **运行时配置系统** - 23 项配置支持热更新，无需重启即可调整行为
+- **测试覆盖大幅提升** - 新增 10+ 集成测试模块，覆盖 API、Analytics、IPC、中间件等核心功能
+
+### Added (since v0.4.3)
+
+- **详细点击分析** - 新增 `click_logs` 表和多维度统计
+  - GeoIP 地理位置解析（国家、城市、经纬度）
+  - 设备指纹分析（浏览器、操作系统、设备类型、是否机器人）
+  - UTM 来源追踪（utm_source / ref:domain / direct）
+  - 全局天级汇总统计（`click_stats_global_daily` 表）
+- **点击日志采样控制** - 新增运行时配置
+  - `analytics.sample_rate` - 采样率（0.0-1.0）
+  - `analytics.max_log_rows` - 最大行数限制
+  - `analytics.max_rows_action` - 超限行为（cleanup/stop）
+- **Prometheus 指标系统** - 18 项指标，`/health/metrics` 端点
+  - HTTP 请求延迟直方图、活跃连接数
+  - 数据库查询延迟、缓存命中率
+  - 重定向状态码统计、点击缓冲区大小
+  - 系统运行时间、进程内存、CPU 时间
+- **配置 Action API** - 支持通过 API 执行配置操作
+  - `POST /admin/v1/config/{key}/action` - 执行并返回结果
+  - `POST /admin/v1/config/{key}/execute-and-save` - 执行并保存
+  - 目前支持 `api.jwt_secret` 的 `generate_token` action
+- **IPC 配置化** - 新增 `[ipc]` 配置段
+  - 自定义 socket 路径、超时参数、消息大小限制
+  - CLI 全局 `--socket` 参数覆盖配置
+- **Bloom Filter 定时重建** - `cache.bloom_rebuild_interval` 配置（默认 4 小时）
+- **数据库索引优化** - 新增 4 个复合索引优化分析查询性能
+- **集成测试套件** - 新增 10+ 测试模块（+5283 行）
+  - Admin API、Analytics、Auth、CORS、IPC、Metrics、中间件等
+
+### Improved (since v0.4.3)
+
+- **Analytics 异步处理** - 使用 crossbeam-channel 将详细日志处理移出热路径
+- **缓存原子重建** - Bloom Filter 重建期间零空窗期，增量 buffer 防止并发写入丢失
+- **链接导出游标分页** - 使用 `short_code` 游标替代 OFFSET，大数据量性能提升 10-100 倍
+- **小时汇总批量 Upsert** - 单次数据库交互完成所有汇总写入
+- **Moka 缓存 TTL 抖动** - ±10% 随机抖动避免缓存雪崩
+- **数据库连接池优化** - SQLite 最大连接数 5→10，通用后端 pool_size 10→20
+- **分析查询内存保护** - 时间范围限制 90 天，聚合 key 限制 1000
+- **IPC 服务检测增强** - Ping 验证替代文件存在检查，1 秒超时避免僵死进程
+- **重定向性能优化** - UTM 解析、GeoIP 查询全部移到后台，不阻塞 307 响应
+- **Windows 命名管道安全** - 迁移至 windows-sys，增强安全描述符配置
+
+### Refactored (since v0.4.3)
+
+- **Metrics 系统统一** - 移除大量条件编译，使用 `MetricsRecorder` trait 注入
+  - 新增 `metrics_core.rs` 模块，定义 trait 和 `NoopMetrics`
+  - 所有模块无条件接受 `Arc<dyn MetricsRecorder>`
+- **配置系统重构** - 支持环境变量覆盖和运行时热更新
+  - 23 项运行时配置，涵盖认证、Cookie、功能开关、路由、CORS、追踪等
+  - 配置元信息系统（`definitions.rs`）为 Admin UI 提供 schema
+- **密码处理逻辑分离** - 区分用户输入与导入数据
+  - `process_new_password()` / `process_update_password()` 始终哈希
+  - 新增 `process_imported_password()` 用于 CSV 导入
+- **TUI 状态管理** - 引入 `FormState` 状态机，表单验证逻辑统一
+- **Analytics 模块** - 重构为统一业务逻辑层，支持流式 CSV 导出
+- **移除 JSON 导入支持** - 统一使用 CSV 格式
+- **缓存初始化简化** - `rebuild_all()` 内部自行从数据库流式加载
+
+### Fixed (since v0.4.3)
+
+- **点击刷盘 SQLite 变量限制** - 分批处理，每批最多 400 条记录
+- **关闭时刷盘重试** - 增加 3 次重试机制，每次 30 秒超时
+- **重试逻辑增强** - 新增死锁和锁超时检测（MySQL/PostgreSQL/SQLite）
+
+### Dependencies
+
+- 新增 `crossbeam-channel` 0.5 - Analytics 事件队列
+- 新增 `prometheus` 0.14 - 指标导出（可选 feature）
+- 新增 `sysinfo` 0.38 - 系统指标收集（可选 feature）
+- 新增 `maxminddb` 0.27 - GeoIP 解析
+- 新增 `ureq` 3.2.0 - HTTP 客户端（替换 reqwest）
+- 新增 `woothee` 0.13 - User-Agent 解析
+- 新增 `urlencoding` 2.1.3 - URL 参数解码
+- 升级 `rand` 0.9.2 → 0.10.0
+- 升级 `sea-orm` 2.0.0-rc.30 → 2.0.0-rc.31
+- Windows: 迁移至 `windows-sys` 0.61（移除 `winapi`）
+
+### Docs
+
+- **文档结构重组** - 配置、部署、API 文档拆分为细粒度文件
+  - 配置指南：启动配置、运行时配置、安全实践、示例
+  - 部署指南：Docker/Proxy/Systemd 各拆分为快速入门和运维文档
+  - API 文档：Admin/Health 各拆分为端点详解
+- 新增事件系统文档（为插件化架构做准备）
+- 新增 Prometheus 指标文档
+- 新增 Analytics API 文档
+- 移除 v0.3.x 版本警告通知
+
+### Breaking Changes
+
+- **Admin Token 默认值变更** - 默认为空字符串（原来自动生成），首次启动需运行 `reset-password` 手动设置
+- **CLI 命令变更** - `generate-config` → `config generate`
+- **数据库 Schema 变更** - 新增多个表和字段（自动迁移）
+  - 新增表：`click_logs`、`user_agents`、`click_stats_global_daily`
+  - 新增字段：`click_stats_hourly.source_counts`、`click_stats_daily.top_sources`
+  - 删除字段：`click_logs.user_agent`（改为 hash 引用）
+- **API 响应变化** - `/admin/v1/stats` 的 `referrers` 现在返回 `source`（utm_source / ref:{domain} / direct）
+- **Metrics Feature API 签名变化** - `SeaOrmStorage::new`、`CompositeCache::create`、`ClickManager::new` 需要传入 `metrics` 参数
+- **JWT 配置需重启** - `api.jwt_secret`、`api.access_token_minutes`、`api.refresh_token_days` 现在需要重启生效
+- **缓存 API 变更** - `reconfigure()` 和 `load_bloom()` 合并为 `rebuild_all()`
+- **密码处理 API 变更** - `process_new_password()` 不再接受预哈希值，导入场景使用 `process_imported_password()`
+
+### Migration Notes
+
+**⚠️ 从 v0.4.x 升级注意事项：**
+
+1. **数据库迁移** - 自动运行，新增多个表和索引（首次启动可能需要几秒）
+2. **Admin Token** - 默认为空，需运行 `shortlinker reset-password` 设置密码
+3. **CLI 命令** - `generate-config` 改为 `config generate`
+4. **配置文件** - 建议重新生成配置文件查看新增配置项
+   ```bash
+   shortlinker config generate --force
+   ```
+5. **新增配置项**（可选）：
+   - `cache.bloom_rebuild_interval` - Bloom Filter 重建间隔（秒，默认 14400）
+   - `analytics.sample_rate` - 点击日志采样率（默认 1.0）
+   - `analytics.max_log_rows` - 最大日志行数（默认 0 = 无限制）
+   - `[ipc]` 配置段 - IPC 服务器设置
+6. **Docker 用户** - 如需 Prometheus 指标，使用 `latest-metrics` 标签
+
 ## [v0.5.0-rc.1] - 2026-02-09
 
 ### 🎉 Release Highlights

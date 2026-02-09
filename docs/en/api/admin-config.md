@@ -100,13 +100,16 @@ class ShortlinkerAdmin:
     def __init__(self, base_url: str, admin_token: str):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
+        self.csrf_token = None
 
+        # Login: Set-Cookie is automatically handled by requests.Session
         resp = self.session.post(
             f"{self.base_url}/admin/v1/auth/login",
             json={"password": admin_token},
             timeout=10,
         )
         resp.raise_for_status()
+        self.csrf_token = self.session.cookies.get("csrf_token")
 
     def list_links(self, page=1, page_size=20):
         resp = self.session.get(
@@ -117,6 +120,29 @@ class ShortlinkerAdmin:
         resp.raise_for_status()
         return resp.json()
 
+    def create_link(self, code, target, expires_at=None, force=False):
+        payload = {"code": code, "target": target, "force": force}
+        if expires_at:
+            payload["expires_at"] = expires_at
+        resp = self.session.post(
+            f"{self.base_url}/admin/v1/links",
+            headers={"X-CSRF-Token": self.csrf_token or ""},
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+# Example usage
 admin = ShortlinkerAdmin("http://localhost:8080", "your_admin_token")
+print("Listing links:")
 print(admin.list_links())
+
+# Example of creating a link
+try:
+    print("\nCreating a link:")
+    new_link = admin.create_link("example-py", "https://example.com/python")
+    print(new_link)
+except requests.exceptions.HTTPError as e:
+    print(f"Error creating link: {e.response.text}")
 ```
