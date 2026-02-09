@@ -7,10 +7,11 @@ use actix_web::{
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
-use tracing::{trace, warn};
+use subtle::ConstantTimeEq;
+use tracing::{info, trace};
 
 use crate::api::constants;
-use crate::api::jwt::JwtService;
+use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
 
@@ -52,7 +53,7 @@ where
         if let Some(auth_header) = req.headers().get("Authorization")
             && let Ok(auth_str) = auth_header.to_str()
             && let Some(token) = auth_str.strip_prefix("Bearer ")
-            && token == health_token
+            && token.as_bytes().ct_eq(health_token.as_bytes()).into()
         {
             trace!("Health Bearer token validation successful");
             return true;
@@ -64,8 +65,7 @@ where
     fn validate_jwt_cookie(req: &ServiceRequest, cookie_name: &str) -> bool {
         let cookie_token = req.cookie(cookie_name).map(|c| c.value().to_string());
         if let Some(token) = cookie_token {
-            // 每次验证都从最新配置读取 jwt_secret
-            let jwt_service = JwtService::from_config();
+            let jwt_service = get_jwt_service();
             if jwt_service.validate_access_token(&token).is_ok() {
                 trace!("Health JWT validation successful");
                 return true;
@@ -102,7 +102,7 @@ where
 
             // 两个 token 都为空才禁用健康接口
             if admin_token.is_empty() && health_token.is_empty() {
-                warn!("Neither admin_token nor health_token configured - health endpoint disabled");
+                info!("Neither admin_token nor health_token configured - health endpoint disabled");
                 return Ok(req.into_response(
                     HttpResponse::NotFound()
                         .insert_header((CONTENT_TYPE, "text/plain; charset=utf-8"))
@@ -140,7 +140,7 @@ where
             }
 
             // 两种认证都失败
-            warn!("Health authentication failed - invalid or missing token");
+            info!("Health authentication failed - invalid or missing token");
             Ok(req.into_response(
                 HttpResponse::Unauthorized()
                     .insert_header((CONTENT_TYPE, "application/json; charset=utf-8"))

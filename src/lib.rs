@@ -7,6 +7,7 @@
 //! - **server**: HTTP server mode (default)
 //! - **cli**: Command-line interface
 //! - **tui**: Terminal user interface
+//! - **metrics**: Prometheus metrics export
 //! - **full**: All features enabled
 //!
 //! # Architecture
@@ -27,6 +28,9 @@ pub mod config;
 pub mod errors;
 mod event;
 pub mod interfaces;
+#[cfg(feature = "metrics")]
+pub mod metrics;
+pub mod metrics_core;
 pub mod runtime;
 pub mod services;
 pub mod storage;

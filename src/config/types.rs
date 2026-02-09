@@ -8,6 +8,18 @@ use ts_rs::TS;
 /// 输出目录常量
 pub const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
 
+/// 配置 Action 类型枚举
+///
+/// 用于标识配置项可执行的操作（如生成 token）。
+/// 这是一个与 ValueType 正交的概念 - 任何类型的配置都可以有可选的 action。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionType {
+    /// 生成安全随机 token（32 字节 hex）
+    GenerateToken,
+}
+
 /// 配置值类型枚举
 ///
 /// 用于标识配置项在数据库和前端的类型。
@@ -17,6 +29,8 @@ pub const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts
 pub enum ValueType {
     String,
     Int,
+    /// 浮点数类型，前端渲染为数字输入（step=0.01）
+    Float,
     Bool,
     Json,
     Enum,
@@ -31,6 +45,7 @@ impl std::fmt::Display for ValueType {
         match self {
             Self::String => write!(f, "string"),
             Self::Int => write!(f, "int"),
+            Self::Float => write!(f, "float"),
             Self::Bool => write!(f, "bool"),
             Self::Json => write!(f, "json"),
             Self::Enum => write!(f, "enum"),
@@ -46,6 +61,7 @@ impl std::str::FromStr for ValueType {
         match s {
             "string" => Ok(Self::String),
             "int" => Ok(Self::Int),
+            "float" => Ok(Self::Float),
             "bool" => Ok(Self::Bool),
             "json" => Ok(Self::Json),
             "enum" => Ok(Self::Enum),
@@ -67,6 +83,8 @@ pub enum RustType {
     U64,
     /// usize 类型
     Usize,
+    /// f64 类型
+    F64,
     /// bool 类型
     Bool,
     /// Option<String> 类型
@@ -77,6 +95,8 @@ pub enum RustType {
     VecHttpMethod,
     /// SameSitePolicy 枚举类型
     SameSitePolicy,
+    /// MaxRowsAction 枚举类型（cleanup 或 stop）
+    MaxRowsAction,
 }
 
 #[cfg(test)]
@@ -87,6 +107,7 @@ mod tests {
     fn test_value_type_display() {
         assert_eq!(ValueType::String.to_string(), "string");
         assert_eq!(ValueType::Int.to_string(), "int");
+        assert_eq!(ValueType::Float.to_string(), "float");
         assert_eq!(ValueType::Bool.to_string(), "bool");
         assert_eq!(ValueType::Json.to_string(), "json");
         assert_eq!(ValueType::Enum.to_string(), "enum");
@@ -98,6 +119,7 @@ mod tests {
     fn test_value_type_from_str() {
         assert_eq!("string".parse::<ValueType>().unwrap(), ValueType::String);
         assert_eq!("int".parse::<ValueType>().unwrap(), ValueType::Int);
+        assert_eq!("float".parse::<ValueType>().unwrap(), ValueType::Float);
         assert_eq!("bool".parse::<ValueType>().unwrap(), ValueType::Bool);
         assert_eq!("json".parse::<ValueType>().unwrap(), ValueType::Json);
         assert_eq!("enum".parse::<ValueType>().unwrap(), ValueType::Enum);
@@ -113,9 +135,28 @@ mod tests {
     }
 
     #[test]
+    fn test_rust_type_variants() {
+        // 确保所有 RustType 变体都可以创建
+        let variants = [
+            RustType::String,
+            RustType::U64,
+            RustType::Usize,
+            RustType::F64,
+            RustType::Bool,
+            RustType::OptionString,
+            RustType::VecString,
+            RustType::VecHttpMethod,
+            RustType::SameSitePolicy,
+            RustType::MaxRowsAction,
+        ];
+        assert_eq!(variants.len(), 10);
+    }
+
+    #[test]
     fn export_typescript_types() {
         let cfg = ts_rs::Config::default();
+        ActionType::export_all(&cfg).expect("Failed to export ActionType");
         ValueType::export_all(&cfg).expect("Failed to export ValueType");
-        println!("ValueType exported to {}", TS_EXPORT_PATH);
+        println!("ActionType and ValueType exported to {}", TS_EXPORT_PATH);
     }
 }

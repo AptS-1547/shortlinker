@@ -46,6 +46,7 @@ impl LinkStatus {
     }
 
     /// 获取状态颜色
+    #[allow(dead_code)]
     pub fn color(&self) -> Color {
         match self {
             Self::Active => colors::SUCCESS,
@@ -55,6 +56,7 @@ impl LinkStatus {
     }
 
     /// 获取状态样式
+    #[allow(dead_code)]
     pub fn style(&self) -> Style {
         Style::default().fg(self.color())
     }
@@ -91,11 +93,13 @@ impl StatusIndicator {
     }
 
     /// 获取主要颜色（基于状态）
+    #[allow(dead_code)]
     pub fn color(&self) -> Color {
         self.status.color()
     }
 
     /// 获取样式
+    #[allow(dead_code)]
     pub fn style(&self) -> Style {
         self.status.style()
     }

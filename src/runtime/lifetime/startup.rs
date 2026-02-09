@@ -1,13 +1,22 @@
 use crate::analytics::global::set_global_click_manager;
 use crate::analytics::manager::ClickManager;
+use crate::analytics::{ClickDetail, DataRetentionTask, RawClickEvent, RollupManager};
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
-use crate::services::{AnalyticsService, LinkService};
+use crate::services::{
+    AnalyticsService, LinkService, UserAgentStore, get_user_agent_store,
+    set_global_user_agent_store,
+};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 use anyhow::{Context, Result};
+use chrono::Utc;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
+
+#[cfg(feature = "metrics")]
+use crate::metrics::PrometheusMetricsWrapper;
+use crate::metrics_core::MetricsRecorder;
 
 pub struct StartupContext {
     pub storage: Arc<SeaOrmStorage>,
@@ -15,6 +24,7 @@ pub struct StartupContext {
     pub link_service: Arc<LinkService>,
     pub analytics_service: Arc<AnalyticsService>,
     pub route_config: RouteConfig,
+    pub metrics: Arc<dyn MetricsRecorder>,
 }
 
 #[derive(Clone, Debug)]
@@ -25,10 +35,12 @@ pub struct RouteConfig {
     pub enable_frontend: bool,
 }
 
-/// CLI / TUI 模式预处理
+/// CLI / TUI 模式预处理（预留扩展点）
+///
+/// 当前为空实现，供未来 CLI/TUI 特定初始化使用。
 #[cfg(any(feature = "cli", feature = "tui"))]
 pub async fn cli_tui_pre_startup() {
-    // CLI / TUI Mode
+    // Reserved for future CLI/TUI-specific initialization
 }
 
 /// 准备服务器启动的上下文
@@ -43,20 +55,66 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         .install_default()
         .map_err(|e| anyhow::anyhow!("Failed to install rustls crypto provider: {:?}", e))?;
 
-    let storage = StorageFactory::create()
+    // Create metrics instance for dependency injection
+    #[cfg(feature = "metrics")]
+    let metrics: Arc<dyn MetricsRecorder> = {
+        match crate::metrics::init_metrics() {
+            Ok(()) => {
+                debug!("Prometheus metrics initialized");
+                Arc::new(PrometheusMetricsWrapper)
+            }
+            Err(e) => {
+                error!(
+                    "Failed to initialize Prometheus metrics, degrading to NoopMetrics: {}",
+                    e
+                );
+                crate::metrics_core::NoopMetrics::arc()
+            }
+        }
+    };
+    #[cfg(not(feature = "metrics"))]
+    let metrics: Arc<dyn MetricsRecorder> = crate::metrics_core::NoopMetrics::arc();
+
+    let storage = StorageFactory::create(metrics.clone())
         .await
         .context("Failed to create storage backend")?;
-    warn!(
+    info!(
         "Using storage backend: {}",
         storage.get_backend_config().await.storage_type
     );
 
     // 初始化运行时配置系统
     let db = storage.get_db().clone();
-    init_runtime_config(db)
+    init_runtime_config(db.clone())
         .await
         .context("Failed to initialize runtime config")?;
     debug!("Runtime config system initialized");
+
+    // 初始化 UserAgentStore（UA 去重存储）
+    let ua_store = UserAgentStore::new();
+    if let Err(e) = ua_store.load_known_hashes(&db).await {
+        warn!("Failed to preload UserAgent hashes (non-fatal): {}", e);
+    }
+
+    let known_count = ua_store.known_count();
+    set_global_user_agent_store(ua_store);
+    debug!(
+        "UserAgentStore initialized with {} known hashes",
+        known_count
+    );
+
+    // 启动 UserAgent 后台刷新任务（每 30 秒批量写入新 UA）
+    let db_for_ua = storage.get_db().clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            if let Some(store) = crate::services::get_user_agent_store()
+                && let Err(e) = store.flush_pending(&db_for_ua).await
+            {
+                tracing::warn!("Failed to flush UserAgent pending inserts: {}", e);
+            }
+        }
+    });
 
     // 初始化点击计数器（从 RuntimeConfig 读取配置）
     let rt = get_runtime_config();
@@ -74,18 +132,32 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
                 // SeaOrmStorage 实现了 DetailedClickSink trait
                 let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
                 info!("Detailed click logging enabled, initializing with DetailedClickSink");
-                Arc::new(ClickManager::with_detailed_logging(
+                let (manager, rx) = ClickManager::with_detailed_logging(
                     sink,
                     detailed_sink,
                     Duration::from_secs(flush_interval),
                     max_clicks_before_flush as usize,
-                ))
+                    metrics.clone(),
+                );
+                let mgr = Arc::new(manager);
+
+                // 启动事件处理器
+                let mgr_for_processor = mgr.clone();
+                tokio::spawn(async move {
+                    mgr_for_processor
+                        .start_event_processor(rx, process_raw_click_event)
+                        .await;
+                });
+
+                mgr
             } else {
-                Arc::new(ClickManager::new(
+                let manager = ClickManager::new(
                     sink,
                     Duration::from_secs(flush_interval),
                     max_clicks_before_flush as usize,
-                ))
+                    metrics.clone(),
+                );
+                Arc::new(manager)
             };
 
             set_global_click_manager(mgr.clone());
@@ -108,35 +180,76 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     }
 
     // 初始化缓存
-    let cache = cache::CompositeCache::create()
+    let cache = cache::CompositeCache::create(metrics.clone(), storage.clone())
         .await
         .context("Failed to create cache")?;
 
-    // 只加载短码到 Bloom Filter（不加载完整数据到 Object Cache）
-    let codes = storage
-        .load_all_codes()
-        .await
-        .context("Failed to load codes for bloom filter")?;
-    let codes_count = codes.len();
+    // 加载短码到 Bloom Filter（内部自行从 DB 加载，不加载完整数据到 Object Cache）
     cache
-        .reconfigure(cache::traits::BloomConfig {
-            capacity: codes_count,
-            fp_rate: 0.001,
-        })
+        .rebuild_all()
         .await
-        .context("Failed to reconfigure cache")?;
-    cache.load_bloom(&codes).await;
-    debug!("Bloom filter initialized with {} codes", codes_count);
+        .context("Failed to initialize bloom filter")?;
+    debug!("Bloom filter initialized");
 
     // Initialize the ReloadCoordinator (must be before setup_reload_mechanism)
     crate::system::reload::init_default_coordinator(cache.clone(), storage.clone());
     debug!("ReloadCoordinator initialized");
+
+    // 启动 Bloom Filter 定时重建任务
+    let bloom_rebuild_interval = rt.get_u64_or(keys::CACHE_BLOOM_REBUILD_INTERVAL, 14400);
+    if bloom_rebuild_interval > 0 {
+        if let Some(coordinator) = crate::system::reload::get_reload_coordinator() {
+            tokio::spawn(async move {
+                use crate::system::reload::ReloadTarget;
+                let interval = Duration::from_secs(bloom_rebuild_interval);
+                loop {
+                    tokio::time::sleep(interval).await;
+
+                    // 检查是否正在 reload，避免撞车
+                    if coordinator.status().is_reloading {
+                        info!("Skipping periodic bloom rebuild: reload in progress");
+                        continue;
+                    }
+
+                    info!("Starting periodic bloom filter rebuild...");
+                    match coordinator.reload(ReloadTarget::Data).await {
+                        Ok(result) => info!(
+                            "Periodic bloom rebuild completed in {}ms",
+                            result.duration_ms
+                        ),
+                        Err(e) => error!("Periodic bloom rebuild failed: {}", e),
+                    }
+                }
+            });
+            debug!(
+                "Bloom filter periodic rebuild task started (interval: {}s)",
+                bloom_rebuild_interval
+            );
+        }
+    } else {
+        debug!("Bloom filter periodic rebuild is disabled");
+    }
 
     // Create LinkService for unified link management
     let link_service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
     // Create AnalyticsService for analytics queries
     let analytics_service = Arc::new(AnalyticsService::new(storage.clone()));
+
+    // 初始化数据清理后台任务
+    let enable_auto_rollup = rt.get_bool_or(keys::ANALYTICS_ENABLE_AUTO_ROLLUP, true);
+    if enable_auto_rollup {
+        let rollup_manager = Arc::new(RollupManager::new(storage.clone()));
+        let retention_task = Arc::new(DataRetentionTask::new(
+            storage.clone(),
+            rollup_manager.clone(),
+        ));
+        // 每 4 小时运行一次清理
+        retention_task.spawn_background_task(4);
+        debug!("Data retention background task initialized");
+    } else {
+        debug!("Auto rollup and data retention is disabled");
+    }
 
     // Initialize IPC handler with LinkService
     crate::system::ipc::handler::init_link_service(link_service.clone());
@@ -145,8 +258,16 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     crate::system::ipc::handler::init_start_time();
     #[cfg(any(feature = "cli", feature = "tui"))]
     {
-        crate::system::ipc::server::start_ipc_server().await;
-        debug!("IPC server started");
+        let config = crate::config::get_config();
+        if config.ipc.enabled {
+            crate::system::ipc::server::start_ipc_server().await;
+            debug!(
+                "IPC server started on {}",
+                config.ipc.effective_socket_path()
+            );
+        } else {
+            info!("IPC server is disabled by configuration");
+        }
     }
 
     // 提取路由配置（从 RuntimeConfig 读取）
@@ -158,7 +279,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         enable_frontend: rt.get_bool_or(keys::FEATURES_ENABLE_ADMIN_PANEL, false),
     };
 
-    check_compoment_enabled(&route_config);
+    check_component_enabled(&route_config);
 
     debug!(
         "Pre-startup processing completed in {} ms",
@@ -171,10 +292,11 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         link_service,
         analytics_service,
         route_config,
+        metrics,
     })
 }
 
-fn check_compoment_enabled(route_config: &RouteConfig) {
+fn check_component_enabled(route_config: &RouteConfig) {
     let rt = get_runtime_config();
 
     // 检查 JWT Secret 安全性
@@ -192,30 +314,34 @@ fn check_compoment_enabled(route_config: &RouteConfig) {
     // 检查 Admin API 是否启用
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
     if admin_token.is_empty() {
-        warn!("Admin API is disabled (ADMIN_TOKEN not set)");
+        info!(
+            "Admin API is disabled. Run 'shortlinker reset-password' to set a password and enable it."
+        );
     } else {
-        warn!("Admin API available at: {}", route_config.admin_prefix);
+        info!("Admin API available at: {}", route_config.admin_prefix);
     }
 
     // 检查 Health API 是否启用
     let health_token = rt.get_or(keys::API_HEALTH_TOKEN, "");
     if health_token.is_empty() && admin_token.is_empty() {
-        warn!("Health API is disabled (HEALTH_TOKEN not set and ADMIN_TOKEN is empty)");
+        info!("Health API is disabled (api.health_token not set and ADMIN_TOKEN is empty)");
     } else {
-        warn!("Health API available at: {}", route_config.health_prefix);
+        info!("Health API available at: {}", route_config.health_prefix);
     }
 
-    // 检查前端路由是否启用，如果 ADMIN_TOKEN 未设置 或者 ENABLE_ADMIN_PANEL 未设置为 true
+    // 检查前端路由是否启用，如果 api.admin_token 未设置 或者 features.enable_admin_panel 未设置为 true
     if !route_config.enable_frontend || admin_token.is_empty() {
         // 前端路由未启用
-        warn!("Frontend routes are disabled (ENABLE_ADMIN_PANEL is false or ADMIN_TOKEN not set)");
+        info!(
+            "Frontend routes are disabled (features.enable_admin_panel is false or api.admin_token not set)"
+        );
     } else {
         // 检测自定义前端
         let custom_frontend = std::path::Path::new("./frontend-panel");
         if custom_frontend.exists() && custom_frontend.is_dir() {
             info!("Custom frontend detected at: ./frontend-panel");
         }
-        warn!(
+        info!(
             "Frontend routes available at: {}",
             route_config.frontend_prefix
         );
@@ -239,4 +365,76 @@ fn check_jwt_secret_security(rt: &crate::config::RuntimeConfig) {
     if !admin_token.is_empty() && admin_token.len() < 8 {
         warn!("WARNING: Admin Token is very short. Consider using a stronger token.");
     }
+}
+
+/// 将原始点击事件转换为详细点击信息
+fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
+    // 在消费者端读取配置（不在热路径读取）
+    let rt = get_runtime_config();
+    let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
+
+    // derive_source: utm_source > ref:{domain} > direct
+    let source = derive_source_from_raw(&event.query, &event.referrer);
+
+    // UA hash
+    let user_agent_hash = event
+        .user_agent
+        .as_ref()
+        .and_then(|ua| get_user_agent_store().map(|store| store.get_or_create_hash(ua)));
+
+    let ip_address = if enable_ip_logging { event.ip } else { None };
+
+    ClickDetail {
+        code: event.code,
+        timestamp: Utc::now(),
+        referrer: event.referrer,
+        user_agent_hash,
+        ip_address,
+        country: None, // GeoIP 查询暂不在 channel 处理器中做
+        city: None,
+        source,
+    }
+}
+
+/// 从原始数据推导流量来源
+#[inline]
+fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
+    // 1. 检查 utm_source 参数
+    if let Some(query) = query
+        && let Some(utm_source) = extract_query_param(query, "utm_source")
+    {
+        return Some(utm_source.into_owned());
+    }
+
+    // 2. 有 Referer → ref:{domain}
+    if let Some(referer_url) = referrer
+        && let Some(domain) = extract_domain(referer_url)
+    {
+        return Some(format!("ref:{}", domain));
+    }
+
+    // 3. direct
+    Some("direct".to_string())
+}
+
+/// 提取 URL 中的指定查询参数值
+#[inline]
+fn extract_query_param<'a>(query: &'a str, key: &str) -> Option<std::borrow::Cow<'a, str>> {
+    let prefix = format!("{}=", key);
+    for part in query.split('&') {
+        if let Some(value) = part.strip_prefix(&prefix) {
+            return urlencoding::decode(value).ok();
+        }
+    }
+    None
+}
+
+/// 从 URL 提取域名
+#[inline]
+fn extract_domain(url: &str) -> Option<&str> {
+    url.strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .and_then(|rest| rest.split('/').next())
+        .and_then(|host| host.split(':').next())
+        .filter(|s| !s.is_empty())
 }

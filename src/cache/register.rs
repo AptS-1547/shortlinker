@@ -178,7 +178,7 @@ mod tests {
         // 获取并调用，应该是第二个构造函数
         let retrieved = get_object_cache_plugin(&name).unwrap();
         let before = CALL_COUNT.load(Ordering::SeqCst);
-        let _ = retrieved(); // 调用构造函数
+        drop(retrieved()); // 调用构造函数并显式 drop future
         let after = CALL_COUNT.load(Ordering::SeqCst);
 
         // 第二个构造函数加 10

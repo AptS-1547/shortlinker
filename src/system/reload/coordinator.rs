@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
 use tracing::{error, info, warn};
 
-use crate::cache::{CompositeCacheTrait, traits::BloomConfig};
+use crate::cache::CompositeCacheTrait;
 use crate::config::try_get_runtime_config;
 use crate::errors::Result;
 use crate::storage::SeaOrmStorage;
@@ -57,18 +57,9 @@ impl DefaultReloadCoordinator {
 
         // Reload storage backend
         self.storage.reload().await?;
-        let links = self.storage.load_all().await?;
 
-        // Reconfigure cache with new capacity
-        self.cache
-            .reconfigure(BloomConfig {
-                capacity: links.len(),
-                fp_rate: 0.001,
-            })
-            .await?;
-
-        // Load data into cache
-        self.cache.load_cache(links).await;
+        // 原子重建所有缓存层（含 Bloom Filter，内部自行从 DB 加载短码）
+        self.cache.rebuild_all().await?;
 
         info!("Data reload process completed successfully");
         Ok(())

@@ -24,14 +24,14 @@ impl SeaOrmStorage {
             &format!("set({})", link.code),
             self.retry_config,
             || async {
-                upsert(db, &link).await.map_err(|e| {
-                    // 转换为 DbErr 以便重试机制判断
-                    sea_orm::DbErr::Custom(e.to_string())
-                })
+                // upsert() 返回原始 DbErr，retry 能正确识别连接错误
+                upsert(db, &link).await
             },
         )
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("设置短链接失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to set short link: {}", e))
+        })?;
 
         self.invalidate_count_cache();
         Ok(())
@@ -45,11 +45,13 @@ impl SeaOrmStorage {
             short_link::Entity::delete_by_id(&code_owned).exec(db).await
         })
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("删除短链接失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to delete short link: {}", e))
+        })?;
 
         if result.rows_affected == 0 {
             return Err(ShortlinkerError::not_found(format!(
-                "短链接不存在: {}",
+                "Short link not found: {}",
                 code
             )));
         }
@@ -66,12 +68,22 @@ impl SeaOrmStorage {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        // 先查询哪些存在
+        // 使用事务确保查询和删除的原子性
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
+        })?;
+
+        // 在事务内查询哪些存在
         let existing: Vec<String> = short_link::Entity::find()
             .filter(short_link::Column::ShortCode.is_in(codes.iter().cloned()))
-            .all(&self.db)
+            .all(&txn)
             .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("查询失败: {}", e)))?
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query existing links: {}",
+                    e
+                ))
+            })?
             .into_iter()
             .map(|m| m.short_code)
             .collect();
@@ -85,18 +97,28 @@ impl SeaOrmStorage {
             .collect();
 
         if existing.is_empty() {
+            // 没有需要删除的，直接提交空事务
+            txn.commit().await.map_err(|e| {
+                ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
+            })?;
             return Ok((Vec::new(), not_found));
         }
 
-        // 批量删除
+        // 在事务内批量删除
         short_link::Entity::delete_many()
             .filter(short_link::Column::ShortCode.is_in(existing.iter().cloned()))
-            .exec(&self.db)
+            .exec(&txn)
             .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("批量删除失败: {}", e)))?;
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Batch delete failed: {}", e))
+            })?;
+
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
+        })?;
 
         self.invalidate_count_cache();
-        info!("批量删除 {} 条链接成功", existing.len());
+        info!("Batch deleted {} links", existing.len());
 
         Ok((existing, not_found))
     }
@@ -107,10 +129,9 @@ impl SeaOrmStorage {
             return Ok(());
         }
 
-        let txn =
-            self.db.begin().await.map_err(|e| {
-                ShortlinkerError::database_operation(format!("开始事务失败: {}", e))
-            })?;
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
+        })?;
 
         // 构建批量 ActiveModel
         let active_models: Vec<short_link::ActiveModel> = links
@@ -133,14 +154,16 @@ impl SeaOrmStorage {
             )
             .exec(&txn)
             .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("批量插入失败: {}", e)))?;
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Batch insert failed: {}", e))
+            })?;
 
-        txn.commit()
-            .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("提交事务失败: {}", e)))?;
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
+        })?;
 
         self.invalidate_count_cache();
-        info!("批量插入 {} 条链接成功", links.len());
+        info!("Batch inserted {} links", links.len());
         Ok(())
     }
 }

@@ -3,9 +3,7 @@
 use super::state::App;
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
-use crate::utils::csv_handler::{self, FileFormat};
-use std::fs::File;
-use std::io::BufReader;
+use crate::utils::csv_handler;
 
 impl App {
     pub async fn export_links(&mut self) -> Result<(), ShortlinkerError> {
@@ -18,23 +16,7 @@ impl App {
     }
 
     pub async fn import_links(&mut self) -> Result<(), ShortlinkerError> {
-        // Detect file format
-        let format = csv_handler::detect_format(&self.import_path);
-
-        let imported_links: Vec<ShortLink> = match format {
-            FileFormat::Csv => {
-                // CSV format (new)
-                csv_handler::import_from_csv(&self.import_path)?
-            }
-            FileFormat::Json => {
-                // JSON format (deprecated, for backward compatibility)
-                let file = File::open(&self.import_path)
-                    .map_err(|e| ShortlinkerError::file_operation(e.to_string()))?;
-                let reader = BufReader::new(file);
-                serde_json::from_reader(reader)
-                    .map_err(|e| ShortlinkerError::serialization(e.to_string()))?
-            }
-        };
+        let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&self.import_path)?;
 
         for link in imported_links {
             self.storage.set(link).await?;
@@ -68,11 +50,10 @@ impl App {
             let path = entry.path();
             if path.is_dir() {
                 dirs.push(path);
-            } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                // Show CSV files (primary) and JSON files (backward compatibility)
-                if ext.eq_ignore_ascii_case("csv") || ext.eq_ignore_ascii_case("json") {
-                    files.push(path);
-                }
+            } else if let Some(ext) = path.extension().and_then(|s| s.to_str())
+                && ext.eq_ignore_ascii_case("csv")
+            {
+                files.push(path);
             }
         }
 

@@ -51,6 +51,7 @@ impl EditingField {
     }
 
     /// 获取字段显示标题
+    #[allow(dead_code)]
     pub fn display_title(&self) -> &'static str {
         match self {
             Self::ShortCode => "Short Code",
@@ -113,6 +114,7 @@ impl FormState {
     }
 
     /// 获取当前编辑字段的输入引用
+    #[allow(dead_code)]
     pub fn current_input(&self) -> Option<&String> {
         self.currently_editing.as_ref().map(|field| match field {
             EditingField::ShortCode => &self.short_code,
@@ -148,6 +150,7 @@ impl FormState {
     }
 
     /// 获取指定字段的验证错误
+    #[allow(dead_code)]
     pub fn get_error(&self, field: EditingField) -> Option<&String> {
         self.validation_errors.get(field.field_name())
     }

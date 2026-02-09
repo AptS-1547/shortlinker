@@ -4,10 +4,12 @@
 
 mod form_state;
 
-pub use form_state::EditingField;
+pub use form_state::{EditingField, FormState};
 
 use crate::errors::ShortlinkerError;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
+
+use crate::metrics_core::NoopMetrics;
 
 use ratatui::widgets::TableState;
 use std::collections::{HashMap, HashSet};
@@ -86,17 +88,9 @@ pub struct App {
     pub storage: Arc<SeaOrmStorage>,
     pub links: HashMap<String, ShortLink>,
     pub current_screen: CurrentScreen,
-    pub currently_editing: Option<CurrentlyEditing>,
 
-    // Input fields for add/edit
-    pub short_code_input: String,
-    pub target_url_input: String,
-    pub expire_time_input: String,
-    pub password_input: String,
-    pub force_overwrite: bool,
-
-    // Validation errors for real-time feedback
-    pub validation_errors: HashMap<String, String>,
+    // Form state for add/edit
+    pub form: FormState,
 
     // Search functionality
     pub search_input: String,
@@ -130,7 +124,7 @@ pub struct App {
 
 impl App {
     pub async fn new() -> Result<App, ShortlinkerError> {
-        let storage = StorageFactory::create().await?;
+        let storage = StorageFactory::create(NoopMetrics::arc()).await?;
         let links = storage.load_all().await?;
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -142,13 +136,7 @@ impl App {
             storage,
             links,
             current_screen: CurrentScreen::Main,
-            currently_editing: None,
-            short_code_input: String::new(),
-            target_url_input: String::new(),
-            expire_time_input: String::new(),
-            password_input: String::new(),
-            force_overwrite: false,
-            validation_errors: HashMap::new(),
+            form: FormState::new(),
             search_input: String::new(),
             filtered_links: Vec::new(),
             is_searching: false,
@@ -193,34 +181,11 @@ impl App {
     }
 
     pub fn clear_inputs(&mut self) {
-        self.short_code_input.clear();
-        self.target_url_input.clear();
-        self.expire_time_input.clear();
-        self.password_input.clear();
-        self.force_overwrite = false;
-        self.validation_errors.clear();
-        self.currently_editing = None;
+        self.form.clear();
     }
 
     pub fn toggle_editing(&mut self) {
-        if let Some(edit_mode) = &self.currently_editing {
-            match edit_mode {
-                CurrentlyEditing::ShortCode => {
-                    self.currently_editing = Some(CurrentlyEditing::TargetUrl)
-                }
-                CurrentlyEditing::TargetUrl => {
-                    self.currently_editing = Some(CurrentlyEditing::ExpireTime)
-                }
-                CurrentlyEditing::ExpireTime => {
-                    self.currently_editing = Some(CurrentlyEditing::Password)
-                }
-                CurrentlyEditing::Password => {
-                    self.currently_editing = Some(CurrentlyEditing::ShortCode)
-                }
-            };
-        } else {
-            self.currently_editing = Some(CurrentlyEditing::ShortCode);
-        }
+        self.form.toggle_field();
     }
 
     pub fn get_selected_link(&self) -> Option<&ShortLink> {
@@ -309,6 +274,7 @@ impl App {
     }
 
     /// Select all visible links
+    #[allow(dead_code)]
     pub fn select_all(&mut self) {
         let codes: Vec<String> = self
             .get_display_links()

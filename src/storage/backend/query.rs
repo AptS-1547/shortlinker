@@ -4,6 +4,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
+use std::time::Instant;
+
+use std::sync::Arc;
 
 use chrono::Utc;
 use futures_util::stream::Stream;
@@ -21,6 +24,15 @@ use crate::storage::models::LinkStats;
 use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
+
+use crate::metrics_core::MetricsRecorder;
+
+/// Record database query metrics
+fn record_db_metrics(metrics: &Arc<dyn MetricsRecorder>, operation: &str, start: Instant) {
+    let duration = start.elapsed().as_secs_f64();
+    metrics.observe_db_query(operation, duration);
+    metrics.inc_db_query(operation);
+}
 
 /// 根据 LinkFilter 构建 SeaORM 查询条件
 fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Condition {
@@ -74,6 +86,7 @@ struct StatsResult {
 
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
+        let start = Instant::now();
         let db = &self.db;
         let code_owned = code.to_string();
 
@@ -82,20 +95,29 @@ impl SeaOrmStorage {
         })
         .await
         .map_err(|e| {
-            ShortlinkerError::database_operation(format!("查询短链接失败（重试后仍失败）: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to query short link (still failed after retries): {}",
+                e
+            ))
         })?;
 
+        record_db_metrics(&self.metrics, "get", start);
         Ok(result.map(model_to_shortlink))
     }
 
     pub async fn load_all(&self) -> Result<HashMap<String, ShortLink>> {
+        let start = Instant::now();
         let models = short_link::Entity::find()
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("加载所有短链接失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to load all short links: {}",
+                    e
+                ))
             })?;
 
+        record_db_metrics(&self.metrics, "load_all", start);
         let count = models.len();
         let links: HashMap<String, ShortLink> = models
             .into_iter()
@@ -110,6 +132,7 @@ impl SeaOrmStorage {
 
     /// 只加载所有短码（用于 Bloom Filter 初始化，内存占用小）
     pub async fn load_all_codes(&self) -> Result<Vec<String>> {
+        let start = Instant::now();
         let codes = short_link::Entity::find()
             .select_only()
             .column(short_link::Column::ShortCode)
@@ -117,9 +140,13 @@ impl SeaOrmStorage {
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("加载短码列表失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to load short code list: {}",
+                    e
+                ))
             })?;
 
+        record_db_metrics(&self.metrics, "load_all_codes", start);
         info!("Loaded {} short codes for Bloom filter", codes.len());
         Ok(codes)
     }
@@ -149,7 +176,10 @@ impl SeaOrmStorage {
                 })
                 .await
                 .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("批量检查短码存在性失败: {}", e))
+                    ShortlinkerError::database_operation(format!(
+                        "Failed to batch-check short code existence: {}",
+                        e
+                    ))
                 })?;
 
             existing.extend(result);
@@ -165,12 +195,16 @@ impl SeaOrmStorage {
 
     /// 获取链接总数（轻量查询，用于健康检查）
     pub async fn count(&self) -> Result<u64> {
+        let start = Instant::now();
         let db = &self.db;
-        retry::with_retry("count", self.retry_config, || async {
+        let result = retry::with_retry("count", self.retry_config, || async {
             short_link::Entity::find().count(db).await
         })
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("查询链接总数失败: {}", e)))
+        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)));
+
+        record_db_metrics(&self.metrics, "count", start);
+        result
     }
 
     /// 带过滤条件的分页加载链接（带 COUNT 缓存）
@@ -180,6 +214,7 @@ impl SeaOrmStorage {
         page_size: u64,
         filter: LinkFilter,
     ) -> Result<(Vec<ShortLink>, u64)> {
+        let start = Instant::now();
         let now = Utc::now();
 
         // 生成缓存 key（基于过滤条件）
@@ -215,7 +250,10 @@ impl SeaOrmStorage {
             )
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("分页 COUNT 查询失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Pagination COUNT query failed: {}",
+                    e
+                ))
             })?;
 
             self.count_cache.insert(cache_key, count);
@@ -238,9 +276,12 @@ impl SeaOrmStorage {
             },
         )
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("分页数据查询失败: {}", e)))?;
+        .map_err(|e| {
+            ShortlinkerError::database_operation(format!("Pagination data query failed: {}", e))
+        })?;
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
+        record_db_metrics(&self.metrics, "paginated_query", start);
         Ok((links, total))
     }
 
@@ -250,6 +291,7 @@ impl SeaOrmStorage {
             return Ok(HashMap::new());
         }
 
+        let start = Instant::now();
         let db = &self.db;
         let codes_owned: Vec<String> = codes.iter().map(|s| s.to_string()).collect();
 
@@ -261,9 +303,13 @@ impl SeaOrmStorage {
         })
         .await
         .map_err(|e| {
-            ShortlinkerError::database_operation(format!("批量查询失败（重试后仍失败）: {}", e))
+            ShortlinkerError::database_operation(format!(
+                "Batch query failed (still failed after retries): {}",
+                e
+            ))
         })?;
 
+        record_db_metrics(&self.metrics, "batch_get", start);
         Ok(models
             .into_iter()
             .map(|m| {
@@ -273,48 +319,114 @@ impl SeaOrmStorage {
             .collect())
     }
 
-    /// 分页流式加载所有符合条件的链接（用于导出等大数据量场景）
+    /// 流式加载所有短码（游标分页，内存 O(page_size)）
     ///
-    /// 使用 SeaORM paginate API 分批查询，避免一次性加载全部数据到内存。
-    /// 返回 boxed stream 产生分批数据。
-    pub fn stream_all_filtered_paginated(
+    /// 使用 `short_code` 作为游标，每次只加载 `page_size` 条记录。
+    /// 用于 Bloom Filter 重建，避免全量 `Vec<String>` 导致 OOM。
+    pub fn stream_all_codes_cursor(
         &self,
-        filter: LinkFilter,
         page_size: u64,
-    ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
-        let now = Utc::now();
-        let condition = build_filter_condition(&filter, now);
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send + 'static>> {
         let db = self.db.clone();
 
         use futures_util::stream;
 
-        // 手动实现分页流
         Box::pin(stream::unfold(
-            (0u64, db, condition, page_size),
-            |(page, db, condition, page_size)| async move {
-                // 构建查询
-                let models = short_link::Entity::find()
-                    .filter(condition.clone())
-                    .order_by_desc(short_link::Column::CreatedAt)
+            (None::<String>, db, page_size, false),
+            |(cursor, db, page_size, done)| async move {
+                if done {
+                    return None;
+                }
+
+                let mut query = short_link::Entity::find()
+                    .select_only()
+                    .column(short_link::Column::ShortCode);
+
+                if let Some(ref last_code) = cursor {
+                    query = query.filter(short_link::Column::ShortCode.gt(last_code.clone()));
+                }
+
+                let codes = query
+                    .order_by_asc(short_link::Column::ShortCode)
                     .limit(page_size)
-                    .offset(page * page_size)
+                    .into_tuple::<String>()
+                    .all(&db)
+                    .await;
+
+                match codes {
+                    Ok(codes) if codes.is_empty() => None,
+                    Ok(codes) => {
+                        let next_cursor = codes.last().cloned();
+                        let is_last = (codes.len() as u64) < page_size;
+                        Some((Ok(codes), (next_cursor, db, page_size, is_last)))
+                    }
+                    Err(e) => {
+                        tracing::error!("Cursor query for codes failed: {}", e);
+                        Some((
+                            Err(ShortlinkerError::database_operation(format!(
+                                "Cursor query for codes failed: {}",
+                                e
+                            ))),
+                            (cursor, db, page_size, true),
+                        ))
+                    }
+                }
+            },
+        ))
+    }
+
+    /// 流式导出链接（游标分页）
+    ///
+    /// 使用 `short_code` 作为游标，避免 OFFSET 在大数据量下的性能问题。
+    pub fn stream_all_filtered_cursor(
+        &self,
+        filter: LinkFilter,
+        page_size: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
+        let db = self.db.clone();
+        let now = Utc::now();
+        let condition = build_filter_condition(&filter, now);
+
+        use futures_util::stream;
+
+        Box::pin(stream::unfold(
+            (None::<String>, db, condition, page_size, false),
+            |(cursor, db, condition, page_size, done)| async move {
+                if done {
+                    return None;
+                }
+
+                let mut query = short_link::Entity::find().filter(condition.clone());
+
+                if let Some(ref last_code) = cursor {
+                    query = query.filter(short_link::Column::ShortCode.gt(last_code.clone()));
+                }
+
+                let models = query
+                    .order_by_asc(short_link::Column::ShortCode)
+                    .limit(page_size)
                     .all(&db)
                     .await;
 
                 match models {
-                    Ok(models) if models.is_empty() => None, // 没有更多数据
+                    Ok(models) if models.is_empty() => None,
                     Ok(models) => {
+                        let next_cursor = models.last().map(|m| m.short_code.clone());
+                        let is_last = (models.len() as u64) < page_size;
                         let links: Vec<ShortLink> =
                             models.into_iter().map(model_to_shortlink).collect();
-                        Some((Ok(links), (page + 1, db, condition, page_size)))
+                        Some((Ok(links), (next_cursor, db, condition, page_size, is_last)))
                     }
-                    Err(e) => Some((
-                        Err(ShortlinkerError::database_operation(format!(
-                            "分页查询失败 (page={}): {}",
-                            page, e
-                        ))),
-                        (page + 1, db, condition, page_size),
-                    )),
+                    Err(e) => {
+                        tracing::error!("Cursor query failed: {}", e);
+                        Some((
+                            Err(ShortlinkerError::database_operation(format!(
+                                "Cursor query failed: {}",
+                                e
+                            ))),
+                            (cursor, db, condition, page_size, true),
+                        ))
+                    }
                 }
             },
         ))
@@ -322,6 +434,7 @@ impl SeaOrmStorage {
 
     /// 获取链接统计信息（SeaORM DSL 聚合查询）
     pub async fn get_stats(&self) -> Result<LinkStats> {
+        let start = Instant::now();
         let now = Utc::now();
 
         let result = short_link::Entity::find()
@@ -345,8 +458,11 @@ impl SeaOrmStorage {
             .into_model::<StatsResult>()
             .one(&self.db)
             .await
-            .map_err(|e| ShortlinkerError::database_operation(format!("统计查询失败: {}", e)))?;
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
+            })?;
 
+        record_db_metrics(&self.metrics, "get_stats", start);
         match result {
             Some(stats) => Ok(LinkStats {
                 total_links: stats.total_links as usize,

@@ -65,6 +65,8 @@ define_shortlinker_errors! {
     LinkAlreadyExists("E021", "Link Already Exists"),
     LinkInvalidExpireTime("E022", "Invalid Expire Time"),
     LinkPasswordHashError("E023", "Password Hash Error"),
+    LinkInvalidCode("E024", "Invalid Short Code"),
+    LinkReservedCode("E025", "Reserved Short Code"),
 
     // ========== E030-E039: 导入导出错误（保留，未来实现） ==========
     CsvParseFailed("E030", "CSV Parse Error"),
@@ -118,6 +120,8 @@ impl ShortlinkerError {
             Self::Validation(_)
             | Self::LinkInvalidUrl(_)
             | Self::LinkInvalidExpireTime(_)
+            | Self::LinkInvalidCode(_)
+            | Self::LinkReservedCode(_)
             | Self::InvalidMultipartData(_)
             | Self::CsvFileMissing(_)
             | Self::CsvParseFailed(_)
@@ -234,6 +238,14 @@ impl ShortlinkerError {
         ShortlinkerError::LinkPasswordHashError(msg.into())
     }
 
+    pub fn link_invalid_code<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkInvalidCode(msg.into())
+    }
+
+    pub fn link_reserved_code<T: Into<String>>(msg: T) -> Self {
+        ShortlinkerError::LinkReservedCode(msg.into())
+    }
+
     // 导入导出错误
     pub fn csv_parse_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CsvParseFailed(msg.into())
@@ -339,6 +351,8 @@ impl From<ShortlinkerError> for crate::api::services::admin::error_code::ErrorCo
             ShortlinkerError::LinkAlreadyExists(_) => ErrorCode::LinkAlreadyExists,
             ShortlinkerError::LinkInvalidExpireTime(_) => ErrorCode::LinkInvalidExpireTime,
             ShortlinkerError::LinkPasswordHashError(_) => ErrorCode::LinkPasswordHashError,
+            ShortlinkerError::LinkInvalidCode(_) => ErrorCode::LinkInvalidCode,
+            ShortlinkerError::LinkReservedCode(_) => ErrorCode::LinkReservedCode,
 
             // 导入导出错误
             ShortlinkerError::CsvParseFailed(_) => ErrorCode::CsvParseError,

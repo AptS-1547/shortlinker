@@ -5,7 +5,9 @@
 //! - 定时刷盘到存储后端
 //! - 阈值触发刷盘
 //! - 详细点击日志记录（可选）
+//! - Channel 异步处理（避免热路径 spawn）
 
+use crossbeam_channel::{Receiver, Sender, TrySendError};
 use dashmap::DashMap;
 use std::sync::{
     Arc,
@@ -15,7 +17,9 @@ use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 use tracing::{debug, trace, warn};
 
-use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink};
+use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink, RawClickEvent};
+
+use crate::metrics_core::MetricsRecorder;
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -40,23 +44,19 @@ impl ClickBuffer {
     }
 
     /// 增加点击计数
+    ///
+    /// 使用 DashMap 的 entry API 实现原子性增加，无 TOCTOU 窗口。
+    /// 每次新 key 都会分配 Arc，但代码更简洁且完全无竞态。
     fn increment(&self, key: &str) -> usize {
-        // 优化：先尝试 get_mut 更新已存在的 key（无 Arc 分配）
-        // 高并发下大多数请求是热点 key，可显著减少分配开销
-        if let Some(mut entry) = self.data.get_mut(key) {
-            *entry += 1;
-        } else {
-            // 只有新 key 才需要分配 Arc
-            // 注意：这里有 TOCTOU 窗口，但在点击统计场景下可接受
-            // 最坏情况只是多分配一次 Arc
-            self.data
-                .entry(Arc::from(key))
-                .and_modify(|v| *v += 1)
-                .or_insert(1);
-        }
+        self.data
+            .entry(Arc::from(key))
+            .and_modify(|v| *v += 1)
+            .or_insert(1);
+
         trace!("ClickBuffer: Incremented key: {}", key);
 
-        self.total_clicks.fetch_add(1, Ordering::Relaxed) + 1
+        // 使用 AcqRel 确保与其他线程的操作正确同步
+        self.total_clicks.fetch_add(1, Ordering::AcqRel) + 1
     }
 
     /// 收集所有更新并清空缓冲区（逐个 remove 避免竞态）
@@ -74,10 +74,10 @@ impl ClickBuffer {
             }
         }
 
-        // 3. 更新总计数
+        // 3. 更新总计数（使用 AcqRel 确保一致性）
         if total_removed > 0 {
             self.total_clicks
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |current| {
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                     Some(current.saturating_sub(total_removed))
                 })
                 .ok();
@@ -94,12 +94,12 @@ impl ClickBuffer {
             restored_total += v;
         }
         self.total_clicks
-            .fetch_add(restored_total, Ordering::Relaxed);
+            .fetch_add(restored_total, Ordering::AcqRel);
     }
 
     /// 获取当前缓冲区总点击数
     fn total(&self) -> usize {
-        self.total_clicks.load(Ordering::Relaxed)
+        self.total_clicks.load(Ordering::Acquire)
     }
 }
 
@@ -109,8 +109,12 @@ struct DetailedBuffer {
     data: DashMap<u64, ClickDetail>,
     /// 下一个 ID
     next_id: AtomicU64,
+    /// 当前条目数（用于阈值判断）
+    entry_count: AtomicUsize,
     /// 刷盘锁
     flush_lock: Mutex<()>,
+    /// 是否有 flush 任务待处理（防止重复 spawn）
+    flush_pending: AtomicBool,
 }
 
 impl DetailedBuffer {
@@ -118,14 +122,17 @@ impl DetailedBuffer {
         Self {
             data: DashMap::new(),
             next_id: AtomicU64::new(0),
+            entry_count: AtomicUsize::new(0),
             flush_lock: Mutex::new(()),
+            flush_pending: AtomicBool::new(false),
         }
     }
 
-    /// 添加详细点击日志
-    fn push(&self, detail: ClickDetail) {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+    /// 添加详细点击日志，返回当前缓冲区大小
+    fn push(&self, detail: ClickDetail) -> usize {
+        let id = self.next_id.fetch_add(1, Ordering::AcqRel);
         self.data.insert(id, detail);
+        self.entry_count.fetch_add(1, Ordering::AcqRel) + 1
     }
 
     /// 收集所有日志并清空缓冲区
@@ -137,19 +144,19 @@ impl DetailedBuffer {
                 details.push(detail);
             }
         }
+        // 重置计数器（使用 Release 确保其他线程看到正确的值）
+        self.entry_count.store(0, Ordering::Release);
         details
     }
 
-    /// 恢复数据到缓冲区
+    /// 恢复数据到缓冲区（不调用 push 避免重复计数）
     fn restore(&self, details: Vec<ClickDetail>) {
+        let count = details.len();
         for detail in details {
-            self.push(detail);
+            let id = self.next_id.fetch_add(1, Ordering::AcqRel);
+            self.data.insert(id, detail);
         }
-    }
-
-    /// 获取当前缓冲区大小
-    fn len(&self) -> usize {
-        self.data.len()
+        self.entry_count.fetch_add(count, Ordering::AcqRel);
     }
 }
 
@@ -171,6 +178,10 @@ pub struct ClickManager {
     detailed_buffer: Option<Arc<DetailedBuffer>>,
     /// 详细日志 Sink（可选）
     detailed_sink: Option<Arc<dyn DetailedClickSink>>,
+    /// 原始事件 channel sender（用于异步处理详细日志，使用 crossbeam 高性能 channel）
+    raw_event_tx: Option<Sender<RawClickEvent>>,
+    /// Metrics recorder for dependency injection
+    metrics: Arc<dyn MetricsRecorder>,
 }
 
 impl ClickManager {
@@ -178,6 +189,7 @@ impl ClickManager {
         sink: Arc<dyn ClickSink>,
         flush_interval: Duration,
         max_clicks_before_flush: usize,
+        metrics: Arc<dyn MetricsRecorder>,
     ) -> Self {
         Self {
             buffer: Arc::new(ClickBuffer::new()),
@@ -186,24 +198,35 @@ impl ClickManager {
             max_clicks_before_flush,
             detailed_buffer: None,
             detailed_sink: None,
+            raw_event_tx: None,
+            metrics,
         }
     }
 
     /// 创建带详细日志支持的点击管理器
+    /// 返回 (ClickManager, Receiver) 以便启动后台处理任务
     pub fn with_detailed_logging(
         sink: Arc<dyn ClickSink>,
         detailed_sink: Arc<dyn DetailedClickSink>,
         flush_interval: Duration,
         max_clicks_before_flush: usize,
-    ) -> Self {
-        Self {
+        metrics: Arc<dyn MetricsRecorder>,
+    ) -> (Self, Receiver<RawClickEvent>) {
+        // 使用 crossbeam bounded channel，容量 10000
+        let (tx, rx) = crossbeam_channel::bounded(10000);
+
+        let manager = Self {
             buffer: Arc::new(ClickBuffer::new()),
             sink,
             flush_interval,
             max_clicks_before_flush,
             detailed_buffer: Some(Arc::new(DetailedBuffer::new())),
             detailed_sink: Some(detailed_sink),
-        }
+            raw_event_tx: Some(tx),
+            metrics,
+        };
+
+        (manager, rx)
     }
 
     /// 检查是否启用了详细日志
@@ -220,12 +243,64 @@ impl ClickManager {
 
         // 2. 如果启用详细日志，写入 detailed_buffer
         if let Some(ref buffer) = self.detailed_buffer {
-            buffer.push(detail);
+            let current_size = buffer.push(detail);
             trace!(
                 "ClickManager: Detailed log recorded, buffer size: {}",
-                buffer.len()
+                current_size
             );
+
+            // 阈值触发刷盘
+            if current_size >= self.max_clicks_before_flush
+                && buffer
+                    .flush_pending
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                    .is_ok()
+            {
+                let buffer = Arc::clone(buffer);
+                let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                tokio::spawn(async move {
+                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                        Self::flush_detailed_buffer(&buffer, &sink).await;
+                    } else {
+                        trace!("ClickManager: detailed flush already in progress, skipping");
+                    }
+                    buffer.flush_pending.store(false, Ordering::Release);
+                });
+            }
         }
+    }
+
+    /// 发送原始点击事件到 channel（热路径调用，非阻塞）
+    ///
+    /// 返回 true 表示发送成功，false 表示 channel 已满或未启用
+    #[inline]
+    pub fn send_raw_event(&self, event: RawClickEvent) -> bool {
+        // 始终增加 click_count
+        self.increment(&event.code);
+
+        // 尝试发送到 channel（crossbeam try_send）
+        if let Some(ref tx) = self.raw_event_tx {
+            match tx.try_send(event) {
+                Ok(()) => true,
+                Err(TrySendError::Full(_)) => {
+                    warn!("ClickManager: Event channel full, dropping event");
+                    self.metrics.inc_clicks_channel_dropped("full");
+                    false
+                }
+                Err(TrySendError::Disconnected(_)) => {
+                    warn!("ClickManager: Event channel disconnected");
+                    self.metrics.inc_clicks_channel_dropped("disconnected");
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    /// 获取 channel sender 的克隆（用于外部直接发送）
+    pub fn get_event_sender(&self) -> Option<Sender<RawClickEvent>> {
+        self.raw_event_tx.clone()
     }
 
     /// 增加点击计数（线程安全，无锁）
@@ -245,13 +320,20 @@ impl ClickManager {
             {
                 let buffer = Arc::clone(&self.buffer);
                 let sink = Arc::clone(&self.sink);
+                let metrics = Arc::clone(&self.metrics);
                 tokio::spawn(async move {
-                    if let Ok(_guard) = buffer.flush_lock.try_lock() {
-                        Self::flush_buffer(&buffer, &sink).await;
+                    let success = if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                        Self::flush_buffer_with_trigger(&buffer, &sink, "threshold", &metrics).await
                     } else {
                         trace!("ClickManager: flush already in progress, skipping");
+                        true // 跳过也算成功，不需要退避
+                    };
+
+                    // 失败时延迟 5 秒再重置标志，实现退避
+                    if !success {
+                        trace!("ClickManager: flush failed, backing off for 5 seconds");
+                        sleep(Duration::from_secs(5)).await;
                     }
-                    // 无论成功与否都重置标志，允许下次触发
                     buffer.flush_pending.store(false, Ordering::Release);
                 });
             }
@@ -267,7 +349,7 @@ impl ClickManager {
             // 定期触发刷盘
             if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
                 trace!("ClickManager: Starting scheduled flush");
-                Self::flush_buffer(&self.buffer, &self.sink).await;
+                Self::flush_buffer(&self.buffer, &self.sink, &self.metrics).await;
             } else {
                 trace!("ClickManager: flush already in progress, skipping scheduled flush");
             }
@@ -282,11 +364,64 @@ impl ClickManager {
         }
     }
 
+    /// 启动原始事件处理器（消费 crossbeam channel 并生成 ClickDetail）
+    ///
+    /// 需要传入事件处理函数，用于将 RawClickEvent 转换为 ClickDetail
+    pub async fn start_event_processor<F>(&self, rx: Receiver<RawClickEvent>, process_fn: F)
+    where
+        F: Fn(RawClickEvent) -> ClickDetail + Send + 'static,
+    {
+        debug!("ClickManager: Starting event processor");
+
+        // crossbeam channel 的 recv 是阻塞的，需要在 blocking task 中运行
+        // 或者用 try_recv + yield
+        loop {
+            // 使用 try_recv 避免阻塞 tokio runtime
+            match rx.try_recv() {
+                Ok(event) => {
+                    let detail = process_fn(event);
+
+                    // 直接写入 detailed_buffer（不再调用 record_detailed 避免重复 increment）
+                    if let Some(ref buffer) = self.detailed_buffer {
+                        let current_size = buffer.push(detail);
+
+                        // 阈值触发刷盘
+                        if current_size >= self.max_clicks_before_flush
+                            && buffer
+                                .flush_pending
+                                .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+                                .is_ok()
+                        {
+                            let buffer = Arc::clone(buffer);
+                            let sink = Arc::clone(self.detailed_sink.as_ref().unwrap());
+                            tokio::spawn(async move {
+                                if let Ok(_guard) = buffer.flush_lock.try_lock() {
+                                    Self::flush_detailed_buffer(&buffer, &sink).await;
+                                }
+                                buffer.flush_pending.store(false, Ordering::Release);
+                            });
+                        }
+                    }
+                }
+                Err(crossbeam_channel::TryRecvError::Empty) => {
+                    // Channel 空，短暂休眠避免忙等（1ms 平衡延迟和 CPU）
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                    debug!("ClickManager: Event channel disconnected, stopping processor");
+                    break;
+                }
+            }
+        }
+
+        debug!("ClickManager: Event processor stopped (channel closed)");
+    }
+
     /// 手动触发刷盘（阻塞直到完成）
     pub async fn flush(&self) {
         debug!("ClickManager: Manual flush triggered");
         let _guard = self.buffer.flush_lock.lock().await;
-        Self::flush_buffer(&self.buffer, &self.sink).await;
+        Self::flush_buffer_with_trigger(&self.buffer, &self.sink, "manual", &self.metrics).await;
 
         // 刷新详细日志
         if let (Some(detailed_buffer), Some(detailed_sink)) =
@@ -298,18 +433,39 @@ impl ClickManager {
     }
 
     /// 执行实际的刷盘操作
-    async fn flush_buffer(buffer: &ClickBuffer, sink: &Arc<dyn ClickSink>) {
+    async fn flush_buffer(
+        buffer: &ClickBuffer,
+        sink: &Arc<dyn ClickSink>,
+        metrics: &Arc<dyn MetricsRecorder>,
+    ) -> bool {
+        Self::flush_buffer_with_trigger(buffer, sink, "interval", metrics).await
+    }
+
+    /// 执行实际的刷盘操作（带触发类型标记）
+    ///
+    /// 返回 true 表示成功，false 表示失败
+    async fn flush_buffer_with_trigger(
+        buffer: &ClickBuffer,
+        sink: &Arc<dyn ClickSink>,
+        trigger: &str,
+        metrics: &Arc<dyn MetricsRecorder>,
+    ) -> bool {
         let updates = buffer.drain();
+
+        // Update buffer size gauge after drain
+        metrics.set_clicks_buffer_entries(buffer.data.len() as f64);
 
         if updates.is_empty() {
             trace!("ClickManager: No clicks to flush");
-            return;
+            return true; // 没有数据也算成功
         }
 
         let count = updates.len();
         match sink.flush_clicks(updates.clone()).await {
             Ok(_) => {
                 debug!("ClickManager: Successfully flushed {} entries", count);
+                metrics.inc_clicks_flush(trigger, "success");
+                true
             }
             Err(e) => {
                 // 刷盘失败，恢复数据到 buffer
@@ -318,11 +474,15 @@ impl ClickManager {
                     "ClickManager: flush_clicks failed: {}, {} entries restored to buffer",
                     e, count
                 );
+                metrics.inc_clicks_flush(trigger, "failed");
+                // Update gauge again after restore
+                metrics.set_clicks_buffer_entries(buffer.data.len() as f64);
+                false
             }
         }
     }
 
-    /// 执行详细日志刷盘操作
+    /// 执行详细日志刷盘操作（分批插入，避免超出 SQL 变量限制）
     async fn flush_detailed_buffer(buffer: &DetailedBuffer, sink: &Arc<dyn DetailedClickSink>) {
         let details = buffer.drain();
 
@@ -331,22 +491,41 @@ impl ClickManager {
             return;
         }
 
-        let count = details.len();
-        match sink.log_clicks_batch(details.clone()).await {
-            Ok(_) => {
-                debug!(
-                    "ClickManager: Successfully flushed {} detailed log entries",
-                    count
-                );
+        let total_count = details.len();
+        const BATCH_SIZE: usize = 500;
+        let mut failed = Vec::new();
+        let mut success_count = 0;
+
+        for chunk in details.chunks(BATCH_SIZE) {
+            match sink.log_clicks_batch(chunk.to_vec()).await {
+                Ok(_) => {
+                    success_count += chunk.len();
+                }
+                Err(e) => {
+                    warn!(
+                        "ClickManager: log_clicks_batch failed: {}, {} entries will be restored",
+                        e,
+                        chunk.len()
+                    );
+                    failed.extend(chunk.iter().cloned());
+                }
             }
-            Err(e) => {
-                // 刷盘失败，恢复数据到 buffer
-                buffer.restore(details);
-                warn!(
-                    "ClickManager: log_clicks_batch failed: {}, {} entries restored to buffer",
-                    e, count
-                );
-            }
+        }
+
+        if success_count > 0 {
+            debug!(
+                "ClickManager: Successfully flushed {} detailed log entries",
+                success_count
+            );
+        }
+
+        if !failed.is_empty() {
+            warn!(
+                "ClickManager: {} of {} entries failed, restoring to buffer",
+                failed.len(),
+                total_count
+            );
+            buffer.restore(failed);
         }
     }
 
@@ -360,6 +539,8 @@ impl ClickManager {
 mod tests {
     use super::*;
     use async_trait::async_trait;
+
+    use crate::metrics_core::NoopMetrics;
 
     struct MockSink {
         flushed: std::sync::Mutex<Vec<(String, usize)>>,
@@ -389,14 +570,19 @@ mod tests {
         }
     }
 
+    fn create_test_manager(sink: Arc<dyn ClickSink>, max_clicks: usize) -> ClickManager {
+        ClickManager::new(
+            sink,
+            Duration::from_secs(60),
+            max_clicks,
+            NoopMetrics::arc(),
+        )
+    }
+
     #[tokio::test]
     async fn test_increment_and_flush() {
         let sink = Arc::new(MockSink::new());
-        let manager = ClickManager::new(
-            Arc::clone(&sink) as Arc<dyn ClickSink>,
-            Duration::from_secs(60),
-            100,
-        );
+        let manager = create_test_manager(Arc::clone(&sink) as Arc<dyn ClickSink>, 100);
 
         manager.increment("key1");
         manager.increment("key1");
@@ -416,9 +602,8 @@ mod tests {
     #[tokio::test]
     async fn test_concurrent_increment() {
         let sink = Arc::new(MockSink::new());
-        let manager = Arc::new(ClickManager::new(
+        let manager = Arc::new(create_test_manager(
             Arc::clone(&sink) as Arc<dyn ClickSink>,
-            Duration::from_secs(60),
             100000, // 高阈值，避免自动刷盘
         ));
 
@@ -452,9 +637,8 @@ mod tests {
     #[tokio::test]
     async fn test_concurrent_increment_and_drain() {
         let sink = Arc::new(MockSink::new());
-        let manager = Arc::new(ClickManager::new(
+        let manager = Arc::new(create_test_manager(
             Arc::clone(&sink) as Arc<dyn ClickSink>,
-            Duration::from_secs(60),
             100000, // 高阈值，避免自动刷盘
         ));
 

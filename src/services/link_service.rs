@@ -14,7 +14,7 @@ use crate::errors::ShortlinkerError;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
-use crate::utils::password::{hash_password, is_argon2_hash};
+use crate::utils::password::{process_imported_password, process_new_password};
 use crate::utils::url_validator::validate_url;
 
 // ============ Request/Response DTOs ============
@@ -118,6 +118,37 @@ pub struct ImportError {
     pub message: String,
 }
 
+// ============ Batch Operation DTOs ============
+
+/// Single successful batch operation item
+#[derive(Debug, Clone)]
+pub struct BatchSuccessItem {
+    pub code: String,
+    pub link: ShortLink,
+}
+
+/// Single failed batch operation item
+#[derive(Debug, Clone)]
+pub struct BatchFailedItem {
+    pub code: String,
+    pub reason: String,
+}
+
+/// Result of batch create/update operation
+#[derive(Debug, Clone, Default)]
+pub struct BatchOperationResult {
+    pub success: Vec<BatchSuccessItem>,
+    pub failed: Vec<BatchFailedItem>,
+}
+
+/// Result of batch delete operation
+#[derive(Debug, Clone, Default)]
+pub struct BatchDeleteResult {
+    pub deleted: Vec<String>,
+    pub not_found: Vec<String>,
+    pub errors: Vec<BatchFailedItem>,
+}
+
 // ============ LinkService Implementation ============
 
 /// Service for link management operations
@@ -147,21 +178,12 @@ impl LinkService {
         get_config().cache.default_ttl
     }
 
-    /// Process password field - hash if needed
+    /// Process password field - always hash, never accept pre-hashed values
     fn process_password(&self, password: Option<&str>) -> Result<Option<String>, ShortlinkerError> {
-        match password {
-            Some(pwd) if !pwd.is_empty() => {
-                if is_argon2_hash(pwd) {
-                    Ok(Some(pwd.to_string()))
-                } else {
-                    hash_password(pwd).map(Some).map_err(|e| {
-                        error!("Failed to hash password: {}", e);
-                        ShortlinkerError::link_password_hash_error(e.to_string())
-                    })
-                }
-            }
-            _ => Ok(None),
-        }
+        process_new_password(password).map_err(|e| {
+            error!("Failed to hash password: {}", e);
+            ShortlinkerError::link_password_hash_error(e.to_string())
+        })
     }
 
     /// Parse expiration time from flexible format
@@ -193,9 +215,25 @@ impl LinkService {
         // Validate URL
         validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
 
-        // Generate code if not provided
+        // Generate code if not provided, or validate user-provided code
         let (code, generated) = match req.code.filter(|c| !c.is_empty()) {
-            Some(c) => (c, false),
+            Some(c) => {
+                // Validate short code format
+                if !crate::utils::is_valid_short_code(&c) {
+                    return Err(ShortlinkerError::link_invalid_code(format!(
+                        "Invalid short code '{}'. Only alphanumeric, underscore, hyphen, dot, and slash allowed.",
+                        c
+                    )));
+                }
+                // Check reserved route conflicts (reads from RuntimeConfig)
+                if crate::utils::is_reserved_short_code(&c) {
+                    return Err(ShortlinkerError::link_reserved_code(format!(
+                        "Short code '{}' conflicts with reserved routes",
+                        c
+                    )));
+                }
+                (c, false)
+            }
             None => (generate_random_code(self.random_code_length()), true),
         };
 
@@ -447,8 +485,8 @@ impl LinkService {
                 }
             };
 
-            // Process password
-            let password = match self.process_password(item.password.as_deref()) {
+            // Process password (import path: preserve existing hashes)
+            let password = match process_imported_password(item.password.as_deref()) {
                 Ok(pwd) => pwd,
                 Err(_) => {
                     result.failed += 1;
@@ -508,5 +546,333 @@ impl LinkService {
         let links: Vec<ShortLink> = links_map.into_values().collect();
         info!("LinkService: exported {} links", links.len());
         Ok(links)
+    }
+
+    /// Batch create links
+    ///
+    /// Creates multiple links in a single operation. Each link is validated
+    /// and processed independently - failures do not affect other links.
+    pub async fn batch_create_links(
+        &self,
+        requests: Vec<CreateLinkRequest>,
+    ) -> Result<BatchOperationResult, ShortlinkerError> {
+        let mut result = BatchOperationResult::default();
+
+        // Step 1: Collect codes and validate URLs
+        struct ValidatedRequest {
+            code: String,
+            target: String,
+            expires_at: Option<String>,
+            password: Option<String>,
+            force: bool,
+        }
+
+        let mut codes_to_check: Vec<String> = Vec::new();
+        let mut valid_requests: Vec<ValidatedRequest> = Vec::new();
+
+        for req in requests {
+            // Validate URL first
+            if let Err(e) = validate_url(&req.target) {
+                let code = req
+                    .code
+                    .clone()
+                    .unwrap_or_else(|| "<generated>".to_string());
+                result.failed.push(BatchFailedItem {
+                    code,
+                    reason: format!("Invalid URL: {}", e),
+                });
+                continue;
+            }
+
+            // Generate code if not provided
+            let code = match req.code.filter(|c| !c.is_empty()) {
+                Some(c) => c,
+                None => generate_random_code(self.random_code_length()),
+            };
+
+            codes_to_check.push(code.clone());
+            valid_requests.push(ValidatedRequest {
+                code,
+                target: req.target,
+                expires_at: req.expires_at,
+                password: req.password,
+                force: req.force,
+            });
+        }
+
+        // Step 2: Batch check existing codes
+        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+        let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to batch check codes: {}", e))
+        })?;
+
+        // Step 3: Process each request
+        let mut links_to_save: Vec<ShortLink> = Vec::new();
+
+        for req in valid_requests {
+            let existing = existing_map.get(&req.code);
+
+            // Check existence conflict
+            if existing.is_some() && !req.force {
+                result.failed.push(BatchFailedItem {
+                    code: req.code,
+                    reason: "Code already exists. Use force=true to overwrite.".to_string(),
+                });
+                continue;
+            }
+
+            // Parse expiration time
+            let expires_at = match self.parse_expires_at(req.expires_at.as_deref()) {
+                Ok(dt) => dt,
+                Err(e) => {
+                    result.failed.push(BatchFailedItem {
+                        code: req.code,
+                        reason: format!("Invalid expires_at: {}", e),
+                    });
+                    continue;
+                }
+            };
+
+            // Process password
+            let password = match self.process_password(req.password.as_deref()) {
+                Ok(pwd) => pwd,
+                Err(e) => {
+                    result.failed.push(BatchFailedItem {
+                        code: req.code,
+                        reason: format!("Password error: {}", e),
+                    });
+                    continue;
+                }
+            };
+
+            // Preserve created_at and click if overwriting
+            let (created_at, click) = if let Some(existing_link) = existing {
+                (existing_link.created_at, existing_link.click)
+            } else {
+                (Utc::now(), 0)
+            };
+
+            let new_link = ShortLink {
+                code: req.code.clone(),
+                target: req.target,
+                created_at,
+                expires_at,
+                password,
+                click,
+            };
+
+            links_to_save.push(new_link);
+        }
+
+        // Step 4: Batch save to storage
+        if !links_to_save.is_empty() {
+            self.storage
+                .batch_set(links_to_save.clone())
+                .await
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("Failed to batch save: {}", e))
+                })?;
+
+            // Update cache for each saved link
+            for link in &links_to_save {
+                self.update_cache(link).await;
+                result.success.push(BatchSuccessItem {
+                    code: link.code.clone(),
+                    link: link.clone(),
+                });
+            }
+        }
+
+        info!(
+            "LinkService: batch created {} links, {} failed",
+            result.success.len(),
+            result.failed.len()
+        );
+
+        Ok(result)
+    }
+
+    /// Batch update links
+    ///
+    /// Updates multiple links in a single operation. Each update is validated
+    /// and processed independently.
+    pub async fn batch_update_links(
+        &self,
+        updates: Vec<(String, UpdateLinkRequest)>,
+    ) -> Result<BatchOperationResult, ShortlinkerError> {
+        let mut result = BatchOperationResult::default();
+
+        // Step 1: Collect codes and validate URLs
+        struct ValidatedUpdate {
+            code: String,
+            target: String,
+            expires_at: Option<String>,
+            password: Option<String>,
+        }
+
+        let mut codes_to_check: Vec<String> = Vec::new();
+        let mut valid_updates: Vec<ValidatedUpdate> = Vec::new();
+
+        for (code, req) in updates {
+            // Validate URL first
+            if let Err(e) = validate_url(&req.target) {
+                result.failed.push(BatchFailedItem {
+                    code,
+                    reason: format!("Invalid URL: {}", e),
+                });
+                continue;
+            }
+
+            codes_to_check.push(code.clone());
+            valid_updates.push(ValidatedUpdate {
+                code,
+                target: req.target,
+                expires_at: req.expires_at,
+                password: req.password,
+            });
+        }
+
+        // Step 2: Batch fetch existing links
+        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+        let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to batch fetch: {}", e))
+        })?;
+
+        // Step 3: Process each update
+        let mut links_to_save: Vec<ShortLink> = Vec::new();
+
+        for update in valid_updates {
+            let existing = match existing_map.get(&update.code) {
+                Some(link) => link,
+                None => {
+                    result.failed.push(BatchFailedItem {
+                        code: update.code,
+                        reason: "Link not found".to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            // Parse expiration time (None = keep existing)
+            let expires_at = if update.expires_at.is_some() {
+                match self.parse_expires_at(update.expires_at.as_deref()) {
+                    Ok(dt) => dt,
+                    Err(e) => {
+                        result.failed.push(BatchFailedItem {
+                            code: update.code,
+                            reason: format!("Invalid expires_at: {}", e),
+                        });
+                        continue;
+                    }
+                }
+            } else {
+                existing.expires_at
+            };
+
+            // Process password
+            let password = match crate::utils::password::process_update_password(
+                update.password.as_deref(),
+                existing.password.clone(),
+            ) {
+                Ok(pwd) => pwd,
+                Err(e) => {
+                    result.failed.push(BatchFailedItem {
+                        code: update.code,
+                        reason: format!("Password error: {}", e),
+                    });
+                    continue;
+                }
+            };
+
+            let updated_link = ShortLink {
+                code: update.code.clone(),
+                target: update.target,
+                created_at: existing.created_at,
+                expires_at,
+                password,
+                click: existing.click,
+            };
+
+            links_to_save.push(updated_link);
+        }
+
+        // Step 4: Batch save to storage
+        if !links_to_save.is_empty() {
+            self.storage
+                .batch_set(links_to_save.clone())
+                .await
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("Failed to batch update: {}", e))
+                })?;
+
+            // Update cache for each saved link
+            for link in &links_to_save {
+                self.update_cache(link).await;
+                result.success.push(BatchSuccessItem {
+                    code: link.code.clone(),
+                    link: link.clone(),
+                });
+            }
+        }
+
+        info!(
+            "LinkService: batch updated {} links, {} failed",
+            result.success.len(),
+            result.failed.len()
+        );
+
+        Ok(result)
+    }
+
+    /// Batch delete links
+    ///
+    /// Deletes multiple links in a single operation.
+    pub async fn batch_delete_links(
+        &self,
+        codes: Vec<String>,
+    ) -> Result<BatchDeleteResult, ShortlinkerError> {
+        let mut result = BatchDeleteResult::default();
+
+        // Step 1: Batch check which codes exist
+        let codes_refs: Vec<&str> = codes.iter().map(|s| s.as_str()).collect();
+        let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to batch check: {}", e))
+        })?;
+
+        // Step 2: Separate existing and non-existing codes
+        let mut codes_to_delete: Vec<String> = Vec::new();
+
+        for code in codes {
+            if existing_map.contains_key(&code) {
+                codes_to_delete.push(code);
+            } else {
+                result.not_found.push(code);
+            }
+        }
+
+        // Step 3: Batch delete from storage
+        if !codes_to_delete.is_empty() {
+            self.storage
+                .batch_remove(&codes_to_delete)
+                .await
+                .map_err(|e| {
+                    ShortlinkerError::database_operation(format!("Failed to batch delete: {}", e))
+                })?;
+
+            // Remove from cache
+            for code in &codes_to_delete {
+                self.cache.remove(code).await;
+            }
+
+            result.deleted = codes_to_delete;
+        }
+
+        info!(
+            "LinkService: batch deleted {} links, {} not found",
+            result.deleted.len(),
+            result.not_found.len()
+        );
+
+        Ok(result)
     }
 }

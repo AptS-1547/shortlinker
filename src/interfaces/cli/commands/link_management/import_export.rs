@@ -2,15 +2,15 @@
 
 use colored::Colorize;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufWriter;
 use std::path::Path;
 use std::sync::Arc;
 
 use crate::interfaces::cli::CliError;
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse};
-use crate::utils::csv_handler::{self, CsvLinkRow, FileFormat};
-use crate::utils::password::process_new_password;
+use crate::system::ipc::{self, ImportLinkData, IpcError, IpcResponse, ShortLinkData};
+use crate::utils::csv_handler::{self, CsvLinkRow};
+use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
 pub async fn export_links(
@@ -19,29 +19,62 @@ pub async fn export_links(
 ) -> Result<(), CliError> {
     // Try IPC first if server is running
     if ipc::is_server_running() {
-        match ipc::export_links().await {
-            Ok(IpcResponse::ExportResult { links }) => {
+        match export_links_via_ipc().await {
+            Ok(links) => {
                 return export_links_to_file(&links, file_path);
             }
-            Ok(IpcResponse::Error { code, message }) => {
-                return Err(CliError::CommandError(format!("{}: {}", code, message)));
-            }
-            Err(IpcError::ServerNotRunning) => {
+            Err(ExportIpcError::ServerNotRunning) => {
                 // Fall through to direct database operation
             }
-            Err(e) => {
-                return Err(CliError::CommandError(format!("IPC error: {}", e)));
-            }
-            _ => {
-                return Err(CliError::CommandError(
-                    "Unexpected response from server".to_string(),
-                ));
+            Err(ExportIpcError::Other(msg)) => {
+                return Err(CliError::CommandError(msg));
             }
         }
     }
 
     // Fallback: Direct database operation when server is not running
     export_links_direct(storage, file_path).await
+}
+
+/// Error type for paginated IPC export
+enum ExportIpcError {
+    ServerNotRunning,
+    Other(String),
+}
+
+/// Export links via IPC using paginated ListLinks to avoid message size limits
+async fn export_links_via_ipc() -> Result<Vec<ShortLinkData>, ExportIpcError> {
+    let page_size = 100;
+    let mut all_links = Vec::new();
+    let mut page = 1u64;
+
+    loop {
+        match ipc::list_links(page, page_size, None).await {
+            Ok(IpcResponse::LinkList { links, total, .. }) => {
+                all_links.extend(links);
+                if all_links.len() >= total {
+                    break;
+                }
+                page += 1;
+            }
+            Ok(IpcResponse::Error { code, message }) => {
+                return Err(ExportIpcError::Other(format!("{}: {}", code, message)));
+            }
+            Err(IpcError::ServerNotRunning) => {
+                return Err(ExportIpcError::ServerNotRunning);
+            }
+            Err(e) => {
+                return Err(ExportIpcError::Other(format!("IPC error: {}", e)));
+            }
+            _ => {
+                return Err(ExportIpcError::Other(
+                    "Unexpected response from server".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(all_links)
 }
 
 /// Export links to file (shared logic for IPC and direct)
@@ -141,30 +174,9 @@ pub async fn import_links(
         )));
     }
 
-    // Detect file format
-    let format = csv_handler::detect_format(&file_path);
-
-    // Read and parse the import file based on format
-    let imported_links: Vec<ShortLink> = match format {
-        FileFormat::Csv => {
-            // CSV format (new)
-            csv_handler::import_from_csv(&file_path)
-                .map_err(|e| CliError::CommandError(format!("Failed to import CSV: {}", e)))?
-        }
-        FileFormat::Json => {
-            // JSON format (deprecated, for backward compatibility)
-            println!(
-                "{} JSON format is deprecated and will be removed in v0.5.0, please use CSV format",
-                "⚠".bold().yellow()
-            );
-            let file = File::open(&file_path).map_err(|e| {
-                CliError::CommandError(format!("Failed to open import file '{}': {}", file_path, e))
-            })?;
-            let reader = BufReader::new(file);
-            serde_json::from_reader(reader)
-                .map_err(|e| CliError::CommandError(format!("Failed to parse JSON file: {}", e)))?
-        }
-    };
+    // Read and parse the import file
+    let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&file_path)
+        .map_err(|e| CliError::CommandError(format!("Failed to import CSV: {}", e)))?;
 
     if imported_links.is_empty() {
         println!("{} Import file is empty", "ℹ".bold().blue());
@@ -270,7 +282,8 @@ async fn import_links_direct(
         }
 
         // Process password (hash if plaintext, keep if already hashed)
-        let processed_password = match process_new_password(imported_link.password.as_deref()) {
+        let processed_password = match process_imported_password(imported_link.password.as_deref())
+        {
             Ok(pwd) => pwd,
             Err(e) => {
                 println!(

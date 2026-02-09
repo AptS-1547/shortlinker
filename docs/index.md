@@ -37,16 +37,6 @@ features:
     details: 自定义短码、随机生成、过期时间、CLI 工具管理和 TUI 界面
 ---
 
-:::warning ⚠️ v0.3.x 版本提醒
-当前版本 (v0.3.x) 正在进行**大幅度功能调整和重构**，更新频率较高，可能会有 API 变更或功能调整。
-
-**建议**：
-- 📌 **生产环境**：使用稳定版本标签（如 `v0.2.x`）
-- 🔄 **开发环境**：跟随最新版本体验新功能
-- 📖 **文档参考**：文档可能滞后于代码实现，以实际功能为准
-- 🐛 **问题反馈**：欢迎通过 [GitHub Issues](https://github.com/AptS-1547/shortlinker/issues) 报告问题
-:::
-
 ## 设计理念
 
 ### 极简主义
@@ -67,12 +57,12 @@ Rust 原生性能保障，SQLite 提供生产级数据库性能，异步并发�
 - **跨平台支持**：Windows、Linux、macOS，智能进程锁防止重复启动
 - **容器优化**：Docker 镜像部署，支持容器重启检测
 - **TUI 界面**：终端用户界面，支持交互式链接管理
-- **TOML 配置**：启动配置（server/database/cache/logging/geoip）+ 数据库运行时配置（auth/routes/features 等）
+- **TOML 配置**：启动配置（server/database/cache/logging/analytics/ipc）+ 数据库运行时配置（auth/routes/features 等）
 
 ## 快速体验
 
 ```bash
-# Docker 快速启动（需要挂载 config.toml，确保容器内 server.host=0.0.0.0）
+# Docker 快速开始（需要挂载 config.toml，确保容器内 server.host=0.0.0.0）
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/config.toml:/config.toml:ro \

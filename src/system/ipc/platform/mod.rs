@@ -7,10 +7,6 @@
 use std::io;
 use tokio::io::{AsyncRead, AsyncWrite};
 
-#[cfg(windows)]
-use super::types::PIPE_NAME_WINDOWS;
-#[cfg(unix)]
-use super::types::SOCKET_PATH_UNIX;
 #[cfg(unix)]
 use std::path::Path;
 
@@ -25,8 +21,8 @@ pub trait IpcPlatform: Send + Sync + 'static {
     /// The listener type for this platform
     type Listener: Send + 'static;
 
-    /// Get the socket/pipe path for this platform
-    fn socket_path() -> &'static str;
+    /// Get the socket/pipe path for this platform (from config)
+    fn socket_path() -> String;
 
     /// Check if the server is running by testing socket connectivity
     ///
@@ -75,18 +71,16 @@ pub type PlatformIpc = UnixIpc;
 #[cfg(windows)]
 pub type PlatformIpc = WindowsIpc;
 
-/// Get the socket path for the current platform
-pub fn socket_path() -> &'static str {
-    #[cfg(unix)]
-    return SOCKET_PATH_UNIX;
-    #[cfg(windows)]
-    return PIPE_NAME_WINDOWS;
+/// Get the socket path for the current platform (from config)
+pub fn socket_path() -> String {
+    crate::config::get_config().ipc.effective_socket_path()
 }
 
 /// Check if the socket file exists (Unix only)
 #[cfg(unix)]
 pub fn socket_exists() -> bool {
-    Path::new(SOCKET_PATH_UNIX).exists()
+    let path_str = crate::config::get_config().ipc.effective_socket_path();
+    Path::new(&path_str).exists()
 }
 
 #[cfg(windows)]

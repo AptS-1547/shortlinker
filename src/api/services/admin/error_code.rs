@@ -29,6 +29,9 @@ pub enum ErrorCode {
     Unauthorized = 1001,
     NotFound = 1004,
     InternalServerError = 1005,
+    BatchSizeTooLarge = 1010,
+    FileTooLarge = 1011,
+    InvalidDateFormat = 1012,
     ServiceUnavailable = 1030,
 
     // 认证错误 2000-2099
@@ -46,6 +49,8 @@ pub enum ErrorCode {
     LinkPasswordHashError = 3004,
     LinkDatabaseError = 3005,
     LinkEmptyCode = 3006,
+    LinkInvalidCode = 3007,
+    LinkReservedCode = 3008,
 
     // 导入导出错误 4000-4099
     ImportFailed = 4000,

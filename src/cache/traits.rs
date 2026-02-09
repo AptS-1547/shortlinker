@@ -1,12 +1,24 @@
 use std::collections::HashMap;
+use std::pin::Pin;
 
 use crate::errors::Result;
 use crate::storage::ShortLink;
 use async_trait::async_trait;
+use futures_util::stream::Stream;
 
 pub struct BloomConfig {
     pub capacity: usize,
     pub fp_rate: f64,
+}
+
+/// 缓存健康检查状态
+#[derive(Debug, Clone)]
+pub struct CacheHealthStatus {
+    pub status: String,
+    pub cache_type: String,
+    pub bloom_filter_enabled: bool,
+    pub negative_cache_enabled: bool,
+    pub error: Option<String>,
 }
 
 /// 缓存查询结果
@@ -25,7 +37,19 @@ pub trait CompositeCacheTrait: Send + Sync {
     async fn get(&self, key: &str) -> CacheResult;
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>);
     async fn remove(&self, key: &str);
+    /// 清空 Object Cache 和 Negative Cache。
+    ///
+    /// **注意**：不会清理 Bloom Filter。如果需要完整重置（包括 Bloom Filter 重建），
+    /// 请使用 [`rebuild_all`](Self::rebuild_all)。
     async fn invalidate_all(&self);
+
+    /// 完整重置所有缓存层，包括原子重建 Bloom Filter。
+    ///
+    /// 内部自行从数据库流式加载短码列表，然后：
+    /// 1. 流式重建 Bloom Filter（原子交换，无空窗期，增量 buffer 捕获并发写入）
+    /// 2. 清空 Object Cache
+    /// 3. 清空 Negative Cache
+    async fn rebuild_all(&self) -> Result<()>;
 
     /// 标记 key 为不存在（写入 Negative Cache）
     async fn mark_not_found(&self, key: &str);
@@ -43,6 +67,9 @@ pub trait CompositeCacheTrait: Send + Sync {
     /// - `false` = 一定不存在
     /// - `true` = 可能存在（有误报可能）
     async fn bloom_check(&self, key: &str) -> bool;
+
+    /// 健康检查 - 返回缓存类型和状态
+    async fn health_check(&self) -> CacheHealthStatus;
 }
 
 #[async_trait]
@@ -68,6 +95,35 @@ pub trait ExistenceFilter: Send + Sync {
         );
         Ok(())
     }
+
+    /// 用提供的 keys 原子重建 Filter。
+    ///
+    /// 默认实现为 `clear` + `bulk_set`（非原子）。
+    /// Bloom Filter 实现会在锁外构建新实例后原子交换，消除空窗期。
+    async fn rebuild(&self, keys: &[String], count: usize, fp_rate: f64) -> Result<()> {
+        self.clear(count, fp_rate).await?;
+        self.bulk_set(keys).await;
+        Ok(())
+    }
+
+    /// 流式重建 Filter：先用 count 预分配，然后从 Stream 逐批加载 keys。
+    ///
+    /// 默认实现消费 stream 后调用 `clear`（适用于 no-op 的 NullExistenceFilterPlugin）。
+    /// Bloom Filter 实现会在锁外流式构建新实例后原子交换，内存 O(batch_size)。
+    async fn rebuild_streaming(
+        &self,
+        count: usize,
+        fp_rate: f64,
+        stream: Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send>>,
+    ) -> Result<()> {
+        use futures_util::StreamExt;
+        // 默认实现：消费 stream（确保数据库游标正常关闭）但不收集数据
+        let mut stream = stream;
+        while let Some(batch) = stream.next().await {
+            batch?; // 仅检查错误，丢弃数据
+        }
+        self.clear(count, fp_rate).await
+    }
 }
 
 #[async_trait]
@@ -76,6 +132,11 @@ pub trait ObjectCache: Send + Sync {
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>);
     async fn remove(&self, key: &str);
     async fn invalidate_all(&self);
+
+    /// Returns the number of entries in the cache (for metrics)
+    fn entry_count(&self) -> u64 {
+        0 // Default: unknown/not supported
+    }
 
     async fn load_object_cache(&self, _keys: HashMap<String, ShortLink>) {
         // 默认实现：子类可以选择覆盖

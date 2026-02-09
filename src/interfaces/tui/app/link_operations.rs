@@ -10,33 +10,41 @@ use chrono::Utc;
 
 impl App {
     pub async fn save_new_link(&mut self) -> Result<(), ShortlinkerError> {
+        // Check for validation errors first
+        self.validate_inputs();
+        if self.has_validation_errors() {
+            return Err(ShortlinkerError::validation(
+                "Please fix validation errors before saving",
+            ));
+        }
+
         // Validate URL format
-        validate_url(&self.target_url_input)
+        validate_url(&self.form.target_url)
             .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
 
         let rt = crate::config::get_runtime_config();
         let random_code_length =
             rt.get_usize_or(crate::config::keys::FEATURES_RANDOM_CODE_LENGTH, 6);
 
-        let final_short_code = if self.short_code_input.is_empty() {
+        let final_short_code = if self.form.short_code.is_empty() {
             let code = generate_random_code(random_code_length);
             self.set_status(format!("Generated random code: {}", code));
             code
         } else {
-            self.short_code_input.clone()
+            self.form.short_code.clone()
         };
 
         // Check if short code already exists
-        if self.links.contains_key(&final_short_code) && !self.force_overwrite {
+        if self.links.contains_key(&final_short_code) && !self.form.force_overwrite {
             return Err(ShortlinkerError::validation(format!(
                 "Code '{}' already exists. Use force overwrite.",
                 final_short_code
             )));
         }
 
-        let expires_at = if !self.expire_time_input.is_empty() {
+        let expires_at = if !self.form.expire_time.is_empty() {
             Some(
-                TimeParser::parse_expire_time(&self.expire_time_input)
+                TimeParser::parse_expire_time(&self.form.expire_time)
                     .map_err(ShortlinkerError::link_invalid_expire_time)?,
             )
         } else {
@@ -44,16 +52,16 @@ impl App {
         };
 
         // Process password (hash if needed)
-        let password = process_new_password(if self.password_input.is_empty() {
+        let password = process_new_password(if self.form.password.is_empty() {
             None
         } else {
-            Some(&self.password_input)
+            Some(&self.form.password)
         })
         .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
 
         let link = ShortLink {
             code: final_short_code.clone(),
-            target: self.target_url_input.clone(),
+            target: self.form.target_url.clone(),
             created_at: Utc::now(),
             expires_at,
             password,
@@ -72,17 +80,17 @@ impl App {
         };
 
         // Validate URL format
-        let target_url = if self.target_url_input.is_empty() {
+        let target_url = if self.form.target_url.is_empty() {
             link.target.clone()
         } else {
-            validate_url(&self.target_url_input)
+            validate_url(&self.form.target_url)
                 .map_err(|e| ShortlinkerError::validation(e.to_string()))?;
-            self.target_url_input.clone()
+            self.form.target_url.clone()
         };
 
-        let expires_at = if !self.expire_time_input.is_empty() {
+        let expires_at = if !self.form.expire_time.is_empty() {
             Some(
-                TimeParser::parse_expire_time(&self.expire_time_input)
+                TimeParser::parse_expire_time(&self.form.expire_time)
                     .map_err(ShortlinkerError::link_invalid_expire_time)?,
             )
         } else {
@@ -91,10 +99,10 @@ impl App {
 
         // Process password (hash if needed)
         let password = process_update_password(
-            if self.password_input.is_empty() {
+            if self.form.password.is_empty() {
                 None
             } else {
-                Some(&self.password_input)
+                Some(&self.form.password)
             },
             link.password.clone(),
         )

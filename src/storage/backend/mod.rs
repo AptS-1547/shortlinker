@@ -12,7 +12,7 @@ mod operations;
 mod query;
 pub mod retry;
 
-pub use analytics::{GeoRow, ReferrerRow, TopLinkRow, TrendRow};
+pub use analytics::{GeoRow, GroupBy, ReferrerRow, TopLinkRow, TrendRow, UaStatsRow};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,6 +25,8 @@ use tracing::warn;
 use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::models::StorageConfig;
+
+use crate::metrics_core::MetricsRecorder;
 
 pub use connection::{connect_generic, connect_sqlite, run_migrations};
 pub use converters::{model_to_shortlink, shortlink_to_active_model};
@@ -44,7 +46,7 @@ pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
         Ok("postgres".to_string())
     } else {
         Err(ShortlinkerError::database_config(format!(
-            "无法从 URL 推断数据库类型: {}. 支持的 URL 格式: sqlite://, mysql://, mariadb://, postgres://",
+            "Failed to infer database type from URL: {}. Supported URL schemes: sqlite://, mysql://, mariadb://, postgres://",
             database_url
         )))
     }
@@ -82,13 +84,19 @@ pub struct SeaOrmStorage {
     count_cache: Cache<String, u64>,
     /// 重试配置
     retry_config: retry::RetryConfig,
+    /// Metrics recorder for dependency injection
+    pub(crate) metrics: Arc<dyn MetricsRecorder>,
 }
 
 impl SeaOrmStorage {
-    pub async fn new(database_url: &str, backend_name: &str) -> Result<Self> {
+    pub async fn new(
+        database_url: &str,
+        backend_name: &str,
+        metrics: Arc<dyn MetricsRecorder>,
+    ) -> Result<Self> {
         if database_url.is_empty() {
             return Err(ShortlinkerError::database_config(
-                "DATABASE_URL 未设置".to_string(),
+                "DATABASE_URL is not set".to_string(),
             ));
         }
 
@@ -112,9 +120,10 @@ impl SeaOrmStorage {
             backend_name: backend_name.to_string(),
             count_cache: Cache::builder()
                 .time_to_live(Duration::from_secs(30))
-                .max_capacity(100)
+                .max_capacity(1000)
                 .build(),
             retry_config,
+            metrics,
         };
 
         // 运行迁移
@@ -127,6 +136,10 @@ impl SeaOrmStorage {
         Ok(storage)
     }
 
+    /// Reload storage state (placeholder for future extensions)
+    ///
+    /// Currently this is a no-op. The actual data reload is handled by
+    /// `ReloadCoordinator` which refreshes the cache layer directly.
     pub async fn reload(&self) -> Result<()> {
         tracing::info!(
             "Reloading links from {} storage",

@@ -35,21 +35,21 @@ pub mod popup {
     /// 编辑链接弹窗
     pub const EDIT_LINK: PopupSize = PopupSize::new(80, 70);
     /// 帮助弹窗
-    pub const HELP: PopupSize = PopupSize::new(80, 85);
+    pub const HELP: PopupSize = PopupSize::new(80, 90);
     /// 删除确认弹窗
     pub const DELETE_CONFIRM: PopupSize = PopupSize::new(65, 45);
     /// 搜索弹窗
     pub const SEARCH: PopupSize = PopupSize::new(70, 30);
     /// 查看详情弹窗
-    pub const VIEW_DETAILS: PopupSize = PopupSize::new(70, 60);
+    pub const VIEW_DETAILS: PopupSize = PopupSize::new(75, 65);
     /// 导入导出菜单
     pub const EXPORT_IMPORT: PopupSize = PopupSize::new(50, 40);
     /// 文件浏览器
-    pub const FILE_BROWSER: PopupSize = PopupSize::new(70, 70);
+    pub const FILE_BROWSER: PopupSize = PopupSize::new(80, 80);
     /// 导出文件名输入
     pub const EXPORT_FILENAME: PopupSize = PopupSize::new(60, 30);
     /// 退出确认
-    pub const EXITING: PopupSize = PopupSize::new(50, 25);
+    pub const EXITING: PopupSize = PopupSize::new(55, 30);
 }
 
 /// 颜色主题（预留扩展）

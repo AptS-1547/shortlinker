@@ -1,6 +1,6 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
+    QueryOrder, Set, TransactionTrait, sea_query::OnConflict,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -58,7 +58,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(result.map(|m| m.value))
@@ -70,7 +73,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(result.map(|m| ConfigItem {
@@ -90,7 +96,7 @@ impl ConfigStore {
             Some(v) => match v.parse::<T>() {
                 Ok(parsed) => Ok(Some(parsed)),
                 Err(_) => Err(ShortlinkerError::database_operation(format!(
-                    "配置 '{}' 值 '{}' 解析失败",
+                    "Failed to parse config '{}' value '{}'",
                     key, v
                 ))),
             },
@@ -124,14 +130,17 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         let (old_value, requires_restart, is_sensitive) = match &old_record {
             Some(r) => (Some(r.value.clone()), r.requires_restart, r.is_sensitive),
             None => {
                 return Err(ShortlinkerError::database_operation(format!(
-                    "配置项 '{}' 不存在",
+                    "Config key '{}' does not exist",
                     key
                 )));
             }
@@ -148,15 +157,6 @@ impl ConfigStore {
             });
         }
 
-        // 更新配置
-        let mut active_model: system_config::ActiveModel = old_record.unwrap().into();
-        active_model.value = Set(value.to_string());
-        active_model.updated_at = Set(chrono::Utc::now());
-
-        active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("更新配置 '{}' 失败: {}", key, e))
-        })?;
-
         // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
         let is_sensitive_config = get_def(key)
             .map(|def| def.is_sensitive)
@@ -172,17 +172,41 @@ impl ConfigStore {
             (old_value.clone(), value.to_string())
         };
 
+        // 使用事务确保更新和历史记录的原子性
+        let txn = self.db.begin().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
+        })?;
+
+        // 更新配置
+        let mut active_model: system_config::ActiveModel = old_record.unwrap().into();
+        active_model.value = Set(value.to_string());
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        active_model.update(&txn).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!(
+                "Failed to update config '{}': {}",
+                key, e
+            ))
+        })?;
+
         let history = config_history::ActiveModel {
             id: Default::default(),
             config_key: Set(key.to_string()),
             old_value: Set(history_old_value),
             new_value: Set(history_new_value),
             changed_at: Set(chrono::Utc::now()),
-            changed_by: Set(None), // TODO: 未来可以传入操作者信息
+            changed_by: Set(None),
         };
 
-        history.insert(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("记录配置变更历史失败: {}", e))
+        history.insert(&txn).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!(
+                "Failed to record config change history: {}",
+                e
+            ))
+        })?;
+
+        txn.commit().await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
         })?;
 
         Ok(ConfigUpdateResult {
@@ -200,7 +224,7 @@ impl ConfigStore {
             .all(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询所有配置失败: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to query all configs: {}", e))
             })?;
 
         let mut map = HashMap::new();
@@ -230,7 +254,10 @@ impl ConfigStore {
             .fetch_page(0)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置历史失败: {}", e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config history: {}",
+                    e
+                ))
             })?;
 
         Ok(records
@@ -252,13 +279,22 @@ impl ConfigStore {
             .count(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("检查配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to check config '{}': {}",
+                    key, e
+                ))
             })?;
 
         Ok(count > 0)
     }
 
-    /// 批量插入配置
+    /// 原子性插入配置（如果不存在）
+    ///
+    /// 使用 `INSERT ... ON CONFLICT DO NOTHING` 避免 TOCTOU 竞态条件。
+    ///
+    /// 返回值:
+    /// - `Ok(true)`: 插入成功（配置之前不存在）
+    /// - `Ok(false)`: 配置已存在，未执行插入
     pub async fn insert_if_not_exists(
         &self,
         key: &str,
@@ -267,11 +303,6 @@ impl ConfigStore {
         requires_restart: bool,
         is_sensitive: bool,
     ) -> Result<bool> {
-        // 检查是否已存在
-        if self.exists(key).await? {
-            return Ok(false);
-        }
-
         let model = system_config::ActiveModel {
             key: Set(key.to_string()),
             value: Set(value.to_string()),
@@ -281,11 +312,32 @@ impl ConfigStore {
             updated_at: Set(chrono::Utc::now()),
         };
 
-        model.insert(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("插入配置 '{}' 失败: {}", key, e))
-        })?;
+        // 使用 ON CONFLICT DO NOTHING 实现原子性的 "insert if not exists"
+        let result = system_config::Entity::insert(model)
+            .on_conflict(
+                OnConflict::column(system_config::Column::Key)
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec(&self.db)
+            .await;
 
-        Ok(true)
+        match result {
+            Ok(_) => Ok(true),
+            Err(sea_orm::DbErr::RecordNotInserted) => Ok(false), // PostgreSQL
+            Err(e) => {
+                // 某些数据库后端在 do_nothing 时可能返回特定错误
+                let err_str = e.to_string().to_lowercase();
+                if err_str.contains("no rows") || err_str.contains("record not inserted") {
+                    Ok(false)
+                } else {
+                    Err(ShortlinkerError::database_operation(format!(
+                        "Failed to insert config '{}': {}",
+                        key, e
+                    )))
+                }
+            }
+        }
     }
 
     /// 同步配置项的元信息（不修改 value / updated_at）
@@ -309,7 +361,10 @@ impl ConfigStore {
             .one(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("查询配置 '{}' 失败: {}", key, e))
+                ShortlinkerError::database_operation(format!(
+                    "Failed to query config '{}': {}",
+                    key, e
+                ))
             })?;
 
         let Some(r) = record else {
@@ -344,7 +399,10 @@ impl ConfigStore {
         }
 
         active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("同步配置 '{}' 的元信息失败: {}", key, e))
+            ShortlinkerError::database_operation(format!(
+                "Failed to sync metadata for config '{}': {}",
+                key, e
+            ))
         })?;
 
         Ok(true)
@@ -356,7 +414,7 @@ impl ConfigStore {
             .count(&self.db)
             .await
             .map_err(|e| {
-                ShortlinkerError::database_operation(format!("统计配置数量失败: {}", e))
+                ShortlinkerError::database_operation(format!("Failed to count configs: {}", e))
             })?;
 
         Ok(count)
@@ -368,15 +426,10 @@ impl ConfigStore {
     /// 对于数据库中不存在的配置，调用其 `default_fn` 生成默认值并插入。
     /// 同时同步配置的元数据（value_type, requires_restart, is_sensitive）。
     ///
-    /// 特殊处理：
-    /// - `api.admin_token`: 如果是新生成的明文密码，会写入 `admin_token.txt` 让用户保存，
-    ///   然后哈希后再存入数据库。
-    ///
     /// 应在服务启动时调用，确保首次启动时配置表不为空。
     pub async fn ensure_defaults(&self) -> Result<usize> {
-        use crate::config::definitions::{ALL_CONFIGS, keys};
-        use crate::utils::password::{hash_password, is_argon2_hash};
-        use tracing::{debug, info, warn};
+        use crate::config::definitions::ALL_CONFIGS;
+        use tracing::{debug, info};
 
         let mut inserted_count = 0;
 
@@ -384,28 +437,11 @@ impl ConfigStore {
             // 调用默认值函数生成值
             let default_value = (def.default_fn)();
 
-            // 特殊处理：api.admin_token 需要哈希
-            let is_new_admin_token = def.key == keys::API_ADMIN_TOKEN
-                && !default_value.is_empty()
-                && !is_argon2_hash(&default_value);
-
-            // 如果是新生成的 admin_token，先哈希（在插入数据库前）
-            let value_to_insert = if is_new_admin_token {
-                hash_password(&default_value).map_err(|e| {
-                    ShortlinkerError::database_operation(format!(
-                        "Failed to hash admin_token: {}",
-                        e
-                    ))
-                })?
-            } else {
-                default_value.clone()
-            };
-
             // 尝试插入（如果不存在）
             let inserted = self
                 .insert_if_not_exists(
                     def.key,
-                    &value_to_insert,
+                    &default_value,
                     def.value_type,
                     def.requires_restart,
                     def.is_sensitive,
@@ -415,58 +451,6 @@ impl ConfigStore {
             if inserted {
                 debug!("Initialized config '{}' with default value", def.key);
                 inserted_count += 1;
-
-                // 如果是新生成的 admin_token，写入明文到文件（可选操作，失败不影响安全性）
-                if is_new_admin_token {
-                    let token_file = std::path::Path::new("admin_token.txt");
-
-                    // 安全修复：使用 create_new 防止 symlink 攻击
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-
-                    match OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(token_file)
-                    {
-                        Ok(mut file) => {
-                            // 设置文件权限 0600 (仅 Unix)
-                            #[cfg(unix)]
-                            {
-                                use std::os::unix::fs::PermissionsExt;
-                                let perms = std::fs::Permissions::from_mode(0o600);
-                                if let Err(e) = std::fs::set_permissions(token_file, perms) {
-                                    warn!("Failed to set permissions on admin_token.txt: {}", e);
-                                }
-                            }
-
-                            if let Err(e) = writeln!(
-                                file,
-                                "Auto-generated ADMIN_TOKEN (delete this file after saving):\n{}",
-                                default_value
-                            ) {
-                                warn!(
-                                    "Failed to write admin_token.txt: {}, but token is already hashed in database",
-                                    e
-                                );
-                            } else {
-                                info!(
-                                    "Auto-generated admin token saved to admin_token.txt - please save it and delete the file"
-                                );
-                            }
-                        }
-                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                            // 文件已存在，跳过
-                            debug!("admin_token.txt already exists, skipping");
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to create admin_token.txt: {}, but token is already hashed in database",
-                                e
-                            );
-                        }
-                    }
-                }
             } else {
                 // 配置已存在，同步元数据
                 if self

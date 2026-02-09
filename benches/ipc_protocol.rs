@@ -2,9 +2,19 @@
 
 use bytes::BytesMut;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use shortlinker::config::init_config;
 use shortlinker::system::ipc::protocol::{decode, encode};
 use shortlinker::system::ipc::types::{IpcCommand, IpcResponse, ShortLinkData};
 use shortlinker::system::reload::ReloadTarget;
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+fn ensure_config_initialized() {
+    INIT.call_once(|| {
+        init_config();
+    });
+}
 
 fn create_test_commands() -> Vec<IpcCommand> {
     vec![
@@ -67,6 +77,8 @@ fn create_test_responses() -> Vec<IpcResponse> {
 
 /// 命令编码性能
 fn bench_encode_commands(c: &mut Criterion) {
+    ensure_config_initialized();
+
     let mut group = c.benchmark_group("ipc/encode");
 
     let commands = create_test_commands();
@@ -94,6 +106,8 @@ fn bench_encode_commands(c: &mut Criterion) {
 
 /// 响应编码性能
 fn bench_encode_responses(c: &mut Criterion) {
+    ensure_config_initialized();
+
     let mut group = c.benchmark_group("ipc/encode");
 
     let responses = create_test_responses();
@@ -113,6 +127,8 @@ fn bench_encode_responses(c: &mut Criterion) {
 
 /// 命令解码性能
 fn bench_decode_commands(c: &mut Criterion) {
+    ensure_config_initialized();
+
     let mut group = c.benchmark_group("ipc/decode");
 
     let commands = create_test_commands();
@@ -141,6 +157,8 @@ fn bench_decode_commands(c: &mut Criterion) {
 
 /// 响应解码性能
 fn bench_decode_responses(c: &mut Criterion) {
+    ensure_config_initialized();
+
     let mut group = c.benchmark_group("ipc/decode");
 
     let responses = create_test_responses();
@@ -162,6 +180,8 @@ fn bench_decode_responses(c: &mut Criterion) {
 
 /// 批量编解码性能
 fn bench_batch_roundtrip(c: &mut Criterion) {
+    ensure_config_initialized();
+
     let mut group = c.benchmark_group("ipc/batch");
 
     // 模拟批量 link list 响应

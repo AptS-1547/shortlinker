@@ -29,7 +29,7 @@ export default {
         nav: [
           { text: '首页', link: '/' },
           { text: '快速开始', link: '/guide/getting-started' },
-          { text: '配置说明', link: '/config/' },
+          { text: '配置指南', link: '/config/' },
           { text: 'CLI 工具', link: '/cli/' },
           { text: 'Web 管理界面', link: '/admin-panel/' },
           { text: '部署指南', link: '/deployment/' },
@@ -148,21 +148,52 @@ export default {
       ],
       '/config/': [
         {
-          text: '配置说明',
+          text: '核心配置',
           items: [
-            { text: '环境变量', link: '/config/' },
-            { text: '存储后端', link: '/config/storage' }
+            { text: '配置指南', link: '/config/' },
+            { text: '启动配置参数', link: '/config/startup' },
+            { text: '运行时配置参数', link: '/config/runtime' },
+            { text: '安全最佳实践', link: '/config/security' },
+            { text: '配置示例与热重载', link: '/config/examples' }
+          ]
+        },
+        {
+          text: '存储配置',
+          items: [
+            { text: '存储后端配置', link: '/config/storage' },
+            { text: '存储后端详解', link: '/config/storage-backends' },
+            { text: '存储选型与性能', link: '/config/storage-selection' },
+            { text: '存储迁移与运维', link: '/config/storage-operations' }
           ]
         }
       ],
       '/deployment/': [
         {
-          text: '部署指南',
+          text: '部署',
           items: [
-            { text: '部署概述', link: '/deployment/' },
-            { text: 'Docker 部署', link: '/deployment/docker' },
-            { text: '反向代理', link: '/deployment/proxy' },
-            { text: '系统服务', link: '/deployment/systemd' }
+            { text: '部署指南', link: '/deployment/' }
+          ]
+        },
+        {
+          text: 'Docker 部署',
+          items: [
+            { text: 'Docker 概览', link: '/deployment/docker' },
+            { text: '快速开始与 Compose', link: '/deployment/docker-quickstart' },
+            { text: '运维与安全', link: '/deployment/docker-operations' }
+          ]
+        },
+        {
+          text: '反向代理',
+          items: [
+            { text: '反向代理概览', link: '/deployment/proxy' },
+            { text: '性能优化与监控', link: '/deployment/proxy-operations' }
+          ]
+        },
+        {
+          text: '系统服务',
+          items: [
+            { text: 'systemd 概览', link: '/deployment/systemd' },
+            { text: 'Docker Compose 与运维', link: '/deployment/systemd-operations' }
           ]
         }
       ],
@@ -171,8 +202,13 @@ export default {
           text: 'API 文档',
           items: [
             { text: 'HTTP 接口', link: '/api/' },
-            { text: 'Admin API', link: '/api/admin' },
-            { text: '健康检查 API', link: '/api/health' }
+            { text: 'Admin API 概览', link: '/api/admin' },
+            { text: '链接与批量操作', link: '/api/admin-links' },
+            { text: '运行时配置与自动化', link: '/api/admin-config' },
+            { text: 'Analytics 统计分析', link: '/api/admin-analytics' },
+            { text: '健康检查 API 概览', link: '/api/health' },
+            { text: '健康端点与状态码', link: '/api/health-endpoints' },
+            { text: '监控集成与故障排除', link: '/api/health-monitoring' }
           ]
         }
       ],
@@ -226,10 +262,22 @@ export default {
       ],
       '/en/config/': [
         {
-          text: 'Configuration',
+          text: 'Core Configuration',
           items: [
-            { text: 'Environment Variables', link: '/en/config/' },
-            { text: 'Storage Backends', link: '/en/config/storage' }
+            { text: 'Configuration Guide', link: '/en/config/' },
+            { text: 'Startup Parameters', link: '/en/config/startup' },
+            { text: 'Runtime Keys and API Workflow', link: '/en/config/runtime' },
+            { text: 'Security Best Practices', link: '/en/config/security' },
+            { text: 'Examples and Hot Reload', link: '/en/config/examples' }
+          ]
+        },
+        {
+          text: 'Storage Configuration',
+          items: [
+            { text: 'Storage Overview', link: '/en/config/storage' },
+            { text: 'Storage Backends', link: '/en/config/storage-backends' },
+            { text: 'Storage Selection and Benchmarks', link: '/en/config/storage-selection' },
+            { text: 'Storage Operations and Monitoring', link: '/en/config/storage-operations' }
           ]
         }
       ],
@@ -237,10 +285,29 @@ export default {
         {
           text: 'Deployment',
           items: [
-            { text: 'Deployment Overview', link: '/en/deployment/' },
-            { text: 'Docker Deployment', link: '/en/deployment/docker' },
-            { text: 'Reverse Proxy', link: '/en/deployment/proxy' },
-            { text: 'System Service', link: '/en/deployment/systemd' }
+            { text: 'Deployment Guide', link: '/en/deployment/' }
+          ]
+        },
+        {
+          text: 'Docker Deployment',
+          items: [
+            { text: 'Docker Overview', link: '/en/deployment/docker' },
+            { text: 'Quick Start and Compose', link: '/en/deployment/docker-quickstart' },
+            { text: 'Operations and Security', link: '/en/deployment/docker-operations' }
+          ]
+        },
+        {
+          text: 'Reverse Proxy',
+          items: [
+            { text: 'Reverse Proxy Overview', link: '/en/deployment/proxy' },
+            { text: 'Performance and Monitoring', link: '/en/deployment/proxy-operations' }
+          ]
+        },
+        {
+          text: 'System Service',
+          items: [
+            { text: 'Systemd Overview', link: '/en/deployment/systemd' },
+            { text: 'Docker Compose and Operations', link: '/en/deployment/systemd-operations' }
           ]
         }
       ],
@@ -249,8 +316,13 @@ export default {
           text: 'API Documentation',
           items: [
             { text: 'HTTP Interface', link: '/en/api/' },
-            { text: 'Admin API', link: '/en/api/admin' },
-            { text: 'Health Check API', link: '/en/api/health' }
+            { text: 'Admin API Overview', link: '/en/api/admin' },
+            { text: 'Links and Batch Operations', link: '/en/api/admin-links' },
+            { text: 'Runtime Config and Automation', link: '/en/api/admin-config' },
+            { text: 'Analytics', link: '/en/api/admin-analytics' },
+            { text: 'Health Check Overview', link: '/en/api/health' },
+            { text: 'Health Endpoints and Status Codes', link: '/en/api/health-endpoints' },
+            { text: 'Monitoring and Troubleshooting', link: '/en/api/health-monitoring' }
           ]
         }
       ],

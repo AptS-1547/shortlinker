@@ -3,26 +3,18 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph},
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_search_screen(frame: &mut Frame, app: &App, area: Rect) {
-    let popup_area = centered_rect(70, 30, area);
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title("Search Links")
-        .title_style(Style::default().fg(Color::Cyan).bold())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(Color::Cyan));
-    frame.render_widget(block, popup_area);
-
-    let inner_area = popup_area.inner(Margin::new(2, 2));
+    let inner_area = Popup::new("Search Links", popup::SEARCH)
+        .theme_color(Color::Cyan)
+        .margin(Margin::new(2, 2))
+        .render(frame, area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)

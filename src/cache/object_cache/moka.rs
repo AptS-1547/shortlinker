@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use moka::future::Cache;
 use moka::policy::Expiry;
+use rand::Rng;
 use std::time::{Duration, Instant};
 use tracing::debug;
 
@@ -11,8 +12,22 @@ use crate::storage::ShortLink;
 declare_object_cache_plugin!("memory", MokaCacheWrapper);
 
 /// 自定义过期策略，基于 ShortLink.expires_at 计算过期时间
+/// 添加 ±10% 随机抖动避免缓存集中失效
 struct ShortLinkExpiry {
     default_ttl: Duration,
+}
+
+impl ShortLinkExpiry {
+    /// 添加 ±10% 随机抖动到 TTL
+    fn apply_jitter(ttl_secs: u64) -> u64 {
+        if ttl_secs == 0 {
+            return 0;
+        }
+        let jitter_range = (ttl_secs / 10).max(1); // 至少 1 秒抖动
+        let jitter = rand::rng().random_range(0..=jitter_range * 2);
+        // 范围: ttl - 10% 到 ttl + 10%
+        ttl_secs.saturating_sub(jitter_range).saturating_add(jitter)
+    }
 }
 
 impl Expiry<String, ShortLink> for ShortLinkExpiry {
@@ -30,12 +45,17 @@ impl Expiry<String, ShortLink> for ShortLinkExpiry {
                     Some(Duration::from_secs(1))
                 } else {
                     let remaining = (expires_at - now).num_seconds() as u64;
-                    Some(Duration::from_secs(
-                        remaining.min(self.default_ttl.as_secs()),
-                    ))
+                    let capped = remaining.min(self.default_ttl.as_secs());
+                    // 添加随机抖动避免缓存雪崩
+                    Some(Duration::from_secs(Self::apply_jitter(capped)))
                 }
             }
-            None => Some(self.default_ttl), // 无过期时间，使用默认 TTL
+            None => {
+                // 无过期时间，使用默认 TTL 并添加抖动
+                Some(Duration::from_secs(Self::apply_jitter(
+                    self.default_ttl.as_secs(),
+                )))
+            }
         }
     }
 }
@@ -81,6 +101,19 @@ impl ObjectCache for MokaCacheWrapper {
         self.inner.invalidate(key).await;
     }
 
+    fn entry_count(&self) -> u64 {
+        self.inner.entry_count()
+    }
+
+    /// Invalidates all entries in the cache.
+    ///
+    /// # Note
+    /// Moka's `invalidate_all()` is **lazy** - entries are marked for deletion but
+    /// may still be readable for a brief window (typically <1ms). This is by design
+    /// for performance. The actual cleanup happens asynchronously via background tasks.
+    ///
+    /// If strong consistency is required (e.g., in tests), call `run_pending_tasks()`
+    /// after `invalidate_all()`, but be aware this has a performance cost.
     async fn invalidate_all(&self) {
         self.inner.invalidate_all();
     }
@@ -103,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expiry_no_expiration_uses_default() {
+    fn test_expiry_no_expiration_uses_default_with_jitter() {
         let expiry = ShortLinkExpiry {
             default_ttl: std::time::Duration::from_secs(3600),
         };
@@ -111,7 +144,14 @@ mod tests {
 
         let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
 
-        assert_eq!(result, Some(std::time::Duration::from_secs(3600)));
+        // 应该是 3600 ± 10% (3240 - 3960)
+        assert!(result.is_some());
+        let ttl = result.unwrap().as_secs();
+        assert!(
+            (3240..=3960).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]
@@ -129,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expiry_future_uses_remaining_time() {
+    fn test_expiry_future_uses_remaining_time_with_jitter() {
         let expiry = ShortLinkExpiry {
             default_ttl: std::time::Duration::from_secs(3600),
         };
@@ -138,15 +178,18 @@ mod tests {
 
         let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
 
-        // 剩余时间约 100 秒
+        // 剩余时间约 100 秒 ± 10% (90 - 110)
         assert!(result.is_some());
-        let ttl = result.unwrap();
-        assert!(ttl.as_secs() <= 100);
-        assert!(ttl.as_secs() >= 98); // 允许少量时间误差
+        let ttl = result.unwrap().as_secs();
+        assert!(
+            (88..=112).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]
-    fn test_expiry_caps_at_default_ttl() {
+    fn test_expiry_caps_at_default_ttl_with_jitter() {
         let expiry = ShortLinkExpiry {
             default_ttl: std::time::Duration::from_secs(3600),
         };
@@ -156,8 +199,14 @@ mod tests {
 
         let result = expiry.expire_after_create(&"key".to_string(), &link, Instant::now());
 
-        // 应该被限制在默认 TTL
-        assert_eq!(result, Some(std::time::Duration::from_secs(3600)));
+        // 应该被限制在默认 TTL ± 10% (3240 - 3960)
+        assert!(result.is_some());
+        let ttl = result.unwrap().as_secs();
+        assert!(
+            (3240..=3960).contains(&ttl),
+            "TTL {} not in expected range",
+            ttl
+        );
     }
 
     #[test]

@@ -1,30 +1,21 @@
 use chrono::Utc;
 use ratatui::{
     Frame,
-    layout::{Margin, Rect},
+    layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::Paragraph,
 };
 
-use super::common::centered_rect;
+use super::widgets::Popup;
 use crate::interfaces::tui::app::App;
+use crate::interfaces::tui::constants::popup;
 
 pub fn draw_view_details_screen(frame: &mut Frame, app: &App, area: Rect) {
     if let Some(link) = app.get_selected_link() {
-        let popup_area = centered_rect(75, 65, area);
-
-        frame.render_widget(Clear, popup_area);
-
-        let block = Block::default()
-            .title(format!("Link Details: {}", link.code))
-            .title_style(Style::default().fg(Color::Cyan).bold())
-            .borders(Borders::ALL)
-            .border_type(BorderType::Double)
-            .border_style(Style::default().fg(Color::Cyan));
-        frame.render_widget(block, popup_area);
-
-        let inner_area = popup_area.inner(Margin::new(2, 1));
+        let inner_area = Popup::new(&format!("Link Details: {}", link.code), popup::VIEW_DETAILS)
+            .theme_color(Color::Cyan)
+            .render(frame, area);
 
         // Calculate time remaining
         let expiry_info = if let Some(expires_at) = link.expires_at {

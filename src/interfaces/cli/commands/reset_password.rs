@@ -2,7 +2,7 @@
 
 use crate::config::runtime_config::keys;
 use crate::storage::ConfigStore;
-use crate::utils::password::hash_password;
+use crate::utils::password::process_new_password;
 use colored::Colorize;
 use sea_orm::DatabaseConnection;
 use std::io::{self, BufRead, Write};
@@ -66,7 +66,7 @@ fn atty_check() -> bool {
     #[cfg(windows)]
     {
         use std::os::windows::io::AsRawHandle;
-        use winapi::um::consoleapi::GetConsoleMode;
+        use windows_sys::Win32::System::Console::GetConsoleMode;
         let handle = io::stdin().as_raw_handle();
         let mut mode = 0;
         unsafe { GetConsoleMode(handle as *mut _, &mut mode) != 0 }
@@ -98,8 +98,12 @@ pub async fn run_reset_password(db: DatabaseConnection, password: Option<String>
     }
 
     // 哈希新密码
-    let hashed = match hash_password(&new_password) {
-        Ok(h) => h,
+    let hashed = match process_new_password(Some(&new_password)) {
+        Ok(Some(h)) => h,
+        Ok(None) => {
+            eprintln!("{} Password cannot be empty", "Error:".red().bold());
+            std::process::exit(1);
+        }
         Err(e) => {
             eprintln!("{} Failed to hash password: {}", "Error:".red().bold(), e);
             std::process::exit(1);

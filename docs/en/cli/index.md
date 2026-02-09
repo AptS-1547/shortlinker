@@ -1,4 +1,4 @@
-# CLI Command Line Tool
+# CLI Overview
 
 Shortlinker provides an intuitive and easy-to-use command line tool for managing short links.
 
@@ -8,13 +8,14 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 - 🔄 **Real-time Sync** - Commands take effect immediately  
 - ⚡ **Fast Response** - Supports SQLite, PostgreSQL, MySQL, MariaDB storage backends
 - 🛡️ **Error Handling** - Detailed error messages and suggestions
-- 📦 **Import/Export** - CSV format backup and migration support (JSON is legacy/deprecated)
+- 📦 **Import/Export** - Link import/export supports CSV only
 
 ## Basic Syntax
 
 ```bash
 ./shortlinker                         # start HTTP server (default)
 ./shortlinker <command> [args] [opts] # run CLI command
+./shortlinker --socket <path> <command> # override IPC socket (Unix) / named pipe (Windows)
 ```
 
 ## Command Overview
@@ -30,7 +31,8 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 | `list` | List all links | `./shortlinker list` |
 | `export` | Export data | `./shortlinker export backup.csv` |
 | `import` | Import data | `./shortlinker import backup.csv --force` |
-| `generate-config` | Generate config template | `./shortlinker generate-config` |
+| `status` | Show server status (IPC) | `./shortlinker status` |
+| `config generate` | Generate config template | `./shortlinker config generate` |
 | `reset-password` | Reset admin password | `./shortlinker reset-password` |
 | `config` | Runtime config management (DB) | `./shortlinker config list` |
 | `tui` | Launch TUI interface (requires build feature) | `./shortlinker tui` |

@@ -144,6 +144,52 @@ impl ObjectCache for RedisObjectCache {
     async fn invalidate_all(&self) {
         let mut conn = self.connection.clone();
         let pattern = format!("{}*", self.key_prefix);
+
+        // 使用 Lua 脚本原子性删除所有匹配的 key
+        // 这避免了 SCAN+DEL 模式中新 key 可能被漏删的问题
+        let lua_script = r#"
+            local cursor = "0"
+            local deleted = 0
+            repeat
+                local result = redis.call("SCAN", cursor, "MATCH", ARGV[1], "COUNT", 100)
+                cursor = result[1]
+                local keys = result[2]
+                if #keys > 0 then
+                    deleted = deleted + redis.call("DEL", unpack(keys))
+                end
+            until cursor == "0"
+            return deleted
+        "#;
+
+        let result: redis::RedisResult<u64> = redis::Script::new(lua_script)
+            .arg(&pattern)
+            .invoke_async(&mut conn)
+            .await;
+
+        match result {
+            Ok(deleted_count) => {
+                debug!(
+                    "Invalidated {} keys with prefix: {} (using Lua script)",
+                    deleted_count, self.key_prefix
+                );
+            }
+            Err(e) => {
+                // 如果 Lua 脚本失败（可能是 Redis 集群不支持），回退到 SCAN+DEL
+                error!(
+                    "Lua script invalidate_all failed: {}, falling back to SCAN+DEL",
+                    e
+                );
+                self.invalidate_all_fallback().await;
+            }
+        }
+    }
+}
+
+impl RedisObjectCache {
+    /// 回退方案：使用 SCAN+DEL 模式删除
+    async fn invalidate_all_fallback(&self) {
+        let mut conn = self.connection.clone();
+        let pattern = format!("{}*", self.key_prefix);
         let mut deleted_count = 0u64;
         let mut cursor: u64 = 0;
 
@@ -182,7 +228,7 @@ impl ObjectCache for RedisObjectCache {
         }
 
         debug!(
-            "Invalidated {} keys with prefix: {}",
+            "Invalidated {} keys with prefix: {} (fallback)",
             deleted_count, self.key_prefix
         );
     }

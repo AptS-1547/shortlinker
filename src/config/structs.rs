@@ -124,6 +124,7 @@ impl std::str::FromStr for HttpMethod {
 /// - cache: 缓存系统配置
 /// - logging: 日志配置
 /// - analytics: 分析统计配置
+/// - ipc: IPC 服务器配置
 ///
 /// 运行时配置（api, routes, features, click_manager, cors）存储在数据库中，
 /// 通过 Admin Panel 或 API 进行管理，使用 RuntimeConfig 读取。
@@ -139,6 +140,8 @@ pub struct StaticConfig {
     pub logging: LoggingConfig,
     #[serde(default)]
     pub analytics: AnalyticsConfig,
+    #[serde(default)]
+    pub ipc: IpcConfig,
 }
 
 impl StaticConfig {
@@ -277,6 +280,10 @@ pub struct LoggingConfig {
     pub format: String,
     #[serde(default = "default_log_file")]
     pub file: Option<String>,
+    /// 单个日志文件最大大小（MB）
+    ///
+    /// **注意**: 当前版本未使用此字段，日志轮转按天而非按大小。
+    /// 保留字段以保持配置文件向后兼容。
     #[serde(default = "default_max_size")]
     pub max_size: u64,
     #[serde(default = "default_max_backups")]
@@ -306,7 +313,7 @@ fn default_database_url() -> String {
 }
 
 fn default_database_pool_size() -> u32 {
-    10
+    20
 }
 
 fn default_database_timeout() -> u64 {
@@ -461,6 +468,108 @@ impl Default for AnalyticsConfig {
         Self {
             maxminddb_path: None,
             geoip_api_url: default_geoip_api_url(),
+        }
+    }
+}
+
+/// IPC (进程间通信) 配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IpcConfig {
+    /// 是否启用 IPC 服务器
+    /// 禁用后 CLI 的 status、reload 等命令将无法与服务器通信
+    #[serde(default = "default_ipc_enabled")]
+    pub enabled: bool,
+
+    /// Socket 路径（Unix）或命名管道路径（Windows）
+    /// Unix 默认: "./shortlinker.sock"
+    /// Windows 默认: r"\\.\pipe\shortlinker"
+    #[serde(default)]
+    pub socket_path: Option<String>,
+
+    /// 最大消息大小（字节）
+    #[serde(default = "default_ipc_max_message_size")]
+    pub max_message_size: usize,
+
+    /// 默认超时（秒）
+    #[serde(default = "default_ipc_timeout")]
+    pub timeout: u64,
+
+    /// Reload 操作超时（秒）
+    #[serde(default = "default_ipc_reload_timeout")]
+    pub reload_timeout: u64,
+
+    /// 批量操作（导入/导出）超时（秒）
+    #[serde(default = "default_ipc_bulk_timeout")]
+    pub bulk_timeout: u64,
+}
+
+impl IpcConfig {
+    /// 获取实际的 socket 路径
+    ///
+    /// 优先级: CLI --socket 参数 > config.toml > 平台默认值
+    pub fn effective_socket_path(&self) -> String {
+        // 1. CLI 参数覆盖
+        if let Some(override_path) = crate::config::get_ipc_socket_override() {
+            return override_path.clone();
+        }
+
+        // 2. config.toml 配置
+        if let Some(ref path) = self.socket_path {
+            return path.clone();
+        }
+
+        // 3. 平台默认值
+        #[cfg(unix)]
+        {
+            "./shortlinker.sock".to_string()
+        }
+        #[cfg(windows)]
+        {
+            r"\\.\pipe\shortlinker".to_string()
+        }
+    }
+
+    /// 获取默认超时 Duration
+    pub fn default_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.timeout)
+    }
+
+    /// 获取 reload 超时 Duration
+    pub fn reload_timeout_duration(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.reload_timeout)
+    }
+
+    /// 获取批量操作超时 Duration
+    pub fn bulk_timeout_duration(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.bulk_timeout)
+    }
+}
+
+fn default_ipc_enabled() -> bool {
+    true
+}
+fn default_ipc_max_message_size() -> usize {
+    64 * 1024
+}
+fn default_ipc_timeout() -> u64 {
+    5
+}
+fn default_ipc_reload_timeout() -> u64 {
+    30
+}
+fn default_ipc_bulk_timeout() -> u64 {
+    60
+}
+
+impl Default for IpcConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_ipc_enabled(),
+            socket_path: None,
+            max_message_size: default_ipc_max_message_size(),
+            timeout: default_ipc_timeout(),
+            reload_timeout: default_ipc_reload_timeout(),
+            bulk_timeout: default_ipc_bulk_timeout(),
         }
     }
 }

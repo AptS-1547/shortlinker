@@ -10,8 +10,14 @@ use bytes::{Buf, BufMut, BytesMut};
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt;
 
-/// Maximum allowed message size (64KB)
-pub const MAX_MESSAGE_SIZE: usize = 64 * 1024;
+/// Default maximum allowed message size (64KB)
+/// Used for documentation and fallback when config is not available
+pub const DEFAULT_MAX_MESSAGE_SIZE: usize = 64 * 1024;
+
+/// Get the configured maximum message size
+fn max_message_size() -> usize {
+    crate::config::get_config().ipc.max_message_size
+}
 
 /// Protocol errors
 #[derive(Debug)]
@@ -31,7 +37,8 @@ impl fmt::Display for ProtocolError {
                 write!(
                     f,
                     "Message too large: {} bytes (max: {})",
-                    size, MAX_MESSAGE_SIZE
+                    size,
+                    max_message_size()
                 )
             }
             ProtocolError::JsonError(e) => write!(f, "JSON error: {}", e),
@@ -62,8 +69,9 @@ impl From<serde_json::Error> for ProtocolError {
 /// - N bytes: JSON-encoded payload
 pub fn encode<T: Serialize>(msg: &T) -> Result<Vec<u8>, ProtocolError> {
     let json = serde_json::to_vec(msg)?;
+    let limit = max_message_size();
 
-    if json.len() > MAX_MESSAGE_SIZE {
+    if json.len() > limit {
         return Err(ProtocolError::MessageTooLarge(json.len()));
     }
 
@@ -89,9 +97,10 @@ pub fn decode<T: DeserializeOwned>(buf: &mut BytesMut) -> Result<Option<T>, Prot
 
     // Peek at the length without consuming
     let length = (&buf[..4]).get_u32() as usize;
+    let limit = max_message_size();
 
     // Validate message size
-    if length > MAX_MESSAGE_SIZE {
+    if length > limit {
         return Err(ProtocolError::MessageTooLarge(length));
     }
 
@@ -115,8 +124,16 @@ pub fn decode<T: DeserializeOwned>(buf: &mut BytesMut) -> Result<Option<T>, Prot
 mod tests {
     use super::*;
 
+    fn init_test_config() {
+        // Initialize config for tests if not already initialized
+        let _ = std::panic::catch_unwind(|| {
+            crate::config::init_config();
+        });
+    }
+
     #[test]
     fn test_encode_decode_roundtrip() {
+        init_test_config();
         use crate::system::ipc::types::IpcCommand;
 
         let cmd = IpcCommand::Ping;
@@ -131,6 +148,7 @@ mod tests {
 
     #[test]
     fn test_incomplete_message() {
+        init_test_config();
         let mut buf = BytesMut::from(&[0, 0, 0, 10][..]); // Length says 10 bytes, but no payload
         let result: Result<Option<String>, _> = decode(&mut buf);
         assert!(matches!(result, Ok(None)));
@@ -138,8 +156,9 @@ mod tests {
 
     #[test]
     fn test_message_too_large() {
+        init_test_config();
         let mut buf = BytesMut::with_capacity(8);
-        buf.put_u32((MAX_MESSAGE_SIZE + 1) as u32);
+        buf.put_u32((DEFAULT_MAX_MESSAGE_SIZE + 1) as u32);
         buf.put_u32(0); // Dummy data
 
         let result: Result<Option<String>, _> = decode(&mut buf);

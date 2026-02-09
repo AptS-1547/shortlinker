@@ -12,15 +12,6 @@ use super::protocol::{decode, encode};
 use super::types::{ImportLinkData, IpcCommand, IpcError, IpcResponse};
 use crate::system::reload::ReloadTarget;
 
-/// Default timeout for IPC operations
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// Reload operation timeout (longer since reload can take time)
-const RELOAD_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// Import/export operation timeout (can be long for large datasets)
-const BULK_TIMEOUT: Duration = Duration::from_secs(60);
-
 /// Check if the server is running
 ///
 /// This performs a quick synchronous check by testing socket connectivity.
@@ -30,12 +21,15 @@ pub fn is_server_running() -> bool {
 
 /// Send an IPC command and wait for response
 ///
-/// Uses the default timeout of 5 seconds.
+/// Uses timeout from configuration based on command type.
 pub async fn send_command(cmd: IpcCommand) -> Result<IpcResponse, IpcError> {
+    let config = crate::config::get_config();
     let timeout_duration = match &cmd {
-        IpcCommand::Reload { .. } => RELOAD_TIMEOUT,
-        IpcCommand::ImportLinks { .. } | IpcCommand::ExportLinks => BULK_TIMEOUT,
-        _ => DEFAULT_TIMEOUT,
+        IpcCommand::Reload { .. } => config.ipc.reload_timeout_duration(),
+        IpcCommand::ImportLinks { .. } | IpcCommand::ExportLinks => {
+            config.ipc.bulk_timeout_duration()
+        }
+        _ => config.ipc.default_timeout(),
     };
     send_command_with_timeout(cmd, timeout_duration).await
 }

@@ -1,56 +1,76 @@
 # CLI Command Reference
 
-Detailed command line tool usage instructions and parameter options.
+Detailed command-line usage and options for day-to-day management.
 
-## Basic Commands
+## Task-Oriented Navigation
+
+- **First-time usage**: `add` → `list` → `update` → `remove`
+- **Bulk migration**: `import` / `export`
+- **Operations**: `config` / `reset-password`
+- **Interactive management**: `tui`
+
+> If you prefer visual management, start with the [TUI guide](/en/cli/tui).
+
+## Global Options
+
+All CLI subcommands support:
+
+- `-s, --socket <path>`: override IPC socket path (Unix) or named pipe path (Windows)
+
+> Priority: CLI `--socket` > `ipc.socket_path` in `config.toml` > platform default.
+
+## Core Commands (Recommended Order)
 
 ### add - Add Short Link
 
 ```bash
-# Custom short code
 ./shortlinker add <short_code> <target_url> [options]
-
-# Random short code
-./shortlinker add <target_url> [options]
+./shortlinker add <target_url> [options]  # random short code
 ```
 
+> Note: short codes must satisfy constraints (length ≤ 128, allowed chars `[a-zA-Z0-9_.-/]`) and must not conflict with reserved route prefixes (default `admin`/`health`/`panel`, from `routes.*_prefix`).
+
 **Options**:
-- `--force`: Force overwrite existing short code
-- `--expire <time>`: Set expiration time
-- `--password <password>`: Set password protection (experimental)
+- `--force`: force overwrite existing short code
+- `--expire <time>`: set expiration time
+- `--password <password>`: set password protection (experimental)
 
 **Examples**:
 ```bash
-# Basic usage
 ./shortlinker add google https://www.google.com
-
-# Random short code
 ./shortlinker add https://www.example.com
-
-# Set expiration time
 ./shortlinker add daily https://example.com --expire 1d
-./shortlinker add sale https://shop.com --expire 2w3d
-
-# Force overwrite
 ./shortlinker add google https://www.google.com --force
-
-# Password protected link
 ./shortlinker add secret https://example.com --password mypass
 ```
 
-### export - Export Short Links
+### list - List Short Links
 
 ```bash
-./shortlinker export [file_path]
+./shortlinker list
 ```
+
+### update - Update Short Link
+
+```bash
+./shortlinker update <short_code> <new_target_url> [options]
+```
+
+**Options**:
+- `--expire <time>`: set new expiration time
+- `--password <password>`: set or update password
 
 **Examples**:
 ```bash
-# Default filename
-./shortlinker export
+./shortlinker update github https://new-github.com
+./shortlinker update github https://new-github.com --expire 30d
+./shortlinker update github https://new-github.com --password secret123
+```
 
-# Specify filename
-./shortlinker export backup.csv
+### remove - Delete Short Link
+
+```bash
+./shortlinker remove <short_code>
 ```
 
 ### import - Import Short Links
@@ -60,52 +80,106 @@ Detailed command line tool usage instructions and parameter options.
 ```
 
 **Options**:
-- `--force`: Force overwrite existing short codes
+- `--force`: force overwrite existing short codes
 
 **Examples**:
 ```bash
-# Import with default options
 ./shortlinker import backup.csv
-
-# Force overwrite existing codes
 ./shortlinker import backup.csv --force
 ```
 
-> CSV is the default format. `.json` is supported only for legacy compatibility (will be removed in v0.5.0).
+> Import supports CSV only; please use `.csv` files.
 
-### remove - Delete Short Link
-
-```bash
-./shortlinker remove <short_code>
-```
-
-### list - List Short Links
+### export - Export Short Links
 
 ```bash
-./shortlinker list
+./shortlinker export [file_path]
 ```
 
-### help - Show command help
+**Examples**:
+```bash
+./shortlinker export
+./shortlinker export backup.csv
+```
+
+> If file path is omitted, CLI generates `shortlinks_export_YYYYMMDD_HHMMSS.csv`.
+
+### help - Show Command Help
 
 ```bash
 ./shortlinker help
 ```
 
-### generate-config - Generate Configuration File
+### status - Show Server Status (IPC)
 
 ```bash
-./shortlinker generate-config [output_path]
+./shortlinker status
+./shortlinker --socket /tmp/custom.sock status
 ```
 
-Generate a **startup config** (`config.toml`) template, including `server` / `database` / `cache` / `logging` / `analytics`.  
-Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in the database and is not part of this file.
+When reachable, it shows version, uptime, reload-in-progress status, last data/config reload time, and total link count.
+If IPC is unreachable (server not running, `ipc.enabled=false`, socket path mismatch, etc.), it reports "Server is not running".
+
+## Operations Commands
+
+### config - Configuration Management
+
+The `config` subcommand manages Shortlinker configuration.
+
+#### config generate - Generate Configuration File
+
+```bash
+./shortlinker config generate [output_path] [options]
+```
+
+Generates a **startup config** (`config.toml`) template including `server` / `database` / `cache` / `logging` / `analytics` / `ipc`.
+Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `click.*`, `cors.*`, `analytics.*`, `utm.*`, `cache.*`) is stored in DB and not part of this file.
+
+> Note: This command does not require a database connection and can be used during initial deployment.
+
+**Options**:
+- `--force`: skip confirmation and force overwrite existing file
 
 **Examples**:
 ```bash
-./shortlinker generate-config                 # Generate config.example.toml
-./shortlinker generate-config config.toml     # Generate/overwrite config.toml
-./shortlinker generate-config myconfig.toml   # Specify filename
+./shortlinker config generate                       # generate config.example.toml
+./shortlinker config generate config.toml           # prompts for confirmation if file exists
+./shortlinker config generate config.toml --force   # force overwrite
 ```
+
+#### config list/get/set/reset - Runtime Config Management (DB)
+
+The following subcommands manage runtime config stored in the database (same config system used by the web admin panel).
+
+> Note: `config set/reset` automatically **attempt** IPC `Config` reload only for keys marked as no-restart.
+> `config import` performs one best-effort `Config` reload attempt after import.
+> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), trigger Admin API `POST /admin/v1/config/reload` manually.
+> Keys marked as "requires restart" (e.g. `routes.*`, `click.*`, `cors.*`, `cache.*`) will not hot-apply even after reload.
+
+Common subcommands:
+
+```bash
+# List configs (plain-text output groups only: auth/cookie/features/routes/cors/tracking)
+./shortlinker config list
+./shortlinker config list --category routes
+# Use --json to get the full key set (including analytics/utm/cache)
+./shortlinker config list --json
+
+# Get one config (use --json for structured output)
+./shortlinker config get features.random_code_length
+./shortlinker config get api.cookie_same_site --json
+
+# Set/reset
+./shortlinker config set features.random_code_length 8
+./shortlinker config reset features.random_code_length
+
+# Export/import (JSON)
+./shortlinker config export config-backup.json
+./shortlinker config import config-backup.json
+./shortlinker config import config-backup.json --force
+```
+
+> Security note: exported config files contain real sensitive values (e.g. `api.admin_token`, `api.jwt_secret`, `api.health_token`). Store them securely.
 
 ### reset-password - Reset Admin Password
 
@@ -113,9 +187,9 @@ Runtime config (e.g. `features.*`, `api.*`, `routes.*`, `cors.*`) is stored in t
 ./shortlinker reset-password [options]
 ```
 
-Reset the admin API password. The new password will be hashed with Argon2id and stored in the database.
+Resets the admin API password. The new password is hashed with Argon2id before being stored.
 
-**Requirement**: Password must be at least 8 characters long.
+**Requirement**: password length must be at least 8 characters.
 
 **Examples**:
 ```bash
@@ -129,195 +203,83 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 ./shortlinker reset-password --password "my_new_secure_password"
 ```
 
-### config - Runtime config management (DB)
+## Interactive Interface
 
-The `config` subcommand manages runtime configuration values stored in the database (the same config system used by the web admin panel).
-
-> Note: `config` writes values into the database. To make a **running** server reload configs from the database, call Admin API `POST /admin/v1/config/reload` or restart the service.  
-> Keys marked as “requires restart” (e.g. `routes.*`, `click.*`, `cors.*`) will not hot-apply even after reload; a restart is required.
-
-Common subcommands:
-
-```bash
-# List configs (optional --category: auth/cookie/features/routes/cors/tracking)
-./shortlinker config list
-./shortlinker config list --category routes
-
-# Get a config (use --json for structured output)
-./shortlinker config get features.random_code_length
-./shortlinker config get api.cookie_same_site --json
-
-# Set/reset
-./shortlinker config set features.random_code_length 8
-./shortlinker config reset features.random_code_length
-
-# Export/import (JSON)
-./shortlinker config export config-backup.json
-./shortlinker config import config-backup.json
-./shortlinker config import config-backup.json --force   # skip interactive confirmation
-```
-
-> Security note: exported config files contain real sensitive values (e.g. `api.admin_token`, `api.jwt_secret`, `api.health_token`). Store them securely.
-
-### tui - Launch Terminal User Interface
+### tui - Launch Terminal UI
 
 ```bash
 ./shortlinker tui
 ```
 
-**TUI Mode Features**:
-- Interactive visual interface
-- Real-time view of all short links
-- Keyboard navigation and operations
-- Display link details (click count, expiration time, etc.)
+**TUI features**:
+- interactive visual interface
+- real-time link list view
+- keyboard-based navigation and actions
+- link details (clicks, expiration, etc.)
 
-**Keyboard Shortcuts**:
-- `↑/↓` or `j/k`: Move selection up/down
-- `Enter` or `v`: View details
-- `/`: Search
-- `?` (or `h`): Help
-- `x`: Export / Import
-- `q`: Quit (`Esc` is commonly used for back/cancel/clear search)
+**Keyboard shortcuts**:
+- `↑/↓` or `j/k`: move selection
+- `Enter` or `v`: view details
+- `/`: search
+- `?` (or `h`): help
+- `x`: export/import
+- `q`: quit (`Esc` is commonly used for back/cancel/clear)
 
-> 💡 **Tip**: TUI mode is ideal for quick browsing and link management. For detailed usage, see [TUI User Guide](/en/cli/tui)
+> For full details, see the [TUI guide](/en/cli/tui).
 
-**Output Format**:
-```bash
-Short links list:
+## Advanced and Automation
 
-  google -> https://www.google.com
-  github -> https://github.com
-  temp -> https://example.com (expires: 2024-12-31 23:59:59 UTC)
-
-ℹ Total 3 short links
-```
-
-### update - Update Short Link
+### Expiration Time Formats
 
 ```bash
-./shortlinker update <short_code> <new_target_url> [options]
+1h      # 1 hour
+1d      # 1 day
+1w      # 1 week
+1M      # 1 month
+1y      # 1 year
+1d2h30m # combined format
+2024-12-31T23:59:59Z  # RFC3339
 ```
 
-**Examples**:
-```bash
-# Update target URL
-./shortlinker update github https://new-github.com
+### Import/Export Formats (links)
 
-# Update URL and expiration time
-./shortlinker update github https://new-github.com --expire 30d
+**CSV (default)**
+
+Export includes header fields:
+`code,target,created_at,expires_at,password,click_count`
+
+```csv
+code,target,created_at,expires_at,password,click_count
+github,https://github.com,2024-12-15T14:30:22Z,,,
 ```
 
-## Expiration Time Formats
+### Reload Behavior
 
-### Simple Format (Recommended)
+When the server is running and IPC is reachable, link-management commands execute through IPC in the server process to keep storage/cache state aligned.
 
-```bash
-1h    # 1 hour
-1d    # 1 day
-1w    # 1 week
-1M    # 1 month
-1y    # 1 year
-```
+If IPC is unreachable, CLI falls back to direct DB operations (good for offline maintenance). If an online server is still running, you should manually refresh data (typically by restarting the service).
 
-### Combined Format
+> Runtime config changes are a separate path. `config set/reset` only attempt `Config` reload for no-restart keys; `config import` performs one best-effort `Config` reload after import; keys marked "requires restart" still require restart.
 
-```bash
-1d2h30m     # 1 day 2 hours 30 minutes
-2w3d        # 2 weeks 3 days
-1h30m15s    # 1 hour 30 minutes 15 seconds
-```
+### Database Configuration
 
-### RFC3339 Format (Compatible)
-
-```bash
-2024-12-31T23:59:59Z
-2024-12-31T23:59:59+08:00
-```
-
-> 💡 **Tip**: For more advanced time format options and detailed explanations, check the "Advanced Usage" section in the project documentation
-
-## Common Time Examples
-
-```bash
-# Short-term links
-./shortlinker add flash https://example.com --expire 1h      # 1 hour
-./shortlinker add daily https://example.com --expire 1d     # 1 day
-
-# Medium to long-term links  
-./shortlinker add weekly https://example.com --expire 1w    # 1 week
-./shortlinker add monthly https://example.com --expire 1M   # 1 month
-
-# Precise time
-./shortlinker add meeting https://zoom.us/j/123 --expire 2h30m
-./shortlinker add sale https://shop.com --expire 2w3d
-```
-
-## Hot Reload Mechanism
-
-After link-management operations (add/update/remove/import), CLI notifies the running server to reload short link data and rebuild in-memory caches:
-
-```bash
-# Unix/Linux systems - automatically send SIGUSR1 signal
-./shortlinker add new https://example.com
-# Output: ✓ Added short link: new -> https://example.com
-#        ℹ Server reload notification sent
-
-# Windows systems - automatically create trigger file
-./shortlinker add new https://example.com
-```
-
-> Note: this reload mechanism is about **link data / caches**, not runtime config. For runtime config changes done outside the server process (e.g. via `./shortlinker config set`), call Admin API `POST /admin/v1/config/reload` or restart the service.
-
-## Exit Codes
-
-| Exit Code | Meaning |
-|----------|---------|
-| 0 | Success |
-| 1 | Failed (validation/storage/command error) |
-
-## Configuration
-
-The CLI connects to the database using `config.toml` in the current working directory. To point it to a different database:
+CLI reads `config.toml` in the current working directory. To use a different DB:
 
 ```toml
 [database]
-database_url = "sqlite://links.db"
+database_url = "sqlite://shortlinks.db"
 ```
 
 > See [Configuration Guide](/en/config/).
 
-## Script Integration
+### Batch Scripts
 
-### Batch Operations
 ```bash
-#!/bin/bash
-# Batch import links
+# Backup script
+./shortlinker export "backup_$(date +%Y%m%d).csv"
+
+# Batch import
 while IFS=',' read -r code url; do
     ./shortlinker add "$code" "$url"
 done < links.csv
 ```
-
-### Error Checking
-```bash
-if ./shortlinker add test https://example.com --expire 1d; then
-    echo "Added successfully"
-else
-    echo "Failed to add"
-    exit 1
-fi
-```
-
-## Process Management
-
-### Check Service Status
-```bash
-# Unix systems
-if [ -f shortlinker.pid ]; then
-    echo "Server PID: $(cat shortlinker.pid)"
-else
-    echo "Server not running"
-fi
-```
-
-### Container Environment
-In Docker containers, process management automatically handles container restarts without manual intervention.

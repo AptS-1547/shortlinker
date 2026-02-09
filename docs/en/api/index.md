@@ -6,6 +6,17 @@ Shortlinker provides a simple HTTP API interface for short link redirection.
 
 Shortlinker mainly provides a redirection interface that supports GET and HEAD methods.
 
+## Navigation by Topic
+
+- Redirection endpoint (this page): `GET/HEAD /{path...}`
+- [Admin API Overview](/en/api/admin)
+- [Admin API: Links and Batch Operations](/en/api/admin-links)
+- [Admin API: Runtime Config and Automation](/en/api/admin-config)
+- [Admin API: Analytics](/en/api/admin-analytics)
+- [Health Check API Overview](/en/api/health)
+- [Health Check API: Endpoints and Status Codes](/en/api/health-endpoints)
+- [Health Check API: Monitoring and Troubleshooting](/en/api/health-monitoring)
+
 ## Basic Information
 
 - **Base URL**: `http://your-domain:port/`
@@ -30,6 +41,8 @@ Redirects to the target URL corresponding to the specified short code.
 - Max length: 128
 - Allowed characters: `[a-zA-Z0-9_.-/]`
 
+> Note: Route prefixes configured by `routes.admin_prefix` / `routes.health_prefix` / `routes.frontend_prefix` (default `/admin` / `/health` / `/panel`) are reserved and won’t hit the redirect route. Short link `code` must not conflict with these prefixes (e.g. `admin` or `admin/...`), otherwise creation will be rejected.
+
 **Responses**:
 
 #### Successful Redirect (307)
@@ -37,6 +50,19 @@ Redirects to the target URL corresponding to the specified short code.
 HTTP/1.1 307 Temporary Redirect
 Location: https://example.com
 Cache-Control: no-cache, no-store, must-revalidate
+```
+
+> **Optional UTM passthrough**:
+> - When runtime config `utm.enable_passthrough=true`, the redirect appends these request params to the target URL: `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`.
+> - Only these 5 keys are forwarded; other query params are not appended.
+
+Example:
+
+```http
+GET /promo?utm_source=newsletter&utm_campaign=spring HTTP/1.1
+
+HTTP/1.1 307 Temporary Redirect
+Location: https://example.com/landing?utm_source=newsletter&utm_campaign=spring
 ```
 
 #### Short Code Not Found/Expired (404)
@@ -47,6 +73,16 @@ Cache-Control: public, max-age=60
 
 Not Found
 ```
+
+#### Internal Server Error (500)
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Type: text/html; charset=utf-8
+
+Internal Server Error
+```
+
+> This usually indicates a storage/backend lookup failure (for example, temporary database unavailability). Check `error`-level server logs for details.
 
 ## Special Paths
 
@@ -141,13 +177,17 @@ def check_short_link(base_url, short_code):
 
 ## Monitoring and Logging
 
-The server logs the following information:
-- Redirect operation logs
-- 404 error logs
-- Expired link access logs
+In the current implementation, redirect handling logs only essential events by default (actual output depends on log level):
+- `trace`: fine-grained events such as invalid short-code rejection
+- `debug`: non-error branches like cache misses and link-not-found
+- `error`: database lookup failures (corresponding to HTTP `500`)
 
-Log examples:
-```
-[INFO] Redirect example -> https://www.example.com
-[INFO] Link expired: temp
-```
+If built with the `metrics` feature, you can monitor redirect status distribution via `shortlinker_redirects_total{status="307"|"404"|"500"}`.
+
+## UTM Source Derivation (Detailed Logs)
+
+When `analytics.enable_detailed_logging=true`, each click stores `click_logs.source` with this priority:
+
+1. If request URL has `utm_source`, use it directly.
+2. Otherwise, if `Referer` exists, store `ref:{domain}` (e.g. `ref:google.com`).
+3. Otherwise, store `direct`.

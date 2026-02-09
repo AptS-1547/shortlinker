@@ -37,16 +37,6 @@ features:
     details: Custom short codes, random generation, expiration time, CLI tool management, TUI interface
 ---
 
-:::warning ⚠️ v0.3.x Version Notice
-The current version (v0.3.x) is undergoing **significant feature adjustments and refactoring** with frequent updates, which may include API changes or functionality modifications.
-
-**Recommendations**:
-- 📌 **Production**: Use stable version tags (e.g., `v0.2.x`)
-- 🔄 **Development**: Follow the latest version to experience new features
-- 📖 **Documentation**: Documentation may lag behind code implementation; actual functionality prevails
-- 🐛 **Issue Reporting**: Please report issues via [GitHub Issues](https://github.com/AptS-1547/shortlinker/issues)
-:::
-
 ## Design Philosophy
 
 ### Minimalism
@@ -67,7 +57,7 @@ Command line tool management, TOML startup config + DB runtime config, one-click
 - **Cross-platform Support**: Windows, Linux, macOS, smart process locking to prevent duplicate startup
 - **Container Optimization**: Docker image deployment with container restart detection support
 - **TUI Interface**: Terminal user interface for interactive management and monitoring
-- **TOML Configuration**: Startup config (server/database/cache/logging/geoip) + DB runtime config (auth/routes/features, etc.)
+- **TOML Configuration**: Startup config (server/database/cache/logging/analytics/ipc) + DB runtime config (auth/routes/features, etc.)
 
 ## Quick Experience
 

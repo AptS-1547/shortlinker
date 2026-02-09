@@ -1,12 +1,33 @@
 //! Generate config command
 
+use std::io::{self, BufRead, Write};
+use std::path::Path;
+
 use colored::Colorize;
 
 use crate::interfaces::cli::CliError;
 
 /// Generate example configuration file
-pub async fn generate_config(output_path: Option<String>) -> Result<(), CliError> {
+pub async fn config_generate(output_path: Option<String>, force: bool) -> Result<(), CliError> {
     let path = output_path.unwrap_or_else(|| "config.example.toml".to_string());
+
+    // 检查文件是否存在，非 --force 模式下交互确认
+    if !force && Path::new(&path).exists() {
+        print!(
+            "{} {} {}",
+            "File already exists:".yellow(),
+            path.blue(),
+            "Overwrite? [y/N] ".yellow()
+        );
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin().lock().read_line(&mut input).unwrap();
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("{}", "Aborted.".red());
+            return Ok(());
+        }
+    }
 
     println!(
         "{} {}",

@@ -11,7 +11,7 @@ use std::path::Path;
 
 use crate::errors::ShortlinkerError;
 use crate::storage::ShortLink;
-use crate::utils::password::process_new_password;
+use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
 /// CSV 行数据结构（用于序列化/反序列化）
@@ -34,7 +34,7 @@ pub struct ClickLogCsvRow {
     pub short_code: String,
     pub clicked_at: String,
     pub referrer: String,
-    pub user_agent: String,
+    pub source: String,
     pub ip_address: String,
     pub country: String,
     pub city: String,
@@ -77,8 +77,8 @@ impl CsvLinkRow {
             }
         });
 
-        // 处理密码（明文则哈希，已哈希则保留）
-        let password = process_new_password(self.password.as_deref()).map_err(|e| {
+        // 处理密码（明文则哈希，已哈希则保留 - 导入场景）
+        let password = process_imported_password(self.password.as_deref()).map_err(|e| {
             ShortlinkerError::validation(format!(
                 "Failed to process password for code '{}': {}",
                 self.code, e
@@ -93,22 +93,6 @@ impl CsvLinkRow {
             password,
             click: self.click_count,
         })
-    }
-}
-
-/// 文件格式枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileFormat {
-    Csv,
-    Json,
-}
-
-/// 根据文件扩展名检测格式
-pub fn detect_format(path: &str) -> FileFormat {
-    if path.to_lowercase().ends_with(".json") {
-        FileFormat::Json
-    } else {
-        FileFormat::Csv // 默认 CSV
     }
 }
 
@@ -198,16 +182,6 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
-
-    #[test]
-    fn test_detect_format() {
-        assert_eq!(detect_format("test.csv"), FileFormat::Csv);
-        assert_eq!(detect_format("test.CSV"), FileFormat::Csv);
-        assert_eq!(detect_format("test.json"), FileFormat::Json);
-        assert_eq!(detect_format("test.JSON"), FileFormat::Json);
-        assert_eq!(detect_format("test.txt"), FileFormat::Csv); // 默认 CSV
-        assert_eq!(detect_format("test"), FileFormat::Csv);
-    }
 
     #[test]
     fn test_csv_link_row_from_short_link() {

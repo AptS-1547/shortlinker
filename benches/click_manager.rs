@@ -20,6 +20,7 @@ fn create_manager() -> shortlinker::analytics::manager::ClickManager {
         Arc::new(NoopSink) as Arc<dyn ClickSink>,
         Duration::from_secs(3600), // 长间隔，避免自动刷盘
         usize::MAX,                // 高阈值，避免阈值刷盘
+        shortlinker::metrics_core::NoopMetrics::arc(),
     )
 }
 

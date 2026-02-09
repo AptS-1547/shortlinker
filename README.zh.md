@@ -56,8 +56,8 @@ cargo run
 ./shortlinker add temp https://example.com --expire 7d          # 7 天后过期
 ./shortlinker list                              # 列出所有链接
 ./shortlinker remove github                     # 删除链接
-./shortlinker export links.json                 # 导出到 JSON
-./shortlinker import links.json                 # 从 JSON 导入
+./shortlinker export links.csv                  # 导出到 CSV
+./shortlinker import links.csv                  # 从 CSV 导入
 ```
 
 ## 管理 API
@@ -87,10 +87,10 @@ curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
 生成配置文件：
 
 ```bash
-./shortlinker generate-config
+./shortlinker config generate
 ```
 
-这会创建 `config.toml`，包含服务器、数据库、缓存和日志设置。
+这会创建 `config.example.toml`，包含 `server`、`database`、`cache`、`logging`、`analytics`、`ipc` 等配置。
 
 详细配置选项见 [配置文档](docs/config/index.md)。
 

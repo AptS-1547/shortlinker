@@ -6,6 +6,17 @@ Shortlinker 提供简洁的 HTTP API 接口用于短链接重定向。
 
 Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 
+## 分区导航
+
+- 重定向接口（本页）：`GET/HEAD /{path...}`
+- [Admin API 概览](/api/admin)
+- [Admin API：链接与批量操作](/api/admin-links)
+- [Admin API：运行时配置与自动化示例](/api/admin-config)
+- [Admin API：Analytics 统计分析](/api/admin-analytics)
+- [健康检查 API 概览](/api/health)
+- [健康检查 API：端点与状态码](/api/health-endpoints)
+- [健康检查 API：监控集成与故障排除](/api/health-monitoring)
+
 ## 基础信息
 
 - **Base URL**: `http://your-domain:port/`
@@ -30,6 +41,8 @@ Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 - 最大长度：128
 - 允许字符：`[a-zA-Z0-9_.-/]`
 
+> 注意：`routes.admin_prefix` / `routes.health_prefix` / `routes.frontend_prefix` 对应的路径前缀是保留路由（默认 `/admin` / `/health` / `/panel`），不会命中重定向接口；短链接 `code` 也不能与这些前缀冲突（如 `admin` 或 `admin/...`），否则创建会被拒绝。
+
 **响应**:
 
 #### 成功重定向 (307)
@@ -37,6 +50,19 @@ Shortlinker 主要提供一个重定向接口，支持 GET 和 HEAD 方法。
 HTTP/1.1 307 Temporary Redirect
 Location: https://example.com
 Cache-Control: no-cache, no-store, must-revalidate
+```
+
+> **UTM 透传（可选）**：
+> - 当运行时配置 `utm.enable_passthrough=true` 时，会把请求中的以下参数透传到目标 URL：`utm_source`、`utm_medium`、`utm_campaign`、`utm_term`、`utm_content`。
+> - 仅透传这 5 个键，其它 Query 参数不会追加到目标 URL。
+
+示例：
+
+```http
+GET /promo?utm_source=newsletter&utm_campaign=spring HTTP/1.1
+
+HTTP/1.1 307 Temporary Redirect
+Location: https://example.com/landing?utm_source=newsletter&utm_campaign=spring
 ```
 
 #### 短码不存在/已过期 (404)
@@ -49,6 +75,16 @@ Not Found
 ```
 
 > **注意**：404 响应使用 `Cache-Control: public, max-age=60` 进行短时缓存，以减少对不存在短码的重复请求。
+
+#### 服务内部错误 (500)
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Type: text/html; charset=utf-8
+
+Internal Server Error
+```
+
+> 通常表示存储层查询异常（例如数据库暂时不可用）；可结合服务日志中的 `error` 级别信息排查。
 
 ## 特殊路径
 
@@ -143,13 +179,17 @@ def check_short_link(base_url, short_code):
 
 ## 监控和日志
 
-服务器会记录以下信息：
-- 重定向操作日志
-- 404 错误日志
-- 过期链接访问日志
+当前实现的重定向链路默认仅记录必要日志（是否输出取决于日志级别）：
+- `trace`：非法短码拒绝等细粒度行为
+- `debug`：缓存未命中、短码不存在等非错误分支
+- `error`：数据库查询异常（对应返回 `500`）
 
-日志示例：
-```
-[INFO] 重定向 example -> https://www.example.com
-[INFO] 链接已过期: temp
-```
+如果启用 `metrics` feature，可通过 `shortlinker_redirects_total{status="307"|"404"|"500"}` 观测重定向状态分布。
+
+## UTM 来源解析（详细日志）
+
+当 `analytics.enable_detailed_logging=true` 时，每次点击会写入 `click_logs.source`，来源推导规则如下：
+
+1. 请求 URL 存在 `utm_source`：直接使用该值；
+2. 否则若请求头有 `Referer`：记录为 `ref:{domain}`（例如 `ref:google.com`）；
+3. 否则记录为 `direct`。

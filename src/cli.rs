@@ -10,6 +10,10 @@ use clap::{Parser, Subcommand};
 #[command(version)]
 #[command(about = "A high-performance URL shortener service", long_about = None)]
 pub struct Cli {
+    /// Override IPC socket path (Unix) or named pipe path (Windows)
+    #[arg(long, short = 's', global = true)]
+    pub socket: Option<String>,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -70,13 +74,13 @@ pub enum Commands {
     /// List all short links
     List,
 
-    /// Export links to JSON file
+    /// Export links to CSV file
     Export {
-        /// Output file path (default: stdout)
+        /// Output file path (default: shortlinks_export_YYYYMMDD_HHMMSS.csv)
         file_path: Option<String>,
     },
 
-    /// Import links from JSON file
+    /// Import links from CSV file
     Import {
         /// Input file path
         file_path: String,
@@ -84,12 +88,6 @@ pub enum Commands {
         /// Force overwrite existing links
         #[arg(long)]
         force: bool,
-    },
-
-    /// Generate example configuration file
-    GenerateConfig {
-        /// Output path (default: config.example.toml)
-        output_path: Option<String>,
     },
 
     /// Show server status (via IPC)
@@ -116,6 +114,16 @@ pub enum Commands {
 /// Configuration management commands
 #[derive(Subcommand)]
 pub enum ConfigCommands {
+    /// Generate example configuration file
+    Generate {
+        /// Output path (default: config.example.toml)
+        output_path: Option<String>,
+
+        /// Force overwrite without confirmation
+        #[arg(long)]
+        force: bool,
+    },
+
     /// List all configurations
     List {
         /// Filter by category (auth, cookie, features, routes, cors, tracking)

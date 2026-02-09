@@ -233,6 +233,23 @@ pub struct HealthStorageCheck {
 )]
 pub struct HealthChecks {
     pub storage: HealthStorageCheck,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache: Option<HealthCacheCheck>,
+}
+
+/// 缓存健康检查状态
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+#[ts(
+    export,
+    export_to = TS_EXPORT_PATH
+)]
+pub struct HealthCacheCheck {
+    pub status: String,
+    pub cache_type: String,
+    pub bloom_filter_enabled: bool,
+    pub negative_cache_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 /// 健康检查响应
@@ -338,6 +355,7 @@ mod tests {
         HealthStorageBackend::export_all(&cfg).expect("Failed to export HealthStorageBackend");
         HealthStorageCheck::export_all(&cfg).expect("Failed to export HealthStorageCheck");
         HealthChecks::export_all(&cfg).expect("Failed to export HealthChecks");
+        HealthCacheCheck::export_all(&cfg).expect("Failed to export HealthCacheCheck");
         HealthResponse::export_all(&cfg).expect("Failed to export HealthResponse");
 
         // Export/Import types

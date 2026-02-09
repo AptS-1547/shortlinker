@@ -90,7 +90,25 @@ pub fn init_logging(config: &StaticConfig) -> LoggingInitResult {
     };
 
     let (non_blocking_writer, guard) = tracing_appender::non_blocking(writer);
-    let filter = tracing_subscriber::EnvFilter::new(config.logging.level.clone());
+
+    // Validate logging level/filter string to avoid silently falling back to ERROR.
+    let mut warning = warning;
+    let filter = match tracing_subscriber::EnvFilter::try_new(config.logging.level.clone()) {
+        Ok(filter) => filter,
+        Err(e) => {
+            let msg = format!(
+                "Invalid logging.level '{}': {}. Falling back to 'info'.",
+                config.logging.level, e
+            );
+            if let Some(existing) = warning.as_mut() {
+                existing.push(' ');
+                existing.push_str(&msg);
+            } else {
+                warning = Some(msg);
+            }
+            tracing_subscriber::EnvFilter::new("info")
+        }
+    };
 
     let subscriber_builder = tracing_subscriber::fmt()
         .with_writer(non_blocking_writer)

@@ -42,16 +42,23 @@ The TUI interface consists of several main areas:
 | Shortcut | Function |
 |----------|----------|
 | `↑` / `↓` | Move selection up/down |
+| `j` / `k` | Move down/up (Vim style) |
 | `PageUp` / `PageDown` | Page up/down (10 items) |
 | `Home` / `g` | Jump to top |
 | `End` / `G` | Jump to bottom |
+| `s` | Cycle sort column (code / URL / clicks / status) |
+| `S` | Toggle sort direction (asc / desc) |
+| `Space` | Toggle select current link (for batch delete) |
+| `Esc` | Clear search state or clear batch selection |
 | `/` | Search (fuzzy match on code / target URL) |
 | `Enter` / `v` | View details |
 | `?` / `h` | Help |
 | `a` | Add new short link |
 | `e` | Edit selected short link |
-| `d` | Delete selected short link |
+| `d` | Delete current link (or open batch delete when selected items exist) |
 | `x` | Export/Import menu |
+| `y` | Copy selected short code to clipboard |
+| `Y` | Copy selected target URL to clipboard |
 | `q` | Quit (with confirmation) |
 
 ### Add/Edit Interface
@@ -109,7 +116,13 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 
 **Warning**: Delete operation cannot be undone!
 
-### 5. Export/Import (Press `x`)
+### 5. Batch Selection and Batch Delete (Press `Space` + `d`)
+
+- Press `Space` in the main screen to select/unselect current link
+- After selecting multiple links, press `d` to open the batch delete confirmation popup
+- In batch delete confirmation, press `y` to delete, `n` or `Esc` to cancel
+
+### 6. Export/Import (Press `x`)
 
 **Export Function**:
 - Default filename is a timestamped name like `shortlinks_export_20250115_183000.csv` (editable)
@@ -117,13 +130,15 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 - Useful for backup or migration
 
 **Import Function**:
-- Select a `.csv` file via the built-in file browser (`.json` is legacy/deprecated)
+- Select a `.csv` file via the built-in file browser
 - Batch import links (simple upsert: existing codes will be overwritten)
 - Compatible with CLI export format
 
-### 6. Auto Server Notification
+### 7. Auto Server Notification
 
-After create/update/delete (and import), TUI automatically notifies the server to reload **short link data / caches** (Unix: SIGUSR1; Windows: trigger file).
+After create/update/delete (and import), TUI notifies the server via IPC to run `ReloadTarget::Data`, refreshing short-link data and caches.
+
+> If IPC is unreachable (server not running, `ipc.enabled=false`, socket mismatch, etc.), the notification is skipped and local TUI operations still complete.
 
 ## Color Scheme
 
@@ -141,14 +156,14 @@ TUI mode is suitable for:
 1. **Visual Management**: Intuitive interface for quick CRUD operations
 2. **No API Required**: No need to configure Admin API Token or start Web service
 3. **Server Management**: Complete short link management in SSH terminals
-4. **Batch Operations**: Export/import functions for easy migration and backup
+4. **Batch Operations**: Supports batch import and batch delete
 5. **Immediate Feedback**: Operations take effect immediately without waiting for API responses
 
 ## Limitations
 
 Current version TUI known limitations:
 
-- ⚠️ No batch selection and batch operations (planned)
+- ⚠️ Only batch delete is supported; no batch edit or batch create
 - ⚠️ Password input shown as masked, cannot see actual content
 
 ## Troubleshooting
@@ -192,7 +207,7 @@ There is no manual refresh shortcut in the current version:
 | Visual UI | ✅ | ❌ | ❌ | ✅ |
 | Auth Required | ❌ | ❌ | ✅ | ✅ |
 | Interactive | ✅ | ❌ | ❌ | ✅ |
-| Batch Operations | ⚠️ Import | ✅ | ✅ | ✅ |
+| Batch Operations | ⚠️ Import + Batch delete | ✅ | ✅ | ✅ |
 | Remote Access | ❌ | ❌ | ✅ | ✅ |
 
 ## Next Steps

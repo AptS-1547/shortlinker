@@ -6,6 +6,9 @@ use super::StaticConfig;
 
 static CONFIG: OnceLock<ArcSwap<StaticConfig>> = OnceLock::new();
 
+/// CLI override for IPC socket path
+static IPC_SOCKET_OVERRIDE: OnceLock<String> = OnceLock::new();
+
 /// Get the global configuration instance
 ///
 /// Returns an Arc pointer to the configuration, which is cheap to clone
@@ -29,4 +32,16 @@ pub fn get_config() -> Arc<StaticConfig> {
 /// ```
 pub fn init_config() {
     CONFIG.get_or_init(|| ArcSwap::from_pointee(StaticConfig::load()));
+}
+
+/// Set CLI override for IPC socket path
+///
+/// This should be called before any IPC operations if --socket is specified.
+pub fn set_ipc_socket_override(path: String) {
+    let _ = IPC_SOCKET_OVERRIDE.set(path);
+}
+
+/// Get CLI override for IPC socket path (if set)
+pub fn get_ipc_socket_override() -> Option<&'static String> {
+    IPC_SOCKET_OVERRIDE.get()
 }

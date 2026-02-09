@@ -1,16 +1,46 @@
 //! 配置管理 API 端点
 
-use actix_web::{HttpRequest, Responder, Result as ActixResult, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use ts_rs::TS;
 
-use crate::config::{get_all_schemas, try_get_runtime_config};
+use crate::config::definitions::get_def;
+use crate::config::types::ActionType;
+use crate::config::{RuntimeConfig, get_all_schemas, try_get_runtime_config};
 use crate::errors::ShortlinkerError;
 use crate::system::reload::{ReloadTarget, get_reload_coordinator};
 
 use super::helpers::{error_from_shortlinker, success_response};
 use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
+
+/// 获取 RuntimeConfig 或返回错误响应
+///
+/// 用于简化各 handler 中的重复模式。
+/// 由于 actix-web handler 返回类型的限制，需要使用 `match` 而非 `?`。
+fn require_runtime_config() -> Option<&'static RuntimeConfig> {
+    try_get_runtime_config()
+}
+
+/// 返回 RuntimeConfig 未初始化的错误响应
+fn runtime_config_unavailable_error() -> HttpResponse {
+    error_from_shortlinker(&ShortlinkerError::service_unavailable(
+        "Runtime config not initialized",
+    ))
+}
+
+/// 宏：获取 RuntimeConfig 或返回错误
+///
+/// 由于 actix-web 的 handler 返回 `ActixResult<impl Responder>`，
+/// 无法直接用 `?` 运算符返回 HttpResponse。此宏简化这种模式。
+macro_rules! get_runtime_config_or_return {
+    () => {
+        match require_runtime_config() {
+            Some(rc) => rc,
+            None => return Ok(runtime_config_unavailable_error()),
+        }
+    };
+}
 
 /// 配置项响应
 #[derive(Debug, Serialize, TS)]
@@ -69,14 +99,7 @@ pub struct ConfigHistoryResponse {
 
 /// 获取所有配置
 pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     let configs = rc.get_all();
     let items: Vec<ConfigItemResponse> = configs
@@ -105,15 +128,7 @@ pub async fn get_all_configs(_req: HttpRequest) -> ActixResult<impl Responder> {
 /// 获取单个配置
 pub async fn get_config(_req: HttpRequest, path: web::Path<String>) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     match rc.get_full(&key) {
         Some(item) => {
@@ -145,15 +160,7 @@ pub async fn update_config(
     body: web::Json<ConfigUpdateRequest>,
 ) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     match rc.set(&key, &body.value).await {
         Ok(result) => {
@@ -165,7 +172,7 @@ pub async fn update_config(
             }
 
             let message = if result.requires_restart {
-                Some("此配置需要重启服务后生效".to_string())
+                Some("This configuration requires a service restart to take effect".to_string())
             } else {
                 None
             };
@@ -201,15 +208,7 @@ pub async fn get_config_history(
     query: web::Query<HistoryQuery>,
 ) -> ActixResult<impl Responder> {
     let key = path.into_inner();
-
-    let rc = match try_get_runtime_config() {
-        Some(rc) => rc,
-        None => {
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::service_unavailable("Runtime config not initialized"),
-            ));
-        }
-    };
+    let rc = get_runtime_config_or_return!();
 
     let limit = query.limit.unwrap_or(20).min(100);
 
@@ -298,6 +297,154 @@ pub async fn get_config_schema(_req: HttpRequest) -> ActixResult<impl Responder>
     Ok(success_response(schemas))
 }
 
+// ========== Config Action API ==========
+
+/// 配置 action 执行请求
+#[derive(Debug, Deserialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ConfigActionRequest {
+    pub action: ActionType,
+}
+
+/// 配置 action 执行响应
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ConfigActionResponse {
+    pub value: String,
+}
+
+/// 执行并保存响应（安全版本，不返回密钥值）
+#[derive(Debug, Serialize, TS)]
+#[ts(export, export_to = TS_EXPORT_PATH)]
+pub struct ExecuteAndSaveResponse {
+    pub success: bool,
+    pub requires_restart: bool,
+    pub message: Option<String>,
+}
+
+/// 执行配置 action（如生成 token）
+///
+/// POST /admin/v1/config/{key}/action
+pub async fn execute_config_action(
+    _req: HttpRequest,
+    path: web::Path<String>,
+    body: web::Json<ConfigActionRequest>,
+) -> ActixResult<impl Responder> {
+    let key = path.into_inner();
+
+    // 验证 key 存在且支持该 action
+    let def = match get_def(&key) {
+        Some(d) => d,
+        None => {
+            return Ok(error_from_shortlinker(&ShortlinkerError::config_not_found(
+                format!("Config key '{}' not found", key),
+            )));
+        }
+    };
+
+    // 检查是否支持请求的 action
+    match def.action {
+        Some(expected) if expected == body.action => {
+            // 执行 action
+            let value = execute_action(body.action);
+            info!("Config action {:?} executed for key: {}", body.action, key);
+            Ok(success_response(ConfigActionResponse { value }))
+        }
+        Some(_) => Ok(error_from_shortlinker(&ShortlinkerError::validation(
+            format!(
+                "Action {:?} not supported for config '{}', expected {:?}",
+                body.action, key, def.action
+            ),
+        ))),
+        None => Ok(error_from_shortlinker(&ShortlinkerError::validation(
+            format!("Config '{}' does not support any action", key),
+        ))),
+    }
+}
+
+/// 执行具体的 action
+fn execute_action(action: ActionType) -> String {
+    match action {
+        ActionType::GenerateToken => crate::utils::generate_secure_token(32),
+    }
+}
+
+/// 执行配置 action 并保存（安全版本）
+///
+/// POST /admin/v1/config/{key}/execute-and-save
+///
+/// 密钥值在后端生成并保存，不返回给前端，最大化安全性。
+pub async fn execute_and_save_config_action(
+    _req: HttpRequest,
+    path: web::Path<String>,
+    body: web::Json<ConfigActionRequest>,
+) -> ActixResult<impl Responder> {
+    let key = path.into_inner();
+    let rc = get_runtime_config_or_return!();
+
+    // 验证 key 存在且支持该 action
+    let def = match get_def(&key) {
+        Some(d) => d,
+        None => {
+            return Ok(error_from_shortlinker(&ShortlinkerError::config_not_found(
+                format!("Config key '{}' not found", key),
+            )));
+        }
+    };
+
+    // 检查是否支持请求的 action
+    match def.action {
+        Some(expected) if expected == body.action => {
+            // 执行 action 生成值
+            let value = execute_action(body.action);
+
+            // 保存值（密钥不返回给前端）
+            match rc.set(&key, &value).await {
+                Ok(result) => {
+                    // 敏感配置不记录明文值
+                    info!(
+                        "Config '{}' action {:?} executed and saved (value redacted)",
+                        key, body.action
+                    );
+
+                    let message = if result.requires_restart {
+                        Some(
+                            "Configuration saved. Server restart required to take effect."
+                                .to_string(),
+                        )
+                    } else {
+                        Some("Configuration saved successfully.".to_string())
+                    };
+
+                    Ok(success_response(ExecuteAndSaveResponse {
+                        success: true,
+                        requires_restart: result.requires_restart,
+                        message,
+                    }))
+                }
+                Err(e) => {
+                    warn!("Failed to save config '{}': {}", key, e);
+                    Ok(error_from_shortlinker(
+                        &ShortlinkerError::config_update_failed(format!(
+                            "Failed to save config: {}",
+                            e
+                        )),
+                    ))
+                }
+            }
+        }
+        Some(_) => Ok(error_from_shortlinker(&ShortlinkerError::validation(
+            format!(
+                "Action {:?} not supported for config '{}', expected {:?}",
+                body.action, key, def.action
+            ),
+        ))),
+        None => Ok(error_from_shortlinker(&ShortlinkerError::validation(
+            format!("Config '{}' does not support any action", key),
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,6 +458,9 @@ mod tests {
         ConfigUpdateRequest::export_all(&cfg).expect("Failed to export ConfigUpdateRequest");
         ConfigUpdateResponse::export_all(&cfg).expect("Failed to export ConfigUpdateResponse");
         ConfigHistoryResponse::export_all(&cfg).expect("Failed to export ConfigHistoryResponse");
+        ConfigActionRequest::export_all(&cfg).expect("Failed to export ConfigActionRequest");
+        ConfigActionResponse::export_all(&cfg).expect("Failed to export ConfigActionResponse");
+        ExecuteAndSaveResponse::export_all(&cfg).expect("Failed to export ExecuteAndSaveResponse");
         println!("Config TypeScript types exported");
     }
 }

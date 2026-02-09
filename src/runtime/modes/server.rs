@@ -6,14 +6,16 @@
 use actix_cors::Cors;
 use actix_web::{
     App, HttpServer,
-    middleware::{Compress, DefaultHeaders},
+    middleware::{Compress, Condition, DefaultHeaders},
     web,
 };
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{info, warn};
 
-use crate::api::middleware::{AdminAuth, CsrfGuard, FrontendGuard, HealthAuth};
+use crate::api::middleware::{
+    AdminAuth, CsrfGuard, FrontendGuard, HealthAuth, RequestIdMiddleware, TimingMiddleware,
+};
 use crate::api::services::{
     AppStartTime, admin::routes::admin_v1_routes, frontend_routes, health_routes, redirect_routes,
 };
@@ -94,13 +96,8 @@ fn validate_cors_config(cors_config: &CorsSettings) {
     }
 }
 
-/// Build CORS middleware from configuration
+/// Build CORS middleware from configuration (only called when CORS is enabled)
 fn build_cors_middleware(cors_config: &CorsSettings) -> Cors {
-    // When CORS is disabled, use browser's default same-origin policy (restrictive)
-    if !cors_config.enabled {
-        return Cors::default();
-    }
-
     let mut cors = Cors::default();
 
     // Track if we're using wildcard origins
@@ -176,6 +173,7 @@ pub async fn run_server() -> Result<()> {
     let link_service = startup.link_service.clone();
     let analytics_service = startup.analytics_service.clone();
     let route = startup.route_config.clone();
+    let metrics = startup.metrics.clone();
 
     let admin_prefix = route.admin_prefix;
     let health_prefix = route.health_prefix;
@@ -194,12 +192,16 @@ pub async fn run_server() -> Result<()> {
     };
 
     let cpu_count = config.server.cpu_count.min(32);
-    warn!("Using {} CPU cores for the server", cpu_count);
+    info!("Using {} CPU cores for the server", cpu_count);
 
     // GeoIP provider is startup-config driven and can be toggled at runtime via
     // `analytics.enable_geo_lookup` (runtime config). We always initialize it here so
     // toggling doesn't require a restart; actual lookup only happens when enabled.
     let geoip_provider = Arc::new(GeoIpProvider::new(&config.analytics));
+
+    // Start background system metrics updater (memory, CPU)
+    #[cfg(feature = "metrics")]
+    crate::metrics::spawn_system_metrics_updater();
 
     // Load CORS configuration from RuntimeConfig
     let cors_config = CorsSettings::from_runtime_config();
@@ -208,10 +210,11 @@ pub async fn run_server() -> Result<()> {
     validate_cors_config(&cors_config);
 
     // Check and log proxy detection mode + Unix Socket mode
+    #[allow(unused_mut)]
     let mut is_tcp_mode = true;
     #[cfg(unix)]
     if let Some(ref socket_path) = config.server.unix_socket {
-        warn!(
+        info!(
             "Unix Socket mode enabled: {}. \
              Rate limiting requires nginx to set X-Forwarded-For header.",
             socket_path
@@ -232,26 +235,33 @@ pub async fn run_server() -> Result<()> {
             }
         };
         if trusted_proxies.is_empty() {
-            warn!(
+            info!(
                 "Login rate limiting: Auto-detect mode enabled. \
                  Connections from private IPs will use X-Forwarded-For. \
                  To disable, configure api.trusted_proxies explicitly."
             );
         } else {
-            warn!(
+            info!(
                 "Login rate limiting: Explicit trusted proxies configured: {:?}",
                 trusted_proxies
             );
         }
     }
 
-    // Configure HTTP server
-    let server = HttpServer::new(move || {
-        // Build CORS middleware
-        let cors = build_cors_middleware(&cors_config);
+    // Clone db reference before storage moves into HttpServer closure
+    let db_for_shutdown = storage.get_db().clone();
 
-        App::new()
-            .wrap(cors)
+    // Configure HTTP server
+    let metrics_for_server = metrics.clone();
+    let server = HttpServer::new(move || {
+        // Build CORS middleware (Condition::new skips it entirely when disabled)
+        let cors = build_cors_middleware(&cors_config);
+        let cors_enabled = cors_config.enabled;
+
+        let app = App::new()
+            .wrap(TimingMiddleware) // 最外层，记录请求延迟
+            .wrap(RequestIdMiddleware) // 为每个请求生成 request_id
+            .wrap(Condition::new(cors_enabled, cors))
             .wrap(Compress::default())
             .app_data(web::Data::new(cache.clone()))
             .app_data(web::Data::new(storage.clone()))
@@ -260,29 +270,31 @@ pub async fn run_server() -> Result<()> {
             .app_data(web::Data::new(geoip_provider.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024))
-            .wrap(
-                DefaultHeaders::new()
-                    .add(("Connection", "keep-alive"))
-                    .add(("Keep-Alive", "timeout=30, max=1000"))
-                    .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
-            )
-            .service(
-                web::scope(&admin_prefix)
-                    .wrap(CsrfGuard)
-                    .wrap(AdminAuth)
-                    .service(admin_v1_routes()),
-            )
-            .service(
-                web::scope(&health_prefix)
-                    .wrap(HealthAuth)
-                    .service(health_routes()),
-            )
-            .service(
-                web::scope(&frontend_prefix)
-                    .wrap(FrontendGuard)
-                    .service(frontend_routes()),
-            )
-            .service(redirect_routes())
+            .app_data(web::Data::new(metrics_for_server.clone()));
+
+        app.wrap(
+            DefaultHeaders::new()
+                .add(("Connection", "keep-alive"))
+                .add(("Keep-Alive", "timeout=30, max=1000"))
+                .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
+        )
+        .service(
+            web::scope(&admin_prefix)
+                .wrap(CsrfGuard)
+                .wrap(AdminAuth)
+                .service(admin_v1_routes()),
+        )
+        .service(
+            web::scope(&health_prefix)
+                .wrap(HealthAuth)
+                .service(health_routes()),
+        )
+        .service(
+            web::scope(&frontend_prefix)
+                .wrap(FrontendGuard)
+                .service(frontend_routes()),
+        )
+        .service(redirect_routes())
     })
     .keep_alive(std::time::Duration::from_secs(30))
     .client_request_timeout(std::time::Duration::from_millis(5000))
@@ -294,7 +306,7 @@ pub async fn run_server() -> Result<()> {
         #[cfg(unix)]
         {
             if let Some(ref socket_path) = server_config.unix_socket_path {
-                warn!("Starting server on Unix socket: {}", socket_path);
+                info!("Starting server on Unix socket: {}", socket_path);
                 if std::path::Path::new(socket_path).exists() {
                     std::fs::remove_file(socket_path)?;
                 }
@@ -304,7 +316,7 @@ pub async fn run_server() -> Result<()> {
                     "{}:{}",
                     server_config.server_host, server_config.server_port
                 );
-                warn!("Starting server at http://{}", bind_address);
+                info!("Starting server at http://{}", bind_address);
                 Some(server.bind(bind_address)?)
             }
         }
@@ -315,7 +327,7 @@ pub async fn run_server() -> Result<()> {
                 "{}:{}",
                 server_config.server_host, server_config.server_port
             );
-            warn!("Starting server at http://{}", bind_address);
+            info!("Starting server at http://{}", bind_address);
             Some(server.bind(bind_address)?)
         }
     }
@@ -327,8 +339,8 @@ pub async fn run_server() -> Result<()> {
         res = server => {
             res?;
         }
-        _ = lifetime::shutdown::listen_for_shutdown() => {
-            warn!("Graceful shutdown: all tasks completed");
+        _ = lifetime::shutdown::listen_for_shutdown(&db_for_shutdown) => {
+            info!("Graceful shutdown: all tasks completed");
         }
     }
 

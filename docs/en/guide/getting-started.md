@@ -10,11 +10,11 @@ Please complete any installation method from the [Installation Guide](/en/guide/
 
 ### Method 1: Using TOML Configuration File (Recommended)
 
-Use the `generate-config` command to generate a configuration file:
+Use the `config generate` command to generate a configuration file:
 
 ```bash
-./shortlinker generate-config config.toml
-# Generates a startup config template (server/database/cache/logging/analytics)
+./shortlinker config generate config.toml
+# Generates a startup config template (server/database/cache/logging/analytics/ipc)
 ```
 
 Then modify `config.toml` as needed:
@@ -45,7 +45,7 @@ If you don't create a configuration file, the program will run with built-in def
 
 # Success output:
 # [INFO] Starting server at http://127.0.0.1:8080
-# [INFO] SQLite storage initialized with 0 links
+# [INFO] Using storage backend: sqlite
 ```
 
 ## Step 3: Add Short Links
@@ -95,10 +95,17 @@ curl -I http://localhost:8080/github
 # Method 2: Send signal
 kill $(cat shortlinker.pid)
 
-# Reload short link data / caches (Unix systems)
-# Note: SIGUSR1 only reloads link data/caches; it does NOT reload runtime config.
-# Reload runtime config via Admin API `/admin/v1/config/reload` or restart the service.
-kill -USR1 $(cat shortlinker.pid)
+# Check server status (IPC)
+./shortlinker status
+
+# If you use a custom IPC path, override with --socket
+./shortlinker --socket /tmp/shortlinker.sock status
+
+# Runtime config changes: `config set/reset` auto-attempt IPC `Config` reload
+# only for keys marked as no-restart; `config import` performs one best-effort
+# `Config` reload attempt after import. If IPC is unreachable (server not running,
+# ipc.enabled=false, socket mismatch, etc.), call Admin API
+# `/admin/v1/config/reload` manually; restart-required keys still need restart.
 ```
 
 ## Production Environment Quick Configuration
@@ -111,7 +118,7 @@ host = "127.0.0.1"
 port = 8080
 
 [database]
-database_url = "sqlite:///data/links.db"
+database_url = "sqlite:///data/shortlinks.db"
 
 [logging]
 level = "info"

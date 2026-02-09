@@ -4,13 +4,15 @@
 
 pub mod commands;
 
-use crate::cli::Commands;
+use crate::cli::{Commands, ConfigCommands};
 use crate::storage::StorageFactory;
 use commands::{
-    add_link, config_management, export_links, generate_config, import_links, list_links,
-    remove_link, run_reset_password, server_status, update_link,
+    add_link, config_management, export_links, import_links, list_links, remove_link,
+    run_reset_password, server_status, update_link,
 };
 use std::fmt;
+
+use crate::metrics_core::NoopMetrics;
 
 /// IPC fallback 宏，用于消除 CLI 命令中的 IPC 错误处理重复代码
 ///
@@ -124,23 +126,29 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
 
     // Handle reset-password command separately (needs DB connection)
     if let Commands::ResetPassword { password, stdin } = cmd {
-        let storage = StorageFactory::create()
+        let storage = StorageFactory::create(NoopMetrics::arc())
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
         run_reset_password(storage.get_db().clone(), password, stdin).await;
         return Ok(());
     }
 
-    // Handle config command separately (needs DB connection)
+    // Handle config command
     if let Commands::Config { action } = cmd {
-        let storage = StorageFactory::create()
+        // Generate doesn't need DB connection, handle it separately
+        if let ConfigCommands::Generate { output_path, force } = action {
+            return config_management::config_generate(output_path, force).await;
+        }
+
+        // Other config subcommands need DB connection
+        let storage = StorageFactory::create(NoopMetrics::arc())
             .await
             .map_err(|e| CliError::StorageError(e.to_string()))?;
         return config_management::run_config_command(storage.get_db().clone(), action).await;
     }
 
     // Create storage for commands that need it
-    let storage = StorageFactory::create()
+    let storage = StorageFactory::create(NoopMetrics::arc())
         .await
         .map_err(|e| CliError::StorageError(e.to_string()))?;
 
@@ -169,8 +177,6 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::Export { file_path } => export_links(storage, file_path).await,
 
         Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
-
-        Commands::GenerateConfig { output_path } => generate_config(output_path).await,
 
         Commands::Status => unreachable!("handled above"),
 

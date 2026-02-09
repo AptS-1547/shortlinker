@@ -12,6 +12,8 @@ use shortlinker::storage::backend::{
 use std::sync::Once;
 use tempfile::TempDir;
 
+use shortlinker::metrics_core::NoopMetrics;
+
 // 确保 config 只初始化一次
 static INIT: Once = Once::new();
 
@@ -53,7 +55,7 @@ async fn create_temp_storage() -> (SeaOrmStorage, TempDir) {
     let db_path = temp_dir.path().join("test.db");
     let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-    let storage = SeaOrmStorage::new(&db_url, "sqlite")
+    let storage = SeaOrmStorage::new(&db_url, "sqlite", NoopMetrics::arc())
         .await
         .expect("Failed to create storage");
 
@@ -175,7 +177,7 @@ mod connection_tests {
     #[tokio::test]
     async fn test_storage_new_empty_url_fails() {
         init_test_config();
-        let result = SeaOrmStorage::new("", "sqlite").await;
+        let result = SeaOrmStorage::new("", "sqlite", NoopMetrics::arc()).await;
         assert!(result.is_err());
     }
 }

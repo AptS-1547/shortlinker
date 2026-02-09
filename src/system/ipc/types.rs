@@ -11,12 +11,6 @@ use std::io;
 
 use crate::system::reload::ReloadTarget;
 
-/// Socket path for Unix Domain Socket
-pub const SOCKET_PATH_UNIX: &str = "./shortlinker.sock";
-
-/// Named pipe path for Windows
-pub const PIPE_NAME_WINDOWS: &str = r"\\.\pipe\shortlinker";
-
 /// Short link data for IPC transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShortLinkData {
@@ -386,12 +380,5 @@ mod tests {
         let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.code, "test");
         assert_eq!(decoded.password, Some("secret".into()));
-    }
-
-    #[test]
-    fn test_socket_paths() {
-        assert!(!SOCKET_PATH_UNIX.is_empty());
-        assert!(!PIPE_NAME_WINDOWS.is_empty());
-        assert!(PIPE_NAME_WINDOWS.starts_with(r"\\.\pipe\"));
     }
 }

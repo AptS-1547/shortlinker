@@ -123,5 +123,5 @@ PRs welcome to improve the Web admin panel! Before developing:
 
 ## Related Links
 
-- 📖 [Feature Overview](./index)
+- 📖 [Web Admin Panel](./index)
 - ❓ [Troubleshooting](./troubleshooting)

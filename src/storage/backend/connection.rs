@@ -13,7 +13,9 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
     use std::str::FromStr;
 
     let opt = SqliteConnectOptions::from_str(database_url)
-        .map_err(|e| ShortlinkerError::database_config(format!("SQLite URL 解析失败: {}", e)))?
+        .map_err(|e| {
+            ShortlinkerError::database_config(format!("Failed to parse SQLite URL: {}", e))
+        })?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
@@ -25,15 +27,18 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
 
     // 使用 SqlitePoolOptions 配置连接池，包含健康检查
     let pool = SqlitePoolOptions::new()
-        .max_connections(5) // SQLite 通常不需要太多连接
-        .min_connections(1)
+        .max_connections(10) // SQLite WAL 模式支持更多并发读
+        .min_connections(2)
         .test_before_acquire(true) // 获取连接前测试有效性
         .acquire_timeout(std::time::Duration::from_secs(8))
         .idle_timeout(std::time::Duration::from_secs(300))
         .connect_with(opt)
         .await
         .map_err(|e| {
-            ShortlinkerError::database_connection(format!("无法连接到 SQLite 数据库: {}", e))
+            ShortlinkerError::database_connection(format!(
+                "Failed to connect to SQLite database: {}",
+                e
+            ))
         })?;
 
     // 转换为 Sea-ORM 的 DatabaseConnection
@@ -46,8 +51,10 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
     let pool_size = config.database.pool_size;
 
     let mut opt = ConnectOptions::new(database_url.to_owned());
+    // min_connections 设为 max(2, pool_size/4) 以保持连接池弹性
+    let min_conn = 2.max(pool_size / 4);
     opt.max_connections(pool_size)
-        .min_connections(pool_size.min(5))
+        .min_connections(min_conn)
         .connect_timeout(std::time::Duration::from_secs(8))
         .acquire_timeout(std::time::Duration::from_secs(8))
         .idle_timeout(std::time::Duration::from_secs(300)) // 5分钟空闲超时
@@ -57,7 +64,7 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
 
     Database::connect(opt).await.map_err(|e| {
         ShortlinkerError::database_connection(format!(
-            "无法连接到 {} 数据库: {}",
+            "Failed to connect to {} database: {}",
             backend_name.to_uppercase(),
             e
         ))
@@ -68,7 +75,7 @@ pub async fn connect_generic(database_url: &str, backend_name: &str) -> Result<D
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     Migrator::up(db, None)
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("迁移失败: {}", e)))?;
+        .map_err(|e| ShortlinkerError::database_operation(format!("Migration failed: {}", e)))?;
 
     info!("Database migrations completed");
     Ok(())

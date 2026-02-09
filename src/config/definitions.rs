@@ -14,7 +14,7 @@
 //! 2. 添加默认值函数（如果需要动态默认值）
 //! 3. 在 `ALL_CONFIGS` 数组中添加 `ConfigDef` 定义
 
-use super::types::{RustType, ValueType};
+use super::types::{ActionType, RustType, ValueType};
 
 /// 配置分类常量
 pub mod categories {
@@ -25,6 +25,7 @@ pub mod categories {
     pub const CORS: &str = "cors";
     pub const TRACKING: &str = "tracking";
     pub const ANALYTICS: &str = "analytics";
+    pub const CACHE: &str = "cache";
 }
 
 /// 配置项完整定义
@@ -47,6 +48,8 @@ pub struct ConfigDef {
     pub category: &'static str,
     /// 描述（英文）
     pub description: &'static str,
+    /// 可执行的 action（如生成 token）
+    pub action: Option<ActionType>,
 }
 
 /// Key 常量
@@ -79,6 +82,15 @@ pub mod keys {
     pub const ANALYTICS_LOG_RETENTION_DAYS: &str = "analytics.log_retention_days";
     pub const ANALYTICS_ENABLE_IP_LOGGING: &str = "analytics.enable_ip_logging";
     pub const ANALYTICS_ENABLE_GEO_LOOKUP: &str = "analytics.enable_geo_lookup";
+    pub const ANALYTICS_HOURLY_RETENTION_DAYS: &str = "analytics.hourly_retention_days";
+    pub const ANALYTICS_DAILY_RETENTION_DAYS: &str = "analytics.daily_retention_days";
+    pub const ANALYTICS_ENABLE_AUTO_ROLLUP: &str = "analytics.enable_auto_rollup";
+    pub const ANALYTICS_SAMPLE_RATE: &str = "analytics.sample_rate";
+    pub const ANALYTICS_MAX_LOG_ROWS: &str = "analytics.max_log_rows";
+    pub const ANALYTICS_MAX_ROWS_ACTION: &str = "analytics.max_rows_action";
+
+    // UTM 追踪
+    pub const UTM_ENABLE_PASSTHROUGH: &str = "utm.enable_passthrough";
 
     // 路由配置
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
@@ -92,6 +104,9 @@ pub mod keys {
     pub const CORS_ALLOWED_HEADERS: &str = "cors.allowed_headers";
     pub const CORS_MAX_AGE: &str = "cors.max_age";
     pub const CORS_ALLOW_CREDENTIALS: &str = "cors.allow_credentials";
+
+    // 缓存配置
+    pub const CACHE_BLOOM_REBUILD_INTERVAL: &str = "cache.bloom_rebuild_interval";
 }
 
 // 默认值函数
@@ -100,7 +115,7 @@ fn default_empty() -> String {
 }
 
 fn default_admin_token() -> String {
-    crate::utils::generate_random_code(16)
+    String::new() // 默认为空，用户需运行 reset-password 手动设置
 }
 
 fn default_jwt_secret() -> String {
@@ -203,6 +218,38 @@ fn default_analytics_enable_geo_lookup() -> String {
     "false".to_string()
 }
 
+fn default_analytics_hourly_retention_days() -> String {
+    "7".to_string()
+}
+
+fn default_analytics_daily_retention_days() -> String {
+    "365".to_string()
+}
+
+fn default_analytics_enable_auto_rollup() -> String {
+    "true".to_string()
+}
+
+fn default_analytics_sample_rate() -> String {
+    "1.0".to_string() // 默认记录所有点击
+}
+
+fn default_analytics_max_log_rows() -> String {
+    "0".to_string() // 默认不限制
+}
+
+fn default_analytics_max_rows_action() -> String {
+    "cleanup".to_string() // 默认自动清理
+}
+
+fn default_utm_enable_passthrough() -> String {
+    "false".to_string()
+}
+
+fn default_bloom_rebuild_interval() -> String {
+    "14400".to_string() // 4 hours, 0 = disabled
+}
+
 /// 所有配置定义（单一数据源）
 pub static ALL_CONFIGS: &[ConfigDef] = &[
     // ========== API 认证 (auth) ==========
@@ -216,6 +263,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::AUTH,
         description: "Admin API authentication token (Argon2 hashed)",
+        action: None,
     },
     ConfigDef {
         key: keys::API_HEALTH_TOKEN,
@@ -227,17 +275,19 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::AUTH,
         description: "Health check endpoint authentication token",
+        action: None,
     },
     ConfigDef {
         key: keys::API_JWT_SECRET,
         value_type: ValueType::String,
         rust_type: RustType::String,
         default_fn: default_jwt_secret,
-        requires_restart: false,
+        requires_restart: true,
         is_sensitive: true,
         editable: true,
         category: categories::AUTH,
         description: "JWT token signing secret key",
+        action: Some(ActionType::GenerateToken),
     },
     ConfigDef {
         key: keys::API_TRUSTED_PROXIES,
@@ -249,28 +299,31 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::AUTH,
         description: "Trusted proxy IPs or CIDRs (e.g., [\"10.0.0.1\", \"192.168.1.0/24\"]). Empty = trust no proxies, use connection IP only.",
+        action: None,
     },
     ConfigDef {
         key: keys::API_ACCESS_TOKEN_MINUTES,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_access_token_minutes,
-        requires_restart: false,
+        requires_restart: true,
         is_sensitive: false,
         editable: true,
         category: categories::AUTH,
         description: "Access token expiration time in minutes",
+        action: None,
     },
     ConfigDef {
         key: keys::API_REFRESH_TOKEN_DAYS,
         value_type: ValueType::Int,
         rust_type: RustType::U64,
         default_fn: default_refresh_token_days,
-        requires_restart: false,
+        requires_restart: true,
         is_sensitive: false,
         editable: true,
         category: categories::AUTH,
         description: "Refresh token expiration time in days",
+        action: None,
     },
     // ========== Cookie 配置 (cookie) ==========
     ConfigDef {
@@ -283,6 +336,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::COOKIE,
         description: "Enable secure flag for cookies (HTTPS only)",
+        action: None,
     },
     ConfigDef {
         key: keys::API_COOKIE_SAME_SITE,
@@ -294,6 +348,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::COOKIE,
         description: "Cookie SameSite policy",
+        action: None,
     },
     ConfigDef {
         key: keys::API_COOKIE_DOMAIN,
@@ -305,6 +360,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::COOKIE,
         description: "Cookie domain (empty for current domain)",
+        action: None,
     },
     // ========== 功能配置 (features) ==========
     ConfigDef {
@@ -317,6 +373,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::FEATURES,
         description: "Length of randomly generated short codes",
+        action: None,
     },
     ConfigDef {
         key: keys::FEATURES_DEFAULT_URL,
@@ -328,6 +385,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::FEATURES,
         description: "Default redirect URL for invalid short codes",
+        action: None,
     },
     ConfigDef {
         key: keys::FEATURES_ENABLE_ADMIN_PANEL,
@@ -339,6 +397,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::FEATURES,
         description: "Enable admin panel interface",
+        action: None,
     },
     // ========== 点击追踪 (tracking) ==========
     ConfigDef {
@@ -351,6 +410,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::TRACKING,
         description: "Enable click tracking and analytics",
+        action: None,
     },
     ConfigDef {
         key: keys::CLICK_FLUSH_INTERVAL,
@@ -362,6 +422,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::TRACKING,
         description: "Click data flush interval in seconds",
+        action: None,
     },
     ConfigDef {
         key: keys::CLICK_MAX_CLICKS_BEFORE_FLUSH,
@@ -373,6 +434,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::TRACKING,
         description: "Maximum clicks before forcing flush",
+        action: None,
     },
     // ========== 路由配置 (routes) ==========
     ConfigDef {
@@ -385,6 +447,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ROUTES,
         description: "Admin API route prefix",
+        action: None,
     },
     ConfigDef {
         key: keys::ROUTES_HEALTH_PREFIX,
@@ -396,6 +459,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ROUTES,
         description: "Health check route prefix",
+        action: None,
     },
     ConfigDef {
         key: keys::ROUTES_FRONTEND_PREFIX,
@@ -407,6 +471,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ROUTES,
         description: "Frontend assets route prefix",
+        action: None,
     },
     // ========== CORS 配置 (cors) ==========
     ConfigDef {
@@ -419,6 +484,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Enable CORS configuration. When disabled, uses browser's same-origin policy (no cross-origin requests allowed)",
+        action: None,
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_ORIGINS,
@@ -430,6 +496,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Allowed origins for CORS (JSON array). Use [\"*\"] to allow any origin, empty array means same-origin only",
+        action: None,
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_METHODS,
@@ -441,6 +508,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Allowed HTTP methods for CORS",
+        action: None,
     },
     ConfigDef {
         key: keys::CORS_ALLOWED_HEADERS,
@@ -452,6 +520,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Allowed headers for CORS (JSON array)",
+        action: None,
     },
     ConfigDef {
         key: keys::CORS_MAX_AGE,
@@ -463,6 +532,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "CORS preflight cache duration in seconds",
+        action: None,
     },
     ConfigDef {
         key: keys::CORS_ALLOW_CREDENTIALS,
@@ -474,6 +544,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::CORS,
         description: "Allow credentials in CORS requests. Cannot be used with wildcard origins for security reasons",
+        action: None,
     },
     // ========== 详细分析统计 (analytics) ==========
     ConfigDef {
@@ -486,6 +557,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable detailed click logging (writes to click_logs table)",
+        action: None,
     },
     ConfigDef {
         key: keys::ANALYTICS_LOG_RETENTION_DAYS,
@@ -496,7 +568,8 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         is_sensitive: false,
         editable: true,
         category: categories::ANALYTICS,
-        description: "Log retention period in days (automatic cleanup is not implemented yet)",
+        description: "Raw click log retention period in days (cleaned by DataRetentionTask)",
+        action: None,
     },
     ConfigDef {
         key: keys::ANALYTICS_ENABLE_IP_LOGGING,
@@ -508,6 +581,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable IP address logging (disable for privacy compliance)",
+        action: None,
     },
     ConfigDef {
         key: keys::ANALYTICS_ENABLE_GEO_LOOKUP,
@@ -519,6 +593,105 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         editable: true,
         category: categories::ANALYTICS,
         description: "Enable geographic location lookup for IP addresses",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_HOURLY_RETENTION_DAYS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_hourly_retention_days,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Hourly rollup data retention period in days",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_DAILY_RETENTION_DAYS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_daily_retention_days,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Daily rollup data retention period in days",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_ENABLE_AUTO_ROLLUP,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_analytics_enable_auto_rollup,
+        requires_restart: true,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable automatic rollup aggregation and data cleanup",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_SAMPLE_RATE,
+        value_type: ValueType::Float,
+        rust_type: RustType::F64,
+        default_fn: default_analytics_sample_rate,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Click log sampling rate (0.0-1.0). 1.0 = log all clicks, 0.1 = log 10% of clicks",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_MAX_LOG_ROWS,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_analytics_max_log_rows,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Maximum rows in click_logs table. 0 = unlimited",
+        action: None,
+    },
+    ConfigDef {
+        key: keys::ANALYTICS_MAX_ROWS_ACTION,
+        value_type: ValueType::Enum,
+        rust_type: RustType::MaxRowsAction,
+        default_fn: default_analytics_max_rows_action,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Action when max_log_rows exceeded: 'cleanup' (delete oldest) or 'stop' (stop logging)",
+        action: None,
+    },
+    // ========== UTM 追踪 (analytics) ==========
+    ConfigDef {
+        key: keys::UTM_ENABLE_PASSTHROUGH,
+        value_type: ValueType::Bool,
+        rust_type: RustType::Bool,
+        default_fn: default_utm_enable_passthrough,
+        requires_restart: false,
+        is_sensitive: false,
+        editable: true,
+        category: categories::ANALYTICS,
+        description: "Enable UTM parameter passthrough to target URL (utm_source/medium/campaign/term/content)",
+        action: None,
+    },
+    // ========== 缓存配置 (cache) ==========
+    ConfigDef {
+        key: keys::CACHE_BLOOM_REBUILD_INTERVAL,
+        value_type: ValueType::Int,
+        rust_type: RustType::U64,
+        default_fn: default_bloom_rebuild_interval,
+        requires_restart: true,
+        is_sensitive: false,
+        editable: true,
+        category: categories::CACHE,
+        description: "Bloom filter periodic rebuild interval in seconds (0 = disabled)",
+        action: None,
     },
 ];
 
