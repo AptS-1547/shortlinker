@@ -892,3 +892,319 @@ mod edge_cases {
         }
     }
 }
+
+// =============================================================================
+// Batch Operations Tests
+// =============================================================================
+
+#[cfg(test)]
+mod batch_operations_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_batch_create_links_success() {
+        let (service, _temp) = create_test_service().await;
+
+        let requests = vec![
+            create_request(Some("batch1"), "https://example1.com"),
+            create_request(Some("batch2"), "https://example2.com"),
+            create_request(Some("batch3"), "https://example3.com"),
+        ];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert_eq!(result.success.len(), 3);
+        assert!(result.failed.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_batch_create_links_with_invalid_url() {
+        let (service, _temp) = create_test_service().await;
+
+        let requests = vec![
+            create_request(Some("valid_batch"), "https://valid.com"),
+            create_request(Some("invalid_batch"), "not-a-url"),
+        ];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert_eq!(result.success.len(), 1);
+        assert_eq!(result.failed.len(), 1);
+        assert_eq!(result.failed[0].code, "invalid_batch");
+    }
+
+    #[tokio::test]
+    async fn test_batch_create_links_auto_generate_code() {
+        let (service, _temp) = create_test_service().await;
+
+        let requests = vec![
+            create_request(None, "https://auto1.com"),
+            create_request(None, "https://auto2.com"),
+        ];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert_eq!(result.success.len(), 2);
+        // All should have generated codes
+        for item in &result.success {
+            assert!(!item.code.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_batch_create_links_conflict_without_force() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create existing link
+        let req = create_request(Some("batch_conflict"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        // Try batch create with same code
+        let requests = vec![create_request(Some("batch_conflict"), "https://new.com")];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert!(result.success.is_empty());
+        assert_eq!(result.failed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_create_links_with_force() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create existing link
+        let req = create_request(Some("batch_force"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        // Batch create with force
+        let requests = vec![CreateLinkRequest {
+            code: Some("batch_force".to_string()),
+            target: "https://new.com".to_string(),
+            force: true,
+            expires_at: None,
+            password: None,
+        }];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert_eq!(result.success.len(), 1);
+
+        // Verify overwritten
+        let link = service.get_link("batch_force").await.unwrap().unwrap();
+        assert_eq!(link.target, "https://new.com");
+    }
+
+    #[tokio::test]
+    async fn test_batch_create_links_with_expiry() {
+        let (service, _temp) = create_test_service().await;
+
+        let requests = vec![
+            CreateLinkRequest {
+                code: Some("batch_exp1".to_string()),
+                target: "https://example.com".to_string(),
+                force: false,
+                expires_at: Some("1h".to_string()),
+                password: None,
+            },
+            CreateLinkRequest {
+                code: Some("batch_exp2".to_string()),
+                target: "https://example.com".to_string(),
+                force: false,
+                expires_at: Some("invalid-time".to_string()),
+                password: None,
+            },
+        ];
+
+        let result = service.batch_create_links(requests).await.unwrap();
+        assert_eq!(result.success.len(), 1);
+        assert_eq!(result.failed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_update_links_success() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create links first
+        for i in 1..=3 {
+            let req = create_request(Some(&format!("upd{}", i)), "https://old.com");
+            service.create_link(req).await.unwrap();
+        }
+
+        // Batch update
+        let updates = vec![
+            (
+                "upd1".to_string(),
+                UpdateLinkRequest {
+                    target: "https://new1.com".to_string(),
+                    expires_at: None,
+                    password: None,
+                },
+            ),
+            (
+                "upd2".to_string(),
+                UpdateLinkRequest {
+                    target: "https://new2.com".to_string(),
+                    expires_at: None,
+                    password: None,
+                },
+            ),
+        ];
+
+        let result = service.batch_update_links(updates).await.unwrap();
+        assert_eq!(result.success.len(), 2);
+        assert!(result.failed.is_empty());
+
+        // Verify updates
+        let link1 = service.get_link("upd1").await.unwrap().unwrap();
+        assert_eq!(link1.target, "https://new1.com");
+    }
+
+    #[tokio::test]
+    async fn test_batch_update_links_not_found() {
+        let (service, _temp) = create_test_service().await;
+
+        let updates = vec![(
+            "nonexistent_batch".to_string(),
+            UpdateLinkRequest {
+                target: "https://new.com".to_string(),
+                expires_at: None,
+                password: None,
+            },
+        )];
+
+        let result = service.batch_update_links(updates).await.unwrap();
+        assert!(result.success.is_empty());
+        assert_eq!(result.failed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_update_links_invalid_url() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create link
+        let req = create_request(Some("batch_upd_invalid"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let updates = vec![(
+            "batch_upd_invalid".to_string(),
+            UpdateLinkRequest {
+                target: "not-a-url".to_string(),
+                expires_at: None,
+                password: None,
+            },
+        )];
+
+        let result = service.batch_update_links(updates).await.unwrap();
+        assert!(result.success.is_empty());
+        assert_eq!(result.failed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_update_links_mixed() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create one link
+        let req = create_request(Some("batch_mix_exists"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let updates = vec![
+            (
+                "batch_mix_exists".to_string(),
+                UpdateLinkRequest {
+                    target: "https://new.com".to_string(),
+                    expires_at: None,
+                    password: None,
+                },
+            ),
+            (
+                "batch_mix_missing".to_string(),
+                UpdateLinkRequest {
+                    target: "https://new.com".to_string(),
+                    expires_at: None,
+                    password: None,
+                },
+            ),
+        ];
+
+        let result = service.batch_update_links(updates).await.unwrap();
+        assert_eq!(result.success.len(), 1);
+        assert_eq!(result.failed.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_update_links_with_password() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create link
+        let req = create_request(Some("batch_pwd"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let updates = vec![(
+            "batch_pwd".to_string(),
+            UpdateLinkRequest {
+                target: "https://old.com".to_string(),
+                expires_at: None,
+                password: Some("newpassword".to_string()),
+            },
+        )];
+
+        let result = service.batch_update_links(updates).await.unwrap();
+        assert_eq!(result.success.len(), 1);
+
+        let link = service.get_link("batch_pwd").await.unwrap().unwrap();
+        assert!(link.password.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_batch_delete_links_success() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create links
+        for i in 1..=3 {
+            let req = create_request(Some(&format!("del{}", i)), "https://example.com");
+            service.create_link(req).await.unwrap();
+        }
+
+        let codes = vec!["del1".to_string(), "del2".to_string()];
+        let result = service.batch_delete_links(codes).await.unwrap();
+
+        assert_eq!(result.deleted.len(), 2);
+        assert!(result.not_found.is_empty());
+
+        // Verify deleted
+        assert!(service.get_link("del1").await.unwrap().is_none());
+        assert!(service.get_link("del2").await.unwrap().is_none());
+        // del3 should still exist
+        assert!(service.get_link("del3").await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_batch_delete_links_not_found() {
+        let (service, _temp) = create_test_service().await;
+
+        let codes = vec!["never_existed1".to_string(), "never_existed2".to_string()];
+        let result = service.batch_delete_links(codes).await.unwrap();
+
+        assert!(result.deleted.is_empty());
+        assert_eq!(result.not_found.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_batch_delete_links_mixed() {
+        let (service, _temp) = create_test_service().await;
+
+        // Create one link
+        let req = create_request(Some("del_exists"), "https://example.com");
+        service.create_link(req).await.unwrap();
+
+        let codes = vec!["del_exists".to_string(), "del_missing".to_string()];
+        let result = service.batch_delete_links(codes).await.unwrap();
+
+        assert_eq!(result.deleted.len(), 1);
+        assert_eq!(result.not_found.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_batch_delete_links_empty() {
+        let (service, _temp) = create_test_service().await;
+
+        let result = service.batch_delete_links(vec![]).await.unwrap();
+        assert!(result.deleted.is_empty());
+        assert!(result.not_found.is_empty());
+    }
+}

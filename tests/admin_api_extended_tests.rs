@@ -342,3 +342,141 @@ mod analytics_api_tests {
         );
     }
 }
+
+// =============================================================================
+// Analytics API 扩展测试
+// =============================================================================
+
+#[cfg(test)]
+mod analytics_extended_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_referrers() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/referrers?days=7&limit=10")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: Value = test::read_body_json(resp).await;
+        assert_eq!(body["code"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_geo_stats() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/geo?days=7&limit=10")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: Value = test::read_body_json(resp).await;
+        assert_eq!(body["code"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_trends_with_group_by_hour() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/trends?days=1&group_by=hour")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_get_trends_with_group_by_week() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/trends?days=30&group_by=week")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_get_trends_with_group_by_month() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/trends?days=90&group_by=month")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_get_top_links_with_limit() {
+        init_test_env().await;
+        let storage = get_storage();
+        let analytics = Arc::new(AnalyticsService::new(storage));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(analytics))
+                .service(web::scope("/v1").service(analytics_routes())),
+        )
+        .await;
+
+        let req = TestRequest::get()
+            .uri("/v1/analytics/top?days=7&limit=5")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: Value = test::read_body_json(resp).await;
+        assert_eq!(body["code"], 0);
+    }
+}
