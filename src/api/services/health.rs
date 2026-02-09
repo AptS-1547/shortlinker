@@ -1,3 +1,17 @@
+//! Health check handler - 基础设施路径直连策略
+//!
+//! # 架构决策：直连 Storage + Cache
+//!
+//! health handler 直接访问 `SeaOrmStorage` 和 `CompositeCacheTrait`，
+//! 不经过任何 service 层。这是有意为之的设计决策：
+//!
+//! ## 原因
+//! 1. **独立性**：health check 用于监控系统健康状态，
+//!    不应依赖业务 service 层（如果 service 层有 bug，health check 不应受影响）
+//! 2. **直接性**：health check 需要直接探测底层组件（DB 连接、缓存状态），
+//!    service 层的抽象反而会掩盖真实的健康状态
+//! 3. **k8s 探针**：readiness/liveness 探针需要最小依赖链
+
 use actix_web::{HttpResponse, Responder, web};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

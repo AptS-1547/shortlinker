@@ -7,16 +7,15 @@ use chrono::Utc;
 use csv::{ReaderBuilder, WriterBuilder};
 use futures_util::stream::{Stream, StreamExt};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use crate::cache::traits::CompositeCacheTrait;
 use crate::errors::ShortlinkerError;
-use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
+use crate::services::LinkService;
+use crate::storage::{LinkFilter, ShortLink};
 use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
@@ -158,7 +157,7 @@ where
 pub async fn export_links(
     _req: HttpRequest,
     query: web::Query<ExportQuery>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!(
         "Admin API: export links (streaming) with filters: {:?}",
@@ -210,7 +209,7 @@ pub async fn export_links(
     };
 
     // 获取游标分页流式数据
-    let batch_stream = storage.stream_all_filtered_cursor(filter, EXPORT_BATCH_SIZE as u64);
+    let batch_stream = service.export_links_stream(filter, EXPORT_BATCH_SIZE as u64);
 
     // 行映射：ShortLink → CsvLinkRow
     let row_mapper = |link: ShortLink| CsvLinkRow {
@@ -248,8 +247,7 @@ pub async fn export_links(
 pub async fn import_links(
     _req: HttpRequest,
     mut payload: Multipart,
-    cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!("Admin API: import links request");
 
@@ -350,25 +348,15 @@ pub async fn import_links(
         .from_reader(cursor);
 
     let mut total_rows = 0;
-    let mut success_count = 0;
-    let mut skipped_count = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
-
-    // 单次解析：收集所有行和 codes
-    let mut parsed_rows: Vec<(usize, CsvLinkRow)> = Vec::new();
-    let mut all_codes: Vec<String> = Vec::new();
+    let mut valid_items: Vec<crate::services::ImportLinkItemRich> = Vec::new();
 
     for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
         let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
         total_rows += 1;
 
-        match result {
-            Ok(row) => {
-                if !row.code.is_empty() {
-                    all_codes.push(row.code.clone());
-                }
-                parsed_rows.push((row_num, row));
-            }
+        let row = match result {
+            Ok(row) => row,
             Err(e) => {
                 failed_items.push(ImportFailedItem {
                     row: row_num,
@@ -376,44 +364,10 @@ pub async fn import_links(
                     error: format!("CSV parse error: {}", e),
                     error_code: Some(ErrorCode::CsvParseError as i32),
                 });
+                continue;
             }
-        }
-    }
+        };
 
-    // 冲突检测：Overwrite 模式不需要，Skip/Error 用 Bloom 预筛选
-    let existing_codes: HashSet<String> = match mode {
-        ImportMode::Overwrite => HashSet::new(),
-        ImportMode::Skip | ImportMode::Error => {
-            // Bloom Filter 预筛选：false = 一定不存在，跳过 DB 查询
-            let mut maybe_exist = Vec::new();
-            for code in &all_codes {
-                if cache.bloom_check(code).await {
-                    maybe_exist.push(code.clone());
-                }
-            }
-
-            // 只对 Bloom 返回"可能存在"的 codes 精确查询
-            if maybe_exist.is_empty() {
-                HashSet::new()
-            } else {
-                storage
-                    .batch_check_codes_exist(&maybe_exist)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to check existing codes for import: {}", e);
-                        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-                    })?
-            }
-        }
-    };
-
-    // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
-    let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
-    // 已处理的代码（用于检测 CSV 内重复）
-    let mut processed_codes: HashSet<String> = HashSet::new();
-
-    // 处理收集的行数据
-    for (row_num, row) in parsed_rows {
         // 验证 code
         if row.code.is_empty() {
             failed_items.push(ImportFailedItem {
@@ -434,29 +388,6 @@ pub async fn import_links(
                 error_code: Some(ErrorCode::LinkInvalidUrl as i32),
             });
             continue;
-        }
-
-        // 检查冲突
-        let exists = existing_codes.contains(&row.code) || processed_codes.contains(&row.code);
-        if exists {
-            match mode {
-                ImportMode::Skip => {
-                    skipped_count += 1;
-                    continue;
-                }
-                ImportMode::Error => {
-                    failed_items.push(ImportFailedItem {
-                        row: row_num,
-                        code: row.code,
-                        error: "Link already exists".to_string(),
-                        error_code: Some(ErrorCode::LinkAlreadyExists as i32),
-                    });
-                    continue;
-                }
-                ImportMode::Overwrite => {
-                    // 继续处理，允许覆盖
-                }
-            }
         }
 
         // 解析 created_at
@@ -495,39 +426,37 @@ pub async fn import_links(
             }
         };
 
-        let link = ShortLink {
-            code: row.code.clone(),
+        valid_items.push(crate::services::ImportLinkItemRich {
+            code: row.code,
             target: row.target,
             created_at,
             expires_at,
             password,
-            click: row.click_count,
-        };
-
-        processed_codes.insert(row.code.clone());
-        links_to_insert.insert(row.code, link);
-        success_count += 1;
+            click_count: row.click_count,
+        });
     }
 
-    // 批量插入数据库
-    let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
-    if !links_vec.is_empty() {
-        if let Err(e) = storage.batch_set(links_vec.clone()).await {
-            error!("Failed to batch insert links: {}", e);
-            return Ok(error_from_shortlinker(&ShortlinkerError::import_failed(
-                format!("Database error: {}", e),
-            )));
+    // 委托 service 处理冲突检测、去重、批量写入和缓存更新
+    let batch_result = match service.import_links_batch(valid_items, mode).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to import links: {}", e);
+            return Ok(error_from_shortlinker(&e));
         }
+    };
 
-        // 更新缓存
-        let default_ttl = crate::config::get_config().cache.default_ttl;
-        for link in links_vec {
-            let code = link.code.clone();
-            let ttl = link.cache_ttl(default_ttl);
-            cache.insert(&code, link, ttl).await;
-        }
+    // 合并 service 返回的失败项（这些是冲突检测失败，没有行号信息）
+    for item in batch_result.failed_items {
+        failed_items.push(ImportFailedItem {
+            row: 0, // service 层不跟踪行号
+            code: item.code,
+            error: item.reason,
+            error_code: Some(ErrorCode::LinkAlreadyExists as i32),
+        });
     }
 
+    let success_count = batch_result.success_count;
+    let skipped_count = batch_result.skipped_count;
     let failed_count = failed_items.len();
 
     info!(

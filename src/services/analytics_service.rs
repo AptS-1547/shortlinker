@@ -10,9 +10,11 @@
 //!
 //! 调用方可根据数据规模选择使用哪套方法。
 
+use std::pin::Pin;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
+use futures_util::Stream;
 use sea_orm::{DbBackend, sea_query::Expr};
 use tracing::{debug, info};
 
@@ -610,6 +612,26 @@ impl AnalyticsService {
         );
 
         Ok(logs)
+    }
+
+    /// 流式导出点击日志（游标分页）
+    ///
+    /// 返回分批数据流，无总量限制。
+    /// 用于大数据量导出场景，避免一次性加载全部数据到内存。
+    pub fn export_click_logs_stream(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+        batch_size: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = anyhow::Result<Vec<migration::entities::click_log::Model>>>
+                + Send
+                + 'static,
+        >,
+    > {
+        self.storage
+            .stream_click_logs_cursor(start, end, batch_size)
     }
 
     // ============ v2 查询方法（从汇总表读取） ============

@@ -265,8 +265,6 @@ mod export_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(service))
-                .app_data(web::Data::new(storage))
-                .app_data(web::Data::new(cache))
                 .service(web::scope("/v1").service(links_routes())),
         )
         .await;
@@ -295,8 +293,6 @@ mod export_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(service))
-                .app_data(web::Data::new(storage))
-                .app_data(web::Data::new(cache))
                 .service(web::scope("/v1").service(links_routes())),
         )
         .await;
@@ -318,8 +314,6 @@ mod export_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(service))
-                .app_data(web::Data::new(storage))
-                .app_data(web::Data::new(cache))
                 .service(web::scope("/v1").service(links_routes())),
         )
         .await;
@@ -373,8 +367,6 @@ mod import_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(service))
-                .app_data(web::Data::new(storage))
-                .app_data(web::Data::new(cache))
                 .service(web::scope("/v1").service(links_routes())),
         )
         .await;
@@ -411,8 +403,6 @@ mod import_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(service))
-                .app_data(web::Data::new(storage))
-                .app_data(web::Data::new(cache))
                 .service(web::scope("/v1").service(links_routes())),
         )
         .await;

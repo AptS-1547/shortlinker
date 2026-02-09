@@ -11,7 +11,8 @@ use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
 use shortlinker::errors::ShortlinkerError;
 use shortlinker::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
+    CreateLinkRequest, ImportLinkItem, ImportLinkItemRich, ImportMode, LinkService,
+    UpdateLinkRequest,
 };
 use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::storage::{LinkFilter, ShortLink};
@@ -758,6 +759,163 @@ mod import_export_tests {
 
         let exported = service.export_links().await.unwrap();
         assert_eq!(exported.len(), 3);
+    }
+}
+
+// =============================================================================
+// Import Links Batch Tests
+// =============================================================================
+
+#[cfg(test)]
+mod import_links_batch_tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn make_rich_item(code: &str, target: &str) -> ImportLinkItemRich {
+        ImportLinkItemRich {
+            code: code.to_string(),
+            target: target.to_string(),
+            created_at: Utc::now(),
+            expires_at: None,
+            password: None,
+            click_count: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_skip_mode() {
+        let (service, _temp) = create_test_service().await;
+
+        // 预创建一条链接
+        let req = create_request(Some("existing"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let items = vec![
+            make_rich_item("existing", "https://new.com"),
+            make_rich_item("fresh", "https://fresh.com"),
+        ];
+
+        let result = service
+            .import_links_batch(items, ImportMode::Skip)
+            .await
+            .unwrap();
+
+        assert_eq!(result.success_count, 1);
+        assert_eq!(result.skipped_count, 1);
+        assert!(result.failed_items.is_empty());
+
+        // 原链接未被覆盖
+        let link = service.get_link("existing").await.unwrap().unwrap();
+        assert_eq!(link.target, "https://old.com");
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_overwrite_mode() {
+        let (service, _temp) = create_test_service().await;
+
+        let req = create_request(Some("ow_test"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let items = vec![make_rich_item("ow_test", "https://new.com")];
+
+        let result = service
+            .import_links_batch(items, ImportMode::Overwrite)
+            .await
+            .unwrap();
+
+        assert_eq!(result.success_count, 1);
+        assert_eq!(result.skipped_count, 0);
+
+        let link = service.get_link("ow_test").await.unwrap().unwrap();
+        assert_eq!(link.target, "https://new.com");
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_error_mode() {
+        let (service, _temp) = create_test_service().await;
+
+        let req = create_request(Some("err_test"), "https://old.com");
+        service.create_link(req).await.unwrap();
+
+        let items = vec![
+            make_rich_item("err_test", "https://new.com"),
+            make_rich_item("err_fresh", "https://fresh.com"),
+        ];
+
+        let result = service
+            .import_links_batch(items, ImportMode::Error)
+            .await
+            .unwrap();
+
+        assert_eq!(result.success_count, 1);
+        assert_eq!(result.skipped_count, 0);
+        assert_eq!(result.failed_items.len(), 1);
+        assert_eq!(result.failed_items[0].code, "err_test");
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_dedup_within_csv() {
+        let (service, _temp) = create_test_service().await;
+
+        // 同一 code 出现两次，Overwrite 模式下 HashMap 保留最后一条
+        let mut item1 = make_rich_item("dup", "https://first.com");
+        item1.click_count = 10;
+        let mut item2 = make_rich_item("dup", "https://second.com");
+        item2.click_count = 20;
+
+        let result = service
+            .import_links_batch(vec![item1, item2], ImportMode::Overwrite)
+            .await
+            .unwrap();
+
+        // HashMap 去重，两条算两次 success（与旧 handler 行为一致）
+        assert_eq!(result.success_count, 2);
+
+        let link = service.get_link("dup").await.unwrap().unwrap();
+        assert_eq!(link.target, "https://second.com");
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_preserves_metadata() {
+        let (service, _temp) = create_test_service().await;
+
+        let created = chrono::DateTime::parse_from_rfc3339("2023-06-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let items = vec![ImportLinkItemRich {
+            code: "meta_test".to_string(),
+            target: "https://example.com".to_string(),
+            created_at: created,
+            expires_at: None,
+            password: Some("hashed_pw".to_string()),
+            click_count: 42,
+        }];
+
+        let result = service
+            .import_links_batch(items, ImportMode::Skip)
+            .await
+            .unwrap();
+        assert_eq!(result.success_count, 1);
+
+        let link = service.get_link("meta_test").await.unwrap().unwrap();
+        assert_eq!(link.created_at, created);
+        assert_eq!(link.click, 42);
+        assert_eq!(link.password, Some("hashed_pw".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_batch_import_empty_items() {
+        let (service, _temp) = create_test_service().await;
+
+        let result = service
+            .import_links_batch(vec![], ImportMode::Skip)
+            .await
+            .unwrap();
+
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.skipped_count, 0);
+        assert!(result.failed_items.is_empty());
     }
 }
 

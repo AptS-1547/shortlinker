@@ -172,6 +172,7 @@ pub async fn run_server() -> Result<()> {
     let storage = startup.storage.clone();
     let link_service = startup.link_service.clone();
     let analytics_service = startup.analytics_service.clone();
+    let config_service = startup.config_service.clone();
     let route = startup.route_config.clone();
     let metrics = startup.metrics.clone();
 
@@ -267,6 +268,7 @@ pub async fn run_server() -> Result<()> {
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(link_service.clone()))
             .app_data(web::Data::new(analytics_service.clone()))
+            .app_data(web::Data::new(config_service.clone()))
             .app_data(web::Data::new(geoip_provider.clone()))
             .app_data(web::Data::new(app_start_time.clone()))
             .app_data(web::PayloadConfig::new(1024 * 1024))

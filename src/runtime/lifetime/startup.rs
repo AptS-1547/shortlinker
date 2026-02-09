@@ -4,7 +4,7 @@ use crate::analytics::{ClickDetail, DataRetentionTask, RawClickEvent, RollupMana
 use crate::cache::{self, CompositeCacheTrait};
 use crate::config::{get_runtime_config, init_runtime_config, keys};
 use crate::services::{
-    AnalyticsService, LinkService, UserAgentStore, get_user_agent_store,
+    AnalyticsService, ConfigService, LinkService, UserAgentStore, get_user_agent_store,
     set_global_user_agent_store,
 };
 use crate::storage::{SeaOrmStorage, StorageFactory};
@@ -23,6 +23,7 @@ pub struct StartupContext {
     pub cache: Arc<dyn CompositeCacheTrait>,
     pub link_service: Arc<LinkService>,
     pub analytics_service: Arc<AnalyticsService>,
+    pub config_service: Arc<ConfigService>,
     pub route_config: RouteConfig,
     pub metrics: Arc<dyn MetricsRecorder>,
 }
@@ -236,6 +237,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     // Create AnalyticsService for analytics queries
     let analytics_service = Arc::new(AnalyticsService::new(storage.clone()));
 
+    // Create ConfigService for runtime configuration management
+    let config_service = Arc::new(ConfigService::new().context("Failed to create ConfigService")?);
+
     // 初始化数据清理后台任务
     let enable_auto_rollup = rt.get_bool_or(keys::ANALYTICS_ENABLE_AUTO_ROLLUP, true);
     if enable_auto_rollup {
@@ -291,6 +295,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         cache,
         link_service,
         analytics_service,
+        config_service,
         route_config,
         metrics,
     })
