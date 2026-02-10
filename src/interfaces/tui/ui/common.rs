@@ -18,7 +18,7 @@ pub fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled("| ", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("Total: {} ", app.links.len()),
+            format!("Total: {} ", app.total_count),
             Style::default().fg(Color::Yellow),
         ),
     ])];
@@ -68,6 +68,7 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let shortcuts = match app.current_screen {
         CurrentScreen::Main => vec![
             ("Up/Down", "Navigate", Color::Cyan),
+            ("[/]", "Prev/Next Page", Color::Cyan),
             ("/", "Search", Color::Cyan),
             ("v", "View", Color::Cyan),
             ("a", "Add", Color::Green),

@@ -3,7 +3,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Row, Table},
+    widgets::{Block, BorderType, Borders, Paragraph, Row, Table, TableState},
 };
 
 use crate::interfaces::tui::app::{App, SortColumn};
@@ -31,9 +31,9 @@ fn format_header(name: &str, col: SortColumn, app: &App) -> Span<'static> {
 }
 
 pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
-    let display_links = app.get_display_links();
+    let total_on_page = app.display_count();
 
-    if display_links.is_empty() {
+    if total_on_page == 0 {
         // Empty state or no search results
         let empty_text = if app.is_searching {
             vec![
@@ -49,7 +49,7 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(vec![
                     Span::styled("Search query: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        &app.search_input,
+                        app.search_query.as_deref().unwrap_or(&app.search_input),
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
@@ -95,7 +95,10 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         };
 
         let title = if app.is_searching {
-            format!("Search Results ({})", app.search_input)
+            format!(
+                "Search Results (\"{}\")",
+                app.search_query.as_deref().unwrap_or(&app.search_input)
+            )
         } else {
             "Short Links".to_string()
         };
@@ -115,6 +118,15 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    // 计算可见窗口（border 2行 + header 1行 + header margin 1行 = 4行开销）
+    let visible_height = (area.height as usize).saturating_sub(4);
+    app.last_visible_height = visible_height.max(1);
+
+    // 确保 scroll_offset 合法
+    let offset = app.scroll_offset.min(total_on_page.saturating_sub(1));
+    app.scroll_offset = offset;
+    let end = (offset + visible_height).min(total_on_page);
+
     // Table view for links with sort indicators
     let header = Row::new(vec![
         Span::raw("  "), // Selection indicator column
@@ -125,8 +137,10 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .bottom_margin(1);
 
-    let mut rows = Vec::new();
-    for (code, link) in display_links.iter() {
+    // 虚拟渲染：只构建可见行的 Row
+    let visible_links = &app.page_links[offset..end];
+    let mut rows = Vec::with_capacity(end - offset);
+    for link in visible_links {
         // Truncate URL if too long
         let display_url = if link.target.len() > URL_TRUNCATE_LENGTH {
             format!("{}...", &link.target[..URL_TRUNCATE_LENGTH])
@@ -139,7 +153,7 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         let status_text = indicator.text();
 
         // Selection indicator
-        let selection_prefix = if app.is_selected(code) {
+        let selection_prefix = if app.is_selected(&link.code) {
             Span::styled(
                 "● ",
                 Style::default()
@@ -153,7 +167,7 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         let row = Row::new(vec![
             selection_prefix,
             Span::styled(
-                code.to_string(),
+                link.code.clone(),
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -166,17 +180,24 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         rows.push(row);
     }
 
-    // Build title with search and selection info
+    // Build title with pagination, search and selection info
     let mut title_parts = vec![];
 
+    let total_count = app.total_count;
     if app.is_searching {
         title_parts.push(format!(
             "Search: \"{}\" ({} found)",
-            app.search_input,
-            display_links.len()
+            app.search_query.as_deref().unwrap_or(&app.search_input),
+            total_count
         ));
     } else {
-        title_parts.push("Short Links".to_string());
+        title_parts.push(format!("Short Links ({})", total_count));
+    }
+
+    // 分页信息
+    let total_pages = app.total_pages();
+    if total_pages > 1 {
+        title_parts.push(format!("Page {}/{}", app.current_page, total_pages));
     }
 
     if !app.selected_items.is_empty() {
@@ -222,5 +243,11 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     .highlight_symbol("▶ ")
     .column_spacing(1);
 
-    frame.render_stateful_widget(table, area, &mut app.table_state);
+    // 虚拟 TableState：selected 调整为相对于可见窗口的偏移
+    let mut virtual_state = TableState::default();
+    if app.selected_index >= offset && app.selected_index < end {
+        virtual_state.select(Some(app.selected_index - offset));
+    }
+
+    frame.render_stateful_widget(table, area, &mut virtual_state);
 }

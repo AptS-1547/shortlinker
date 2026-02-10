@@ -7,7 +7,7 @@ use ratatui::crossterm::event::KeyCode;
 use crate::interfaces::tui::app::{App, CurrentScreen};
 
 /// Handle search screen input
-pub fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
+pub async fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
         KeyCode::Esc => {
             app.current_screen = CurrentScreen::Main;
@@ -15,17 +15,17 @@ pub fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result
             app.is_searching = false;
         }
         KeyCode::Enter => {
-            // Apply search and return to main
-            app.filter_links();
+            // Apply search via DB query and return to main
+            if let Err(e) = app.execute_search().await {
+                app.set_error(format!("Search failed: {}", e));
+            }
             app.current_screen = CurrentScreen::Main;
         }
         KeyCode::Backspace => {
             app.search_input.pop();
-            app.filter_links();
         }
         KeyCode::Char(c) => {
             app.search_input.push(c);
-            app.filter_links();
         }
         _ => {}
     }

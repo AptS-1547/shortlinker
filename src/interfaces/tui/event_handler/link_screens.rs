@@ -10,36 +10,52 @@ use crate::interfaces::tui::input_handler::{
 };
 
 /// Handle main screen input
-pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
+pub async fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
         KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => app.move_selection_up(),
         KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => app.move_selection_down(),
-        KeyCode::Home | KeyCode::Char('g') => app.jump_to_top(),
-        KeyCode::End | KeyCode::Char('G') => app.jump_to_bottom(),
+        KeyCode::Home | KeyCode::Char('g') => {
+            if let Err(e) = app.first_page().await {
+                app.set_error(format!("Failed to load page: {}", e));
+            }
+        }
+        KeyCode::End | KeyCode::Char('G') => {
+            if let Err(e) = app.last_page().await {
+                app.set_error(format!("Failed to load page: {}", e));
+            }
+        }
         KeyCode::PageUp => app.page_up(),
         KeyCode::PageDown => app.page_down(),
+        // 翻页：[ 上一页，] 下一页
+        KeyCode::Char('[') => {
+            if let Err(e) = app.prev_page().await {
+                app.set_error(format!("Failed to load page: {}", e));
+            }
+        }
+        KeyCode::Char(']') => {
+            if let Err(e) = app.next_page().await {
+                app.set_error(format!("Failed to load page: {}", e));
+            }
+        }
         KeyCode::Esc => {
             // Clear search if active, then clear selection
             if app.is_searching {
-                app.search_input.clear();
-                app.is_searching = false;
-                app.inline_search_mode = false;
-                app.filtered_links.clear();
-                app.selected_index = 0;
+                if let Err(e) = app.clear_search().await {
+                    app.set_error(format!("Failed to clear search: {}", e));
+                }
             } else if !app.selected_items.is_empty() {
                 app.clear_selection();
             }
         }
         KeyCode::Char('/') => {
             app.inline_search_mode = true;
-            app.is_searching = true;
             app.search_input.clear();
         }
         KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Char('H') => {
             app.current_screen = CurrentScreen::Help;
         }
         KeyCode::Enter | KeyCode::Char('v') | KeyCode::Char('V') => {
-            if !app.links.is_empty() {
+            if !app.page_links.is_empty() {
                 app.current_screen = CurrentScreen::ViewDetails;
             }
         }
@@ -49,7 +65,7 @@ pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<b
             app.clear_inputs();
         }
         KeyCode::Char('e') | KeyCode::Char('E') => {
-            if !app.links.is_empty() {
+            if !app.page_links.is_empty() {
                 app.current_screen = CurrentScreen::EditLink;
                 app.form.currently_editing = Some(EditingField::TargetUrl);
                 app.clear_inputs();
@@ -58,7 +74,7 @@ pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<b
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if !app.selected_items.is_empty() {
                 app.current_screen = CurrentScreen::BatchDeleteConfirm;
-            } else if !app.links.is_empty() {
+            } else if !app.page_links.is_empty() {
                 app.current_screen = CurrentScreen::DeleteConfirm;
             }
         }
@@ -207,6 +223,14 @@ pub async fn handle_delete_confirm_screen(
                 if let Err(e) = app.refresh_links().await {
                     app.set_error(format!("Failed to refresh links: {}", e));
                 }
+                // 如果当前页为空且有上一页，自动回退
+                if app.page_links.is_empty()
+                    && app.has_prev_page()
+                    && let Err(e) = app.prev_page().await
+                {
+                    app.set_error(format!("Failed to load previous page: {}", e));
+                }
+                app.clamp_selection();
             }
             app.current_screen = CurrentScreen::Main;
         }
@@ -261,6 +285,14 @@ pub async fn handle_batch_delete_confirm_screen(
                     } else {
                         app.set_status(format!("Deleted {} links", deleted));
                     }
+                    // 如果当前页为空且有上一页，自动回退
+                    if app.page_links.is_empty()
+                        && app.has_prev_page()
+                        && let Err(e) = app.prev_page().await
+                    {
+                        app.set_error(format!("Failed to load previous page: {}", e));
+                    }
+                    app.clamp_selection();
                 }
                 Err(e) => {
                     app.selected_items.clear();
@@ -278,21 +310,29 @@ pub async fn handle_batch_delete_confirm_screen(
 }
 
 /// Handle inline search mode input
-pub fn handle_inline_search(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
+pub async fn handle_inline_search(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
         KeyCode::Esc => {
-            app.inline_search_mode = false;
-            app.is_searching = false;
-            app.search_input.clear();
-            app.filtered_links.clear();
+            if app.is_searching {
+                // 有活跃搜索时，清除搜索并恢复全量
+                if let Err(e) = app.clear_search().await {
+                    app.set_error(format!("Failed to clear search: {}", e));
+                }
+            } else {
+                // 没有活跃搜索，只是关闭搜索栏
+                app.inline_search_mode = false;
+                app.search_input.clear();
+            }
         }
         KeyCode::Enter => {
             app.inline_search_mode = false;
-            // Keep the search results visible
+            // 提交搜索到数据库
+            if let Err(e) = app.execute_search().await {
+                app.set_error(format!("Search failed: {}", e));
+            }
         }
         KeyCode::Backspace => {
             app.search_input.pop();
-            app.filter_links_fuzzy();
         }
         KeyCode::Up => {
             app.move_selection_up();
@@ -302,7 +342,6 @@ pub fn handle_inline_search(app: &mut App, key_code: KeyCode) -> std::io::Result
         }
         KeyCode::Char(c) => {
             app.search_input.push(c);
-            app.filter_links_fuzzy();
         }
         _ => {}
     }

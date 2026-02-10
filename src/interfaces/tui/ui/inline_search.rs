@@ -28,10 +28,12 @@ pub fn draw_inline_search_bar(frame: &mut Frame, app: &App, area: Rect) {
         ),
     ])];
 
-    let result_count = if app.is_searching && !app.filtered_links.is_empty() {
-        format!(" ({} matches)", app.filtered_links.len())
-    } else if app.is_searching && app.filtered_links.is_empty() && !app.search_input.is_empty() {
+    let result_count = if app.is_searching && app.total_count > 0 {
+        format!(" ({} matches)", app.total_count)
+    } else if app.is_searching && app.total_count == 0 && !app.search_input.is_empty() {
         " (no matches)".to_string()
+    } else if !app.search_input.is_empty() {
+        " (press Enter to search)".to_string()
     } else {
         String::new()
     };

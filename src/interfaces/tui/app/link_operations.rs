@@ -92,12 +92,7 @@ impl App {
 
         let code = link.code.clone();
         self.link_client.delete_link(code).await?;
-
-        // Adjust selection if necessary
-        if self.selected_index >= self.links.len() && self.selected_index > 0 {
-            self.selected_index -= 1;
-        }
-
+        // Selection adjustment is handled by clamp_selection() after refresh_links()
         Ok(())
     }
 }
