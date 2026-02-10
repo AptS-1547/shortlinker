@@ -10,9 +10,8 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 use crate::errors::ShortlinkerError;
+use crate::services::{ImportLinkItemRaw, validate_import_row};
 use crate::storage::ShortLink;
-use crate::utils::password::process_imported_password;
-use crate::utils::url_validator::validate_url;
 
 /// CSV 行数据结构（用于序列化/反序列化）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,44 +53,24 @@ impl From<&ShortLink> for CsvLinkRow {
 }
 
 impl CsvLinkRow {
-    /// 转换为 ShortLink，处理密码哈希和日期解析
+    /// 转换为 ShortLink，委托给共享验证逻辑
     pub fn into_short_link(self) -> Result<ShortLink, ShortlinkerError> {
-        // 验证 URL
-        validate_url(&self.target).map_err(|e| {
-            ShortlinkerError::validation(format!("Invalid URL for code '{}': {}", self.code, e))
-        })?;
-
-        // 解析 created_at
-        let created_at = chrono::DateTime::parse_from_rfc3339(&self.created_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| Utc::now());
-
-        // 解析 expires_at
-        let expires_at = self.expires_at.as_ref().and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-            }
-        });
-
-        // 处理密码（明文则哈希，已哈希则保留 - 导入场景）
-        let password = process_imported_password(self.password.as_deref()).map_err(|e| {
-            ShortlinkerError::validation(format!(
-                "Failed to process password for code '{}': {}",
-                self.code, e
-            ))
-        })?;
-
-        Ok(ShortLink {
+        let raw = ImportLinkItemRaw {
             code: self.code,
             target: self.target,
-            created_at,
-            expires_at,
-            password,
-            click: self.click_count,
+            created_at: self.created_at,
+            expires_at: self.expires_at,
+            password: self.password,
+            click_count: self.click_count,
+        };
+        let rich = validate_import_row(raw).map_err(|e| e.error)?;
+        Ok(ShortLink {
+            code: rich.code,
+            target: rich.target,
+            created_at: rich.created_at,
+            expires_at: rich.expires_at,
+            password: rich.password,
+            click: rich.click_count,
         })
     }
 }

@@ -13,8 +13,8 @@ use super::types::{
 };
 use crate::errors::ShortlinkerError;
 use crate::services::{
-    ConfigService, CreateLinkRequest, ImportLinkItemRich, ImportMode, LinkService,
-    UpdateLinkRequest,
+    ConfigService, CreateLinkRequest, ImportLinkItemRaw, ImportMode, LinkService,
+    UpdateLinkRequest, validate_import_rows,
 };
 use crate::storage::{LinkFilter, ShortLink};
 use crate::system::reload::get_reload_coordinator;
@@ -362,64 +362,28 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
         ));
     };
 
-    // Convert IPC ImportLinkData to service ImportLinkItemRich with validation
-    let mut valid_items: Vec<ImportLinkItemRich> = Vec::with_capacity(links.len());
-    let mut pre_errors: Vec<ImportErrorData> = Vec::new();
-
-    for l in links {
-        // Validate URL
-        if let Err(e) = crate::utils::url_validator::validate_url(&l.target) {
-            pre_errors.push(ImportErrorData {
-                code: l.code,
-                message: format!("Invalid URL: {}", e),
-            });
-            continue;
-        }
-
-        // Parse created_at
-        let created_at = chrono::DateTime::parse_from_rfc3339(&l.created_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| {
-                warn!(
-                    "IPC import: invalid created_at '{}' for code '{}', using now",
-                    l.created_at, l.code
-                );
-                chrono::Utc::now()
-            });
-
-        // Parse expires_at
-        let expires_at = l.expires_at.as_ref().and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-            }
-        });
-
-        // Process password
-        let password =
-            match crate::utils::password::process_imported_password(l.password.as_deref()) {
-                Ok(pwd) => pwd,
-                Err(e) => {
-                    pre_errors.push(ImportErrorData {
-                        code: l.code,
-                        message: format!("Password hash error: {}", e),
-                    });
-                    continue;
-                }
-            };
-
-        valid_items.push(ImportLinkItemRich {
+    // Convert IPC ImportLinkData to ImportLinkItemRaw, then validate via shared logic
+    let raw_items: Vec<ImportLinkItemRaw> = links
+        .into_iter()
+        .map(|l| ImportLinkItemRaw {
             code: l.code,
             target: l.target,
-            created_at,
-            expires_at,
-            password,
+            created_at: l.created_at,
+            expires_at: l.expires_at,
+            password: l.password,
             click_count: l.click_count,
-        });
-    }
+        })
+        .collect();
+
+    let (valid_items, row_errors) = validate_import_rows(raw_items);
+
+    let pre_errors: Vec<ImportErrorData> = row_errors
+        .into_iter()
+        .map(|e| ImportErrorData {
+            code: e.code,
+            message: e.error.message().to_string(),
+        })
+        .collect();
 
     let mode = ImportMode::from_overwrite_flag(overwrite);
 
@@ -428,7 +392,7 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
             let mut errors: Vec<ImportErrorData> = pre_errors;
             errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
                 code: f.code,
-                message: f.reason,
+                message: f.error.message().to_string(),
             }));
             IpcResponse::ImportResult {
                 success: result.success_count,

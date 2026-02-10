@@ -19,11 +19,15 @@
 mod analytics_service;
 mod config_service;
 pub mod geoip;
+pub mod import_validation;
 mod link_service;
 mod user_agent_store;
 
 pub use analytics_service::*;
 pub use config_service::*;
 pub use geoip::{GeoInfo, GeoIpLookup, GeoIpProvider};
+pub use import_validation::{
+    ImportLinkItemRaw, ImportRowError, validate_import_row, validate_import_rows,
+};
 pub use link_service::*;
 pub use user_agent_store::{UserAgentStore, get_user_agent_store, set_global_user_agent_store};

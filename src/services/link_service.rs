@@ -155,7 +155,7 @@ pub struct ImportBatchResult {
 #[derive(Debug, Clone)]
 pub struct ImportBatchFailedItem {
     pub code: String,
-    pub reason: String,
+    pub error: ShortlinkerError,
 }
 
 // ============ Batch Operation DTOs ============
@@ -682,7 +682,7 @@ impl LinkService {
                     ImportMode::Error => {
                         result.failed_items.push(ImportBatchFailedItem {
                             code: item.code,
-                            reason: "Link already exists".to_string(),
+                            error: ShortlinkerError::link_already_exists("Link already exists"),
                         });
                         continue;
                     }

@@ -73,9 +73,14 @@ pub async fn import_links(
     // Print errors if any
     for item in &result.failed_items {
         if item.code.is_empty() {
-            println!("{} {}", "✗".bold().red(), item.reason);
+            println!("{} {}", "✗".bold().red(), item.error.message());
         } else {
-            println!("{} {}: {}", "✗".bold().red(), item.code, item.reason);
+            println!(
+                "{} {}: {}",
+                "✗".bold().red(),
+                item.code,
+                item.error.message()
+            );
         }
     }
 

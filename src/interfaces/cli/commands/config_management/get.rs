@@ -33,7 +33,11 @@ pub async fn config_get(client: &ConfigClient, key: String, json: bool) -> Resul
     let category = def.map(|d| d.category.to_string()).unwrap_or_default();
     let description = def.map(|d| d.description.to_string()).unwrap_or_default();
     let editable = def.map(|d| d.editable).unwrap_or(true);
-    let default_value = def.map(|d| (d.default_fn)()).unwrap_or_default();
+    let default_value = if item.is_sensitive {
+        "(masked)".to_string()
+    } else {
+        def.map(|d| (d.default_fn)()).unwrap_or_default()
+    };
 
     let enum_options = schema.and_then(|s| {
         s.enum_options
@@ -71,11 +75,7 @@ pub async fn config_get(client: &ConfigClient, key: String, json: bool) -> Resul
         println!("{}: {}", "Category".bold(), detail.category);
         println!("{}: {}", "Description".bold(), detail.description);
 
-        if detail.sensitive {
-            println!("{}: (masked)", "Default".bold());
-        } else {
-            println!("{}: {}", "Default".bold(), detail.default_value);
-        }
+        println!("{}: {}", "Default".bold(), detail.default_value);
 
         if detail.requires_restart {
             println!("{}: {}", "Requires Restart".bold(), "Yes".yellow());

@@ -48,19 +48,23 @@ pub async fn handle_file_browser_screen(app: &mut App, key_code: KeyCode) -> std
                         Ok(result) => {
                             let failed = result.failed_items.len();
                             let total = result.success_count + result.skipped_count + failed;
-                            if failed > 0 {
-                                app.set_error(format!(
+                            let import_msg = if failed > 0 {
+                                format!(
                                     "Imported {}/{} links ({} failed, {} skipped)",
                                     result.success_count, total, failed, result.skipped_count
-                                ));
+                                )
                             } else {
-                                app.set_status(format!(
+                                format!(
                                     "Imported {} links ({} skipped)",
                                     result.success_count, result.skipped_count
-                                ));
-                            }
+                                )
+                            };
                             if let Err(e) = app.refresh_links().await {
-                                app.set_error(format!("Failed to refresh links: {}", e));
+                                app.set_error(format!("{}; refresh failed: {}", import_msg, e));
+                            } else if failed > 0 {
+                                app.set_error(import_msg);
+                            } else {
+                                app.set_status(import_msg);
                             }
                         }
                         Err(e) => {

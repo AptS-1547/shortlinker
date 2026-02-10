@@ -14,10 +14,8 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::errors::ShortlinkerError;
-use crate::services::LinkService;
+use crate::services::{ImportLinkItemRaw, LinkService, validate_import_rows};
 use crate::storage::{LinkFilter, ShortLink};
-use crate::utils::password::process_imported_password;
-use crate::utils::url_validator::validate_url;
 
 use super::error_code::ErrorCode;
 use super::helpers::{error_from_shortlinker, error_response, success_response};
@@ -349,11 +347,12 @@ pub async fn import_links(
 
     let mut total_rows = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
-    let mut valid_items: Vec<crate::services::ImportLinkItemRich> = Vec::new();
+    let mut raw_items: Vec<ImportLinkItemRaw> = Vec::new();
     // 记录 code → CSV 行号映射，用于回填 service 层返回的冲突失败项行号
     let mut code_to_row: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
 
+    // Step 1: CSV 解析，收集 raw items（CSV 解析错误留在这层）
     for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
         let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
         total_rows += 1;
@@ -371,72 +370,28 @@ pub async fn import_links(
             }
         };
 
-        // 验证 code
-        if row.code.is_empty() {
-            failed_items.push(ImportFailedItem {
-                row: Some(row_num),
-                code: row.code,
-                error: "Empty code".to_string(),
-                error_code: Some(ErrorCode::LinkEmptyCode as i32),
-            });
-            continue;
-        }
-
-        // 验证 URL
-        if let Err(e) = validate_url(&row.target) {
-            failed_items.push(ImportFailedItem {
-                row: Some(row_num),
-                code: row.code,
-                error: format!("Invalid URL: {}", e),
-                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
-            });
-            continue;
-        }
-
-        // 解析 created_at
-        let created_at = chrono::DateTime::parse_from_rfc3339(&row.created_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| {
-                warn!(
-                    "Row {}: Invalid created_at '{}', using current time",
-                    row_num, row.created_at
-                );
-                Utc::now()
-            });
-
-        // 解析 expires_at
-        let expires_at = row.expires_at.as_ref().and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-            }
-        });
-
-        // 处理密码字段（导入路径：已哈希则保留，明文则哈希）
-        let password = match process_imported_password(row.password.as_deref()) {
-            Ok(pwd) => pwd,
-            Err(e) => {
-                failed_items.push(ImportFailedItem {
-                    row: Some(row_num),
-                    code: row.code,
-                    error: format!("Password hash error: {}", e),
-                    error_code: Some(ErrorCode::LinkPasswordHashError as i32),
-                });
-                continue;
-            }
-        };
-
         code_to_row.entry(row.code.clone()).or_insert(row_num);
-        valid_items.push(crate::services::ImportLinkItemRich {
+        raw_items.push(ImportLinkItemRaw {
             code: row.code,
             target: row.target,
-            created_at,
-            expires_at,
-            password,
+            created_at: row.created_at,
+            expires_at: row.expires_at,
+            password: row.password,
             click_count: row.click_count,
+        });
+    }
+
+    // Step 2: 统一验证（URL、日期、密码、空 code）
+    let (valid_items, row_errors) = validate_import_rows(raw_items);
+
+    for err in row_errors {
+        let row = code_to_row.get(&err.code).copied();
+        let error_code = ErrorCode::from(err.error.clone()) as i32;
+        failed_items.push(ImportFailedItem {
+            row,
+            code: err.code,
+            error: err.error.message().to_string(),
+            error_code: Some(error_code),
         });
     }
 
@@ -450,8 +405,6 @@ pub async fn import_links(
     };
 
     // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
-    // 若 code 在 map 中找不到（理论上不会发生，除非 service 层内部转换了 code），
-    // 则 row 置为 None，让前端明确知道行号未知
     for item in batch_result.failed_items {
         let row = match code_to_row.get(&item.code).copied() {
             Some(r) => Some(r),
@@ -460,11 +413,12 @@ pub async fn import_links(
                 None
             }
         };
+        let error_code = ErrorCode::from(item.error.clone()) as i32;
         failed_items.push(ImportFailedItem {
             row,
             code: item.code,
-            error: item.reason,
-            error_code: Some(ErrorCode::LinkAlreadyExists as i32),
+            error: item.error.message().to_string(),
+            error_code: Some(error_code),
         });
     }
 
