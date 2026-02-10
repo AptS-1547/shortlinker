@@ -450,18 +450,20 @@ pub async fn import_links(
     };
 
     // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
+    // 若 code 在 map 中找不到（理论上不会发生，除非 service 层内部转换了 code），
+    // 则行号置 0 并在错误消息前标注 [Row unknown]，避免用户看到无意义的行号
     for item in batch_result.failed_items {
-        let row = code_to_row.get(&item.code).copied().unwrap_or_else(|| {
-            warn!(
-                "Could not find row number for code '{}', defaulting to 0",
-                &item.code
-            );
-            0
-        });
+        let (row, error) = match code_to_row.get(&item.code).copied() {
+            Some(r) => (r, item.reason),
+            None => {
+                warn!("Could not find row number for code '{}'", &item.code);
+                (0, format!("[Row unknown] {}", item.reason))
+            }
+        };
         failed_items.push(ImportFailedItem {
             row,
             code: item.code,
-            error: item.reason,
+            error,
             error_code: Some(ErrorCode::LinkAlreadyExists as i32),
         });
     }
