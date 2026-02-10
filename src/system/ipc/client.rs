@@ -9,7 +9,9 @@ use tokio::time::timeout;
 
 use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
-use super::types::{ConfigImportItem, ImportLinkData, IpcCommand, IpcError, IpcResponse};
+use super::types::{
+    ConfigImportItem, ImportLinkData, IpcCommand, IpcError, IpcResponse, ShortLinkData,
+};
 use crate::system::reload::ReloadTarget;
 
 /// Check if the server is running
@@ -138,6 +140,11 @@ pub async fn remove_link(code: String) -> Result<IpcResponse, IpcError> {
     send_command(IpcCommand::RemoveLink { code }).await
 }
 
+/// Batch delete links via IPC
+pub async fn batch_delete_links(codes: Vec<String>) -> Result<IpcResponse, IpcError> {
+    send_command(IpcCommand::BatchDeleteLinks { codes }).await
+}
+
 /// Update a link via IPC
 pub async fn update_link(
     code: String,
@@ -181,9 +188,73 @@ pub async fn import_links(
     send_command(IpcCommand::ImportLinks { links, overwrite }).await
 }
 
-/// Export all links via IPC
-pub async fn export_links() -> Result<IpcResponse, IpcError> {
-    send_command(IpcCommand::ExportLinks).await
+/// Export all links via IPC (streaming)
+///
+/// Sends ExportLinks command and receives streaming ExportChunk + ExportDone responses.
+/// Returns all exported links collected from chunks.
+pub async fn export_links() -> Result<Vec<ShortLinkData>, IpcError> {
+    let config = crate::config::get_config();
+    let timeout_duration = config.ipc.bulk_timeout_duration();
+
+    // Connect to the server
+    let mut stream = timeout(timeout_duration, PlatformIpc::connect())
+        .await
+        .map_err(|_| IpcError::Timeout)?
+        .map_err(IpcError::from)?;
+
+    // Encode and send the command
+    let data =
+        encode(&IpcCommand::ExportLinks).map_err(|e| IpcError::ProtocolError(e.to_string()))?;
+    stream.write_all(&data).await.map_err(IpcError::IoError)?;
+    stream.flush().await.map_err(IpcError::IoError)?;
+
+    // Read streaming responses
+    let mut buf = BytesMut::with_capacity(4096);
+    let mut read_buf = [0u8; 4096];
+    let mut all_links: Vec<ShortLinkData> = Vec::new();
+
+    loop {
+        // Try to decode any buffered responses first
+        loop {
+            match decode::<IpcResponse>(&mut buf)
+                .map_err(|e| IpcError::ProtocolError(e.to_string()))?
+            {
+                Some(IpcResponse::ExportChunk { links }) => {
+                    all_links.extend(links);
+                    continue; // Try decoding more from buffer
+                }
+                Some(IpcResponse::ExportDone { .. }) => {
+                    return Ok(all_links);
+                }
+                Some(IpcResponse::Error { code, message }) => {
+                    return Err(IpcError::ProtocolError(format!("{}: {}", code, message)));
+                }
+                Some(other) => {
+                    return Err(IpcError::ProtocolError(format!(
+                        "Unexpected response during streaming export: {:?}",
+                        other
+                    )));
+                }
+                None => {
+                    break; // Need more data
+                }
+            }
+        }
+
+        // Read more data from socket
+        let n = timeout(timeout_duration, stream.read(&mut read_buf))
+            .await
+            .map_err(|_| IpcError::Timeout)?
+            .map_err(IpcError::IoError)?;
+
+        if n == 0 {
+            return Err(IpcError::ProtocolError(
+                "Connection closed during streaming export".to_string(),
+            ));
+        }
+
+        buf.extend_from_slice(&read_buf[..n]);
+    }
 }
 
 /// Get link statistics via IPC

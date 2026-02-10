@@ -10,6 +10,7 @@ use chrono::Utc;
 use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
 use shortlinker::errors::ShortlinkerError;
+#[allow(deprecated)]
 use shortlinker::services::{
     CreateLinkRequest, ImportLinkItem, ImportLinkItemRich, ImportMode, LinkService,
     UpdateLinkRequest,
@@ -624,6 +625,7 @@ mod import_export_tests {
     use super::*;
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_import_links_skip_mode() {
         let (service, _temp) = create_test_service().await;
 
@@ -659,6 +661,7 @@ mod import_export_tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_import_links_overwrite_mode() {
         let (service, _temp) = create_test_service().await;
 
@@ -688,6 +691,7 @@ mod import_export_tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_import_links_error_mode() {
         let (service, _temp) = create_test_service().await;
 
@@ -723,6 +727,7 @@ mod import_export_tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_import_links_invalid_url() {
         let (service, _temp) = create_test_service().await;
 
@@ -748,6 +753,7 @@ mod import_export_tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_export_links() {
         let (service, _temp) = create_test_service().await;
 
@@ -981,6 +987,7 @@ mod edge_cases {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_import_empty_list() {
         let (service, _temp) = create_test_service().await;
 

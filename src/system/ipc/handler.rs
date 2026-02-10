@@ -3,6 +3,7 @@
 //! Processes incoming IPC commands and returns appropriate responses.
 //! Uses LinkService for link management operations.
 
+use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tracing::{debug, info, warn};
@@ -12,7 +13,8 @@ use super::types::{
 };
 use crate::errors::ShortlinkerError;
 use crate::services::{
-    ConfigService, CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
+    ConfigService, CreateLinkRequest, ImportLinkItemRich, ImportMode, LinkService,
+    UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, ShortLink};
 use crate::system::reload::get_reload_coordinator;
@@ -55,7 +57,7 @@ fn get_uptime_secs() -> u64 {
 }
 
 /// Convert ShortLink to ShortLinkData for IPC transfer
-fn to_link_data(link: &ShortLink) -> ShortLinkData {
+pub(crate) fn to_link_data(link: &ShortLink) -> ShortLinkData {
     ShortLinkData {
         code: link.code.clone(),
         target: link.target.clone(),
@@ -169,6 +171,8 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
 
         IpcCommand::RemoveLink { code } => handle_remove_link(code).await,
 
+        IpcCommand::BatchDeleteLinks { codes } => handle_batch_delete_links(codes).await,
+
         IpcCommand::UpdateLink {
             code,
             target,
@@ -186,7 +190,16 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
 
         IpcCommand::ImportLinks { links, overwrite } => handle_import_links(links, overwrite).await,
 
-        IpcCommand::ExportLinks => handle_export_links().await,
+        // ExportLinks is handled directly by server.rs for streaming support.
+        // This branch is a fallback in case it reaches here.
+        IpcCommand::ExportLinks => {
+            warn!(
+                "ExportLinks reached handle_command — should be handled by server.rs streaming path"
+            );
+            error_response(ShortlinkerError::internal_error(
+                "ExportLinks must be handled by streaming path",
+            ))
+        }
 
         IpcCommand::GetLinkStats => handle_get_stats().await,
 
@@ -244,6 +257,30 @@ async fn handle_remove_link(code: String) -> IpcResponse {
 
     match service.delete_link(&code).await {
         Ok(()) => IpcResponse::LinkDeleted { code },
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
+    let Some(service) = LINK_SERVICE.get() else {
+        return error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ));
+    };
+
+    match service.batch_delete_links(codes).await {
+        Ok(result) => IpcResponse::BatchDeleteResult {
+            deleted: result.deleted,
+            not_found: result.not_found,
+            errors: result
+                .errors
+                .into_iter()
+                .map(|e| ImportErrorData {
+                    code: e.code,
+                    message: e.reason,
+                })
+                .collect(),
+        },
         Err(e) => error_response(e),
     }
 }
@@ -325,33 +362,78 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
         ));
     };
 
-    // Convert IPC ImportLinkData to service ImportLinkItem
-    let items: Vec<ImportLinkItem> = links
-        .into_iter()
-        .map(|l| ImportLinkItem {
+    // Convert IPC ImportLinkData to service ImportLinkItemRich with validation
+    let mut valid_items: Vec<ImportLinkItemRich> = Vec::with_capacity(links.len());
+    let mut pre_errors: Vec<ImportErrorData> = Vec::new();
+
+    for l in links {
+        // Validate URL
+        if let Err(e) = crate::utils::url_validator::validate_url(&l.target) {
+            pre_errors.push(ImportErrorData {
+                code: l.code,
+                message: format!("Invalid URL: {}", e),
+            });
+            continue;
+        }
+
+        // Parse created_at
+        let created_at = chrono::DateTime::parse_from_rfc3339(&l.created_at)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| {
+                warn!(
+                    "IPC import: invalid created_at '{}' for code '{}', using now",
+                    l.created_at, l.code
+                );
+                chrono::Utc::now()
+            });
+
+        // Parse expires_at
+        let expires_at = l.expires_at.as_ref().and_then(|s| {
+            if s.is_empty() {
+                None
+            } else {
+                chrono::DateTime::parse_from_rfc3339(s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+            }
+        });
+
+        // Process password
+        let password =
+            match crate::utils::password::process_imported_password(l.password.as_deref()) {
+                Ok(pwd) => pwd,
+                Err(e) => {
+                    pre_errors.push(ImportErrorData {
+                        code: l.code,
+                        message: format!("Password hash error: {}", e),
+                    });
+                    continue;
+                }
+            };
+
+        valid_items.push(ImportLinkItemRich {
             code: l.code,
             target: l.target,
-            expires_at: l.expires_at,
-            password: l.password,
-        })
-        .collect();
+            created_at,
+            expires_at,
+            password,
+            click_count: l.click_count,
+        });
+    }
 
     let mode = ImportMode::from_overwrite_flag(overwrite);
 
-    match service.import_links(items, mode).await {
+    match service.import_links_batch(valid_items, mode).await {
         Ok(result) => {
-            let errors: Vec<ImportErrorData> = result
-                .errors
-                .into_iter()
-                .map(|e| ImportErrorData {
-                    code: e.code,
-                    message: e.message,
-                })
-                .collect();
+            let mut errors: Vec<ImportErrorData> = pre_errors;
+            errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
+                code: f.code,
+                message: f.reason,
+            }));
             IpcResponse::ImportResult {
-                success: result.success,
-                skipped: result.skipped,
-                failed: result.failed,
+                success: result.success_count,
+                skipped: result.skipped_count,
+                failed: errors.len(),
                 errors,
             }
         }
@@ -359,20 +441,18 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
     }
 }
 
-async fn handle_export_links() -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
-    };
+/// Stream of ShortLink batches for export
+type LinkBatchStream =
+    Pin<Box<dyn futures_util::Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send>>;
 
-    match service.export_links().await {
-        Ok(links) => {
-            let link_data: Vec<ShortLinkData> = links.iter().map(to_link_data).collect();
-            IpcResponse::ExportResult { links: link_data }
-        }
-        Err(e) => error_response(e),
-    }
+/// Export links as a stream of batches.
+///
+/// Called by `server.rs` for streaming export.
+/// Returns `None` if the service is not initialized.
+pub fn export_links_stream() -> Option<LinkBatchStream> {
+    let service = LINK_SERVICE.get()?;
+    let stream = service.export_links_stream(LinkFilter::default(), 10000);
+    Some(stream)
 }
 
 async fn handle_get_stats() -> IpcResponse {
@@ -564,7 +644,7 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
     let mut success = 0usize;
     let mut skipped = 0usize;
     let mut failed = 0usize;
-    let mut errors = Vec::new();
+    let mut errors: Vec<ImportErrorData> = Vec::new();
 
     for item in &configs {
         // Validate key
@@ -572,21 +652,30 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
             Some(d) => d,
             None => {
                 skipped += 1;
-                errors.push(format!("{}: unknown key", item.key));
+                errors.push(ImportErrorData {
+                    code: item.key.clone(),
+                    message: "unknown key".into(),
+                });
                 continue;
             }
         };
 
         if !def.editable {
             skipped += 1;
-            errors.push(format!("{}: read-only", item.key));
+            errors.push(ImportErrorData {
+                code: item.key.clone(),
+                message: "read-only".into(),
+            });
             continue;
         }
 
         // Validate value
         if let Err(e) = validators::validate_config_value(&item.key, &item.value) {
             failed += 1;
-            errors.push(format!("{}: {}", item.key, e));
+            errors.push(ImportErrorData {
+                code: item.key.clone(),
+                message: e.to_string(),
+            });
             continue;
         }
 
@@ -596,7 +685,10 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
             }
             Err(e) => {
                 failed += 1;
-                errors.push(format!("{}: {}", item.key, e));
+                errors.push(ImportErrorData {
+                    code: item.key.clone(),
+                    message: e.to_string(),
+                });
             }
         }
     }

@@ -18,7 +18,7 @@ use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::system::ipc::handler::{init_link_service, init_start_time};
 use shortlinker::system::ipc::server::start_ipc_server;
 use shortlinker::system::ipc::types::{ImportLinkData, IpcCommand, IpcResponse};
-use shortlinker::system::ipc::{is_server_running, send_command};
+use shortlinker::system::ipc::{export_links, is_server_running, send_command};
 
 use std::sync::Once;
 use tempfile::TempDir;
@@ -349,14 +349,18 @@ async fn test_e2e_import_export() {
         ImportLinkData {
             code: "e2e-imp1".to_string(),
             target: "https://example.com/imp1".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
             expires_at: None,
             password: None,
+            click_count: 0,
         },
         ImportLinkData {
             code: "e2e-imp2".to_string(),
             target: "https://example.com/imp2".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
             expires_at: None,
             password: None,
+            click_count: 0,
         },
     ];
 
@@ -377,17 +381,12 @@ async fn test_e2e_import_export() {
         other => panic!("Expected ImportResult, got {:?}", other),
     }
 
-    let resp = send_command(IpcCommand::ExportLinks)
+    let links = export_links()
         .await
-        .expect("ExportLinks failed");
+        .expect("ExportLinks (streaming) failed");
 
-    match resp {
-        IpcResponse::ExportResult { links } => {
-            assert!(!links.is_empty());
-            assert!(links.iter().any(|l| l.code == "e2e-imp1"));
-        }
-        other => panic!("Expected ExportResult, got {:?}", other),
-    }
+    assert!(!links.is_empty());
+    assert!(links.iter().any(|l| l.code == "e2e-imp1"));
 }
 
 #[tokio::test]

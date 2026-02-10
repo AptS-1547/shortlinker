@@ -583,6 +583,7 @@ impl AnalyticsService {
     }
 
     /// 导出点击日志（带分页限制）
+    #[deprecated(since = "0.6.0", note = "Use `export_click_logs_stream` instead")]
     pub async fn export_click_logs(
         &self,
         start: DateTime<Utc>,

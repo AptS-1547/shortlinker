@@ -270,27 +270,40 @@ mod service_query_tests {
     }
 
     #[tokio::test]
-    async fn test_export_click_logs_empty_db() {
+    async fn test_export_click_logs_stream_empty_db() {
+        use futures_util::StreamExt;
         let (storage, _td) = create_temp_storage().await;
         let svc = AnalyticsService::new(storage);
         let end = Utc::now();
         let start = end - Duration::days(7);
 
-        let result = svc.export_click_logs(start, end, 100).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_empty());
+        let mut stream = svc.export_click_logs_stream(start, end, 100);
+        let batch = stream.next().await;
+        // Empty DB should yield no batches or an empty batch
+        match batch {
+            None => {} // stream ended immediately
+            Some(Ok(rows)) => assert!(rows.is_empty()),
+            Some(Err(e)) => panic!("Unexpected error: {}", e),
+        }
     }
 
     #[tokio::test]
-    async fn test_export_click_logs_limit_capped() {
+    async fn test_export_click_logs_stream_produces_results() {
+        use futures_util::StreamExt;
         let (storage, _td) = create_temp_storage().await;
         let svc = AnalyticsService::new(storage);
         let end = Utc::now();
         let start = end - Duration::days(7);
 
-        // 超大 limit 应被 cap 到 100000
-        let result = svc.export_click_logs(start, end, 999999).await;
-        assert!(result.is_ok());
+        // Collect all batches from stream
+        let all: Vec<_> = svc
+            .export_click_logs_stream(start, end, 1000)
+            .collect()
+            .await;
+        // Empty DB — should all be Ok and empty
+        for batch in all {
+            assert!(batch.is_ok());
+        }
     }
 }
 

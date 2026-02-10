@@ -238,30 +238,30 @@ pub async fn handle_batch_delete_confirm_screen(
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             let codes_to_delete: Vec<String> = app.selected_items.iter().cloned().collect();
             let total = codes_to_delete.len();
-            let mut deleted = 0;
-            let mut failed = 0;
 
-            for code in codes_to_delete {
-                if app.links.contains_key(&code) {
-                    if let Err(_e) = app.link_client.delete_link(code).await {
-                        failed += 1;
+            match app.link_client.batch_delete(codes_to_delete).await {
+                Ok(result) => {
+                    let deleted = result.deleted.len();
+                    let failed = result.errors.len();
+                    let not_found = result.not_found.len();
+
+                    app.selected_items.clear();
+
+                    if let Err(e) = app.refresh_links().await {
+                        app.set_error(format!("Failed to refresh links: {}", e));
+                    } else if failed > 0 || not_found > 0 {
+                        app.set_error(format!(
+                            "Deleted {}/{} links ({} failed, {} not found)",
+                            deleted, total, failed, not_found
+                        ));
                     } else {
-                        deleted += 1;
+                        app.set_status(format!("Deleted {} links", deleted));
                     }
                 }
-            }
-
-            app.selected_items.clear();
-
-            if let Err(e) = app.refresh_links().await {
-                app.set_error(format!("Failed to refresh links: {}", e));
-            } else if failed > 0 {
-                app.set_error(format!(
-                    "Deleted {}/{} links ({} failed)",
-                    deleted, total, failed
-                ));
-            } else {
-                app.set_status(format!("Deleted {} links", deleted));
+                Err(e) => {
+                    app.selected_items.clear();
+                    app.set_error(format!("Batch delete failed: {}", e));
+                }
             }
             app.current_screen = CurrentScreen::Main;
         }

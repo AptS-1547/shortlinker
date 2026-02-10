@@ -150,7 +150,14 @@ fn config_data_to_view(data: ConfigItemData) -> ConfigItemView {
         is_sensitive: data.sensitive,
         updated_at: chrono::DateTime::parse_from_rfc3339(&data.updated_at)
             .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| chrono::Utc::now()),
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Failed to parse 'updated_at' from IPC (value: '{}'): {}",
+                    &data.updated_at,
+                    e
+                );
+                chrono::Utc::now()
+            }),
     }
 }
 

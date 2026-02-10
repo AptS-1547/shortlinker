@@ -451,7 +451,13 @@ pub async fn import_links(
 
     // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
     for item in batch_result.failed_items {
-        let row = code_to_row.get(&item.code).copied().unwrap_or(0);
+        let row = code_to_row.get(&item.code).copied().unwrap_or_else(|| {
+            warn!(
+                "Could not find row number for code '{}', defaulting to 0",
+                &item.code
+            );
+            0
+        });
         failed_items.push(ImportFailedItem {
             row,
             code: item.code,

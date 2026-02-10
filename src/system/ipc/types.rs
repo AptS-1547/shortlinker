@@ -27,8 +27,10 @@ pub struct ShortLinkData {
 pub struct ImportLinkData {
     pub code: String,
     pub target: String,
+    pub created_at: String,
     pub expires_at: Option<String>,
     pub password: Option<String>,
+    pub click_count: usize,
 }
 
 /// Import error data for IPC transfer
@@ -88,6 +90,9 @@ pub enum IpcCommand {
 
     /// Remove a short link
     RemoveLink { code: String },
+
+    /// Batch delete short links
+    BatchDeleteLinks { codes: Vec<String> },
 
     /// Update an existing short link
     UpdateLink {
@@ -197,6 +202,13 @@ pub enum IpcResponse {
     /// Link deleted successfully
     LinkDeleted { code: String },
 
+    /// Batch delete result
+    BatchDeleteResult {
+        deleted: Vec<String>,
+        not_found: Vec<String>,
+        errors: Vec<ImportErrorData>,
+    },
+
     /// Link updated successfully
     LinkUpdated { link: ShortLinkData },
 
@@ -221,6 +233,12 @@ pub enum IpcResponse {
 
     /// Export result
     ExportResult { links: Vec<ShortLinkData> },
+
+    /// Export chunk (streaming export)
+    ExportChunk { links: Vec<ShortLinkData> },
+
+    /// Export done marker (streaming export)
+    ExportDone { total: usize },
 
     /// Stats result
     StatsResult {
@@ -260,7 +278,7 @@ pub enum IpcResponse {
         success: usize,
         skipped: usize,
         failed: usize,
-        errors: Vec<String>,
+        errors: Vec<ImportErrorData>,
     },
 }
 
@@ -453,13 +471,17 @@ mod tests {
         let data = ImportLinkData {
             code: "test".into(),
             target: "https://example.com".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
             expires_at: None,
             password: Some("secret".into()),
+            click_count: 10,
         };
         let json = serde_json::to_string(&data).unwrap();
         let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.code, "test");
         assert_eq!(decoded.password, Some("secret".into()));
+        assert_eq!(decoded.created_at, "2025-01-01T00:00:00Z");
+        assert_eq!(decoded.click_count, 10);
     }
 
     #[test]
@@ -575,6 +597,26 @@ mod tests {
         {
             assert_eq!(success, 5);
             assert_eq!(skipped, 1);
+        } else {
+            panic!("Expected ConfigImportResult");
+        }
+
+        // ConfigImportResult with errors
+        let resp = IpcResponse::ConfigImportResult {
+            success: 1,
+            skipped: 0,
+            failed: 1,
+            errors: vec![ImportErrorData {
+                code: "auth.token".into(),
+                message: "read-only".into(),
+            }],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
+        if let IpcResponse::ConfigImportResult { errors, .. } = decoded {
+            assert_eq!(errors.len(), 1);
+            assert_eq!(errors[0].code, "auth.token");
+            assert_eq!(errors[0].message, "read-only");
         } else {
             panic!("Expected ConfigImportResult");
         }

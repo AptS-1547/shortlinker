@@ -5,7 +5,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, ImportResult, LinkCreateResult,
+    CreateLinkRequest, ImportBatchResult, ImportLinkItemRich, ImportMode, LinkCreateResult,
     UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, LinkStats, ShortLink};
@@ -76,6 +76,41 @@ impl LinkClient {
             || async move {
                 let service = ctx.get_link_service().await?;
                 Ok(service.delete_link(&code2).await?)
+            },
+        )
+        .await
+    }
+
+    /// Batch delete short links
+    pub async fn batch_delete(
+        &self,
+        codes: Vec<String>,
+    ) -> Result<crate::services::BatchDeleteResult, ClientError> {
+        let ctx = self.ctx.clone();
+        let codes2 = codes.clone();
+        ipc_or_fallback(
+            ipc::batch_delete_links(codes),
+            |resp| match resp {
+                IpcResponse::BatchDeleteResult {
+                    deleted,
+                    not_found,
+                    errors,
+                } => Ok(crate::services::BatchDeleteResult {
+                    deleted,
+                    not_found,
+                    errors: errors
+                        .into_iter()
+                        .map(|e| crate::services::BatchFailedItem {
+                            code: e.code,
+                            reason: e.message,
+                        })
+                        .collect(),
+                }),
+                other => Err(unexpected_response(other)),
+            },
+            || async move {
+                let service = ctx.get_link_service().await?;
+                Ok(service.batch_delete_links(codes2).await?)
             },
         )
         .await
@@ -165,19 +200,21 @@ impl LinkClient {
     /// Import links
     pub async fn import_links(
         &self,
-        links: Vec<ImportLinkItem>,
+        items: Vec<ImportLinkItemRich>,
         overwrite: bool,
-    ) -> Result<ImportResult, ClientError> {
+    ) -> Result<ImportBatchResult, ClientError> {
         let ctx = self.ctx.clone();
-        let links2 = links.clone();
+        let items2 = items.clone();
         // Convert to IPC format
-        let ipc_links: Vec<crate::system::ipc::ImportLinkData> = links
+        let ipc_links: Vec<crate::system::ipc::ImportLinkData> = items
             .into_iter()
             .map(|l| crate::system::ipc::ImportLinkData {
                 code: l.code,
                 target: l.target,
-                expires_at: l.expires_at,
+                created_at: l.created_at.to_rfc3339(),
+                expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
                 password: l.password,
+                click_count: l.click_count,
             })
             .collect();
         ipc_or_fallback(
@@ -186,17 +223,16 @@ impl LinkClient {
                 IpcResponse::ImportResult {
                     success,
                     skipped,
-                    failed,
                     errors,
-                } => Ok(ImportResult {
-                    success,
-                    skipped,
-                    failed,
-                    errors: errors
+                    ..
+                } => Ok(ImportBatchResult {
+                    success_count: success,
+                    skipped_count: skipped,
+                    failed_items: errors
                         .into_iter()
-                        .map(|e| crate::services::ImportError {
+                        .map(|e| crate::services::ImportBatchFailedItem {
                             code: e.code,
-                            message: e.message,
+                            reason: e.message,
                         })
                         .collect(),
                 }),
@@ -205,7 +241,7 @@ impl LinkClient {
             || async move {
                 let service = ctx.get_link_service().await?;
                 let mode = ImportMode::from_overwrite_flag(overwrite);
-                Ok(service.import_links(links2, mode).await?)
+                Ok(service.import_links_batch(items2, mode).await?)
             },
         )
         .await
@@ -214,20 +250,31 @@ impl LinkClient {
     /// Export all links
     pub async fn export_links(&self) -> Result<Vec<ShortLink>, ClientError> {
         let ctx = self.ctx.clone();
-        ipc_or_fallback(
-            ipc::export_links(),
-            |resp| match resp {
-                IpcResponse::ExportResult { links } => {
-                    Ok(links.iter().map(link_data_to_short_link).collect())
+        // IPC path: streaming export returns Vec<ShortLinkData> directly
+        if ipc::is_server_running() {
+            match ipc::export_links().await {
+                Ok(links) => {
+                    return Ok(links.iter().map(link_data_to_short_link).collect());
                 }
-                other => Err(unexpected_response(other)),
-            },
-            || async move {
-                let service = ctx.get_link_service().await?;
-                Ok(service.export_links().await?)
-            },
-        )
-        .await
+                Err(crate::system::ipc::IpcError::ServerNotRunning) => {
+                    // Fall through to fallback
+                }
+                Err(e) => {
+                    return Err(ClientError::Ipc(e));
+                }
+            }
+        }
+
+        // Fallback: use stream + collect
+        use futures_util::StreamExt;
+        let service = ctx.get_link_service().await?;
+        let mut stream = service.export_links_stream(crate::storage::LinkFilter::default(), 10000);
+        let mut all_links = Vec::new();
+        while let Some(batch) = stream.next().await {
+            let links = batch.map_err(ClientError::Service)?;
+            all_links.extend(links);
+        }
+        Ok(all_links)
     }
 
     /// Get link statistics
@@ -265,7 +312,14 @@ fn link_data_to_short_link(data: &ShortLinkData) -> ShortLink {
         target: data.target.clone(),
         created_at: DateTime::parse_from_rfc3339(&data.created_at)
             .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|_| Utc::now()),
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    "Failed to parse 'created_at' from IPC (value: '{}'): {}",
+                    &data.created_at,
+                    e
+                );
+                Utc::now()
+            }),
         expires_at: data.expires_at.as_ref().and_then(|s| {
             DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.with_timezone(&Utc))

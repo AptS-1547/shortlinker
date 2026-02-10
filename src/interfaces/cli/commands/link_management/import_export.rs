@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::client::LinkClient;
 use crate::interfaces::cli::CliError;
-use crate::services::ImportLinkItem;
+use crate::services::ImportLinkItemRich;
 use crate::utils::csv_handler;
 
 pub async fn export_links(client: &LinkClient, file_path: Option<String>) -> Result<(), CliError> {
@@ -55,25 +55,27 @@ pub async fn import_links(
         return Ok(());
     }
 
-    // Convert ShortLink to ImportLinkItem for the client
-    let import_items: Vec<ImportLinkItem> = imported_links
-        .iter()
-        .map(|link| ImportLinkItem {
-            code: link.code.clone(),
-            target: link.target.clone(),
-            expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-            password: link.password.clone(),
+    // Convert ShortLink to ImportLinkItemRich for the client
+    let import_items: Vec<ImportLinkItemRich> = imported_links
+        .into_iter()
+        .map(|link| ImportLinkItemRich {
+            code: link.code,
+            target: link.target,
+            created_at: link.created_at,
+            expires_at: link.expires_at,
+            password: link.password,
+            click_count: link.click,
         })
         .collect();
 
     let result = client.import_links(import_items, force_overwrite).await?;
 
     // Print errors if any
-    for error in &result.errors {
-        if error.code.is_empty() {
-            println!("{} {}", "✗".bold().red(), error.message);
+    for item in &result.failed_items {
+        if item.code.is_empty() {
+            println!("{} {}", "✗".bold().red(), item.reason);
         } else {
-            println!("{} {}: {}", "✗".bold().red(), error.code, error.message);
+            println!("{} {}: {}", "✗".bold().red(), item.code, item.reason);
         }
     }
 
@@ -81,9 +83,9 @@ pub async fn import_links(
     println!(
         "{} Success: {}, skipped: {}, failed: {}",
         "Import finished:".bold().green(),
-        result.success.to_string().green(),
-        result.skipped.to_string().yellow(),
-        result.failed.to_string().red()
+        result.success_count.to_string().green(),
+        result.skipped_count.to_string().yellow(),
+        result.failed_items.len().to_string().red()
     );
 
     Ok(())

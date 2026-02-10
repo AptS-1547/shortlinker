@@ -15,7 +15,7 @@ use shortlinker::services::{ConfigService, LinkService};
 use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
 use shortlinker::system::ipc::handler::{
-    handle_command, init_config_service, init_link_service, init_start_time,
+    export_links_stream, handle_command, init_config_service, init_link_service, init_start_time,
 };
 use shortlinker::system::ipc::types::{ConfigImportItem, ImportLinkData, IpcCommand, IpcResponse};
 use std::sync::Once;
@@ -447,14 +447,18 @@ async fn test_import_links_command() {
         ImportLinkData {
             code: "ipc-imp1".to_string(),
             target: "https://example.com/imp1".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
             expires_at: None,
             password: None,
+            click_count: 0,
         },
         ImportLinkData {
             code: "ipc-imp2".to_string(),
             target: "https://example.com/imp2".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
             expires_at: None,
             password: None,
+            click_count: 0,
         },
     ];
 
@@ -489,14 +493,16 @@ async fn test_export_links_command() {
     })
     .await;
 
-    let resp = handle_command(IpcCommand::ExportLinks).await;
-
-    match resp {
-        IpcResponse::ExportResult { links } => {
-            assert!(!links.is_empty());
-        }
-        other => panic!("Expected ExportResult, got {:?}", other),
-    }
+    // Export uses streaming now — use export_links_stream() directly
+    use futures_util::StreamExt;
+    let stream = export_links_stream().expect("export_links_stream should return Some");
+    let batches: Vec<_> = stream.collect().await;
+    let all_links: Vec<_> = batches
+        .into_iter()
+        .filter_map(|r| r.ok())
+        .flatten()
+        .collect();
+    assert!(!all_links.is_empty());
 }
 
 #[tokio::test]
