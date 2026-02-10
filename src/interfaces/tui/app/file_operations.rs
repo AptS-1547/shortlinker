@@ -32,6 +32,7 @@ impl App {
                 expires_at: link.expires_at,
                 password: link.password,
                 click_count: link.click,
+                row_num: None,
             })
             .collect();
 

@@ -38,6 +38,9 @@ pub struct ImportLinkData {
 pub struct ImportErrorData {
     pub code: String,
     pub message: String,
+    /// 结构化错误码（如 "E020"），用于客户端区分具体失败原因
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
 }
 
 /// Config item data for IPC transfer
@@ -609,6 +612,7 @@ mod tests {
             errors: vec![ImportErrorData {
                 code: "auth.token".into(),
                 message: "read-only".into(),
+                error_code: None,
             }],
         };
         let json = serde_json::to_string(&resp).unwrap();
@@ -620,5 +624,37 @@ mod tests {
         } else {
             panic!("Expected ConfigImportResult");
         }
+    }
+
+    #[test]
+    fn test_import_error_data_with_error_code() {
+        // error_code 存在时序列化
+        let data = ImportErrorData {
+            code: "dup".into(),
+            message: "Link already exists".into(),
+            error_code: Some("E021".into()),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("\"error_code\":\"E021\""));
+
+        let decoded: ImportErrorData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.error_code, Some("E021".into()));
+    }
+
+    #[test]
+    fn test_import_error_data_without_error_code() {
+        // error_code 为 None 时不出现在 JSON 中（skip_serializing_if）
+        let data = ImportErrorData {
+            code: "key".into(),
+            message: "unknown".into(),
+            error_code: None,
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(!json.contains("error_code"));
+
+        // 反序列化时缺失字段也能成功（serde default）
+        let json_no_code = r#"{"code":"key","message":"unknown"}"#;
+        let decoded: ImportErrorData = serde_json::from_str(json_no_code).unwrap();
+        assert_eq!(decoded.error_code, None);
     }
 }

@@ -141,6 +141,8 @@ pub struct ImportLinkItemRich {
     pub expires_at: Option<DateTime<Utc>>,
     pub password: Option<String>,
     pub click_count: usize,
+    /// 来源行号（仅 CSV 导入路径设置），用于错误报告
+    pub row_num: Option<usize>,
 }
 
 /// 批量导入结果
@@ -156,6 +158,8 @@ pub struct ImportBatchResult {
 pub struct ImportBatchFailedItem {
     pub code: String,
     pub error: ShortlinkerError,
+    /// 来源行号，从 ImportLinkItemRich.row_num 透传
+    pub row_num: Option<usize>,
 }
 
 // ============ Batch Operation DTOs ============
@@ -683,11 +687,16 @@ impl LinkService {
                         result.failed_items.push(ImportBatchFailedItem {
                             code: item.code,
                             error: ShortlinkerError::link_already_exists("Link already exists"),
+                            row_num: item.row_num,
                         });
                         continue;
                     }
                     ImportMode::Overwrite => {
-                        // 继续处理，允许覆盖
+                        // 覆盖模式：如果是 CSV 内重复 code，修正前一条的计数
+                        if processed_codes.contains(&item.code) {
+                            // 前一条已计入 success，此条覆盖它，不重复计数
+                            result.success_count -= 1;
+                        }
                     }
                 }
             }

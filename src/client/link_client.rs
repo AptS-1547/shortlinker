@@ -232,7 +232,11 @@ impl LinkClient {
                         .into_iter()
                         .map(|e| crate::services::ImportBatchFailedItem {
                             code: e.code,
-                            error: crate::errors::ShortlinkerError::import_failed(e.message),
+                            error: match e.error_code {
+                                Some(ec) => crate::errors::ShortlinkerError::from_error_code(&ec, e.message),
+                                None => crate::errors::ShortlinkerError::import_failed(e.message),
+                            },
+                            row_num: None,
                         })
                         .collect(),
                 }),

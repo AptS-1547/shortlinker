@@ -785,6 +785,7 @@ mod import_links_batch_tests {
             expires_at: None,
             password: None,
             click_count: 0,
+            row_num: None,
         }
     }
 
@@ -874,8 +875,8 @@ mod import_links_batch_tests {
             .await
             .unwrap();
 
-        // HashMap 去重，两条算两次 success（与旧 handler 行为一致）
-        assert_eq!(result.success_count, 2);
+        // HashMap 去重，后者覆盖前者，success_count 反映实际写入数（1 条）
+        assert_eq!(result.success_count, 1);
 
         let link = service.get_link("dup").await.unwrap().unwrap();
         assert_eq!(link.target, "https://second.com");
@@ -896,6 +897,7 @@ mod import_links_batch_tests {
             expires_at: None,
             password: Some("hashed_pw".to_string()),
             click_count: 42,
+            row_num: None,
         }];
 
         let result = service

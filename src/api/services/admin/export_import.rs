@@ -348,7 +348,8 @@ pub async fn import_links(
     let mut total_rows = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
     let mut raw_items: Vec<ImportLinkItemRaw> = Vec::new();
-    // 记录 code → CSV 行号映射，用于回填 service 层返回的冲突失败项行号
+    // 记录 code → CSV 行号映射，仅用于回填 service 层返回的冲突失败项行号
+    // （验证错误的行号由 ImportLinkItemRaw.row_num 直接携带，不受重复 code 影响）
     let mut code_to_row: std::collections::HashMap<String, usize> =
         std::collections::HashMap::new();
 
@@ -378,6 +379,7 @@ pub async fn import_links(
             expires_at: row.expires_at,
             password: row.password,
             click_count: row.click_count,
+            row_num: Some(row_num),
         });
     }
 
@@ -385,10 +387,10 @@ pub async fn import_links(
     let (valid_items, row_errors) = validate_import_rows(raw_items);
 
     for err in row_errors {
-        let row = code_to_row.get(&err.code).copied();
+        // 验证错误直接使用 row_num（跟随原始数据，不受重复 code 影响）
         let error_code = ErrorCode::from(err.error.clone()) as i32;
         failed_items.push(ImportFailedItem {
-            row,
+            row: err.row_num,
             code: err.code,
             error: err.error.message().to_string(),
             error_code: Some(error_code),
@@ -404,15 +406,15 @@ pub async fn import_links(
         }
     };
 
-    // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
+    // 合并 service 返回的失败项，优先使用 item.row_num（精确），回退到 code_to_row
     for item in batch_result.failed_items {
-        let row = match code_to_row.get(&item.code).copied() {
-            Some(r) => Some(r),
-            None => {
+        let row = item.row_num.or_else(|| {
+            let r = code_to_row.get(&item.code).copied();
+            if r.is_none() {
                 warn!("Could not find row number for code '{}'", &item.code);
-                None
             }
-        };
+            r
+        });
         let error_code = ErrorCode::from(item.error.clone()) as i32;
         failed_items.push(ImportFailedItem {
             row,

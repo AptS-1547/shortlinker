@@ -62,6 +62,7 @@ impl CsvLinkRow {
             expires_at: self.expires_at,
             password: self.password,
             click_count: self.click_count,
+            row_num: None,
         };
         let rich = validate_import_row(raw).map_err(|e| e.error)?;
         Ok(ShortLink {

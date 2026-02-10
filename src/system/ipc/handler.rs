@@ -278,6 +278,7 @@ async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
                 .map(|e| ImportErrorData {
                     code: e.code,
                     message: e.reason,
+                    error_code: None,
                 })
                 .collect(),
         },
@@ -372,6 +373,7 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
             expires_at: l.expires_at,
             password: l.password,
             click_count: l.click_count,
+            row_num: None,
         })
         .collect();
 
@@ -382,6 +384,7 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
         .map(|e| ImportErrorData {
             code: e.code,
             message: e.error.message().to_string(),
+            error_code: Some(e.error.code().to_string()),
         })
         .collect();
 
@@ -393,6 +396,7 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
             errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
                 code: f.code,
                 message: f.error.message().to_string(),
+                error_code: Some(f.error.code().to_string()),
             }));
             IpcResponse::ImportResult {
                 success: result.success_count,
@@ -619,6 +623,7 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
                 errors.push(ImportErrorData {
                     code: item.key.clone(),
                     message: "unknown key".into(),
+                    error_code: None,
                 });
                 continue;
             }
@@ -629,6 +634,7 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
             errors.push(ImportErrorData {
                 code: item.key.clone(),
                 message: "read-only".into(),
+                error_code: None,
             });
             continue;
         }
@@ -639,6 +645,7 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
             errors.push(ImportErrorData {
                 code: item.key.clone(),
                 message: e.to_string(),
+                error_code: None,
             });
             continue;
         }
@@ -652,6 +659,7 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
                 errors.push(ImportErrorData {
                     code: item.key.clone(),
                     message: e.to_string(),
+                    error_code: None,
                 });
             }
         }

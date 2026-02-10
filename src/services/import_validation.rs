@@ -22,6 +22,8 @@ pub struct ImportLinkItemRaw {
     pub expires_at: Option<String>,
     pub password: Option<String>,
     pub click_count: usize,
+    /// CSV 行号（1-based），仅 Admin API 设置，IPC/CSV 路径为 None
+    pub row_num: Option<usize>,
 }
 
 /// 单行验证错误
@@ -29,6 +31,8 @@ pub struct ImportLinkItemRaw {
 pub struct ImportRowError {
     pub code: String,
     pub error: ShortlinkerError,
+    /// 来源行号，直接从 `ImportLinkItemRaw.row_num` 透传
+    pub row_num: Option<usize>,
 }
 
 /// 验证并转换单个导入行
@@ -40,11 +44,14 @@ pub struct ImportRowError {
 /// 4. expires_at 解析（失败忽略）
 /// 5. 密码处理（已哈希保留，明文哈希）
 pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich, ImportRowError> {
+    let row_num = raw.row_num;
+
     // 1. 空 code 检查
     if raw.code.is_empty() {
         return Err(ImportRowError {
             code: raw.code,
             error: ShortlinkerError::link_invalid_code("Empty code"),
+            row_num,
         });
     }
 
@@ -53,6 +60,7 @@ pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich,
         return Err(ImportRowError {
             code: raw.code,
             error: ShortlinkerError::link_invalid_url(format!("Invalid URL: {}", e)),
+            row_num,
         });
     }
 
@@ -88,6 +96,7 @@ pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich,
                     "Password hash error: {}",
                     e
                 )),
+                row_num,
             });
         }
     };
@@ -99,6 +108,7 @@ pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich,
         expires_at,
         password,
         click_count: raw.click_count,
+        row_num,
     })
 }
 
@@ -131,6 +141,7 @@ mod tests {
             expires_at: None,
             password: None,
             click_count: 0,
+            row_num: None,
         }
     }
 
@@ -181,5 +192,59 @@ mod tests {
         let (valid, errors) = validate_import_rows(rows);
         assert_eq!(valid.len(), 2);
         assert_eq!(errors.len(), 2);
+    }
+
+    // ---- row_num propagation tests ----
+
+    #[test]
+    fn test_row_num_propagated_to_valid_item() {
+        let mut raw = make_raw("test", "https://example.com");
+        raw.row_num = Some(5);
+        let rich = validate_import_row(raw).unwrap();
+        assert_eq!(rich.row_num, Some(5));
+    }
+
+    #[test]
+    fn test_row_num_propagated_to_error() {
+        let mut raw = make_raw("test", "javascript:alert(1)");
+        raw.row_num = Some(10);
+        let err = validate_import_row(raw).unwrap_err();
+        assert_eq!(err.row_num, Some(10));
+        assert_eq!(err.error.code(), "E020");
+    }
+
+    #[test]
+    fn test_row_num_none_when_unset() {
+        let raw = make_raw("test", "https://example.com");
+        let rich = validate_import_row(raw).unwrap();
+        assert_eq!(rich.row_num, None);
+    }
+
+    #[test]
+    fn test_batch_row_num_with_duplicates() {
+        // 模拟 CSV 重复 code 场景：同 code 不同行号
+        let mut row5 = make_raw("dup", "https://valid.com");
+        row5.row_num = Some(5);
+        let mut row10 = make_raw("dup", "not-a-url");
+        row10.row_num = Some(10);
+
+        let (valid, errors) = validate_import_rows(vec![row5, row10]);
+        assert_eq!(valid.len(), 1);
+        assert_eq!(errors.len(), 1);
+
+        // 成功项保留行号 5
+        assert_eq!(valid[0].row_num, Some(5));
+        // 失败项保留行号 10（不会错指到行号 5）
+        assert_eq!(errors[0].row_num, Some(10));
+        assert_eq!(errors[0].code, "dup");
+    }
+
+    #[test]
+    fn test_empty_code_error_carries_row_num() {
+        let mut raw = make_raw("", "https://example.com");
+        raw.row_num = Some(3);
+        let err = validate_import_row(raw).unwrap_err();
+        assert_eq!(err.row_num, Some(3));
+        assert_eq!(err.error.code(), "E024");
     }
 }
