@@ -68,6 +68,19 @@ impl From<ShortlinkerError> for ClientError {
     }
 }
 
+impl From<ClientError> for ShortlinkerError {
+    fn from(err: ClientError) -> Self {
+        match err {
+            ClientError::Service(e) => e,
+            ClientError::Ipc(e) => ShortlinkerError::internal_error(format!("IPC: {}", e)),
+            ClientError::InitFailed(msg) => ShortlinkerError::database_operation(msg),
+            ClientError::ServerError { code, message } => {
+                ShortlinkerError::internal_error(format!("{}: {}", code, message))
+            }
+        }
+    }
+}
+
 impl From<ClientError> for crate::interfaces::cli::CliError {
     fn from(err: ClientError) -> Self {
         use crate::interfaces::cli::CliError;

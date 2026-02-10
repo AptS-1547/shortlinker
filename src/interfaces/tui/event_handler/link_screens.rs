@@ -243,7 +243,7 @@ pub async fn handle_batch_delete_confirm_screen(
 
             for code in codes_to_delete {
                 if app.links.contains_key(&code) {
-                    if let Err(_e) = app.storage.remove(&code).await {
+                    if let Err(_e) = app.link_client.delete_link(code).await {
                         failed += 1;
                     } else {
                         deleted += 1;

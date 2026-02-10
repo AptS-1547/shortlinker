@@ -2,7 +2,7 @@
 
 use super::state::App;
 use crate::errors::ShortlinkerError;
-use crate::services::{ImportLinkItem, ImportMode};
+use crate::services::ImportLinkItem;
 use crate::storage::ShortLink;
 use crate::utils::csv_handler;
 
@@ -29,13 +29,7 @@ impl App {
             })
             .collect();
 
-        let mode = if overwrite {
-            ImportMode::Overwrite
-        } else {
-            ImportMode::Skip
-        };
-
-        self.link_service.import_links(items, mode).await?;
+        self.link_client.import_links(items, overwrite).await?;
 
         Ok(())
     }

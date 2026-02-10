@@ -2,7 +2,6 @@
 
 use super::state::App;
 use crate::errors::ShortlinkerError;
-use crate::services::{CreateLinkRequest, UpdateLinkRequest};
 
 impl App {
     pub async fn save_new_link(&mut self) -> Result<(), ShortlinkerError> {
@@ -33,14 +32,14 @@ impl App {
         };
 
         let result = self
-            .link_service
-            .create_link(CreateLinkRequest {
+            .link_client
+            .create_link(
                 code,
-                target: self.form.target_url.clone(),
-                force: self.form.force_overwrite,
+                self.form.target_url.clone(),
+                self.form.force_overwrite,
                 expires_at,
                 password,
-            })
+            )
             .await?;
 
         if result.generated_code {
@@ -77,15 +76,8 @@ impl App {
             Some(self.form.password.clone())
         };
 
-        self.link_service
-            .update_link(
-                &code,
-                UpdateLinkRequest {
-                    target,
-                    expires_at,
-                    password,
-                },
-            )
+        self.link_client
+            .update_link(code, target, expires_at, password)
             .await?;
 
         self.clear_inputs();
@@ -99,7 +91,7 @@ impl App {
         };
 
         let code = link.code.clone();
-        self.link_service.delete_link(&code).await?;
+        self.link_client.delete_link(code).await?;
 
         // Adjust selection if necessary
         if self.selected_index >= self.links.len() && self.selected_index > 0 {

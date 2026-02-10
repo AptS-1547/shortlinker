@@ -31,6 +31,13 @@ pub struct ImportLinkData {
     pub password: Option<String>,
 }
 
+/// Import error data for IPC transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportErrorData {
+    pub code: String,
+    pub message: String,
+}
+
 /// Config item data for IPC transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItemData {
@@ -209,7 +216,7 @@ pub enum IpcResponse {
         success: usize,
         skipped: usize,
         failed: usize,
-        errors: Vec<String>,
+        errors: Vec<ImportErrorData>,
     },
 
     /// Export result

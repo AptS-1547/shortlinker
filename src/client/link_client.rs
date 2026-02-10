@@ -194,9 +194,9 @@ impl LinkClient {
                     failed,
                     errors: errors
                         .into_iter()
-                        .map(|msg| crate::services::ImportError {
-                            code: String::new(),
-                            message: msg,
+                        .map(|e| crate::services::ImportError {
+                            code: e.code,
+                            message: e.message,
                         })
                         .collect(),
                 }),

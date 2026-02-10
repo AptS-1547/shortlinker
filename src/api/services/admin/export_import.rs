@@ -350,6 +350,9 @@ pub async fn import_links(
     let mut total_rows = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
     let mut valid_items: Vec<crate::services::ImportLinkItemRich> = Vec::new();
+    // 记录 code → CSV 行号映射，用于回填 service 层返回的冲突失败项行号
+    let mut code_to_row: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
     for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
         let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
@@ -426,6 +429,7 @@ pub async fn import_links(
             }
         };
 
+        code_to_row.insert(row.code.clone(), row_num);
         valid_items.push(crate::services::ImportLinkItemRich {
             code: row.code,
             target: row.target,
@@ -445,10 +449,11 @@ pub async fn import_links(
         }
     };
 
-    // 合并 service 返回的失败项（这些是冲突检测失败，没有行号信息）
+    // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
     for item in batch_result.failed_items {
+        let row = code_to_row.get(&item.code).copied().unwrap_or(0);
         failed_items.push(ImportFailedItem {
-            row: 0, // service 层不跟踪行号
+            row,
             code: item.code,
             error: item.reason,
             error_code: Some(ErrorCode::LinkAlreadyExists as i32),

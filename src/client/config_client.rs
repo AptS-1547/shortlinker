@@ -155,12 +155,12 @@ fn config_data_to_view(data: ConfigItemData) -> ConfigItemView {
 }
 
 fn parse_value_type(s: &str) -> crate::config::ValueType {
-    match s {
-        "bool" | "Bool" => crate::config::ValueType::Bool,
-        "int" | "Int" => crate::config::ValueType::Int,
-        "float" | "Float" => crate::config::ValueType::Float,
-        "json" | "Json" => crate::config::ValueType::Json,
-        "enum" | "Enum" => crate::config::ValueType::Enum,
+    match s.to_lowercase().as_str() {
+        "bool" => crate::config::ValueType::Bool,
+        "int" => crate::config::ValueType::Int,
+        "float" => crate::config::ValueType::Float,
+        "json" => crate::config::ValueType::Json,
+        "enum" => crate::config::ValueType::Enum,
         _ => crate::config::ValueType::String,
     }
 }
@@ -261,8 +261,16 @@ mod tests {
     fn test_parse_value_type_unknown_defaults_to_string() {
         assert!(matches!(parse_value_type("unknown"), ValueType::String));
         assert!(matches!(parse_value_type(""), ValueType::String));
-        assert!(matches!(parse_value_type("BOOL"), ValueType::String));
         assert!(matches!(parse_value_type("INTEGER"), ValueType::String));
+    }
+
+    #[test]
+    fn test_parse_value_type_case_insensitive() {
+        assert!(matches!(parse_value_type("BOOL"), ValueType::Bool));
+        assert!(matches!(parse_value_type("INT"), ValueType::Int));
+        assert!(matches!(parse_value_type("FLOAT"), ValueType::Float));
+        assert!(matches!(parse_value_type("JSON"), ValueType::Json));
+        assert!(matches!(parse_value_type("ENUM"), ValueType::Enum));
     }
 
     // ---- config_data_to_view tests ----

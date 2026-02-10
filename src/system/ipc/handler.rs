@@ -7,7 +7,9 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
-use super::types::{ConfigItemData, ImportLinkData, IpcCommand, IpcResponse, ShortLinkData};
+use super::types::{
+    ConfigItemData, ImportErrorData, ImportLinkData, IpcCommand, IpcResponse, ShortLinkData,
+};
 use crate::errors::ShortlinkerError;
 use crate::services::{
     ConfigService, CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
@@ -338,10 +340,13 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
 
     match service.import_links(items, mode).await {
         Ok(result) => {
-            let errors: Vec<String> = result
+            let errors: Vec<ImportErrorData> = result
                 .errors
                 .into_iter()
-                .map(|e| format!("{}: {}", e.code, e.message))
+                .map(|e| ImportErrorData {
+                    code: e.code,
+                    message: e.message,
+                })
                 .collect();
             IpcResponse::ImportResult {
                 success: result.success,

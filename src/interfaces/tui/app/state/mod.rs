@@ -8,10 +8,8 @@ mod system_state;
 pub use form_state::{EditingField, FormState};
 pub use system_state::{ConfigListItem, PasswordField, SystemState};
 
-use crate::cache::NullCompositeCache;
-use crate::client::{ConfigClient, ServiceContext, SystemClient};
+use crate::client::{ConfigClient, LinkClient, ServiceContext, SystemClient};
 use crate::errors::ShortlinkerError;
-use crate::services::LinkService;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
 
 use crate::metrics_core::NoopMetrics;
@@ -99,7 +97,7 @@ impl From<CurrentlyEditing> for EditingField {
 
 pub struct App {
     pub storage: Arc<SeaOrmStorage>,
-    pub link_service: Arc<LinkService>,
+    pub link_client: LinkClient,
     pub config_client: ConfigClient,
     pub system_client: SystemClient,
     pub links: HashMap<String, ShortLink>,
@@ -146,10 +144,8 @@ impl App {
         let storage = StorageFactory::create(NoopMetrics::arc()).await?;
         let links = storage.load_all().await?;
 
-        let cache = NullCompositeCache::arc();
-        let link_service = Arc::new(LinkService::new(storage.clone(), cache));
-
         let ctx = Arc::new(ServiceContext::with_storage(storage.clone()));
+        let link_client = LinkClient::new(ctx.clone());
         let config_client = ConfigClient::new(ctx);
         let system_client = SystemClient::new();
 
@@ -160,7 +156,7 @@ impl App {
 
         Ok(App {
             storage,
-            link_service,
+            link_client,
             config_client,
             system_client,
             links,
@@ -188,7 +184,8 @@ impl App {
     }
 
     pub async fn refresh_links(&mut self) -> Result<(), ShortlinkerError> {
-        self.links = self.storage.load_all().await?;
+        let links_vec = self.link_client.export_links().await?;
+        self.links = links_vec.into_iter().map(|l| (l.code.clone(), l)).collect();
         // Notify server via IPC to reload (best effort, don't fail if server not running)
         use crate::system::ipc::{self, IpcResponse};
         use crate::system::reload::ReloadTarget;
