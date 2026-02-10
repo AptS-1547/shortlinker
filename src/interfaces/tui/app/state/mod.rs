@@ -9,6 +9,7 @@ pub use form_state::{EditingField, FormState};
 pub use system_state::{ConfigListItem, PasswordField, SystemState};
 
 use crate::cache::NullCompositeCache;
+use crate::client::{ConfigClient, ServiceContext, SystemClient};
 use crate::errors::ShortlinkerError;
 use crate::services::LinkService;
 use crate::storage::{SeaOrmStorage, ShortLink, StorageFactory};
@@ -99,6 +100,8 @@ impl From<CurrentlyEditing> for EditingField {
 pub struct App {
     pub storage: Arc<SeaOrmStorage>,
     pub link_service: Arc<LinkService>,
+    pub config_client: ConfigClient,
+    pub system_client: SystemClient,
     pub links: HashMap<String, ShortLink>,
     pub current_screen: CurrentScreen,
 
@@ -146,6 +149,10 @@ impl App {
         let cache = NullCompositeCache::arc();
         let link_service = Arc::new(LinkService::new(storage.clone(), cache));
 
+        let ctx = Arc::new(ServiceContext::with_storage(storage.clone()));
+        let config_client = ConfigClient::new(ctx);
+        let system_client = SystemClient::new();
+
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
         let mut table_state = TableState::default();
@@ -154,6 +161,8 @@ impl App {
         Ok(App {
             storage,
             link_service,
+            config_client,
+            system_client,
             links,
             current_screen: CurrentScreen::Main,
             form: FormState::new(),

@@ -1,13 +1,11 @@
 //! Config export/import commands
 
 use super::helpers::notify_config_change;
-use crate::config::definitions::{ALL_CONFIGS, get_def};
+use crate::client::ConfigClient;
+use crate::config::definitions::get_def;
 use crate::config::validators;
 use crate::interfaces::cli::CliError;
-use crate::storage::ConfigStore;
-use crate::system::ipc::{self, ConfigImportItem, ConfigItemData, IpcError, IpcResponse};
 use colored::Colorize;
-use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
@@ -27,49 +25,22 @@ struct ExportData {
     configs: Vec<ExportConfig>,
 }
 
-/// Export configurations to file (IPC-first with direct-DB fallback)
+/// Export configurations to file via ConfigClient
 pub async fn config_export(
-    db: DatabaseConnection,
+    client: &ConfigClient,
     file_path: Option<String>,
 ) -> Result<(), CliError> {
-    // Try IPC first if server is running
-    if ipc::is_server_running() {
-        match ipc::config_list(None).await {
-            Ok(IpcResponse::ConfigListResult { configs }) => {
-                return config_export_from_data(&configs, file_path);
-            }
-            Ok(IpcResponse::Error { code, message }) => {
-                return Err(CliError::CommandError(format!("{}: {}", code, message)));
-            }
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct database operation
-            }
-            Err(e) => {
-                return Err(CliError::CommandError(format!("IPC error: {}", e)));
-            }
-            _ => {
-                return Err(CliError::CommandError(
-                    "Unexpected response from server".to_string(),
-                ));
-            }
-        }
-    }
+    let items = client.get_all(None).await?;
 
-    // Fallback: Direct database operation
-    config_export_direct(db, file_path).await
-}
-
-/// Export configs from IPC data to file or stdout
-fn config_export_from_data(
-    configs: &[ConfigItemData],
-    file_path: Option<String>,
-) -> Result<(), CliError> {
-    let export_configs: Vec<ExportConfig> = configs
+    let export_configs: Vec<ExportConfig> = items
         .iter()
-        .map(|cfg| ExportConfig {
-            key: cfg.key.clone(),
-            value: cfg.value.clone(),
-            category: Some(cfg.category.clone()),
+        .map(|item| {
+            let category = get_def(&item.key).map(|d| d.category.to_string());
+            ExportConfig {
+                key: item.key.clone(),
+                value: item.value.clone(),
+                category,
+            }
         })
         .collect();
 
@@ -103,69 +74,13 @@ fn config_export_from_data(
     Ok(())
 }
 
-/// Direct database operation for export (fallback when server is not running)
-async fn config_export_direct(
-    db: DatabaseConnection,
-    file_path: Option<String>,
-) -> Result<(), CliError> {
-    let store = ConfigStore::new(db);
-    let all_configs = store
-        .get_all()
-        .await
-        .map_err(|e| CliError::StorageError(e.to_string()))?;
-
-    let mut configs = Vec::new();
-
-    for def in ALL_CONFIGS {
-        let value = all_configs
-            .get(def.key)
-            .map(|item| (*item.value).clone())
-            .unwrap_or_else(|| (def.default_fn)());
-
-        configs.push(ExportConfig {
-            key: def.key.to_string(),
-            value,
-            category: Some(def.category.to_string()),
-        });
-    }
-
-    let export_data = ExportData {
-        version: "1.0".to_string(),
-        exported_at: chrono::Utc::now().to_rfc3339(),
-        configs,
-    };
-
-    let json_str = serde_json::to_string_pretty(&export_data)
-        .map_err(|e| CliError::CommandError(format!("Failed to serialize to JSON: {}", e)))?;
-
-    match file_path {
-        Some(path) => {
-            fs::write(&path, &json_str).map_err(|e| {
-                CliError::CommandError(format!("Failed to write to '{}': {}", path, e))
-            })?;
-            println!(
-                "{} Exported {} configurations to {}",
-                "✓".bold().green(),
-                export_data.configs.len(),
-                path.cyan()
-            );
-        }
-        None => {
-            // Output to stdout
-            println!("{}", json_str);
-        }
-    }
-
-    Ok(())
-}
-
-/// Import configurations from file (IPC-first with direct-DB fallback)
+/// Import configurations from file via ConfigClient
 pub async fn config_import(
-    db: DatabaseConnection,
+    client: &ConfigClient,
     file_path: String,
     force: bool,
 ) -> Result<(), CliError> {
-    // Read and parse file (shared between IPC and direct paths)
+    // Read and parse file
     let content = fs::read_to_string(&file_path)
         .map_err(|e| CliError::CommandError(format!("Failed to read '{}': {}", file_path, e)))?;
 
@@ -179,8 +94,7 @@ pub async fn config_import(
         file_path.cyan(),
         import_data.exported_at.dimmed()
     );
-
-    // Validate all configs first (shared validation for both paths)
+    // Validate all configs first
     let mut valid_configs = Vec::new();
     let mut skipped = Vec::new();
     let mut invalid = Vec::new();
@@ -236,7 +150,6 @@ pub async fn config_import(
             println!("  {} ({})", key.red(), reason);
         }
     }
-
     if valid_configs.is_empty() {
         println!("\n{} No valid configurations to import.", "ℹ".bold().blue());
         return Ok(());
@@ -261,86 +174,12 @@ pub async fn config_import(
         }
     }
 
-    // Try IPC first if server is running
-    if ipc::is_server_running() {
-        // Build ConfigImportItem list from validated configs
-        let import_items: Vec<ConfigImportItem> = valid_configs
-            .iter()
-            .map(|(cfg, _)| ConfigImportItem {
-                key: cfg.key.clone(),
-                value: cfg.value.clone(),
-            })
-            .collect();
-
-        match ipc::config_import(import_items).await {
-            Ok(IpcResponse::ConfigImportResult {
-                success,
-                skipped: ipc_skipped,
-                failed,
-                errors,
-            }) => {
-                // Print errors if any
-                for error in &errors {
-                    println!("{} {}", "✗".bold().red(), error);
-                }
-
-                println!(
-                    "\n{} Imported {} configurations successfully.",
-                    "✓".bold().green(),
-                    success
-                );
-
-                if ipc_skipped > 0 {
-                    println!(
-                        "{} {} configurations skipped.",
-                        "ℹ".bold().blue(),
-                        ipc_skipped
-                    );
-                }
-
-                if failed > 0 {
-                    println!(
-                        "{} {} configurations failed to import.",
-                        "✗".bold().red(),
-                        failed
-                    );
-                }
-
-                // Server already handled reload, no need to call notify_config_change
-                return Ok(());
-            }
-            Ok(IpcResponse::Error { code, message }) => {
-                return Err(CliError::CommandError(format!("{}: {}", code, message)));
-            }
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct database operation
-            }
-            Err(e) => {
-                return Err(CliError::CommandError(format!("IPC error: {}", e)));
-            }
-            _ => {
-                return Err(CliError::CommandError(
-                    "Unexpected response from server".to_string(),
-                ));
-            }
-        }
-    }
-
-    // Fallback: Direct database operation
-    config_import_direct(db, valid_configs).await
-}
-
-/// Direct database operation for import (fallback when server is not running)
-async fn config_import_direct(
-    db: DatabaseConnection,
-    valid_configs: Vec<(&ExportConfig, bool)>,
-) -> Result<(), CliError> {
-    let store = ConfigStore::new(db);
+    // Apply each config via ConfigClient
     let mut success = 0;
     let mut failed = 0;
 
     for (cfg, _) in valid_configs {
-        match store.set(&cfg.key, &cfg.value).await {
+        match client.set(cfg.key.clone(), cfg.value.clone()).await {
             Ok(_) => {
                 success += 1;
             }

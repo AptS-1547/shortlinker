@@ -1,42 +1,58 @@
 //! System operations for the TUI system panel
 //!
 //! Implements server status, config management, and password reset operations.
-//! Follows IPC-first with direct DB fallback pattern for config operations,
-//! IPC-only for server status, and direct DB only for password reset.
+//! Uses ConfigClient/SystemClient for IPC-first with service-fallback,
+//! except password reset which stays as direct DB for security.
 
 use super::state::{App, ConfigListItem};
-use crate::config::definitions::{ALL_CONFIGS, get_def, keys};
+use crate::config::definitions::{get_def, keys};
 use crate::config::schema::get_schema;
 use crate::config::validators;
+use crate::services::ConfigItemView;
 use crate::storage::ConfigStore;
-use crate::system::ipc::{self, ConfigItemData, IpcCommand, IpcError, IpcResponse};
+use crate::system::ipc::ConfigItemData;
+
+/// Convert a ConfigItemView (from client layer) to ConfigItemData (for TUI state).
+///
+/// Enriches the view with definition metadata (category, description, default_value,
+/// editable, enum_options) that the client layer doesn't carry.
+fn config_view_to_item_data(view: ConfigItemView) -> ConfigItemData {
+    let def = get_def(&view.key);
+    let schema = get_schema(&view.key);
+    let enum_options = schema.and_then(|s| {
+        s.enum_options
+            .map(|opts| opts.into_iter().map(|o| o.value).collect())
+    });
+    ConfigItemData {
+        key: view.key.clone(),
+        value: view.value,
+        category: def.map(|d| d.category.to_string()).unwrap_or_default(),
+        value_type: def
+            .map(|d| d.value_type.to_string())
+            .unwrap_or_else(|| format!("{}", view.value_type)),
+        default_value: def.map(|d| (d.default_fn)()).unwrap_or_default(),
+        requires_restart: view.requires_restart,
+        editable: def.map(|d| d.editable).unwrap_or(false),
+        sensitive: view.is_sensitive,
+        description: def.map(|d| d.description.to_string()).unwrap_or_default(),
+        enum_options,
+        updated_at: view.updated_at.to_rfc3339(),
+    }
+}
 
 impl App {
-    /// Fetch server status via IPC (IPC-only, no DB fallback)
+    /// Fetch server status via SystemClient (IPC-only, no DB fallback)
     pub async fn fetch_server_status(&mut self) {
         self.system.status_error = None;
 
-        match ipc::send_command(IpcCommand::GetStatus).await {
-            Ok(IpcResponse::Status {
-                version,
-                uptime_secs,
-                is_reloading,
-                last_data_reload,
-                last_config_reload,
-                links_count,
-            }) => {
-                self.system.status_version = version;
-                self.system.status_uptime_secs = uptime_secs;
-                self.system.status_is_reloading = is_reloading;
-                self.system.status_last_data_reload = last_data_reload;
-                self.system.status_last_config_reload = last_config_reload;
-                self.system.status_links_count = links_count;
-            }
-            Ok(IpcResponse::Error { message, .. }) => {
-                self.system.status_error = Some(message);
-            }
-            Ok(other) => {
-                self.system.status_error = Some(format!("Unexpected response: {:?}", other));
+        match self.system_client.get_status().await {
+            Ok(status) => {
+                self.system.status_version = status.version;
+                self.system.status_uptime_secs = status.uptime_secs;
+                self.system.status_is_reloading = status.is_reloading;
+                self.system.status_last_data_reload = status.last_data_reload;
+                self.system.status_last_config_reload = status.last_config_reload;
+                self.system.status_links_count = status.links_count;
             }
             Err(e) => {
                 self.system.status_error = Some(format!("{}", e));
@@ -44,90 +60,17 @@ impl App {
         }
     }
 
-    /// Fetch all configs (IPC-first with direct DB fallback)
+    /// Fetch all configs via ConfigClient (IPC-first with service-fallback)
     pub async fn fetch_configs(&mut self) {
-        // Try IPC first
-        match ipc::config_list(None).await {
-            Ok(IpcResponse::ConfigListResult { configs }) => {
-                self.system.configs = configs;
+        match self.config_client.get_all(None).await {
+            Ok(views) => {
+                self.system.configs = views.into_iter().map(config_view_to_item_data).collect();
                 self.build_config_list_items();
-                return;
-            }
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct DB
             }
             Err(e) => {
                 self.system.config_edit_error = Some(format!("Failed to fetch configs: {}", e));
-                return;
-            }
-            Ok(IpcResponse::Error { message, .. }) => {
-                self.system.config_edit_error =
-                    Some(format!("Failed to fetch configs: {}", message));
-                return;
-            }
-            Ok(_) => {
-                self.system.config_edit_error = Some("Unexpected response from server".to_string());
-                return;
             }
         }
-
-        // Direct DB fallback
-        self.fetch_configs_from_db().await;
-    }
-
-    /// Direct DB fallback for fetch_configs
-    async fn fetch_configs_from_db(&mut self) {
-        let store = ConfigStore::new(self.storage.get_db().clone());
-        let stored = match store.get_all().await {
-            Ok(map) => map,
-            Err(e) => {
-                self.system.config_edit_error =
-                    Some(format!("Failed to load configs from database: {}", e));
-                return;
-            }
-        };
-
-        let mut configs = Vec::with_capacity(ALL_CONFIGS.len());
-        for def in ALL_CONFIGS {
-            let (value, updated_at) = match stored.get(def.key) {
-                Some(item) => {
-                    let val = (*item.value).clone();
-                    (val, item.updated_at.to_rfc3339())
-                }
-                None => ((def.default_fn)(), String::new()),
-            };
-
-            // Mask sensitive values
-            let display_value = if def.is_sensitive {
-                "[REDACTED]".to_string()
-            } else {
-                value
-            };
-
-            // Get enum_options from schema
-            let enum_options = get_schema(def.key).and_then(|schema| {
-                schema
-                    .enum_options
-                    .map(|opts| opts.into_iter().map(|o| o.value).collect())
-            });
-
-            configs.push(ConfigItemData {
-                key: def.key.to_string(),
-                value: display_value,
-                category: def.category.to_string(),
-                value_type: def.value_type.to_string(),
-                default_value: (def.default_fn)(),
-                requires_restart: def.requires_restart,
-                editable: def.editable,
-                sensitive: def.is_sensitive,
-                description: def.description.to_string(),
-                enum_options,
-                updated_at,
-            });
-        }
-
-        self.system.configs = configs;
-        self.build_config_list_items();
     }
 
     /// Build the flat config list items from configs, grouped by category
@@ -170,57 +113,27 @@ impl App {
         }
     }
 
-    /// Update a config value (IPC-first with direct DB fallback)
+    /// Update a config value via ConfigClient (IPC-first with service-fallback)
     pub async fn update_config(&mut self) -> Result<(), String> {
         let key = self.system.config_edit_key.clone();
         let value = self.system.config_edit_value.clone();
 
-        // Validate the value
+        // Validate the value (client-side for immediate feedback)
         validators::validate_config_value(&key, &value)?;
 
-        // Try IPC first
-        match ipc::config_set(key.clone(), value.clone()).await {
-            Ok(IpcResponse::ConfigSetResult { .. }) => return Ok(()),
-            Ok(IpcResponse::Error { message, .. }) => return Err(message),
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct DB
-            }
-            Err(e) => return Err(format!("{}", e)),
-            Ok(_) => return Err("Unexpected response from server".to_string()),
-        }
-
-        // Direct DB fallback
-        let store = ConfigStore::new(self.storage.get_db().clone());
-        store
-            .set(&key, &value)
+        self.config_client
+            .set(key, value)
             .await
             .map(|_| ())
             .map_err(|e| format!("{}", e))
     }
 
-    /// Reset a config to its default value (IPC-first with direct DB fallback)
+    /// Reset a config to its default value via ConfigClient (IPC-first with service-fallback)
     pub async fn reset_config(&mut self) -> Result<(), String> {
         let key = self.system.config_edit_key.clone();
 
-        // Get default value from definitions
-        let def = get_def(&key).ok_or_else(|| format!("Unknown config key: {}", key))?;
-        let default_value = (def.default_fn)();
-
-        // Try IPC first
-        match ipc::config_reset(key.clone()).await {
-            Ok(IpcResponse::ConfigResetResult { .. }) => return Ok(()),
-            Ok(IpcResponse::Error { message, .. }) => return Err(message),
-            Err(IpcError::ServerNotRunning) => {
-                // Fall through to direct DB
-            }
-            Err(e) => return Err(format!("{}", e)),
-            Ok(_) => return Err("Unexpected response from server".to_string()),
-        }
-
-        // Direct DB fallback
-        let store = ConfigStore::new(self.storage.get_db().clone());
-        store
-            .set(&key, &default_value)
+        self.config_client
+            .reset(key)
             .await
             .map(|_| ())
             .map_err(|e| format!("{}", e))
