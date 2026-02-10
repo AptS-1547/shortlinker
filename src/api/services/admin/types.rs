@@ -286,7 +286,8 @@ pub use crate::services::ImportMode;
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]
 #[ts(export, export_to = TS_EXPORT_PATH)]
 pub struct ImportFailedItem {
-    pub row: usize,
+    /// CSV 行号（1-based），None 表示行号未知（如 service 层返回的冲突项无法反查行号）
+    pub row: Option<usize>,
     pub code: String,
     pub error: String,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -362,7 +362,7 @@ pub async fn import_links(
             Ok(row) => row,
             Err(e) => {
                 failed_items.push(ImportFailedItem {
-                    row: row_num,
+                    row: Some(row_num),
                     code: String::new(),
                     error: format!("CSV parse error: {}", e),
                     error_code: Some(ErrorCode::CsvParseError as i32),
@@ -374,7 +374,7 @@ pub async fn import_links(
         // 验证 code
         if row.code.is_empty() {
             failed_items.push(ImportFailedItem {
-                row: row_num,
+                row: Some(row_num),
                 code: row.code,
                 error: "Empty code".to_string(),
                 error_code: Some(ErrorCode::LinkEmptyCode as i32),
@@ -385,7 +385,7 @@ pub async fn import_links(
         // 验证 URL
         if let Err(e) = validate_url(&row.target) {
             failed_items.push(ImportFailedItem {
-                row: row_num,
+                row: Some(row_num),
                 code: row.code,
                 error: format!("Invalid URL: {}", e),
                 error_code: Some(ErrorCode::LinkInvalidUrl as i32),
@@ -420,7 +420,7 @@ pub async fn import_links(
             Ok(pwd) => pwd,
             Err(e) => {
                 failed_items.push(ImportFailedItem {
-                    row: row_num,
+                    row: Some(row_num),
                     code: row.code,
                     error: format!("Password hash error: {}", e),
                     error_code: Some(ErrorCode::LinkPasswordHashError as i32),
@@ -451,19 +451,19 @@ pub async fn import_links(
 
     // 合并 service 返回的失败项，通过 code_to_row 映射回填 CSV 行号
     // 若 code 在 map 中找不到（理论上不会发生，除非 service 层内部转换了 code），
-    // 则行号置 0 并在错误消息前标注 [Row unknown]，避免用户看到无意义的行号
+    // 则 row 置为 None，让前端明确知道行号未知
     for item in batch_result.failed_items {
-        let (row, error) = match code_to_row.get(&item.code).copied() {
-            Some(r) => (r, item.reason),
+        let row = match code_to_row.get(&item.code).copied() {
+            Some(r) => Some(r),
             None => {
                 warn!("Could not find row number for code '{}'", &item.code);
-                (0, format!("[Row unknown] {}", item.reason))
+                None
             }
         };
         failed_items.push(ImportFailedItem {
             row,
             code: item.code,
-            error,
+            error: item.reason,
             error_code: Some(ErrorCode::LinkAlreadyExists as i32),
         });
     }
