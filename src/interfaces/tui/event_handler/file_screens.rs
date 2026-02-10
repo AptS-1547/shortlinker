@@ -20,11 +20,7 @@ pub async fn handle_export_import_screen(
             );
         }
         KeyCode::Char('i') | KeyCode::Char('I') => {
-            if let Err(e) = app.load_directory() {
-                app.set_error(format!("Failed to load directory: {}", e));
-            } else {
-                app.current_screen = CurrentScreen::FileBrowser;
-            }
+            app.current_screen = CurrentScreen::ImportModeSelect;
         }
         KeyCode::Esc => {
             app.current_screen = CurrentScreen::Main;
@@ -48,7 +44,7 @@ pub async fn handle_file_browser_screen(app: &mut App, key_code: KeyCode) -> std
                 Ok(Some(file_path)) => {
                     // File selected, perform import
                     app.import_path = file_path.to_string_lossy().to_string();
-                    if let Err(e) = app.import_links().await {
+                    if let Err(e) = app.import_links(app.system.import_overwrite).await {
                         app.set_error(format!("Failed to import links: {}", e));
                     } else {
                         app.set_status("Links imported successfully!".to_string());

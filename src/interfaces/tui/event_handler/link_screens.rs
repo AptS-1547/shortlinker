@@ -65,6 +65,9 @@ pub fn handle_main_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<b
         KeyCode::Char('x') | KeyCode::Char('X') => {
             app.current_screen = CurrentScreen::ExportImport;
         }
+        KeyCode::Char('o') | KeyCode::Char('O') => {
+            app.current_screen = CurrentScreen::SystemMenu;
+        }
         KeyCode::Char('q') | KeyCode::Char('Q') => {
             app.current_screen = CurrentScreen::Exiting;
         }

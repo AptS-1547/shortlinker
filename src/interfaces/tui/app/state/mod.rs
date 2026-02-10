@@ -3,8 +3,10 @@
 //! 包含核心 App 结构和基础状态管理，以及拆分后的子状态模块
 
 mod form_state;
+mod system_state;
 
 pub use form_state::{EditingField, FormState};
+pub use system_state::{ConfigListItem, PasswordField, SystemState};
 
 use crate::cache::NullCompositeCache;
 use crate::errors::ShortlinkerError;
@@ -53,6 +55,14 @@ pub enum CurrentScreen {
     ViewDetails,
     FileBrowser,
     ExportFileName,
+    // System operations
+    SystemMenu,
+    ServerStatus,
+    ConfigList,
+    ConfigEdit,
+    ConfigResetConfirm,
+    PasswordReset,
+    ImportModeSelect,
 }
 
 /// 当前编辑的字段（保留以兼容现有代码，可通过 From trait 与 EditingField 互转）
@@ -94,6 +104,9 @@ pub struct App {
 
     // Form state for add/edit
     pub form: FormState,
+
+    // System operations state
+    pub system: SystemState,
 
     // Search functionality
     pub search_input: String,
@@ -144,6 +157,7 @@ impl App {
             links,
             current_screen: CurrentScreen::Main,
             form: FormState::new(),
+            system: SystemState::default(),
             search_input: String::new(),
             filtered_links: Vec::new(),
             is_searching: false,

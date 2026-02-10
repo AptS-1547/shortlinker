@@ -74,6 +74,7 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
             ("e", "Edit", Color::Yellow),
             ("d", "Delete", Color::Red),
             ("x", "Export / Import", Color::Magenta),
+            ("o", "System", Color::Magenta),
             ("?", "Help", Color::Blue),
             ("q", "Quit", Color::Magenta),
         ],
@@ -104,6 +105,38 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         ],
         CurrentScreen::ExportFileName => vec![
             ("Enter", "Confirm", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::SystemMenu => vec![
+            ("s", "Status", Color::Cyan),
+            ("c", "Config", Color::Yellow),
+            ("p", "Password", Color::Red),
+            ("Esc", "Back", Color::Red),
+        ],
+        CurrentScreen::ServerStatus => {
+            vec![("r", "Refresh", Color::Cyan), ("Esc", "Back", Color::Red)]
+        }
+        CurrentScreen::ConfigList => vec![
+            ("j/k", "Navigate", Color::Cyan),
+            ("e", "Edit", Color::Yellow),
+            ("r", "Reset", Color::Red),
+            ("Esc", "Back", Color::Red),
+        ],
+        CurrentScreen::ConfigEdit => vec![
+            ("Enter", "Save", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::ConfigResetConfirm => {
+            vec![("y", "Yes", Color::Green), ("n", "No", Color::Red)]
+        }
+        CurrentScreen::PasswordReset => vec![
+            ("Tab", "Switch Field", Color::Cyan),
+            ("Enter", "Save", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::ImportModeSelect => vec![
+            ("s", "Skip", Color::Green),
+            ("o", "Overwrite", Color::Red),
             ("Esc", "Cancel", Color::Red),
         ],
     };

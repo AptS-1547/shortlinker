@@ -11,7 +11,8 @@ mod file_operations;
 mod link_operations;
 mod navigation;
 pub mod state;
+mod system_operations;
 mod validation;
 
 // Re-export main types
-pub use state::{App, CurrentScreen, EditingField, SortColumn};
+pub use state::{App, ConfigListItem, CurrentScreen, EditingField, PasswordField, SortColumn};

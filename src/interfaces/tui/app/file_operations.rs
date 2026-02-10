@@ -16,7 +16,7 @@ impl App {
         Ok(())
     }
 
-    pub async fn import_links(&mut self) -> Result<(), ShortlinkerError> {
+    pub async fn import_links(&mut self, overwrite: bool) -> Result<(), ShortlinkerError> {
         let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&self.import_path)?;
 
         let items: Vec<ImportLinkItem> = imported_links
@@ -29,9 +29,13 @@ impl App {
             })
             .collect();
 
-        self.link_service
-            .import_links(items, ImportMode::Skip)
-            .await?;
+        let mode = if overwrite {
+            ImportMode::Overwrite
+        } else {
+            ImportMode::Skip
+        };
+
+        self.link_service.import_links(items, mode).await?;
 
         Ok(())
     }
