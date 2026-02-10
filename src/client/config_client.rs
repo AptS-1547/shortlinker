@@ -40,8 +40,9 @@ impl ConfigClient {
                 let mut items = service.get_all();
                 if let Some(cat) = cat {
                     items.retain(|item| {
-                        // Match category from the key prefix (e.g., "auth.xxx" → "auth")
-                        item.key.starts_with(&cat)
+                        crate::config::definitions::get_def(&item.key)
+                            .map(|d| d.category == cat.as_str())
+                            .unwrap_or(false)
                     });
                 }
                 Ok(items)

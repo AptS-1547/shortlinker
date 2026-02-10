@@ -2,7 +2,7 @@
 
 use super::state::App;
 use crate::errors::ShortlinkerError;
-use crate::services::ImportLinkItemRich;
+use crate::services::{ImportBatchResult, ImportLinkItemRich};
 use crate::storage::ShortLink;
 use crate::utils::csv_handler;
 
@@ -17,7 +17,10 @@ impl App {
         Ok(())
     }
 
-    pub async fn import_links(&mut self, overwrite: bool) -> Result<(), ShortlinkerError> {
+    pub async fn import_links(
+        &mut self,
+        overwrite: bool,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
         let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&self.import_path)?;
 
         let items: Vec<ImportLinkItemRich> = imported_links
@@ -32,9 +35,9 @@ impl App {
             })
             .collect();
 
-        self.link_client.import_links(items, overwrite).await?;
+        let result = self.link_client.import_links(items, overwrite).await?;
 
-        Ok(())
+        Ok(result)
     }
 
     /// Load directory entries for file browser

@@ -40,9 +40,15 @@ pub async fn config_get(client: &ConfigClient, key: String, json: bool) -> Resul
             .map(|opts| opts.into_iter().map(|o| o.value).collect())
     });
 
+    let display_value = if item.is_sensitive {
+        "[REDACTED]".to_string()
+    } else {
+        item.value.clone()
+    };
+
     let detail = ConfigDetail {
         key: item.key.clone(),
-        value: item.value.clone(),
+        value: display_value,
         category,
         value_type: item.value_type.to_string(),
         default_value,

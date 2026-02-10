@@ -92,8 +92,9 @@ pub fn draw_config_list_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                     // Value (redact sensitive)
                     let display_value = if cfg.sensitive {
                         "[REDACTED]".to_string()
-                    } else if cfg.value.len() > 30 {
-                        format!("{}...", &cfg.value[..27])
+                    } else if cfg.value.chars().count() > 30 {
+                        let truncated: String = cfg.value.chars().take(27).collect();
+                        format!("{}...", truncated)
                     } else {
                         cfg.value.clone()
                     };

@@ -326,7 +326,7 @@ fn link_data_to_short_link(data: &ShortLinkData) -> ShortLink {
                 .ok()
         }),
         password: data.password.clone(),
-        click: data.click as usize,
+        click: data.click.max(0) as usize,
     }
 }
 

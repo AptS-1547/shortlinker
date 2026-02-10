@@ -237,6 +237,10 @@ pub async fn handle_batch_delete_confirm_screen(
     match key_code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             let codes_to_delete: Vec<String> = app.selected_items.iter().cloned().collect();
+            if codes_to_delete.is_empty() {
+                app.current_screen = CurrentScreen::Main;
+                return Ok(false);
+            }
             let total = codes_to_delete.len();
 
             match app.link_client.batch_delete(codes_to_delete).await {

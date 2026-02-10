@@ -44,12 +44,27 @@ pub async fn handle_file_browser_screen(app: &mut App, key_code: KeyCode) -> std
                 Ok(Some(file_path)) => {
                     // File selected, perform import
                     app.import_path = file_path.to_string_lossy().to_string();
-                    if let Err(e) = app.import_links(app.system.import_overwrite).await {
-                        app.set_error(format!("Failed to import links: {}", e));
-                    } else {
-                        app.set_status("Links imported successfully!".to_string());
-                        if let Err(e) = app.refresh_links().await {
-                            app.set_error(format!("Failed to refresh links: {}", e));
+                    match app.import_links(app.system.import_overwrite).await {
+                        Ok(result) => {
+                            let failed = result.failed_items.len();
+                            let total = result.success_count + result.skipped_count + failed;
+                            if failed > 0 {
+                                app.set_error(format!(
+                                    "Imported {}/{} links ({} failed, {} skipped)",
+                                    result.success_count, total, failed, result.skipped_count
+                                ));
+                            } else {
+                                app.set_status(format!(
+                                    "Imported {} links ({} skipped)",
+                                    result.success_count, result.skipped_count
+                                ));
+                            }
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("Failed to refresh links: {}", e));
+                            }
+                        }
+                        Err(e) => {
+                            app.set_error(format!("Failed to import links: {}", e));
                         }
                     }
                     app.current_screen = CurrentScreen::Main;
