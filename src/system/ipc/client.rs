@@ -185,7 +185,94 @@ pub async fn import_links(
     links: Vec<ImportLinkData>,
     overwrite: bool,
 ) -> Result<IpcResponse, IpcError> {
-    send_command(IpcCommand::ImportLinks { links, overwrite }).await
+    send_command(IpcCommand::ImportLinks {
+        links,
+        overwrite,
+        stream_progress: false,
+    })
+    .await
+}
+
+/// Import links via IPC with streaming progress reports.
+///
+/// Sends ImportLinks with stream_progress=true and receives streaming
+/// ImportProgress + ImportResult responses. Calls `on_progress` for each
+/// ImportProgress message. Returns the final ImportResult response.
+pub async fn import_links_streaming(
+    links: Vec<ImportLinkData>,
+    overwrite: bool,
+    on_progress: impl Fn(&super::types::ImportPhase, usize, usize),
+) -> Result<IpcResponse, IpcError> {
+    let config = crate::config::get_config();
+    let timeout_duration = config.ipc.bulk_timeout_duration();
+
+    // Connect to the server
+    let mut stream = timeout(timeout_duration, PlatformIpc::connect())
+        .await
+        .map_err(|_| IpcError::Timeout)?
+        .map_err(IpcError::from)?;
+
+    // Encode and send the command
+    let cmd = IpcCommand::ImportLinks {
+        links,
+        overwrite,
+        stream_progress: true,
+    };
+    let data = encode(&cmd).map_err(|e| IpcError::ProtocolError(e.to_string()))?;
+    stream.write_all(&data).await.map_err(IpcError::IoError)?;
+    stream.flush().await.map_err(IpcError::IoError)?;
+
+    // Read streaming responses
+    let mut buf = BytesMut::with_capacity(4096);
+    let mut read_buf = [0u8; 4096];
+
+    loop {
+        // Try to decode any buffered responses first
+        loop {
+            match decode::<IpcResponse>(&mut buf)
+                .map_err(|e| IpcError::ProtocolError(e.to_string()))?
+            {
+                Some(IpcResponse::ImportProgress {
+                    phase,
+                    processed,
+                    total,
+                    ..
+                }) => {
+                    on_progress(&phase, processed, total);
+                    continue;
+                }
+                Some(resp @ IpcResponse::ImportResult { .. }) => {
+                    return Ok(resp);
+                }
+                Some(IpcResponse::Error { code, message }) => {
+                    return Err(IpcError::ProtocolError(format!("{}: {}", code, message)));
+                }
+                Some(other) => {
+                    return Err(IpcError::ProtocolError(format!(
+                        "Unexpected response during streaming import: {:?}",
+                        other
+                    )));
+                }
+                None => {
+                    break; // Need more data
+                }
+            }
+        }
+
+        // Read more data from socket
+        let n = timeout(timeout_duration, stream.read(&mut read_buf))
+            .await
+            .map_err(|_| IpcError::Timeout)?
+            .map_err(IpcError::IoError)?;
+
+        if n == 0 {
+            return Err(IpcError::ProtocolError(
+                "Connection closed during streaming import".to_string(),
+            ));
+        }
+
+        buf.extend_from_slice(&read_buf[..n]);
+    }
 }
 
 /// Export all links via IPC (streaming)

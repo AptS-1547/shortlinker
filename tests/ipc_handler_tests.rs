@@ -465,6 +465,7 @@ async fn test_import_links_command() {
     let resp = handle_command(IpcCommand::ImportLinks {
         links,
         overwrite: false,
+        stream_progress: false,
     })
     .await;
 

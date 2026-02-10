@@ -233,7 +233,9 @@ impl LinkClient {
                         .map(|e| crate::services::ImportBatchFailedItem {
                             code: e.code,
                             error: match e.error_code {
-                                Some(ec) => crate::errors::ShortlinkerError::from_error_code(&ec, e.message),
+                                Some(ec) => {
+                                    crate::errors::ShortlinkerError::from_error_code(&ec, e.message)
+                                }
                                 None => crate::errors::ShortlinkerError::import_failed(e.message),
                             },
                             row_num: None,
@@ -249,6 +251,82 @@ impl LinkClient {
             },
         )
         .await
+    }
+
+    /// Import links with streaming progress reports
+    ///
+    /// IPC path: uses `import_links_streaming` with progress callback.
+    /// Fallback path: uses `import_links_batch_chunked` with progress callback.
+    pub async fn import_links_with_progress(
+        &self,
+        items: Vec<ImportLinkItemRich>,
+        overwrite: bool,
+        on_progress: impl Fn(&crate::system::ipc::types::ImportPhase, usize, usize) + Send + Sync,
+    ) -> Result<ImportBatchResult, ClientError> {
+        let ctx = self.ctx.clone();
+
+        // IPC path
+        if ipc::is_server_running() {
+            let ipc_links: Vec<crate::system::ipc::ImportLinkData> = items
+                .iter()
+                .map(|l| crate::system::ipc::ImportLinkData {
+                    code: l.code.clone(),
+                    target: l.target.clone(),
+                    created_at: l.created_at.to_rfc3339(),
+                    expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
+                    password: l.password.clone(),
+                    click_count: l.click_count,
+                })
+                .collect();
+
+            match ipc::import_links_streaming(ipc_links, overwrite, &on_progress).await {
+                Ok(IpcResponse::ImportResult {
+                    success,
+                    skipped,
+                    errors,
+                    ..
+                }) => {
+                    return Ok(ImportBatchResult {
+                        success_count: success,
+                        skipped_count: skipped,
+                        failed_items: errors
+                            .into_iter()
+                            .map(|e| crate::services::ImportBatchFailedItem {
+                                code: e.code,
+                                error: match e.error_code {
+                                    Some(ec) => crate::errors::ShortlinkerError::from_error_code(
+                                        &ec, e.message,
+                                    ),
+                                    None => {
+                                        crate::errors::ShortlinkerError::import_failed(e.message)
+                                    }
+                                },
+                                row_num: None,
+                            })
+                            .collect(),
+                    });
+                }
+                Ok(other) => return Err(unexpected_response(other)),
+                Err(crate::system::ipc::IpcError::ServerNotRunning) => {
+                    // Fall through to fallback
+                }
+                Err(e) => return Err(ClientError::Ipc(e)),
+            }
+        }
+
+        // Fallback path: use chunked import with progress
+        use crate::system::ipc::types::ImportPhase;
+        let service = ctx.get_link_service().await?;
+        let mode = ImportMode::from_overwrite_flag(overwrite);
+
+        // Wrap the progress callback to emit ImportPhase::Writing
+        let on_chunk = move |processed: usize, total: usize| {
+            on_progress(&ImportPhase::Writing, processed, total);
+        };
+
+        Ok(service
+            .import_links_batch_chunked(items, mode, 500, Some(&on_chunk))
+            .await?)
     }
 
     /// Export all links
@@ -293,7 +371,7 @@ impl LinkClient {
                     active_links,
                 } => Ok(LinkStats {
                     total_links,
-                    total_clicks: total_clicks as usize,
+                    total_clicks: total_clicks.max(0) as usize,
                     active_links,
                 }),
                 other => Err(unexpected_response(other)),

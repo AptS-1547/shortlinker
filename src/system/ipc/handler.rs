@@ -188,7 +188,25 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
             search,
         } => handle_list_links(page, page_size, search).await,
 
-        IpcCommand::ImportLinks { links, overwrite } => handle_import_links(links, overwrite).await,
+        IpcCommand::ImportLinks {
+            links,
+            overwrite,
+            stream_progress: false,
+        } => handle_import_links(links, overwrite).await,
+
+        // Streaming import: handled by server.rs for progress reporting.
+        // This branch is a fallback in case it reaches here.
+        IpcCommand::ImportLinks {
+            stream_progress: true,
+            ..
+        } => {
+            warn!(
+                "ImportLinks(stream_progress=true) reached handle_command — should be handled by server.rs streaming path"
+            );
+            error_response(ShortlinkerError::internal_error(
+                "Streaming import must be handled by streaming path",
+            ))
+        }
 
         // ExportLinks is handled directly by server.rs for streaming support.
         // This branch is a fallback in case it reaches here.
@@ -438,6 +456,124 @@ async fn handle_get_stats() -> IpcResponse {
         },
         Err(e) => error_response(e),
     }
+}
+
+/// Stream import progress: returns a receiver that yields ImportProgress and ImportResult messages.
+///
+/// Called by `server.rs` for streaming import.
+/// Returns `None` if the service is not initialized.
+pub fn import_links_with_progress(
+    links: Vec<ImportLinkData>,
+    overwrite: bool,
+) -> Option<tokio::sync::mpsc::Receiver<IpcResponse>> {
+    use super::types::ImportPhase;
+    use crate::services::{ImportLinkItemRaw, ImportMode, validate_import_rows};
+
+    let service = LINK_SERVICE.get()?.clone();
+    let (tx, rx) = tokio::sync::mpsc::channel::<IpcResponse>(32);
+
+    tokio::spawn(async move {
+        let total = links.len();
+
+        // Phase 1: Validating
+        let _ = tx
+            .send(IpcResponse::ImportProgress {
+                phase: ImportPhase::Validating,
+                processed: 0,
+                total,
+                success: 0,
+                skipped: 0,
+                failed: 0,
+            })
+            .await;
+
+        let raw_items: Vec<ImportLinkItemRaw> = links
+            .into_iter()
+            .map(|l| ImportLinkItemRaw {
+                code: l.code,
+                target: l.target,
+                created_at: l.created_at,
+                expires_at: l.expires_at,
+                password: l.password,
+                click_count: l.click_count,
+                row_num: None,
+            })
+            .collect();
+
+        let (valid_items, row_errors) = validate_import_rows(raw_items);
+
+        let pre_errors: Vec<ImportErrorData> = row_errors
+            .into_iter()
+            .map(|e| ImportErrorData {
+                code: e.code,
+                message: e.error.message().to_string(),
+                error_code: Some(e.error.code().to_string()),
+            })
+            .collect();
+
+        let pre_failed = pre_errors.len();
+        let valid_count = valid_items.len();
+
+        // Phase 2: ConflictCheck
+        let _ = tx
+            .send(IpcResponse::ImportProgress {
+                phase: ImportPhase::ConflictCheck,
+                processed: 0,
+                total: valid_count,
+                success: 0,
+                skipped: 0,
+                failed: pre_failed,
+            })
+            .await;
+
+        let mode = ImportMode::from_overwrite_flag(overwrite);
+
+        // Use chunked import with progress callback
+        let tx_clone = tx.clone();
+        let on_chunk = move |processed: usize, chunk_total: usize| {
+            let _ = tx_clone.try_send(IpcResponse::ImportProgress {
+                phase: ImportPhase::Writing,
+                processed,
+                total: chunk_total,
+                success: 0, // Will be filled in final result
+                skipped: 0,
+                failed: 0,
+            });
+        };
+
+        match service
+            .import_links_batch_chunked(valid_items, mode, 500, Some(&on_chunk))
+            .await
+        {
+            Ok(result) => {
+                let mut errors = pre_errors;
+                errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
+                    code: f.code,
+                    message: f.error.message().to_string(),
+                    error_code: Some(f.error.code().to_string()),
+                }));
+
+                let _ = tx
+                    .send(IpcResponse::ImportResult {
+                        success: result.success_count,
+                        skipped: result.skipped_count,
+                        failed: errors.len(),
+                        errors,
+                    })
+                    .await;
+            }
+            Err(e) => {
+                let _ = tx
+                    .send(IpcResponse::Error {
+                        code: e.code().to_string(),
+                        message: e.to_string(),
+                    })
+                    .await;
+            }
+        }
+    });
+
+    Some(rx)
 }
 
 // ============ Config Management Handlers ============

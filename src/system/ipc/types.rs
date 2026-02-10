@@ -59,6 +59,26 @@ pub struct ConfigItemData {
     pub updated_at: String,
 }
 
+/// Import progress phase
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImportPhase {
+    Validating,
+    ConflictCheck,
+    Writing,
+    CacheUpdate,
+}
+
+impl fmt::Display for ImportPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImportPhase::Validating => write!(f, "Validating"),
+            ImportPhase::ConflictCheck => write!(f, "Conflict check"),
+            ImportPhase::Writing => write!(f, "Writing"),
+            ImportPhase::CacheUpdate => write!(f, "Cache update"),
+        }
+    }
+}
+
 /// Config import item for batch import
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigImportItem {
@@ -119,6 +139,9 @@ pub enum IpcCommand {
     ImportLinks {
         links: Vec<ImportLinkData>,
         overwrite: bool,
+        /// Request streaming progress reports (default false for backward compatibility)
+        #[serde(default)]
+        stream_progress: bool,
     },
 
     /// Export all links
@@ -232,6 +255,16 @@ pub enum IpcResponse {
         skipped: usize,
         failed: usize,
         errors: Vec<ImportErrorData>,
+    },
+
+    /// Import progress (streaming import)
+    ImportProgress {
+        phase: ImportPhase,
+        processed: usize,
+        total: usize,
+        success: usize,
+        skipped: usize,
+        failed: usize,
     },
 
     /// Export result

@@ -132,6 +132,37 @@ where
     Ok(())
 }
 
+/// Handle streaming import: sends ImportProgress packets followed by ImportResult
+async fn handle_streaming_import<S>(
+    stream: &mut S,
+    links: Vec<super::types::ImportLinkData>,
+    overwrite: bool,
+) -> Result<(), ()>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    let Some(mut rx) = super::handler::import_links_with_progress(links, overwrite) else {
+        let err = IpcResponse::Error {
+            code: "SERVICE_UNAVAILABLE".to_string(),
+            message: "Service not initialized".to_string(),
+        };
+        return send_response(stream, &err).await;
+    };
+
+    while let Some(msg) = rx.recv().await {
+        let is_terminal = matches!(
+            msg,
+            IpcResponse::ImportResult { .. } | IpcResponse::Error { .. }
+        );
+        send_response(stream, &msg).await?;
+        if is_terminal {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 /// Handle a single IPC connection
 async fn handle_connection<S>(mut stream: S)
 where
@@ -168,6 +199,19 @@ where
                         IpcCommand::ExportLinks => {
                             // Streaming export: send multiple responses
                             if handle_streaming_export(&mut stream).await.is_err() {
+                                return;
+                            }
+                        }
+                        IpcCommand::ImportLinks {
+                            links,
+                            overwrite,
+                            stream_progress: true,
+                        } => {
+                            // Streaming import: send progress + final result
+                            if handle_streaming_import(&mut stream, links, overwrite)
+                                .await
+                                .is_err()
+                            {
                                 return;
                             }
                         }

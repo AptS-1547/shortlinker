@@ -746,6 +746,135 @@ impl LinkService {
         Ok(result)
     }
 
+    /// 高性能批量导入链接（分块写入，带进度回调）
+    ///
+    /// 与 `import_links_batch` 相同的验证和冲突检测逻辑，
+    /// 但写入阶段按 `chunk_size` 分批，每批写完后调用 `on_chunk_written(processed, total)`。
+    /// 用于 IPC 流式进度报告场景。
+    pub async fn import_links_batch_chunked(
+        &self,
+        items: Vec<ImportLinkItemRich>,
+        mode: ImportMode,
+        chunk_size: usize,
+        on_chunk_written: Option<&(dyn Fn(usize, usize) + Send + Sync)>,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
+        let mut result = ImportBatchResult::default();
+
+        if items.is_empty() {
+            return Ok(result);
+        }
+
+        // 1. 收集所有 codes
+        let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
+
+        // 2. 冲突检测（与 import_links_batch 相同）
+        let existing_codes: HashSet<String> = match mode {
+            ImportMode::Overwrite => HashSet::new(),
+            ImportMode::Skip | ImportMode::Error => {
+                let mut maybe_exist = Vec::new();
+                for code in &all_codes {
+                    if self.cache.bloom_check(code).await {
+                        maybe_exist.push(code.clone());
+                    }
+                }
+
+                if maybe_exist.is_empty() {
+                    HashSet::new()
+                } else {
+                    self.storage
+                        .batch_check_codes_exist(&maybe_exist)
+                        .await
+                        .map_err(|e| {
+                            ShortlinkerError::database_operation(format!(
+                                "Failed to check existing codes: {}",
+                                e
+                            ))
+                        })?
+                }
+            }
+        };
+
+        // 3. 去重 + 冲突处理（与 import_links_batch 相同）
+        let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
+        let mut processed_codes: HashSet<String> = HashSet::new();
+
+        for item in items {
+            let exists =
+                existing_codes.contains(&item.code) || processed_codes.contains(&item.code);
+            if exists {
+                match mode {
+                    ImportMode::Skip => {
+                        result.skipped_count += 1;
+                        continue;
+                    }
+                    ImportMode::Error => {
+                        result.failed_items.push(ImportBatchFailedItem {
+                            code: item.code,
+                            error: ShortlinkerError::link_already_exists("Link already exists"),
+                            row_num: item.row_num,
+                        });
+                        continue;
+                    }
+                    ImportMode::Overwrite => {
+                        if processed_codes.contains(&item.code) {
+                            result.success_count -= 1;
+                        }
+                    }
+                }
+            }
+
+            let link = ShortLink {
+                code: item.code.clone(),
+                target: item.target,
+                created_at: item.created_at,
+                expires_at: item.expires_at,
+                password: item.password,
+                click: item.click_count,
+            };
+
+            processed_codes.insert(item.code.clone());
+            links_to_insert.insert(item.code, link);
+            result.success_count += 1;
+        }
+
+        // 4. 分块写入数据库 + 缓存更新
+        let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
+        let total = links_vec.len();
+
+        if !links_vec.is_empty() {
+            let default_ttl = self.default_cache_ttl();
+            let mut processed = 0usize;
+
+            for chunk in links_vec.chunks(chunk_size) {
+                self.storage.batch_set(chunk.to_vec()).await.map_err(|e| {
+                    ShortlinkerError::database_operation(format!(
+                        "Failed to batch insert links: {}",
+                        e
+                    ))
+                })?;
+
+                for link in chunk {
+                    let ttl = link.cache_ttl(default_ttl);
+                    self.cache.insert(&link.code, link.clone(), ttl).await;
+                }
+
+                processed += chunk.len();
+                if let Some(cb) = &on_chunk_written {
+                    cb(processed, total);
+                }
+            }
+        }
+
+        info!(
+            "LinkService: import batch chunked completed - success: {}, skipped: {}, failed: {}",
+            result.success_count,
+            result.skipped_count,
+            result.failed_items.len()
+        );
+
+        Ok(result)
+    }
+
     /// Batch create links
     ///
     /// Creates multiple links in a single operation. Each link is validated

@@ -367,6 +367,7 @@ async fn test_e2e_import_export() {
     let resp = send_command(IpcCommand::ImportLinks {
         links,
         overwrite: false,
+        stream_progress: false,
     })
     .await
     .expect("ImportLinks failed");

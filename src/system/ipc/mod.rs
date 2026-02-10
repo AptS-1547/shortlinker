@@ -48,11 +48,11 @@ pub mod types;
 
 pub use client::{
     add_link, batch_delete_links, config_get, config_import, config_list, config_reset, config_set,
-    export_links, get_link, get_link_stats, import_links, is_server_running, list_links, ping,
-    reload, remove_link, send_command, update_link,
+    export_links, get_link, get_link_stats, import_links, import_links_streaming,
+    is_server_running, list_links, ping, reload, remove_link, send_command, update_link,
 };
 pub use platform::PlatformIpc;
 pub use types::{
-    ConfigImportItem, ConfigItemData, ImportErrorData, ImportLinkData, IpcCommand, IpcError,
-    IpcResponse, ShortLinkData,
+    ConfigImportItem, ConfigItemData, ImportErrorData, ImportLinkData, ImportPhase, IpcCommand,
+    IpcError, IpcResponse, ShortLinkData,
 };
