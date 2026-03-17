@@ -32,7 +32,7 @@ The TUI interface consists of several main areas:
 │  Clicks: 142                                           │
 │  Protected: No                                         │
 └─────────────────────────────────────────────────────────┘
-  q:Quit  x:Export/Import  /:Search  ↑↓:Navigate  Enter:Details
+  q:Quit  o:System  x:Export/Import  /:Search  ↑↓:Navigate  Enter:Details
 ```
 
 ## Keyboard Shortcuts
@@ -43,7 +43,8 @@ The TUI interface consists of several main areas:
 |----------|----------|
 | `↑` / `↓` | Move selection up/down |
 | `j` / `k` | Move down/up (Vim style) |
-| `PageUp` / `PageDown` | Page up/down (10 items) |
+| `PageUp` / `PageDown` | Fast move within current page (10 rows) |
+| `[` / `]` | Previous/next page (database pagination) |
 | `Home` / `g` | Jump to top |
 | `End` / `G` | Jump to bottom |
 | `s` | Cycle sort column (code / URL / clicks / status) |
@@ -82,6 +83,8 @@ The main interface displays overview information for all short links:
 - **Expiration**: Shows expiration time or `(EXPIRED)` marker (yellow/red)
 - **Password Protected**: Shows 🔒 icon (magenta)
 - **Click Count**: Shows access count (green)
+- **Paged Loading**: Loads 100 links per page by default; use `[` / `]` to switch database pages
+- **Virtual Scrolling**: Renders only visible rows for smoother large-list navigation
 
 Selected item is highlighted with gray background.
 
@@ -190,7 +193,7 @@ TUI mode is suitable for:
 
 Current version TUI known limitations:
 
-- ⚠️ Only batch delete is supported; no batch edit or batch create
+- ⚠️ Batch operations currently support CSV import and batch delete only; no batch edit or batch create
 - ⚠️ Password input shown as masked, cannot see actual content
 
 ## Troubleshooting

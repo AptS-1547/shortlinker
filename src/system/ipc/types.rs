@@ -33,6 +33,19 @@ pub struct ImportLinkData {
     pub click_count: usize,
 }
 
+impl From<&crate::services::ImportLinkItemRich> for ImportLinkData {
+    fn from(l: &crate::services::ImportLinkItemRich) -> Self {
+        Self {
+            code: l.code.clone(),
+            target: l.target.clone(),
+            created_at: l.created_at.to_rfc3339(),
+            expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
+            password: l.password.clone(),
+            click_count: l.click_count,
+        }
+    }
+}
+
 /// Import error data for IPC transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportErrorData {

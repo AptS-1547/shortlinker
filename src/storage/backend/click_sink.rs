@@ -54,7 +54,8 @@ impl ClickSink for SeaOrmStorage {
             for (code, count) in batch {
                 case_stmt = case_stmt.case(
                     Expr::col(short_link::Column::ShortCode).eq(Expr::val(code.as_str())),
-                    Expr::col(short_link::Column::ClickCount).add(Expr::val(*count as i64)),
+                    Expr::col(short_link::Column::ClickCount)
+                        .add(Expr::val((*count).min(i64::MAX as usize) as i64)),
                 );
                 codes.push(code.clone());
             }
@@ -177,7 +178,7 @@ impl SeaOrmStorage {
 
         // 更新全局小时汇总
         let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
-        let unique_links = updates.len() as i32;
+        let unique_links = updates.len().min(i32::MAX as usize) as i32;
         writer
             .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "sink")
             .await?;

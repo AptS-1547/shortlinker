@@ -5,8 +5,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::services::{
-    CreateLinkRequest, ImportBatchResult, ImportLinkItemRich, ImportMode, LinkCreateResult,
-    UpdateLinkRequest,
+    CreateLinkRequest, ImportBatchFailedItem, ImportBatchResult, ImportLinkItemRich, ImportMode,
+    LinkCreateResult, UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, LinkStats, ShortLink};
 use crate::system::ipc::{self, IpcResponse, ShortLinkData};
@@ -207,15 +207,8 @@ impl LinkClient {
         let items2 = items.clone();
         // Convert to IPC format
         let ipc_links: Vec<crate::system::ipc::ImportLinkData> = items
-            .into_iter()
-            .map(|l| crate::system::ipc::ImportLinkData {
-                code: l.code,
-                target: l.target,
-                created_at: l.created_at.to_rfc3339(),
-                expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
-                password: l.password,
-                click_count: l.click_count,
-            })
+            .iter()
+            .map(crate::system::ipc::ImportLinkData::from)
             .collect();
         ipc_or_fallback(
             ipc::import_links(ipc_links, overwrite),
@@ -225,23 +218,7 @@ impl LinkClient {
                     skipped,
                     errors,
                     ..
-                } => Ok(ImportBatchResult {
-                    success_count: success,
-                    skipped_count: skipped,
-                    failed_items: errors
-                        .into_iter()
-                        .map(|e| crate::services::ImportBatchFailedItem {
-                            code: e.code,
-                            error: match e.error_code {
-                                Some(ec) => {
-                                    crate::errors::ShortlinkerError::from_error_code(&ec, e.message)
-                                }
-                                None => crate::errors::ShortlinkerError::import_failed(e.message),
-                            },
-                            row_num: None,
-                        })
-                        .collect(),
-                }),
+                } => Ok(convert_import_result(success, skipped, errors)),
                 other => Err(unexpected_response(other)),
             },
             || async move {
@@ -269,14 +246,7 @@ impl LinkClient {
         if ipc::is_server_running() {
             let ipc_links: Vec<crate::system::ipc::ImportLinkData> = items
                 .iter()
-                .map(|l| crate::system::ipc::ImportLinkData {
-                    code: l.code.clone(),
-                    target: l.target.clone(),
-                    created_at: l.created_at.to_rfc3339(),
-                    expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
-                    password: l.password.clone(),
-                    click_count: l.click_count,
-                })
+                .map(crate::system::ipc::ImportLinkData::from)
                 .collect();
 
             match ipc::import_links_streaming(ipc_links, overwrite, &on_progress).await {
@@ -286,25 +256,7 @@ impl LinkClient {
                     errors,
                     ..
                 }) => {
-                    return Ok(ImportBatchResult {
-                        success_count: success,
-                        skipped_count: skipped,
-                        failed_items: errors
-                            .into_iter()
-                            .map(|e| crate::services::ImportBatchFailedItem {
-                                code: e.code,
-                                error: match e.error_code {
-                                    Some(ec) => crate::errors::ShortlinkerError::from_error_code(
-                                        &ec, e.message,
-                                    ),
-                                    None => {
-                                        crate::errors::ShortlinkerError::import_failed(e.message)
-                                    }
-                                },
-                                row_num: None,
-                            })
-                            .collect(),
-                    });
+                    return Ok(convert_import_result(success, skipped, errors));
                 }
                 Ok(other) => return Err(unexpected_response(other)),
                 Err(crate::system::ipc::IpcError::ServerNotRunning) => {
@@ -386,6 +338,29 @@ impl LinkClient {
 }
 
 // ============ Conversion helpers ============
+
+/// Convert IPC ImportResult fields to ImportBatchResult
+fn convert_import_result(
+    success: usize,
+    skipped: usize,
+    errors: Vec<crate::system::ipc::types::ImportErrorData>,
+) -> ImportBatchResult {
+    ImportBatchResult {
+        success_count: success,
+        skipped_count: skipped,
+        failed_items: errors
+            .into_iter()
+            .map(|e| ImportBatchFailedItem {
+                code: e.code,
+                error: match e.error_code {
+                    Some(ec) => crate::errors::ShortlinkerError::from_error_code(&ec, e.message),
+                    None => crate::errors::ShortlinkerError::import_failed(e.message),
+                },
+                row_num: None,
+            })
+            .collect(),
+    }
+}
 
 /// Convert IPC ShortLinkData to storage ShortLink
 fn link_data_to_short_link(data: &ShortLinkData) -> ShortLink {

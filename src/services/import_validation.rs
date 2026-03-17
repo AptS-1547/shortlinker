@@ -8,6 +8,7 @@ use tracing::warn;
 
 use crate::errors::ShortlinkerError;
 use crate::services::ImportLinkItemRich;
+use crate::system::ipc::types::ImportLinkData;
 use crate::utils::password::process_imported_password;
 use crate::utils::url_validator::validate_url;
 
@@ -24,6 +25,20 @@ pub struct ImportLinkItemRaw {
     pub click_count: usize,
     /// CSV 行号（1-based），仅 Admin API 设置，IPC/CSV 路径为 None
     pub row_num: Option<usize>,
+}
+
+impl From<ImportLinkData> for ImportLinkItemRaw {
+    fn from(l: ImportLinkData) -> Self {
+        Self {
+            code: l.code,
+            target: l.target,
+            created_at: l.created_at,
+            expires_at: l.expires_at,
+            password: l.password,
+            click_count: l.click_count,
+            row_num: None,
+        }
+    }
 }
 
 /// 单行验证错误

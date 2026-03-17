@@ -382,18 +382,8 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
     };
 
     // Convert IPC ImportLinkData to ImportLinkItemRaw, then validate via shared logic
-    let raw_items: Vec<ImportLinkItemRaw> = links
-        .into_iter()
-        .map(|l| ImportLinkItemRaw {
-            code: l.code,
-            target: l.target,
-            created_at: l.created_at,
-            expires_at: l.expires_at,
-            password: l.password,
-            click_count: l.click_count,
-            row_num: None,
-        })
-        .collect();
+    let raw_items: Vec<ImportLinkItemRaw> =
+        links.into_iter().map(ImportLinkItemRaw::from).collect();
 
     let (valid_items, row_errors) = validate_import_rows(raw_items);
 
@@ -487,18 +477,8 @@ pub fn import_links_with_progress(
             })
             .await;
 
-        let raw_items: Vec<ImportLinkItemRaw> = links
-            .into_iter()
-            .map(|l| ImportLinkItemRaw {
-                code: l.code,
-                target: l.target,
-                created_at: l.created_at,
-                expires_at: l.expires_at,
-                password: l.password,
-                click_count: l.click_count,
-                row_num: None,
-            })
-            .collect();
+        let raw_items: Vec<ImportLinkItemRaw> =
+            links.into_iter().map(ImportLinkItemRaw::from).collect();
 
         let (valid_items, row_errors) = validate_import_rows(raw_items);
 
