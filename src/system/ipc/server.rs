@@ -154,11 +154,17 @@ where
         );
         send_response(stream, &msg).await?;
         if is_terminal {
-            break;
+            return Ok(());
         }
     }
 
-    Ok(())
+    // Channel closed without terminal message - protocol error
+    let err = IpcResponse::Error {
+        code: "PROTOCOL_ERROR".to_string(),
+        message: "Import stream closed unexpectedly".to_string(),
+    };
+    let _ = send_response(stream, &err).await;
+    Err(())
 }
 
 /// Handle a single IPC connection

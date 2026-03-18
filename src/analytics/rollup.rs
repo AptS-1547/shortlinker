@@ -177,7 +177,7 @@ impl RollupManager {
                 .entry(record.short_code.clone())
                 .or_insert_with(|| ClickAggregation::new(0));
 
-            agg.count += record.click_count.max(0) as usize;
+            agg.count = agg.count.saturating_add(record.click_count.max(0) as usize);
 
             // 合并 referrer 统计
             let referrers = super::parse_json_counts(&record.referrer_counts);
@@ -284,7 +284,7 @@ impl RollupManager {
         let total_clicks: i64 = aggregated
             .values()
             .map(|a| a.count.min(i64::MAX as usize) as i64)
-            .sum();
+            .fold(0i64, |acc, x| acc.saturating_add(x));
         let unique_links = aggregated.len().min(i32::MAX as usize) as i32;
 
         let mut global_referrers: HashMap<String, usize> = HashMap::new();
