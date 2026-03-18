@@ -87,7 +87,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             .map(|(code, count)| click_stats_hourly::ActiveModel {
                 short_code: Set(code.clone()),
                 hour_bucket: Set(hour_bucket),
-                click_count: Set((*count).min(i64::MAX as usize) as i64),
+                click_count: Set(i64::try_from(*count).unwrap_or(i64::MAX)),
                 referrer_counts: Set(None),
                 country_counts: Set(None),
                 source_counts: Set(None),
@@ -252,9 +252,11 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         let mut merged = agg.clone();
 
         // 合并计数
-        merged.count = merged
-            .count
-            .saturating_add(Ord::max(record.click_count, 0) as usize);
+        merged.count = merged.count.saturating_add(
+            std::cmp::max(record.click_count, 0)
+                .try_into()
+                .unwrap_or(usize::MAX),
+        );
 
         // 合并 referrers
         let existing_referrers = parse_json_counts(&record.referrer_counts);
@@ -291,7 +293,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             .map(|(code, hour_bucket, agg)| click_stats_hourly::ActiveModel {
                 short_code: Set(code.clone()),
                 hour_bucket: Set(*hour_bucket),
-                click_count: Set(agg.count.min(i64::MAX as usize) as i64),
+                click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
                 referrer_counts: Set(Some(to_json_string(&agg.referrers))),
                 country_counts: Set(Some(to_json_string(&agg.countries))),
                 source_counts: Set(Some(to_json_string(&agg.sources))),
@@ -332,7 +334,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
 
             click_count_case = click_count_case.case(
                 id_expr.clone(),
-                SimpleExpr::Value((agg.count.min(i64::MAX as usize) as i64).into()),
+                SimpleExpr::Value(i64::try_from(agg.count).unwrap_or(i64::MAX).into()),
             );
             referrer_case = referrer_case.case(
                 id_expr.clone(),
@@ -390,7 +392,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
 
         let model = click_stats_global_hourly::ActiveModel {
             hour_bucket: Set(hour_bucket),
-            total_clicks: Set(clicks.min(i64::MAX as usize) as i64),
+            total_clicks: Set(i64::try_from(clicks).unwrap_or(i64::MAX)),
             unique_links: Set(Some(unique_links)),
             top_referrers: Set(None),
             top_countries: Set(None),

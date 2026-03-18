@@ -219,8 +219,8 @@ impl ClickManager {
         max_clicks_before_flush: usize,
         metrics: Arc<dyn MetricsRecorder>,
     ) -> (Self, Receiver<RawClickEvent>) {
-        // 使用 crossbeam bounded channel，容量 10000
-        let (tx, rx) = crossbeam_channel::bounded(10000);
+        // 使用 crossbeam bounded channel，容量 50000（高并发场景）
+        let (tx, rx) = crossbeam_channel::bounded(50000);
         let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
         let manager = Self {
