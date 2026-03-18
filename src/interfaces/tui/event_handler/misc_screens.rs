@@ -10,9 +10,10 @@ use crate::interfaces::tui::app::{App, CurrentScreen};
 pub async fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
         KeyCode::Esc => {
+            if let Err(e) = app.clear_search().await {
+                app.set_error(format!("Failed to clear search: {}", e));
+            }
             app.current_screen = CurrentScreen::Main;
-            app.search_input.clear();
-            app.is_searching = false;
         }
         KeyCode::Enter => {
             // Apply search via DB query and return to main

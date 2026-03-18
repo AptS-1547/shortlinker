@@ -143,7 +143,11 @@ pub fn draw_main_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     for link in visible_links {
         // Truncate URL if too long
         let display_url = if link.target.len() > URL_TRUNCATE_LENGTH {
-            format!("{}...", &link.target[..URL_TRUNCATE_LENGTH])
+            let mut idx = URL_TRUNCATE_LENGTH;
+            while !link.target.is_char_boundary(idx) {
+                idx -= 1;
+            }
+            format!("{}...", &link.target[..idx])
         } else {
             link.target.clone()
         };

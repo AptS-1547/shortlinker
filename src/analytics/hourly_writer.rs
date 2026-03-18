@@ -252,7 +252,9 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         let mut merged = agg.clone();
 
         // 合并计数
-        merged.count += Ord::max(record.click_count, 0) as usize;
+        merged.count = merged
+            .count
+            .saturating_add(Ord::max(record.click_count, 0) as usize);
 
         // 合并 referrers
         let existing_referrers = parse_json_counts(&record.referrer_counts);

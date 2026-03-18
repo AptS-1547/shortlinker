@@ -161,7 +161,7 @@ impl ConfigService {
             .runtime_config
             .get_full(key)
             .map(|item| item.is_sensitive)
-            .unwrap_or(false);
+            .unwrap_or(true);
 
         Ok(history
             .into_iter()

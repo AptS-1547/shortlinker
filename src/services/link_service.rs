@@ -764,6 +764,12 @@ impl LinkService {
             return Ok(result);
         }
 
+        if chunk_size == 0 {
+            return Err(ShortlinkerError::internal_error(
+                "chunk_size must be greater than 0",
+            ));
+        }
+
         // 1. 收集所有 codes
         let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
 
