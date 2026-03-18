@@ -5,6 +5,127 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.5.1] - 2026-03-18
+
+### 🎉 Release Highlights
+
+**v0.5.1 维护版本发布！** 这是一个重要的架构优化与稳定性提升版本：
+
+- **客户端层架构** - 引入 `client/` 模块，实现 IPC 优先 + Service 降级模式，提升 CLI/TUI 的可靠性
+- **IPC 配置管理** - 支持通过 IPC 进行配置查询、修改、重置和批量导入
+- **流式导入/导出** - 支持进度报告和游标分页，大幅降低内存占用
+- **数值溢出修复** - 修复 Analytics 模块多处 `i64` 溢出问题，提升高并发稳定性
+- **TUI 功能增强** - 分页加载、虚拟滚动、系统操作面板，支持大数据量场景
+- **高性能批量导入** - 使用 Bloom filter 预筛选 + batch 操作，大幅提升导入性能
+
+### Added
+
+- **客户端层架构** - 新增 `src/client/` 模块（1303 行）
+  - `LinkClient`: 链接操作客户端，支持 IPC 优先、服务降级
+  - `ConfigClient`: 配置管理客户端
+  - `SystemClient`: 系统操作客户端
+  - `ServiceContext`: 统一服务上下文管理
+  - 支持 `ServerNotRunning` 自动降级到本地服务，其他 IPC 错误不降级（避免双写）
+- **IPC 配置管理命令**
+  - `ConfigList { category }`: 列出配置（支持分类过滤）
+  - `ConfigGet { key }`: 获取单个配置
+  - `ConfigSet { key, value }`: 设置配置值
+  - `ConfigReset { key }`: 重置为默认值
+  - `ConfigImport { configs }`: 批量导入配置
+- **IPC 批量删除** - `BatchDeleteLinks { codes }` 命令
+- **流式导入/导出**
+  - `ImportLinks` 新增 `stream_progress: bool` 字段，支持进度报告
+  - `ImportProgress` 响应类型：`{ phase, processed, total, success, skipped, failed }`
+  - `ExportChunk` 和 `ExportDone` 响应类型，支持流式导出
+  - `LinkService::export_links_stream()`: 游标分页流式导出
+- **高性能批量导入**
+  - `LinkService::import_links_batch()`: 使用 Bloom filter 预筛选 + `batch_check_codes_exist` 精确查询 + `batch_set` 批量写入
+  - `LinkService::import_links_batch_chunked()`: 支持分块写入和进度回调
+  - 新增 DTO：`ImportLinkItemRich`、`ImportBatchResult`、`ImportBatchFailedItem`
+- **TUI 功能增强**
+  - 分页加载和虚拟滚动（+545 行）
+  - 数据库搜索支持
+  - 系统操作面板（+217 行）：服务器状态查看、运行时配置编辑、密码重置
+  - 配置管理 UI（`config_list.rs`, `config_edit.rs`, `config_reset_confirm.rs`）
+  - 导入模式选择 UI（`import_mode.rs`）
+- **导入错误处理增强**
+  - `ImportErrorData` 新增 `error_code: Option<String>` 字段，支持结构化错误码
+  - 行号追踪：`ImportLinkItemRich.row_num` 透传到 `ImportBatchFailedItem.row_num`
+- **测试覆盖** - 新增 821 行客户端层集成测试（`tests/client_tests.rs`）
+
+### Fixed
+
+- **数值溢出修复**
+  - `analytics/manager.rs`: 修复 `i64` 溢出问题，改用 `try_from` 和 `unwrap_or` 替换手动类型转换
+  - 提升高并发场景容量（crossbeam channel 容量从 10000 增至 50000）
+  - `analytics/hourly_writer.rs` 和 `analytics/rollup.rs`: 修复多处边界条件与逻辑缺陷
+- **IPC 流异常关闭处理**
+  - `ClickManager` 新增 shutdown 信号机制（`tokio::sync::watch::channel`）
+  - `start_background_task()` 使用 `tokio::select!` 监听 shutdown 信号
+  - `process_raw_events()` 在 shutdown 时 drain 剩余事件，避免丢失详细点击信息
+- **导入失败项行号处理** - 修复 CSV 导入时行号映射不准确的问题
+- **敏感配置显示** - 修复导入时敏感配置（如密码）的显示问题
+- **多处潜在崩溃修复** - `analytics`, `tui`, `services` 模块的边界条件和逻辑错误
+
+### Changed
+
+- **IPC DTO 简化**
+  - 删除 `ShortLinkData` 中间层，IPC 直接传输 `ShortLink`
+  - 消除 `to_link_data()` 和 `link_data_to_short_link()` 转换函数
+  - 消除 `i64 ↔ usize`、`String ↔ DateTime` 胶水代码
+  - 删除 `ipc/types.rs` 中 300+ 行纯序列化测试
+- **IPC Handler 守卫函数提取**
+  - 提取 `get_link_service()` 和 `get_config_service()` 消除 13 处重复守卫
+  - 提取 `validate_editable_key()` 消除配置操作的重复 def 检查
+  - 新增 `IpcCommand::name()` 方法，日志中隐藏敏感字段
+- **Admin API 统一访问模式** - 所有 admin API 必须通过 service 层访问（已文档化在 `services/mod.rs`）
+- **导入验证逻辑统一** - 提取 `validate_import_rows()` 函数，消除重复的冲突检测逻辑
+- **Analytics 性能优化** - 使用 `try_from` 替换手动类型转换，提升高并发容量
+
+### Deprecated
+
+以下 API 标记为废弃，将在 v0.6.0 删除：
+- `ImportLinkItem` → 使用 `ImportLinkItemRich`
+- `ImportResult` → 使用 `ImportBatchResult`
+- `ImportError` → 使用 `ImportBatchFailedItem`
+- `LinkService::import_links()` → 使用 `import_links_batch()`
+- `LinkService::export_links()` → 使用 `export_links_stream()`
+- `LinkService::export_click_logs()` 标记废弃
+
+### Dependencies
+
+升级全量依赖至最新版本：
+- actix-web: 4.12 → 4.13
+- rand: 0.9.2 → 0.10.0
+- chrono: 0.4.43 → 0.4.44
+- tokio: 1.49.0 → 1.50.0
+- tracing-subscriber: 0.3.22 → 0.3.23
+- moka: 0.12.13 → 0.12.14
+- futures-util: 0.3.31 → 0.3.32
+- once_cell: 1.21.3 → 1.21.4
+- anyhow: 1.0.101 → 1.0.102
+- uuid: 1.20 → 1.22
+- redis: 1.0.3 → 1.0.5
+- rustls: 0.23.36 → 0.23.37
+- toml: 0.9 → 1.0
+- sea-orm: 2.0.0-rc.31 → 2.0.0-rc.37
+- strum: 0.27 → 0.28
+
+删除：`tokio-test` 依赖
+
+### Documentation
+
+- 补充批量操作与 TUI 分页说明，优化类型转换与资源管理
+- 修正每日汇总数据保留配置的说明
+
+---
+
+**统计数据**：
+- 104 files changed, 8672 insertions(+), 2806 deletions(-)
+- 25 commits (20 功能/修复/重构提交)
+- 新增 1303 行客户端层代码
+- 新增 821 行测试代码
+
 ## [v0.5.0] - 2026-02-09
 
 ### 🎉 Release Highlights

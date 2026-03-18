@@ -9,12 +9,10 @@ use crate::interfaces::tui::app::{App, CurrentScreen};
 /// Handle search screen input
 pub async fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
-        KeyCode::Esc => {
-            match app.clear_search().await {
-                Ok(()) => app.current_screen = CurrentScreen::Main,
-                Err(e) => app.set_error(format!("Failed to clear search: {}", e)),
-            }
-        }
+        KeyCode::Esc => match app.clear_search().await {
+            Ok(()) => app.current_screen = CurrentScreen::Main,
+            Err(e) => app.set_error(format!("Failed to clear search: {}", e)),
+        },
         KeyCode::Enter => {
             // Apply search via DB query and return to main
             match app.execute_search().await {
