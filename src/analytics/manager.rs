@@ -182,6 +182,10 @@ pub struct ClickManager {
     raw_event_tx: Option<Sender<RawClickEvent>>,
     /// Metrics recorder for dependency injection
     metrics: Arc<dyn MetricsRecorder>,
+    /// Shutdown signal sender
+    shutdown_tx: Arc<tokio::sync::watch::Sender<bool>>,
+    /// Shutdown signal receiver
+    shutdown_rx: tokio::sync::watch::Receiver<bool>,
 }
 
 impl ClickManager {
@@ -191,6 +195,7 @@ impl ClickManager {
         max_clicks_before_flush: usize,
         metrics: Arc<dyn MetricsRecorder>,
     ) -> Self {
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
         Self {
             buffer: Arc::new(ClickBuffer::new()),
             sink,
@@ -200,6 +205,8 @@ impl ClickManager {
             detailed_sink: None,
             raw_event_tx: None,
             metrics,
+            shutdown_tx: Arc::new(shutdown_tx),
+            shutdown_rx,
         }
     }
 
@@ -212,8 +219,9 @@ impl ClickManager {
         max_clicks_before_flush: usize,
         metrics: Arc<dyn MetricsRecorder>,
     ) -> (Self, Receiver<RawClickEvent>) {
-        // 使用 crossbeam bounded channel，容量 10000
-        let (tx, rx) = crossbeam_channel::bounded(10000);
+        // 使用 crossbeam bounded channel，容量 50000（高并发场景）
+        let (tx, rx) = crossbeam_channel::bounded(50000);
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
         let manager = Self {
             buffer: Arc::new(ClickBuffer::new()),
@@ -224,6 +232,8 @@ impl ClickManager {
             detailed_sink: Some(detailed_sink),
             raw_event_tx: Some(tx),
             metrics,
+            shutdown_tx: Arc::new(shutdown_tx),
+            shutdown_rx,
         };
 
         (manager, rx)
@@ -342,24 +352,31 @@ impl ClickManager {
 
     /// 启动后台刷盘任务（作为异步方法运行）
     pub async fn start_background_task(&self) {
+        let mut shutdown_rx = self.shutdown_rx.clone();
         loop {
-            sleep(self.flush_interval).await;
+            tokio::select! {
+                _ = sleep(self.flush_interval) => {
+                    debug!("ClickManager: Triggering scheduled flush");
+                    // 定期触发刷盘
+                    if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
+                        trace!("ClickManager: Starting scheduled flush");
+                        Self::flush_buffer(&self.buffer, &self.sink, &self.metrics).await;
+                    } else {
+                        trace!("ClickManager: flush already in progress, skipping scheduled flush");
+                    }
 
-            debug!("ClickManager: Triggering scheduled flush");
-            // 定期触发刷盘
-            if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
-                trace!("ClickManager: Starting scheduled flush");
-                Self::flush_buffer(&self.buffer, &self.sink, &self.metrics).await;
-            } else {
-                trace!("ClickManager: flush already in progress, skipping scheduled flush");
-            }
-
-            // 刷新详细日志
-            if let (Some(detailed_buffer), Some(detailed_sink)) =
-                (&self.detailed_buffer, &self.detailed_sink)
-                && let Ok(_guard) = detailed_buffer.flush_lock.try_lock()
-            {
-                Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
+                    // 刷新详细日志
+                    if let (Some(detailed_buffer), Some(detailed_sink)) =
+                        (&self.detailed_buffer, &self.detailed_sink)
+                        && let Ok(_guard) = detailed_buffer.flush_lock.try_lock()
+                    {
+                        Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
+                    }
+                }
+                _ = shutdown_rx.changed() => {
+                    debug!("ClickManager: Shutdown signal received, exiting background task");
+                    break;
+                }
             }
         }
     }
@@ -372,10 +389,35 @@ impl ClickManager {
         F: Fn(RawClickEvent) -> ClickDetail + Send + 'static,
     {
         debug!("ClickManager: Starting event processor");
+        let shutdown_rx = self.shutdown_rx.clone();
 
         // crossbeam channel 的 recv 是阻塞的，需要在 blocking task 中运行
         // 或者用 try_recv + yield
         loop {
+            // 先检查 shutdown 信号（非阻塞）
+            if shutdown_rx.has_changed().unwrap_or(true) {
+                debug!("ClickManager: Shutdown signal received, draining remaining events");
+
+                // Drain channel 中剩余的事件，避免丢失详细点击信息
+                let mut drained = 0;
+                while let Ok(event) = rx.try_recv() {
+                    let detail = process_fn(event);
+                    if let Some(ref buffer) = self.detailed_buffer {
+                        buffer.push(detail);
+                        drained += 1;
+                    }
+                }
+
+                if drained > 0 {
+                    debug!(
+                        "ClickManager: Drained {} events from channel before shutdown",
+                        drained
+                    );
+                }
+
+                break;
+            }
+
             // 使用 try_recv 避免阻塞 tokio runtime
             match rx.try_recv() {
                 Ok(event) => {
@@ -414,7 +456,7 @@ impl ClickManager {
             }
         }
 
-        debug!("ClickManager: Event processor stopped (channel closed)");
+        debug!("ClickManager: Event processor stopped");
     }
 
     /// 手动触发刷盘（阻塞直到完成）
@@ -430,6 +472,12 @@ impl ClickManager {
             let _guard = detailed_buffer.flush_lock.lock().await;
             Self::flush_detailed_buffer(detailed_buffer, detailed_sink).await;
         }
+    }
+
+    /// 发送 shutdown 信号，停止后台任务和事件处理器
+    pub fn cancel(&self) {
+        debug!("ClickManager: Sending shutdown signal");
+        let _ = self.shutdown_tx.send(true);
     }
 
     /// 执行实际的刷盘操作

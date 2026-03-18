@@ -9,26 +9,84 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io;
 
+use crate::storage::ShortLink;
 use crate::system::reload::ReloadTarget;
-
-/// Short link data for IPC transfer
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShortLinkData {
-    pub code: String,
-    pub target: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-    pub password: Option<String>,
-    pub click: i64,
-}
 
 /// Import link data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportLinkData {
     pub code: String,
     pub target: String,
+    pub created_at: String,
     pub expires_at: Option<String>,
     pub password: Option<String>,
+    pub click_count: usize,
+}
+
+impl From<&crate::services::ImportLinkItemRich> for ImportLinkData {
+    fn from(l: &crate::services::ImportLinkItemRich) -> Self {
+        Self {
+            code: l.code.clone(),
+            target: l.target.clone(),
+            created_at: l.created_at.to_rfc3339(),
+            expires_at: l.expires_at.map(|dt| dt.to_rfc3339()),
+            password: l.password.clone(),
+            click_count: l.click_count,
+        }
+    }
+}
+
+/// Import error data for IPC transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportErrorData {
+    pub code: String,
+    pub message: String,
+    /// 结构化错误码（如 "E020"），用于客户端区分具体失败原因
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+}
+
+/// Config item data for IPC transfer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigItemData {
+    pub key: String,
+    pub value: String,
+    pub category: String,
+    pub value_type: String,
+    pub default_value: String,
+    pub requires_restart: bool,
+    pub editable: bool,
+    pub sensitive: bool,
+    pub description: String,
+    pub enum_options: Option<Vec<String>>,
+    pub updated_at: String,
+}
+
+/// Import progress phase
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImportPhase {
+    Validating,
+    ConflictCheck,
+    Writing,
+    CacheUpdate,
+}
+
+impl fmt::Display for ImportPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ImportPhase::Validating => write!(f, "Validating"),
+            ImportPhase::ConflictCheck => write!(f, "Conflict check"),
+            ImportPhase::Writing => write!(f, "Writing"),
+            ImportPhase::CacheUpdate => write!(f, "Cache update"),
+        }
+    }
+}
+
+/// Config import item for batch import
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigImportItem {
+    pub key: String,
+    pub value: String,
 }
 
 /// IPC commands sent from client to server
@@ -59,6 +117,9 @@ pub enum IpcCommand {
     /// Remove a short link
     RemoveLink { code: String },
 
+    /// Batch delete short links
+    BatchDeleteLinks { codes: Vec<String> },
+
     /// Update an existing short link
     UpdateLink {
         code: String,
@@ -81,6 +142,9 @@ pub enum IpcCommand {
     ImportLinks {
         links: Vec<ImportLinkData>,
         overwrite: bool,
+        /// Request streaming progress reports (default false for backward compatibility)
+        #[serde(default)]
+        stream_progress: bool,
     },
 
     /// Export all links
@@ -88,6 +152,48 @@ pub enum IpcCommand {
 
     /// Get link statistics
     GetLinkStats,
+
+    // ============ Config Management Commands ============
+    /// List all configurations
+    ConfigList { category: Option<String> },
+
+    /// Get a single configuration
+    ConfigGet { key: String },
+
+    /// Set a configuration value
+    ConfigSet { key: String, value: String },
+
+    /// Reset a configuration to default
+    ConfigReset { key: String },
+
+    /// Batch import configurations
+    ConfigImport { configs: Vec<ConfigImportItem> },
+}
+
+impl IpcCommand {
+    /// 返回命令名称（不含敏感字段），用于日志
+    pub fn name(&self) -> &'static str {
+        match self {
+            IpcCommand::Ping => "Ping",
+            IpcCommand::Reload { .. } => "Reload",
+            IpcCommand::GetStatus => "GetStatus",
+            IpcCommand::Shutdown => "Shutdown",
+            IpcCommand::AddLink { .. } => "AddLink",
+            IpcCommand::RemoveLink { .. } => "RemoveLink",
+            IpcCommand::BatchDeleteLinks { .. } => "BatchDeleteLinks",
+            IpcCommand::UpdateLink { .. } => "UpdateLink",
+            IpcCommand::GetLink { .. } => "GetLink",
+            IpcCommand::ListLinks { .. } => "ListLinks",
+            IpcCommand::ImportLinks { .. } => "ImportLinks",
+            IpcCommand::ExportLinks => "ExportLinks",
+            IpcCommand::GetLinkStats => "GetLinkStats",
+            IpcCommand::ConfigList { .. } => "ConfigList",
+            IpcCommand::ConfigGet { .. } => "ConfigGet",
+            IpcCommand::ConfigSet { .. } => "ConfigSet",
+            IpcCommand::ConfigReset { .. } => "ConfigReset",
+            IpcCommand::ConfigImport { .. } => "ConfigImport",
+        }
+    }
 }
 
 /// IPC responses sent from server to client
@@ -143,7 +249,7 @@ pub enum IpcResponse {
     // ============ Link Management Responses ============
     /// Link created successfully
     LinkCreated {
-        link: ShortLinkData,
+        link: ShortLink,
         /// Generated code if none was provided
         generated_code: bool,
     },
@@ -151,15 +257,22 @@ pub enum IpcResponse {
     /// Link deleted successfully
     LinkDeleted { code: String },
 
+    /// Batch delete result
+    BatchDeleteResult {
+        deleted: Vec<String>,
+        not_found: Vec<String>,
+        errors: Vec<ImportErrorData>,
+    },
+
     /// Link updated successfully
-    LinkUpdated { link: ShortLinkData },
+    LinkUpdated { link: ShortLink },
 
     /// Get link result
-    LinkFound { link: Option<ShortLinkData> },
+    LinkFound { link: Option<ShortLink> },
 
     /// List links result
     LinkList {
-        links: Vec<ShortLinkData>,
+        links: Vec<ShortLink>,
         total: usize,
         page: u64,
         page_size: u64,
@@ -170,17 +283,67 @@ pub enum IpcResponse {
         success: usize,
         skipped: usize,
         failed: usize,
-        errors: Vec<String>,
+        errors: Vec<ImportErrorData>,
+    },
+
+    /// Import progress (streaming import)
+    ImportProgress {
+        phase: ImportPhase,
+        processed: usize,
+        total: usize,
+        success: usize,
+        skipped: usize,
+        failed: usize,
     },
 
     /// Export result
-    ExportResult { links: Vec<ShortLinkData> },
+    ExportResult { links: Vec<ShortLink> },
+
+    /// Export chunk (streaming export)
+    ExportChunk { links: Vec<ShortLink> },
+
+    /// Export done marker (streaming export)
+    ExportDone { total: usize },
 
     /// Stats result
     StatsResult {
         total_links: usize,
         total_clicks: i64,
         active_links: usize,
+    },
+
+    // ============ Config Management Responses ============
+    /// Config list result
+    ConfigListResult { configs: Vec<ConfigItemData> },
+
+    /// Config get result
+    ConfigGetResult { config: ConfigItemData },
+
+    /// Config set result
+    ConfigSetResult {
+        key: String,
+        value: String,
+        requires_restart: bool,
+        is_sensitive: bool,
+        old_value: Option<String>,
+        message: Option<String>,
+    },
+
+    /// Config reset result
+    ConfigResetResult {
+        key: String,
+        value: String,
+        requires_restart: bool,
+        is_sensitive: bool,
+        message: Option<String>,
+    },
+
+    /// Config import result
+    ConfigImportResult {
+        success: usize,
+        skipped: usize,
+        failed: usize,
+        errors: Vec<ImportErrorData>,
     },
 }
 
@@ -219,7 +382,6 @@ impl std::error::Error for IpcError {
 
 impl From<io::Error> for IpcError {
     fn from(err: io::Error) -> Self {
-        // Map specific error kinds to more specific IPC errors
         match err.kind() {
             io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound => {
                 IpcError::ServerNotRunning
@@ -274,111 +436,40 @@ mod tests {
 
     #[test]
     fn test_ipc_error_source() {
-        // ServerNotRunning has no source
         let err = IpcError::ServerNotRunning;
         assert!(err.source().is_none());
 
-        // IoError has source
         let io_err = io::Error::other("test");
         let err = IpcError::IoError(io_err);
         assert!(err.source().is_some());
     }
 
     #[test]
-    fn test_ipc_command_serialization() {
-        // Test Ping
-        let cmd = IpcCommand::Ping;
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        assert!(matches!(decoded, IpcCommand::Ping));
-
-        // Test AddLink
-        let cmd = IpcCommand::AddLink {
-            code: Some("test".into()),
-            target: "https://example.com".into(),
-            force: true,
-            expires_at: Some("2025-12-31T23:59:59Z".into()),
-            password: None,
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        if let IpcCommand::AddLink {
-            code,
-            target,
-            force,
-            ..
-        } = decoded
-        {
-            assert_eq!(code, Some("test".into()));
-            assert_eq!(target, "https://example.com");
-            assert!(force);
-        } else {
-            panic!("Expected AddLink");
-        }
-    }
-
-    #[test]
-    fn test_ipc_response_serialization() {
-        // Test Pong
-        let resp = IpcResponse::Pong {
-            version: "1.0.0".into(),
-            uptime_secs: 3600,
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::Pong {
-            version,
-            uptime_secs,
-        } = decoded
-        {
-            assert_eq!(version, "1.0.0");
-            assert_eq!(uptime_secs, 3600);
-        } else {
-            panic!("Expected Pong");
-        }
-
-        // Test Error
-        let resp = IpcResponse::Error {
-            code: "E001".into(),
-            message: "Something went wrong".into(),
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::Error { code, message } = decoded {
-            assert_eq!(code, "E001");
-            assert_eq!(message, "Something went wrong");
-        } else {
-            panic!("Expected Error");
-        }
-    }
-
-    #[test]
-    fn test_short_link_data_serialization() {
-        let data = ShortLinkData {
-            code: "abc123".into(),
-            target: "https://example.com".into(),
-            created_at: "2025-01-01T00:00:00Z".into(),
-            expires_at: Some("2025-12-31T23:59:59Z".into()),
-            password: None,
-            click: 42,
+    fn test_import_error_data_with_error_code() {
+        let data = ImportErrorData {
+            code: "dup".into(),
+            message: "Link already exists".into(),
+            error_code: Some("E021".into()),
         };
         let json = serde_json::to_string(&data).unwrap();
-        let decoded: ShortLinkData = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.code, "abc123");
-        assert_eq!(decoded.click, 42);
+        assert!(json.contains("\"error_code\":\"E021\""));
+
+        let decoded: ImportErrorData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.error_code, Some("E021".into()));
     }
 
     #[test]
-    fn test_import_link_data_serialization() {
-        let data = ImportLinkData {
-            code: "test".into(),
-            target: "https://example.com".into(),
-            expires_at: None,
-            password: Some("secret".into()),
+    fn test_import_error_data_without_error_code() {
+        let data = ImportErrorData {
+            code: "key".into(),
+            message: "unknown".into(),
+            error_code: None,
         };
         let json = serde_json::to_string(&data).unwrap();
-        let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.code, "test");
-        assert_eq!(decoded.password, Some("secret".into()));
+        assert!(!json.contains("error_code"));
+
+        let json_no_code = r#"{"code":"key","message":"unknown"}"#;
+        let decoded: ImportErrorData = serde_json::from_str(json_no_code).unwrap();
+        assert_eq!(decoded.error_code, None);
     }
 }

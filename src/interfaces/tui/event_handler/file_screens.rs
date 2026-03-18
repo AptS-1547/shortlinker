@@ -20,11 +20,7 @@ pub async fn handle_export_import_screen(
             );
         }
         KeyCode::Char('i') | KeyCode::Char('I') => {
-            if let Err(e) = app.load_directory() {
-                app.set_error(format!("Failed to load directory: {}", e));
-            } else {
-                app.current_screen = CurrentScreen::FileBrowser;
-            }
+            app.current_screen = CurrentScreen::ImportModeSelect;
         }
         KeyCode::Esc => {
             app.current_screen = CurrentScreen::Main;
@@ -48,12 +44,31 @@ pub async fn handle_file_browser_screen(app: &mut App, key_code: KeyCode) -> std
                 Ok(Some(file_path)) => {
                     // File selected, perform import
                     app.import_path = file_path.to_string_lossy().to_string();
-                    if let Err(e) = app.import_links().await {
-                        app.set_error(format!("Failed to import links: {}", e));
-                    } else {
-                        app.set_status("Links imported successfully!".to_string());
-                        if let Err(e) = app.refresh_links().await {
-                            app.set_error(format!("Failed to refresh links: {}", e));
+                    match app.import_links(app.system.import_overwrite).await {
+                        Ok(result) => {
+                            let failed = result.failed_items.len();
+                            let total = result.success_count + result.skipped_count + failed;
+                            let import_msg = if failed > 0 {
+                                format!(
+                                    "Imported {}/{} links ({} failed, {} skipped)",
+                                    result.success_count, total, failed, result.skipped_count
+                                )
+                            } else {
+                                format!(
+                                    "Imported {} links ({} skipped)",
+                                    result.success_count, result.skipped_count
+                                )
+                            };
+                            if let Err(e) = app.refresh_links().await {
+                                app.set_error(format!("{}; refresh failed: {}", import_msg, e));
+                            } else if failed > 0 {
+                                app.set_error(import_msg);
+                            } else {
+                                app.set_status(import_msg);
+                            }
+                        }
+                        Err(e) => {
+                            app.set_error(format!("Failed to import links: {}", e));
                         }
                     }
                     app.current_screen = CurrentScreen::Main;

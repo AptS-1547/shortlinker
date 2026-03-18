@@ -11,7 +11,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{CaseStatement, Expr, Query};
-use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, ExprTrait};
+use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, ExprTrait, Iden};
 use tracing::{debug, warn};
 
 use super::SeaOrmStorage;
@@ -46,15 +46,28 @@ impl ClickSink for SeaOrmStorage {
         // 每条记录使用 2 个变量（code 和 count），预留一些空间
         const BATCH_SIZE: usize = 400;
 
+        // MySQL 用 LEAST，SQLite/PostgreSQL 用 MIN
+        let clamp_fn = match self.db.get_database_backend() {
+            sea_orm::DatabaseBackend::MySql => "LEAST",
+            _ => "MIN",
+        };
+
         for batch in updates.chunks(BATCH_SIZE) {
-            // 构建 CASE WHEN 表达式（跨平台兼容）
+            // 构建 CASE WHEN 表达式（跨平台兼容，带溢出保护）
             let mut case_stmt = CaseStatement::new();
             let mut codes: Vec<String> = Vec::with_capacity(batch.len());
 
             for (code, count) in batch {
+                let delta = i64::try_from(*count).unwrap_or(i64::MAX);
                 case_stmt = case_stmt.case(
                     Expr::col(short_link::Column::ShortCode).eq(Expr::val(code.as_str())),
-                    Expr::col(short_link::Column::ClickCount).add(Expr::val(*count as i64)),
+                    Expr::cust(format!(
+                        "{}({} + {}, {})",
+                        clamp_fn,
+                        short_link::Column::ClickCount.to_string(),
+                        delta,
+                        i64::MAX
+                    )),
                 );
                 codes.push(code.clone());
             }
@@ -175,9 +188,12 @@ impl SeaOrmStorage {
             .upsert_hourly_counts(updates, timestamp, "sink")
             .await?;
 
-        // 更新全局小时汇总
-        let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
-        let unique_links = updates.len() as i32;
+        // 更新全局小时汇总（用 saturating_add 防止溢出）
+        let total_clicks: usize = updates.iter().map(|(_, c)| c).fold(0usize, |acc, &c| {
+            let capped = c.min(i64::MAX as usize);
+            acc.saturating_add(capped)
+        });
+        let unique_links = i32::try_from(updates.len()).unwrap_or(i32::MAX);
         writer
             .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "sink")
             .await?;

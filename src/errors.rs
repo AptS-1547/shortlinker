@@ -309,6 +309,58 @@ impl ShortlinkerError {
     pub fn analytics_invalid_date_range<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AnalyticsInvalidDateRange(msg.into())
     }
+
+    /// 根据 IPC 传输的 error_code 重建具体错误变体
+    ///
+    /// 用于 IPC 客户端：将序列化传输的 (error_code, message) 还原为对应的枚举变体，
+    /// 而不是一律包装成 `ImportFailed`。未识别的 code 回退到 `InternalError`。
+    pub fn from_error_code(error_code: &str, message: String) -> Self {
+        match error_code {
+            // 基础设施
+            "E001" => ShortlinkerError::CacheConnection(message),
+            "E002" => ShortlinkerError::CachePluginNotFound(message),
+            "E003" => ShortlinkerError::DatabaseConfig(message),
+            "E004" => ShortlinkerError::DatabaseConnection(message),
+            "E005" => ShortlinkerError::DatabaseOperation(message),
+            "E006" => ShortlinkerError::FileOperation(message),
+            "E007" => ShortlinkerError::Validation(message),
+            "E008" => ShortlinkerError::NotFound(message),
+            "E009" => ShortlinkerError::Serialization(message),
+            "E010" => ShortlinkerError::NotifyServer(message),
+            // 认证
+            "E011" => ShortlinkerError::AuthPasswordInvalid(message),
+            "E012" => ShortlinkerError::AuthTokenExpired(message),
+            "E013" => ShortlinkerError::AuthTokenInvalid(message),
+            "E014" => ShortlinkerError::AuthRateLimitExceeded(message),
+            // 链接业务
+            "E020" => ShortlinkerError::LinkInvalidUrl(message),
+            "E021" => ShortlinkerError::LinkAlreadyExists(message),
+            "E022" => ShortlinkerError::LinkInvalidExpireTime(message),
+            "E023" => ShortlinkerError::LinkPasswordHashError(message),
+            "E024" => ShortlinkerError::LinkInvalidCode(message),
+            "E025" => ShortlinkerError::LinkReservedCode(message),
+            // 导入导出
+            "E030" => ShortlinkerError::CsvParseFailed(message),
+            "E031" => ShortlinkerError::CsvGenerationFailed(message),
+            "E032" => ShortlinkerError::CsvFileMissing(message),
+            "E033" => ShortlinkerError::ImportFailed(message),
+            "E034" => ShortlinkerError::ExportFailed(message),
+            "E035" => ShortlinkerError::InvalidMultipartData(message),
+            "E036" => ShortlinkerError::FileReadError(message),
+            // 配置
+            "E040" => ShortlinkerError::ConfigNotFound(message),
+            "E041" => ShortlinkerError::ConfigUpdateFailed(message),
+            "E042" => ShortlinkerError::ConfigReloadFailed(message),
+            // 通用 HTTP
+            "E050" => ShortlinkerError::ServiceUnavailable(message),
+            "E051" => ShortlinkerError::InternalError(message),
+            // Analytics
+            "E060" => ShortlinkerError::AnalyticsQueryFailed(message),
+            "E061" => ShortlinkerError::AnalyticsLinkNotFound(message),
+            "E062" => ShortlinkerError::AnalyticsInvalidDateRange(message),
+            _ => ShortlinkerError::InternalError(message),
+        }
+    }
 }
 
 // 为常见的错误类型实现 From trait
@@ -552,5 +604,49 @@ mod tests {
         let err = ShortlinkerError::validation("test");
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("Validation"));
+    }
+
+    // ---- from_error_code tests ----
+
+    #[test]
+    fn test_from_error_code_known_codes() {
+        let err = ShortlinkerError::from_error_code("E020", "bad url".into());
+        assert_eq!(err.code(), "E020");
+        assert_eq!(err.message(), "bad url");
+
+        let err = ShortlinkerError::from_error_code("E021", "exists".into());
+        assert_eq!(err.code(), "E021");
+
+        let err = ShortlinkerError::from_error_code("E024", "empty".into());
+        assert_eq!(err.code(), "E024");
+
+        let err = ShortlinkerError::from_error_code("E023", "hash fail".into());
+        assert_eq!(err.code(), "E023");
+
+        let err = ShortlinkerError::from_error_code("E025", "reserved".into());
+        assert_eq!(err.code(), "E025");
+
+        let err = ShortlinkerError::from_error_code("E022", "bad time".into());
+        assert_eq!(err.code(), "E022");
+    }
+
+    #[test]
+    fn test_from_error_code_unknown_fallback() {
+        // 未知错误码回退到 InternalError
+        let err = ShortlinkerError::from_error_code("E999", "unknown".into());
+        assert_eq!(err.code(), "E051"); // InternalError
+        assert_eq!(err.message(), "unknown");
+    }
+
+    #[test]
+    fn test_from_error_code_round_trip() {
+        // 模拟 IPC 往返：ShortlinkerError → (code, message) → ShortlinkerError
+        let original = ShortlinkerError::link_already_exists("Link already exists");
+        let code = original.code().to_string();
+        let message = original.message().to_string();
+
+        let reconstructed = ShortlinkerError::from_error_code(&code, message);
+        assert_eq!(reconstructed.code(), original.code());
+        assert_eq!(reconstructed.message(), original.message());
     }
 }

@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use moka::future::Cache;
 use moka::policy::Expiry;
-use rand::Rng;
 use std::time::{Duration, Instant};
 use tracing::debug;
 
@@ -24,7 +23,7 @@ impl ShortLinkExpiry {
             return 0;
         }
         let jitter_range = (ttl_secs / 10).max(1); // 至少 1 秒抖动
-        let jitter = rand::rng().random_range(0..=jitter_range * 2);
+        let jitter = rand::random_range(0..=jitter_range * 2);
         // 范围: ttl - 10% 到 ttl + 10%
         ttl_secs.saturating_sub(jitter_range).saturating_add(jitter)
     }

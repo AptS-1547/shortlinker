@@ -1,12 +1,11 @@
 //! Config export/import commands
 
 use super::helpers::notify_config_change;
-use crate::config::definitions::{ALL_CONFIGS, get_def};
+use crate::client::ConfigClient;
+use crate::config::definitions::get_def;
 use crate::config::validators;
 use crate::interfaces::cli::CliError;
-use crate::storage::ConfigStore;
 use colored::Colorize;
-use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
@@ -26,36 +25,29 @@ struct ExportData {
     configs: Vec<ExportConfig>,
 }
 
-/// Export configurations to file
+/// Export configurations to file via ConfigClient
 pub async fn config_export(
-    db: DatabaseConnection,
+    client: &ConfigClient,
     file_path: Option<String>,
 ) -> Result<(), CliError> {
-    let store = ConfigStore::new(db);
-    let all_configs = store
-        .get_all()
-        .await
-        .map_err(|e| CliError::StorageError(e.to_string()))?;
+    let items = client.get_all(None).await?;
 
-    let mut configs = Vec::new();
-
-    for def in ALL_CONFIGS {
-        let value = all_configs
-            .get(def.key)
-            .map(|item| (*item.value).clone())
-            .unwrap_or_else(|| (def.default_fn)());
-
-        configs.push(ExportConfig {
-            key: def.key.to_string(),
-            value,
-            category: Some(def.category.to_string()),
-        });
-    }
+    let export_configs: Vec<ExportConfig> = items
+        .iter()
+        .map(|item| {
+            let category = get_def(&item.key).map(|d| d.category.to_string());
+            ExportConfig {
+                key: item.key.clone(),
+                value: item.value.clone(),
+                category,
+            }
+        })
+        .collect();
 
     let export_data = ExportData {
         version: "1.0".to_string(),
         exported_at: chrono::Utc::now().to_rfc3339(),
-        configs,
+        configs: export_configs,
     };
 
     let json_str = serde_json::to_string_pretty(&export_data)
@@ -82,17 +74,16 @@ pub async fn config_export(
     Ok(())
 }
 
-/// Import configurations from file
+/// Import configurations from file via ConfigClient
 pub async fn config_import(
-    db: DatabaseConnection,
+    client: &ConfigClient,
     file_path: String,
     force: bool,
 ) -> Result<(), CliError> {
-    // Read file
+    // Read and parse file
     let content = fs::read_to_string(&file_path)
         .map_err(|e| CliError::CommandError(format!("Failed to read '{}': {}", file_path, e)))?;
 
-    // Parse JSON
     let import_data: ExportData = serde_json::from_str(&content)
         .map_err(|e| CliError::CommandError(format!("Failed to parse JSON: {}", e)))?;
 
@@ -103,7 +94,6 @@ pub async fn config_import(
         file_path.cyan(),
         import_data.exported_at.dimmed()
     );
-
     // Validate all configs first
     let mut valid_configs = Vec::new();
     let mut skipped = Vec::new();
@@ -160,7 +150,6 @@ pub async fn config_import(
             println!("  {} ({})", key.red(), reason);
         }
     }
-
     if valid_configs.is_empty() {
         println!("\n{} No valid configurations to import.", "ℹ".bold().blue());
         return Ok(());
@@ -185,13 +174,12 @@ pub async fn config_import(
         }
     }
 
-    // Import
-    let store = ConfigStore::new(db);
+    // Apply each config via ConfigClient
     let mut success = 0;
     let mut failed = 0;
 
     for (cfg, _) in valid_configs {
-        match store.set(&cfg.key, &cfg.value).await {
+        match client.set(cfg.key.clone(), cfg.value.clone()).await {
             Ok(_) => {
                 success += 1;
             }

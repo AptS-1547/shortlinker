@@ -3,14 +3,16 @@
 //! Processes incoming IPC commands and returns appropriate responses.
 //! Uses LinkService for link management operations.
 
+use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
-use super::types::{ImportLinkData, IpcCommand, IpcResponse, ShortLinkData};
+use super::types::{ConfigItemData, ImportErrorData, ImportLinkData, IpcCommand, IpcResponse};
 use crate::errors::ShortlinkerError;
 use crate::services::{
-    CreateLinkRequest, ImportLinkItem, ImportMode, LinkService, UpdateLinkRequest,
+    ConfigService, CreateLinkRequest, ImportLinkItemRaw, ImportMode, LinkService,
+    UpdateLinkRequest, validate_import_rows,
 };
 use crate::storage::{LinkFilter, ShortLink};
 use crate::system::reload::get_reload_coordinator;
@@ -20,6 +22,9 @@ static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 /// LinkService instance for IPC handler
 static LINK_SERVICE: OnceLock<Arc<LinkService>> = OnceLock::new();
+
+/// ConfigService instance for IPC handler
+static CONFIG_SERVICE: OnceLock<Arc<ConfigService>> = OnceLock::new();
 
 /// Initialize the server start time
 ///
@@ -36,21 +41,17 @@ pub fn init_link_service(service: Arc<LinkService>) {
     debug!("IPC handler LinkService initialized");
 }
 
+/// Initialize ConfigService for IPC handler
+///
+/// Should be called once during server startup, after RuntimeConfig is initialized.
+pub fn init_config_service(service: Arc<ConfigService>) {
+    let _ = CONFIG_SERVICE.set(service);
+    debug!("IPC handler ConfigService initialized");
+}
+
 /// Get server uptime in seconds
 fn get_uptime_secs() -> u64 {
     START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0)
-}
-
-/// Convert ShortLink to ShortLinkData for IPC transfer
-fn to_link_data(link: &ShortLink) -> ShortLinkData {
-    ShortLinkData {
-        code: link.code.clone(),
-        target: link.target.clone(),
-        created_at: link.created_at.to_rfc3339(),
-        expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-        password: link.password.clone(),
-        click: link.click as i64,
-    }
 }
 
 /// Convert ShortlinkerError to IpcResponse::Error
@@ -61,9 +62,29 @@ fn error_response(err: ShortlinkerError) -> IpcResponse {
     }
 }
 
+/// Get the LinkService or return a service-unavailable error response
+#[allow(clippy::result_large_err)]
+fn get_link_service() -> Result<&'static Arc<LinkService>, IpcResponse> {
+    LINK_SERVICE.get().ok_or_else(|| {
+        error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ))
+    })
+}
+
+/// Get the ConfigService or return a service-unavailable error response
+#[allow(clippy::result_large_err)]
+fn get_config_service() -> Result<&'static Arc<ConfigService>, IpcResponse> {
+    CONFIG_SERVICE.get().ok_or_else(|| {
+        error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ))
+    })
+}
+
 /// Handle an IPC command and return a response
 pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
-    debug!("Handling IPC command: {:?}", cmd);
+    debug!("Handling IPC command: {}", cmd.name());
 
     match cmd {
         IpcCommand::Ping => IpcResponse::Pong {
@@ -156,6 +177,8 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
 
         IpcCommand::RemoveLink { code } => handle_remove_link(code).await,
 
+        IpcCommand::BatchDeleteLinks { codes } => handle_batch_delete_links(codes).await,
+
         IpcCommand::UpdateLink {
             code,
             target,
@@ -171,11 +194,49 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
             search,
         } => handle_list_links(page, page_size, search).await,
 
-        IpcCommand::ImportLinks { links, overwrite } => handle_import_links(links, overwrite).await,
+        IpcCommand::ImportLinks {
+            links,
+            overwrite,
+            stream_progress: false,
+        } => handle_import_links(links, overwrite).await,
 
-        IpcCommand::ExportLinks => handle_export_links().await,
+        // Streaming import: handled by server.rs for progress reporting.
+        // This branch is a fallback in case it reaches here.
+        IpcCommand::ImportLinks {
+            stream_progress: true,
+            ..
+        } => {
+            warn!(
+                "ImportLinks(stream_progress=true) reached handle_command — should be handled by server.rs streaming path"
+            );
+            error_response(ShortlinkerError::internal_error(
+                "Streaming import must be handled by streaming path",
+            ))
+        }
+
+        // ExportLinks is handled directly by server.rs for streaming support.
+        // This branch is a fallback in case it reaches here.
+        IpcCommand::ExportLinks => {
+            warn!(
+                "ExportLinks reached handle_command — should be handled by server.rs streaming path"
+            );
+            error_response(ShortlinkerError::internal_error(
+                "ExportLinks must be handled by streaming path",
+            ))
+        }
 
         IpcCommand::GetLinkStats => handle_get_stats().await,
+
+        // ============ Config Management Commands ============
+        IpcCommand::ConfigList { category } => handle_config_list(category).await,
+
+        IpcCommand::ConfigGet { key } => handle_config_get(key).await,
+
+        IpcCommand::ConfigSet { key, value } => handle_config_set(key, value).await,
+
+        IpcCommand::ConfigReset { key } => handle_config_reset(key).await,
+
+        IpcCommand::ConfigImport { configs } => handle_config_import(configs).await,
     }
 }
 
@@ -188,10 +249,9 @@ async fn handle_add_link(
     expires_at: Option<String>,
     password: Option<String>,
 ) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let req = CreateLinkRequest {
@@ -204,7 +264,7 @@ async fn handle_add_link(
 
     match service.create_link(req).await {
         Ok(result) => IpcResponse::LinkCreated {
-            link: to_link_data(&result.link),
+            link: result.link,
             generated_code: result.generated_code,
         },
         Err(e) => error_response(e),
@@ -212,14 +272,37 @@ async fn handle_add_link(
 }
 
 async fn handle_remove_link(code: String) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.delete_link(&code).await {
         Ok(()) => IpcResponse::LinkDeleted { code },
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    match service.batch_delete_links(codes).await {
+        Ok(result) => IpcResponse::BatchDeleteResult {
+            deleted: result.deleted,
+            not_found: result.not_found,
+            errors: result
+                .errors
+                .into_iter()
+                .map(|e| ImportErrorData {
+                    code: e.code,
+                    message: e.reason,
+                    error_code: None,
+                })
+                .collect(),
+        },
         Err(e) => error_response(e),
     }
 }
@@ -230,10 +313,9 @@ async fn handle_update_link(
     expires_at: Option<String>,
     password: Option<String>,
 ) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let req = UpdateLinkRequest {
@@ -243,33 +325,27 @@ async fn handle_update_link(
     };
 
     match service.update_link(&code, req).await {
-        Ok(link) => IpcResponse::LinkUpdated {
-            link: to_link_data(&link),
-        },
+        Ok(link) => IpcResponse::LinkUpdated { link },
         Err(e) => error_response(e),
     }
 }
 
 async fn handle_get_link(code: String) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.get_link(&code).await {
-        Ok(link) => IpcResponse::LinkFound {
-            link: link.map(|l| to_link_data(&l)),
-        },
+        Ok(link) => IpcResponse::LinkFound { link },
         Err(e) => error_response(e),
     }
 }
 
 async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let filter = LinkFilter {
@@ -281,50 +357,51 @@ async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) ->
     };
 
     match service.list_links(filter, page, page_size).await {
-        Ok((links, total)) => {
-            let link_data: Vec<ShortLinkData> = links.iter().map(to_link_data).collect();
-            IpcResponse::LinkList {
-                links: link_data,
-                total: total as usize,
-                page,
-                page_size,
-            }
-        }
+        Ok((links, total)) => IpcResponse::LinkList {
+            links,
+            total: total as usize,
+            page,
+            page_size,
+        },
         Err(e) => error_response(e),
     }
 }
 
 async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
-    // Convert IPC ImportLinkData to service ImportLinkItem
-    let items: Vec<ImportLinkItem> = links
+    // Convert IPC ImportLinkData to ImportLinkItemRaw, then validate via shared logic
+    let raw_items: Vec<ImportLinkItemRaw> =
+        links.into_iter().map(ImportLinkItemRaw::from).collect();
+
+    let (valid_items, row_errors) = validate_import_rows(raw_items);
+
+    let pre_errors: Vec<ImportErrorData> = row_errors
         .into_iter()
-        .map(|l| ImportLinkItem {
-            code: l.code,
-            target: l.target,
-            expires_at: l.expires_at,
-            password: l.password,
+        .map(|e| ImportErrorData {
+            code: e.code,
+            message: e.error.message().to_string(),
+            error_code: Some(e.error.code().to_string()),
         })
         .collect();
 
     let mode = ImportMode::from_overwrite_flag(overwrite);
 
-    match service.import_links(items, mode).await {
+    match service.import_links_batch(valid_items, mode).await {
         Ok(result) => {
-            let errors: Vec<String> = result
-                .errors
-                .into_iter()
-                .map(|e| format!("{}: {}", e.code, e.message))
-                .collect();
+            let mut errors: Vec<ImportErrorData> = pre_errors;
+            errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
+                code: f.code,
+                message: f.error.message().to_string(),
+                error_code: Some(f.error.code().to_string()),
+            }));
             IpcResponse::ImportResult {
-                success: result.success,
-                skipped: result.skipped,
-                failed: result.failed,
+                success: result.success_count,
+                skipped: result.skipped_count,
+                failed: errors.len(),
                 errors,
             }
         }
@@ -332,27 +409,24 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
     }
 }
 
-async fn handle_export_links() -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
-    };
+/// Stream of ShortLink batches for export
+type LinkBatchStream =
+    Pin<Box<dyn futures_util::Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send>>;
 
-    match service.export_links().await {
-        Ok(links) => {
-            let link_data: Vec<ShortLinkData> = links.iter().map(to_link_data).collect();
-            IpcResponse::ExportResult { links: link_data }
-        }
-        Err(e) => error_response(e),
-    }
+/// Export links as a stream of batches.
+///
+/// Called by `server.rs` for streaming export.
+/// Returns `None` if the service is not initialized.
+pub fn export_links_stream() -> Option<LinkBatchStream> {
+    let service = LINK_SERVICE.get()?;
+    let stream = service.export_links_stream(LinkFilter::default(), 10000);
+    Some(stream)
 }
 
 async fn handle_get_stats() -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.get_stats().await {
@@ -362,5 +436,342 @@ async fn handle_get_stats() -> IpcResponse {
             active_links: stats.active_links,
         },
         Err(e) => error_response(e),
+    }
+}
+
+/// Stream import progress: returns a receiver that yields ImportProgress and ImportResult messages.
+///
+/// Called by `server.rs` for streaming import.
+/// Returns `None` if the service is not initialized.
+pub fn import_links_with_progress(
+    links: Vec<ImportLinkData>,
+    overwrite: bool,
+) -> Option<tokio::sync::mpsc::Receiver<IpcResponse>> {
+    use super::types::ImportPhase;
+    use crate::services::{ImportLinkItemRaw, ImportMode, validate_import_rows};
+
+    let service = LINK_SERVICE.get()?.clone();
+    let (tx, rx) = tokio::sync::mpsc::channel::<IpcResponse>(32);
+
+    tokio::spawn(async move {
+        let total = links.len();
+
+        // Phase 1: Validating
+        let _ = tx
+            .send(IpcResponse::ImportProgress {
+                phase: ImportPhase::Validating,
+                processed: 0,
+                total,
+                success: 0,
+                skipped: 0,
+                failed: 0,
+            })
+            .await;
+
+        let raw_items: Vec<ImportLinkItemRaw> =
+            links.into_iter().map(ImportLinkItemRaw::from).collect();
+
+        let (valid_items, row_errors) = validate_import_rows(raw_items);
+
+        let pre_errors: Vec<ImportErrorData> = row_errors
+            .into_iter()
+            .map(|e| ImportErrorData {
+                code: e.code,
+                message: e.error.message().to_string(),
+                error_code: Some(e.error.code().to_string()),
+            })
+            .collect();
+
+        let pre_failed = pre_errors.len();
+        let valid_count = valid_items.len();
+
+        // Phase 2: ConflictCheck
+        let _ = tx
+            .send(IpcResponse::ImportProgress {
+                phase: ImportPhase::ConflictCheck,
+                processed: 0,
+                total: valid_count,
+                success: 0,
+                skipped: 0,
+                failed: pre_failed,
+            })
+            .await;
+
+        let mode = ImportMode::from_overwrite_flag(overwrite);
+
+        // Use chunked import with progress callback
+        let tx_clone = tx.clone();
+        let on_chunk = move |processed: usize, chunk_total: usize| {
+            let _ = tx_clone.try_send(IpcResponse::ImportProgress {
+                phase: ImportPhase::Writing,
+                processed,
+                total: chunk_total,
+                success: 0, // Will be filled in final result
+                skipped: 0,
+                failed: 0,
+            });
+        };
+
+        match service
+            .import_links_batch_chunked(valid_items, mode, 500, Some(&on_chunk))
+            .await
+        {
+            Ok(result) => {
+                let mut errors = pre_errors;
+                errors.extend(result.failed_items.into_iter().map(|f| ImportErrorData {
+                    code: f.code,
+                    message: f.error.message().to_string(),
+                    error_code: Some(f.error.code().to_string()),
+                }));
+
+                let _ = tx
+                    .send(IpcResponse::ImportResult {
+                        success: result.success_count,
+                        skipped: result.skipped_count,
+                        failed: errors.len(),
+                        errors,
+                    })
+                    .await;
+            }
+            Err(e) => {
+                let _ = tx
+                    .send(IpcResponse::Error {
+                        code: e.code().to_string(),
+                        message: e.to_string(),
+                    })
+                    .await;
+            }
+        }
+    });
+
+    Some(rx)
+}
+
+// ============ Config Management Handlers ============
+
+use crate::config::definitions::get_def;
+use crate::config::schema::get_schema;
+use crate::config::validators;
+use crate::services::ConfigItemView;
+
+/// Validate that a config key exists and is editable.
+/// Returns the definition on success, or an IpcResponse::Error on failure.
+#[allow(clippy::result_large_err)]
+fn validate_editable_key(
+    key: &str,
+) -> Result<&'static crate::config::definitions::ConfigDef, IpcResponse> {
+    let def = get_def(key).ok_or_else(|| IpcResponse::Error {
+        code: "CONFIG_NOT_FOUND".to_string(),
+        message: format!("Unknown configuration key: '{}'", key),
+    })?;
+    if !def.editable {
+        return Err(IpcResponse::Error {
+            code: "CONFIG_READONLY".to_string(),
+            message: format!("Configuration '{}' is read-only", key),
+        });
+    }
+    Ok(def)
+}
+
+/// Build ConfigItemData from a ConfigItemView by enriching with definition metadata
+fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
+    let def = get_def(&view.key);
+    let schema = get_schema(&view.key);
+
+    let enum_options = schema.and_then(|s| {
+        s.enum_options
+            .map(|opts| opts.into_iter().map(|o| o.value).collect())
+    });
+
+    ConfigItemData {
+        key: view.key.clone(),
+        value: view.value,
+        category: def.map(|d| d.category.to_string()).unwrap_or_default(),
+        value_type: format!("{}", view.value_type),
+        default_value: def.map(|d| (d.default_fn)()).unwrap_or_default(),
+        requires_restart: view.requires_restart,
+        editable: def.map(|d| d.editable).unwrap_or(false),
+        sensitive: view.is_sensitive,
+        description: def.map(|d| d.description.to_string()).unwrap_or_default(),
+        enum_options,
+        updated_at: view.updated_at.to_rfc3339(),
+    }
+}
+
+async fn handle_config_list(category: Option<String>) -> IpcResponse {
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    let all = service.get_all();
+    let configs: Vec<ConfigItemData> = all
+        .into_iter()
+        .filter(|item| {
+            if let Some(ref cat) = category {
+                get_def(&item.key)
+                    .map(|d| d.category == cat.as_str())
+                    .unwrap_or(false)
+            } else {
+                true
+            }
+        })
+        .map(to_config_item_data)
+        .collect();
+
+    IpcResponse::ConfigListResult { configs }
+}
+
+async fn handle_config_get(key: String) -> IpcResponse {
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    match service.get(&key) {
+        Ok(view) => IpcResponse::ConfigGetResult {
+            config: to_config_item_data(view),
+        },
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_set(key: String, value: String) -> IpcResponse {
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    let _def = match validate_editable_key(&key) {
+        Ok(d) => d,
+        Err(e) => return e,
+    };
+
+    // Validate value
+    if let Err(e) = validators::validate_config_value(&key, &value) {
+        return IpcResponse::Error {
+            code: "CONFIG_INVALID_VALUE".to_string(),
+            message: format!("Invalid value for '{}': {}", key, e),
+        };
+    }
+
+    match service.update(&key, &value).await {
+        Ok(view) => {
+            info!("Config '{}' updated via IPC", key);
+            IpcResponse::ConfigSetResult {
+                key: view.key,
+                value: view.value,
+                requires_restart: view.requires_restart,
+                is_sensitive: view.is_sensitive,
+                old_value: None, // ConfigService doesn't expose old value
+                message: view.message,
+            }
+        }
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_reset(key: String) -> IpcResponse {
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    let def = match validate_editable_key(&key) {
+        Ok(d) => d,
+        Err(e) => return e,
+    };
+
+    let default_value = (def.default_fn)();
+
+    match service.update(&key, &default_value).await {
+        Ok(view) => {
+            info!("Config '{}' reset to default via IPC", key);
+            IpcResponse::ConfigResetResult {
+                key: view.key,
+                value: view.value,
+                requires_restart: view.requires_restart,
+                is_sensitive: view.is_sensitive,
+                message: view.message,
+            }
+        }
+        Err(e) => error_response(e),
+    }
+}
+
+async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> IpcResponse {
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    let mut success = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+    let mut errors: Vec<ImportErrorData> = Vec::new();
+
+    for item in &configs {
+        // Validate key
+        let def = match get_def(&item.key) {
+            Some(d) => d,
+            None => {
+                skipped += 1;
+                errors.push(ImportErrorData {
+                    code: item.key.clone(),
+                    message: "unknown key".into(),
+                    error_code: None,
+                });
+                continue;
+            }
+        };
+
+        if !def.editable {
+            skipped += 1;
+            errors.push(ImportErrorData {
+                code: item.key.clone(),
+                message: "read-only".into(),
+                error_code: None,
+            });
+            continue;
+        }
+
+        // Validate value
+        if let Err(e) = validators::validate_config_value(&item.key, &item.value) {
+            failed += 1;
+            errors.push(ImportErrorData {
+                code: item.key.clone(),
+                message: e.to_string(),
+                error_code: None,
+            });
+            continue;
+        }
+
+        match service.update(&item.key, &item.value).await {
+            Ok(_) => {
+                success += 1;
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(ImportErrorData {
+                    code: item.key.clone(),
+                    message: e.to_string(),
+                    error_code: None,
+                });
+            }
+        }
+    }
+
+    if success > 0 {
+        info!(
+            "Config import via IPC: {} success, {} skipped, {} failed",
+            success, skipped, failed
+        );
+    }
+
+    IpcResponse::ConfigImportResult {
+        success,
+        skipped,
+        failed,
+        errors,
     }
 }

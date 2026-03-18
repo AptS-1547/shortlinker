@@ -5,7 +5,6 @@ use actix_web::dev::ServiceRequest;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
 use base64::Engine;
 use governor::middleware::NoOpMiddleware;
-use rand::Rng;
 use tracing::{debug, error, info, warn};
 
 use crate::api::jwt::get_jwt_service;
@@ -25,8 +24,7 @@ use super::types::{ApiResponse, AuthSuccessResponse, LoginCredentials, MessageRe
 
 /// 生成 CSRF Token（32 bytes = 256 bits，Base64 编码）
 fn generate_csrf_token() -> String {
-    let mut bytes = [0u8; 32];
-    rand::rng().fill(&mut bytes);
+    let bytes: [u8; 32] = rand::random();
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 

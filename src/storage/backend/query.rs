@@ -465,9 +465,17 @@ impl SeaOrmStorage {
         record_db_metrics(&self.metrics, "get_stats", start);
         match result {
             Some(stats) => Ok(LinkStats {
-                total_links: stats.total_links as usize,
-                total_clicks: stats.total_clicks.unwrap_or(0) as usize,
-                active_links: stats.active_links.unwrap_or(0) as usize,
+                total_links: stats.total_links.try_into().unwrap_or(usize::MAX),
+                total_clicks: stats
+                    .total_clicks
+                    .unwrap_or(0)
+                    .try_into()
+                    .unwrap_or(usize::MAX),
+                active_links: stats
+                    .active_links
+                    .unwrap_or(0)
+                    .try_into()
+                    .unwrap_or(usize::MAX),
             }),
             None => Ok(LinkStats::default()),
         }

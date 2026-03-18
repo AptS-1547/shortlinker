@@ -50,6 +50,20 @@ pub mod popup {
     pub const EXPORT_FILENAME: PopupSize = PopupSize::new(60, 30);
     /// 退出确认
     pub const EXITING: PopupSize = PopupSize::new(55, 30);
+    /// 系统菜单
+    pub const SYSTEM_MENU: PopupSize = PopupSize::new(50, 40);
+    /// 服务器状态
+    pub const SERVER_STATUS: PopupSize = PopupSize::new(70, 55);
+    /// 配置列表
+    pub const CONFIG_LIST: PopupSize = PopupSize::new(90, 85);
+    /// 配置编辑
+    pub const CONFIG_EDIT: PopupSize = PopupSize::new(70, 50);
+    /// 配置重置确认
+    pub const CONFIG_RESET_CONFIRM: PopupSize = PopupSize::new(60, 35);
+    /// 密码重置
+    pub const PASSWORD_RESET: PopupSize = PopupSize::new(65, 50);
+    /// 导入模式选择
+    pub const IMPORT_MODE: PopupSize = PopupSize::new(55, 35);
 }
 
 /// 颜色主题（预留扩展）

@@ -23,7 +23,7 @@ pub async fn connect_sqlite(database_url: &str) -> Result<DatabaseConnection> {
         .pragma("cache_size", "-64000")
         .pragma("temp_store", "memory")
         .pragma("mmap_size", "536870912")
-        .pragma("wal_autocheckpoint", "1000");
+        .pragma("wal_autocheckpoint", "10000");
 
     // 使用 SqlitePoolOptions 配置连接池，包含健康检查
     let pool = SqlitePoolOptions::new()

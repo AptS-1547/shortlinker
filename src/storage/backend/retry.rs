@@ -133,11 +133,10 @@ where
 
 /// 计算指数退避延迟（带抖动）
 fn calculate_backoff(attempt: u32, base_ms: u64, max_ms: u64) -> u64 {
-    use rand::Rng;
     let exp_delay = base_ms.saturating_mul(2u64.saturating_pow(attempt - 1));
     let capped = exp_delay.min(max_ms);
     // 添加 0-25% 的随机抖动，避免惊群效应
-    let jitter = rand::rng().random_range(0..=capped / 4);
+    let jitter = rand::random_range(0..=capped / 4);
     capped.saturating_add(jitter)
 }
 

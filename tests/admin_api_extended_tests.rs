@@ -20,6 +20,7 @@ use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
 use shortlinker::metrics_core::NoopMetrics;
 use shortlinker::services::AnalyticsService;
+use shortlinker::services::ConfigService;
 use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
 
@@ -69,6 +70,10 @@ async fn init_test_env() {
 
 fn get_storage() -> Arc<SeaOrmStorage> {
     STORAGE.get().expect("Storage 未初始化").clone()
+}
+
+fn get_config_service() -> Arc<ConfigService> {
+    Arc::new(ConfigService::new().expect("ConfigService 创建失败"))
 }
 
 /// Mock cache
@@ -209,9 +214,12 @@ mod config_api_tests {
     async fn test_get_all_configs() {
         init_test_env().await;
 
-        let app =
-            test::init_service(App::new().service(web::scope("/v1").service(config_routes())))
-                .await;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
 
         let req = TestRequest::get().uri("/v1/config").to_request();
         let resp = test::call_service(&app, req).await;
@@ -225,9 +233,12 @@ mod config_api_tests {
     async fn test_get_config_schema() {
         init_test_env().await;
 
-        let app =
-            test::init_service(App::new().service(web::scope("/v1").service(config_routes())))
-                .await;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
 
         let req = TestRequest::get().uri("/v1/config/schema").to_request();
         let resp = test::call_service(&app, req).await;
@@ -241,9 +252,12 @@ mod config_api_tests {
     async fn test_get_single_config() {
         init_test_env().await;
 
-        let app =
-            test::init_service(App::new().service(web::scope("/v1").service(config_routes())))
-                .await;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
 
         let req = TestRequest::get()
             .uri("/v1/config/features.random_code_length")
@@ -256,9 +270,12 @@ mod config_api_tests {
     async fn test_get_nonexistent_config() {
         init_test_env().await;
 
-        let app =
-            test::init_service(App::new().service(web::scope("/v1").service(config_routes())))
-                .await;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
 
         let req = TestRequest::get()
             .uri("/v1/config/nonexistent.key.here")

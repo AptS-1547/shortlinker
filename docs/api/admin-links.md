@@ -151,6 +151,8 @@ curl -sS -b cookies.txt \
 
 ## 批量操作
 
+> 三个批量端点（`POST/PUT/DELETE /links/batch`）均限制单次最多 `5000` 条；超出会返回 `400 Bad Request` + `BatchSizeTooLarge`。
+
 ### POST /links/batch - 批量创建短链接
 
 > 注意：请求体是对象，字段名为 `links`，不是纯数组。
@@ -169,6 +171,8 @@ curl -sS -X POST \
 ### PUT /links/batch - 批量更新短链接
 
 > 注意：请求体字段名为 `updates`，每一项包含 `code` 与 `payload`。
+>
+> `payload.target` 必填（与单条更新接口一致）。
 
 ```bash
 curl -sS -X PUT \
@@ -201,6 +205,8 @@ curl -sS -X DELETE \
 
 支持过滤参数：`search`、`created_after`、`created_before`、`only_expired`、`only_active`（其中日期参数需使用 RFC3339 格式）。
 
+当前实现使用**流式导出**（游标分页 + `Transfer-Encoding: chunked`），适合大数据量导出场景。
+
 响应头 `Content-Disposition` 的默认文件名格式为：`shortlinks_export_YYYYMMDD_HHMMSS.csv`。
 
 ```bash
@@ -214,6 +220,13 @@ curl -sS -b cookies.txt \
 上传 `multipart/form-data`：
 - `file`：CSV 文件（最大 10MB，超出会返回 `400` + `FileTooLarge`）
 - `mode`（可选）：冲突处理模式，`skip`（默认）/`overwrite`/`error`（无效值会回退为 `skip`）
+
+导入行为补充：
+- `mode=skip`：已存在或同一 CSV 内重复的 `code` 会被跳过
+- `mode=overwrite`：允许覆盖；同一 CSV 内重复 `code` 以最后一条为准
+- `mode=error`：已存在或同一 CSV 内重复的 `code` 会记入失败项
+- `created_at` 非法时会回退为当前时间；`expires_at` 非法/空值会按“不过期”处理
+- `password` 字段：明文会自动 Argon2 哈希；`$argon2...` 形式会按已哈希值原样保留
 
 ```bash
 curl -sS -X POST \
@@ -238,3 +251,9 @@ curl -sS -X POST \
   }
 }
 ```
+
+`failed_items` 字段说明：
+- `row`：CSV 行号（从 1 开始，header 为第 1 行；数据第一行通常为 2）
+- `code`：失败项短码（CSV 解析失败时可能为空字符串）
+- `error`：错误描述
+- `error_code`：对应服务端错误码（可选）

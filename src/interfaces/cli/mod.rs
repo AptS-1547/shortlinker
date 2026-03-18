@@ -4,64 +4,18 @@
 
 pub mod commands;
 
+use std::fmt;
+use std::sync::Arc;
+
 use crate::cli::{Commands, ConfigCommands};
+use crate::client::{ConfigClient, LinkClient, ServiceContext};
 use crate::storage::StorageFactory;
 use commands::{
     add_link, config_management, export_links, import_links, list_links, remove_link,
     run_reset_password, server_status, update_link,
 };
-use std::fmt;
 
 use crate::metrics_core::NoopMetrics;
-
-/// IPC fallback 宏，用于消除 CLI 命令中的 IPC 错误处理重复代码
-///
-/// 用法:
-/// ```ignore
-/// try_ipc_or_fallback!(
-///     ipc::remove_link(short_code.clone()),
-///     IpcResponse::LinkDeleted { code } => {
-///         println!("Deleted: {}", code);
-///         return Ok(());
-///     },
-///     @fallback remove_link_direct(storage, short_code).await
-/// )
-/// ```
-#[macro_export]
-macro_rules! try_ipc_or_fallback {
-    (
-        $ipc_call:expr,
-        $($pattern:pat => $success_block:block),+ $(,)?,
-        @fallback $fallback:expr
-    ) => {{
-        use $crate::system::ipc::{self, IpcError, IpcResponse};
-        use $crate::interfaces::cli::CliError;
-
-        if ipc::is_server_running() {
-            match $ipc_call.await {
-                $(
-                    Ok($pattern) => $success_block
-                )+
-                Ok(IpcResponse::Error { code, message }) => {
-                    return Err(CliError::CommandError(format!("{}: {}", code, message)));
-                }
-                Err(IpcError::ServerNotRunning) => {
-                    // Fall through to fallback
-                }
-                Err(e) => {
-                    return Err(CliError::CommandError(format!("IPC error: {}", e)));
-                }
-                _ => {
-                    return Err(CliError::CommandError(
-                        "Unexpected response from server".to_string(),
-                    ));
-                }
-            }
-        }
-
-        $fallback
-    }};
-}
 
 #[derive(Debug)]
 pub enum CliError {
@@ -124,7 +78,7 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         return server_status().await;
     }
 
-    // Handle reset-password command separately (needs DB connection)
+    // Handle reset-password command separately (needs direct DB access)
     if let Commands::ResetPassword { password, stdin } = cmd {
         let storage = StorageFactory::create(NoopMetrics::arc())
             .await
@@ -133,24 +87,20 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         return Ok(());
     }
 
+    // Create shared context for all other commands
+    let ctx = Arc::new(ServiceContext::new());
+    let link_client = LinkClient::new(ctx.clone());
+    let config_client = ConfigClient::new(ctx);
+
     // Handle config command
     if let Commands::Config { action } = cmd {
-        // Generate doesn't need DB connection, handle it separately
+        // Generate doesn't need any service, handle it separately
         if let ConfigCommands::Generate { output_path, force } = action {
             return config_management::config_generate(output_path, force).await;
         }
 
-        // Other config subcommands need DB connection
-        let storage = StorageFactory::create(NoopMetrics::arc())
-            .await
-            .map_err(|e| CliError::StorageError(e.to_string()))?;
-        return config_management::run_config_command(storage.get_db().clone(), action).await;
+        return config_management::run_config_command(&config_client, action).await;
     }
-
-    // Create storage for commands that need it
-    let storage = StorageFactory::create(NoopMetrics::arc())
-        .await
-        .map_err(|e| CliError::StorageError(e.to_string()))?;
 
     match cmd {
         Commands::Add {
@@ -160,23 +110,31 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
             password,
         } => {
             let (short_code, target_url) = Commands::parse_add_args(&args);
-            add_link(storage, short_code, target_url, force, expire, password).await
+            add_link(
+                &link_client,
+                short_code,
+                target_url,
+                force,
+                expire,
+                password,
+            )
+            .await
         }
 
-        Commands::Remove { short_code } => remove_link(storage, short_code).await,
+        Commands::Remove { short_code } => remove_link(&link_client, short_code).await,
 
         Commands::Update {
             short_code,
             target_url,
             expire,
             password,
-        } => update_link(storage, short_code, target_url, expire, password).await,
+        } => update_link(&link_client, short_code, target_url, expire, password).await,
 
-        Commands::List => list_links(storage).await,
+        Commands::List => list_links(&link_client).await,
 
-        Commands::Export { file_path } => export_links(storage, file_path).await,
+        Commands::Export { file_path } => export_links(&link_client, file_path).await,
 
-        Commands::Import { file_path, force } => import_links(storage, file_path, force).await,
+        Commands::Import { file_path, force } => import_links(&link_client, file_path, force).await,
 
         Commands::Status => unreachable!("handled above"),
 

@@ -87,7 +87,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             .map(|(code, count)| click_stats_hourly::ActiveModel {
                 short_code: Set(code.clone()),
                 hour_bucket: Set(hour_bucket),
-                click_count: Set(*count as i64),
+                click_count: Set(i64::try_from(*count).unwrap_or(i64::MAX)),
                 referrer_counts: Set(None),
                 country_counts: Set(None),
                 source_counts: Set(None),
@@ -100,28 +100,32 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         // MySQL: click_count = click_count + VALUES(click_count)
         let on_conflict = match backend {
             DatabaseBackend::MySql => {
-                // MySQL 语法：VALUES(column)
+                // MySQL 语法：VALUES(column)，用 LEAST 防止溢出
                 OnConflict::columns([
                     click_stats_hourly::Column::ShortCode,
                     click_stats_hourly::Column::HourBucket,
                 ])
                 .value(
                     click_stats_hourly::Column::ClickCount,
-                    Expr::col(click_stats_hourly::Column::ClickCount)
-                        .add(Expr::cust("VALUES(click_count)")),
+                    Expr::cust(format!(
+                        "LEAST(click_count + VALUES(click_count), {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned()
             }
             _ => {
-                // SQLite/PostgreSQL 语法：excluded.column
+                // SQLite/PostgreSQL 语法：excluded.column，用 MIN 防止溢出
                 OnConflict::columns([
                     click_stats_hourly::Column::ShortCode,
                     click_stats_hourly::Column::HourBucket,
                 ])
                 .value(
                     click_stats_hourly::Column::ClickCount,
-                    Expr::col(click_stats_hourly::Column::ClickCount)
-                        .add(Expr::cust("excluded.click_count")),
+                    Expr::cust(format!(
+                        "MIN(click_count + excluded.click_count, {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned()
             }
@@ -252,7 +256,11 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         let mut merged = agg.clone();
 
         // 合并计数
-        merged.count += record.click_count as usize;
+        merged.count = merged.count.saturating_add(
+            std::cmp::max(record.click_count, 0)
+                .try_into()
+                .unwrap_or(usize::MAX),
+        );
 
         // 合并 referrers
         let existing_referrers = parse_json_counts(&record.referrer_counts);
@@ -289,7 +297,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             .map(|(code, hour_bucket, agg)| click_stats_hourly::ActiveModel {
                 short_code: Set(code.clone()),
                 hour_bucket: Set(*hour_bucket),
-                click_count: Set(agg.count as i64),
+                click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
                 referrer_counts: Set(Some(to_json_string(&agg.referrers))),
                 country_counts: Set(Some(to_json_string(&agg.countries))),
                 source_counts: Set(Some(to_json_string(&agg.sources))),
@@ -330,7 +338,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
 
             click_count_case = click_count_case.case(
                 id_expr.clone(),
-                SimpleExpr::Value((agg.count as i64).into()),
+                SimpleExpr::Value(i64::try_from(agg.count).unwrap_or(i64::MAX).into()),
             );
             referrer_case = referrer_case.case(
                 id_expr.clone(),
@@ -388,29 +396,33 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
 
         let model = click_stats_global_hourly::ActiveModel {
             hour_bucket: Set(hour_bucket),
-            total_clicks: Set(clicks as i64),
+            total_clicks: Set(i64::try_from(clicks).unwrap_or(i64::MAX)),
             unique_links: Set(Some(unique_links)),
             top_referrers: Set(None),
             top_countries: Set(None),
             ..Default::default()
         };
 
-        // 构建 upsert：total_clicks 累加，unique_links 不累加（取最新值）
+        // 构建 upsert：total_clicks 累加（带溢出保护），unique_links 不累加（取最新值）
         let on_conflict = match backend {
             DatabaseBackend::MySql => {
                 OnConflict::column(click_stats_global_hourly::Column::HourBucket)
                     .value(
                         click_stats_global_hourly::Column::TotalClicks,
-                        Expr::col(click_stats_global_hourly::Column::TotalClicks)
-                            .add(Expr::cust("VALUES(total_clicks)")),
+                        Expr::cust(format!(
+                            "LEAST(total_clicks + VALUES(total_clicks), {})",
+                            i64::MAX
+                        )),
                     )
                     .to_owned()
             }
             _ => OnConflict::column(click_stats_global_hourly::Column::HourBucket)
                 .value(
                     click_stats_global_hourly::Column::TotalClicks,
-                    Expr::col(click_stats_global_hourly::Column::TotalClicks)
-                        .add(Expr::cust("excluded.total_clicks")),
+                    Expr::cust(format!(
+                        "MIN(total_clicks + excluded.total_clicks, {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned(),
         };

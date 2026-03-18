@@ -7,25 +7,26 @@ use ratatui::crossterm::event::KeyCode;
 use crate::interfaces::tui::app::{App, CurrentScreen};
 
 /// Handle search screen input
-pub fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
+pub async fn handle_search_screen(app: &mut App, key_code: KeyCode) -> std::io::Result<bool> {
     match key_code {
         KeyCode::Esc => {
-            app.current_screen = CurrentScreen::Main;
-            app.search_input.clear();
-            app.is_searching = false;
+            match app.clear_search().await {
+                Ok(()) => app.current_screen = CurrentScreen::Main,
+                Err(e) => app.set_error(format!("Failed to clear search: {}", e)),
+            }
         }
         KeyCode::Enter => {
-            // Apply search and return to main
-            app.filter_links();
-            app.current_screen = CurrentScreen::Main;
+            // Apply search via DB query and return to main
+            match app.execute_search().await {
+                Ok(()) => app.current_screen = CurrentScreen::Main,
+                Err(e) => app.set_error(format!("Search failed: {}", e)),
+            }
         }
         KeyCode::Backspace => {
             app.search_input.pop();
-            app.filter_links();
         }
         KeyCode::Char(c) => {
             app.search_input.push(c);
-            app.filter_links();
         }
         _ => {}
     }

@@ -32,7 +32,7 @@ The TUI interface consists of several main areas:
 │  Clicks: 142                                           │
 │  Protected: No                                         │
 └─────────────────────────────────────────────────────────┘
-  q:Quit  x:Export/Import  /:Search  ↑↓:Navigate  Enter:Details
+  q:Quit  o:System  x:Export/Import  /:Search  ↑↓:Navigate  Enter:Details
 ```
 
 ## Keyboard Shortcuts
@@ -43,7 +43,8 @@ The TUI interface consists of several main areas:
 |----------|----------|
 | `↑` / `↓` | Move selection up/down |
 | `j` / `k` | Move down/up (Vim style) |
-| `PageUp` / `PageDown` | Page up/down (10 items) |
+| `PageUp` / `PageDown` | Fast move within current page (10 rows) |
+| `[` / `]` | Previous/next page (database pagination) |
 | `Home` / `g` | Jump to top |
 | `End` / `G` | Jump to bottom |
 | `s` | Cycle sort column (code / URL / clicks / status) |
@@ -57,6 +58,7 @@ The TUI interface consists of several main areas:
 | `e` | Edit selected short link |
 | `d` | Delete current link (or open batch delete when selected items exist) |
 | `x` | Export/Import menu |
+| `o` | System operations (status, config, password reset) |
 | `y` | Copy selected short code to clipboard |
 | `Y` | Copy selected target URL to clipboard |
 | `q` | Quit (with confirmation) |
@@ -81,6 +83,8 @@ The main interface displays overview information for all short links:
 - **Expiration**: Shows expiration time or `(EXPIRED)` marker (yellow/red)
 - **Password Protected**: Shows 🔒 icon (magenta)
 - **Click Count**: Shows access count (green)
+- **Paged Loading**: Loads 100 links per page by default; use `[` / `]` to switch database pages
+- **Virtual Scrolling**: Renders only visible rows for smoother large-list navigation
 
 Selected item is highlighted with gray background.
 
@@ -131,10 +135,36 @@ A confirmation dialog will appear showing link details. Press `y` to confirm del
 
 **Import Function**:
 - Select a `.csv` file via the built-in file browser
-- Batch import links (simple upsert: existing codes will be overwritten)
+- Choose import mode: **Skip existing** (default) or **Overwrite existing**
+- Batch import links
 - Compatible with CLI export format
 
-### 7. Auto Server Notification
+### 7. System Operations (Press `o`)
+
+Access system operations via the System menu:
+
+**Server Status** (`s`):
+- View server version, uptime, links count
+- Check reload status and last reload timestamps
+- Press `r` to refresh, `Esc` to go back
+- Requires the server to be running (IPC connection)
+
+**Runtime Configuration** (`c`):
+- Browse all runtime configs grouped by category (Authentication, Cookie, Features, Routes, CORS, Tracking, Analytics, Cache)
+- Navigate with `j`/`k` or arrow keys
+- Press `e` or `Enter` to edit a config value (non-sensitive, editable configs only)
+- Press `r` to reset a config to its default value
+- Sensitive values are displayed as `[REDACTED]` and cannot be edited in TUI
+- Tags indicate `sensitive`, `restart` (requires server restart), and `readonly` configs
+- Works with or without the server running (IPC-first with direct DB fallback)
+
+**Reset Admin Password** (`p`):
+- Enter new password (min 8 characters) and confirm
+- Password is hashed with Argon2id and stored in the database
+- Uses direct DB access (works even when server is not running)
+- Press `Tab` to switch between password and confirm fields
+
+### 8. Auto Server Notification
 
 After create/update/delete (and import), TUI notifies the server via IPC to run `ReloadTarget::Data`, refreshing short-link data and caches.
 
@@ -163,7 +193,7 @@ TUI mode is suitable for:
 
 Current version TUI known limitations:
 
-- ⚠️ Only batch delete is supported; no batch edit or batch create
+- ⚠️ Batch operations currently support CSV import and batch delete only; no batch edit or batch create
 - ⚠️ Password input shown as masked, cannot see actual content
 
 ## Troubleshooting
@@ -204,6 +234,9 @@ There is no manual refresh shortcut in the current version:
 | Edit Links | ✅ | ✅ | ✅ | ✅ |
 | Delete Links | ✅ | ✅ | ✅ | ✅ |
 | Export/Import | ✅ | ✅ | ✅ (CSV) | ✅ |
+| Server Status | ✅ | ✅ | ✅ | ✅ |
+| Runtime Config | ✅ | ✅ | ✅ | ✅ |
+| Reset Password | ✅ | ✅ | ❌ | ❌ |
 | Visual UI | ✅ | ❌ | ❌ | ✅ |
 | Auth Required | ❌ | ❌ | ✅ | ✅ |
 | Interactive | ✅ | ❌ | ❌ | ✅ |

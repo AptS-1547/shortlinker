@@ -56,6 +56,11 @@ pub async fn listen_for_shutdown(db: &DatabaseConnection) {
 async fn perform_shutdown_tasks(db: &DatabaseConnection) {
     // 刷新点击计数（带重试）
     if let Some(manager) = get_click_manager() {
+        // 先停止后台任务，避免与手动 flush 竞争
+        manager.cancel();
+        // 等待后台任务退出
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
         const MAX_RETRIES: u32 = 3;
         let mut success = false;
 

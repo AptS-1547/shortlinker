@@ -1,4 +1,22 @@
-// Rust 化完成
+//! Redirect handler - 热路径直连策略
+//!
+//! # 架构决策：直连 Storage + Cache
+//!
+//! redirect handler 直接访问 `SeaOrmStorage` 和 `CompositeCacheTrait`，
+//! 不经过 `LinkService`。这是有意为之的设计决策：
+//!
+//! ## 原因
+//! 1. **性能**：redirect 是系统最热的路径，每次请求都会触发。
+//!    额外的 service 层间接调用会增加不必要的开销。
+//! 2. **缓存策略**：redirect 使用 CompositeCache 的完整查询链
+//!    (Bloom → NegativeCache → ObjectCache → DB)，这是 cache 层的核心价值。
+//!    LinkService 的 CRUD 操作不需要这个查询链。
+//! 3. **关注点不同**：redirect 的逻辑（缓存查询、点击计数、UTM 透传）
+//!    与 admin CRUD 操作完全不同，强行统一反而增加复杂度。
+//!
+//! ## 维护约定
+//! - 如果需要修改 redirect 的数据访问逻辑，直接在此文件修改
+//! - 不要将 redirect 的 storage 访问移到 LinkService
 
 use std::borrow::Cow;
 

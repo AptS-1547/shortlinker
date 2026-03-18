@@ -1,12 +1,8 @@
 use crate::cache::traits::{ExistenceFilter, ObjectCache};
 use crate::errors::Result;
 use once_cell::sync::Lazy;
-use std::{
-    collections::HashMap,
-    future::Future,
-    pin::Pin,
-    sync::{Arc, RwLock},
-};
+use parking_lot::RwLock;
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
 pub type BoxedExistenceFilterFuture =
     Pin<Box<dyn Future<Output = Result<Box<dyn ExistenceFilter>>> + Send>>;
@@ -24,40 +20,26 @@ static OBJECT_CACHE_REGISTRY: Lazy<RwLock<HashMap<String, ObjectCacheConstructor
 
 pub fn register_filter_plugin<S: Into<String>>(name: S, constructor: ExistenceFilterConstructor) {
     let name = name.into();
-    let mut registry = CACHE_FILTER_REGISTRY
-        .write()
-        .expect("Filter registry RwLock poisoned - a thread panicked while holding the lock");
+    let mut registry = CACHE_FILTER_REGISTRY.write();
     registry.insert(name, constructor);
 }
 
 pub fn get_filter_plugin(name: &str) -> Option<ExistenceFilterConstructor> {
-    CACHE_FILTER_REGISTRY
-        .read()
-        .expect("Filter registry RwLock poisoned - a thread panicked while holding the lock")
-        .get(name)
-        .cloned()
+    CACHE_FILTER_REGISTRY.read().get(name).cloned()
 }
 
 pub fn register_object_cache_plugin<S: Into<String>>(name: S, constructor: ObjectCacheConstructor) {
     let name = name.into();
-    let mut registry = OBJECT_CACHE_REGISTRY
-        .write()
-        .expect("Object cache registry RwLock poisoned - a thread panicked while holding the lock");
+    let mut registry = OBJECT_CACHE_REGISTRY.write();
     registry.insert(name, constructor);
 }
 
 pub fn get_object_cache_plugin(name: &str) -> Option<ObjectCacheConstructor> {
-    OBJECT_CACHE_REGISTRY
-        .read()
-        .expect("Object cache registry RwLock poisoned - a thread panicked while holding the lock")
-        .get(name)
-        .cloned()
+    OBJECT_CACHE_REGISTRY.read().get(name).cloned()
 }
 
 pub fn debug_cache_registry() {
-    let filter_registry = CACHE_FILTER_REGISTRY
-        .read()
-        .expect("Filter registry RwLock poisoned");
+    let filter_registry = CACHE_FILTER_REGISTRY.read();
     if filter_registry.is_empty() {
         tracing::debug!("No Filter plugins registered.");
     } else {
@@ -67,9 +49,7 @@ pub fn debug_cache_registry() {
         }
     }
 
-    let object_cache_registry = OBJECT_CACHE_REGISTRY
-        .read()
-        .expect("Object cache registry RwLock poisoned");
+    let object_cache_registry = OBJECT_CACHE_REGISTRY.read();
     if object_cache_registry.is_empty() {
         tracing::debug!("No Object Cache plugins registered.");
     } else {
