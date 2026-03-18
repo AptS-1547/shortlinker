@@ -8,9 +8,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tracing::{debug, info, warn};
 
-use super::types::{
-    ConfigItemData, ImportErrorData, ImportLinkData, IpcCommand, IpcResponse, ShortLinkData,
-};
+use super::types::{ConfigItemData, ImportErrorData, ImportLinkData, IpcCommand, IpcResponse};
 use crate::errors::ShortlinkerError;
 use crate::services::{
     ConfigService, CreateLinkRequest, ImportLinkItemRaw, ImportMode, LinkService,
@@ -54,18 +52,6 @@ pub fn init_config_service(service: Arc<ConfigService>) {
 /// Get server uptime in seconds
 fn get_uptime_secs() -> u64 {
     START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0)
-}
-
-/// Convert ShortLink to ShortLinkData for IPC transfer
-pub(crate) fn to_link_data(link: &ShortLink) -> ShortLinkData {
-    ShortLinkData {
-        code: link.code.clone(),
-        target: link.target.clone(),
-        created_at: link.created_at.to_rfc3339(),
-        expires_at: link.expires_at.map(|dt| dt.to_rfc3339()),
-        password: link.password.clone(),
-        click: link.click as i64,
-    }
 }
 
 /// Convert ShortlinkerError to IpcResponse::Error
@@ -259,7 +245,7 @@ async fn handle_add_link(
 
     match service.create_link(req).await {
         Ok(result) => IpcResponse::LinkCreated {
-            link: to_link_data(&result.link),
+            link: result.link,
             generated_code: result.generated_code,
         },
         Err(e) => error_response(e),
@@ -323,9 +309,7 @@ async fn handle_update_link(
     };
 
     match service.update_link(&code, req).await {
-        Ok(link) => IpcResponse::LinkUpdated {
-            link: to_link_data(&link),
-        },
+        Ok(link) => IpcResponse::LinkUpdated { link },
         Err(e) => error_response(e),
     }
 }
@@ -338,9 +322,7 @@ async fn handle_get_link(code: String) -> IpcResponse {
     };
 
     match service.get_link(&code).await {
-        Ok(link) => IpcResponse::LinkFound {
-            link: link.map(|l| to_link_data(&l)),
-        },
+        Ok(link) => IpcResponse::LinkFound { link },
         Err(e) => error_response(e),
     }
 }
@@ -361,15 +343,12 @@ async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) ->
     };
 
     match service.list_links(filter, page, page_size).await {
-        Ok((links, total)) => {
-            let link_data: Vec<ShortLinkData> = links.iter().map(to_link_data).collect();
-            IpcResponse::LinkList {
-                links: link_data,
-                total: total as usize,
-                page,
-                page_size,
-            }
-        }
+        Ok((links, total)) => IpcResponse::LinkList {
+            links,
+            total: total as usize,
+            page,
+            page_size,
+        },
         Err(e) => error_response(e),
     }
 }

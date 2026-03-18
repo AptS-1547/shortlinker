@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, error, info, warn};
 
-use super::handler::{handle_command, to_link_data};
+use super::handler::handle_command;
 use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
 use super::types::{IpcCommand, IpcResponse};
@@ -105,9 +105,7 @@ where
                     continue;
                 }
                 total += count;
-                let chunk = IpcResponse::ExportChunk {
-                    links: links.iter().map(to_link_data).collect(),
-                };
+                let chunk = IpcResponse::ExportChunk { links };
                 send_response(stream, &chunk).await?;
                 debug!(
                     "IPC export: sent chunk of {} links (total: {})",

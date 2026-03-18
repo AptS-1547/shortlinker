@@ -2,14 +2,12 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-
 use crate::services::{
     CreateLinkRequest, ImportBatchFailedItem, ImportBatchResult, ImportLinkItemRich, ImportMode,
     LinkCreateResult, UpdateLinkRequest,
 };
 use crate::storage::{LinkFilter, LinkStats, ShortLink};
-use crate::system::ipc::{self, IpcResponse, ShortLinkData};
+use crate::system::ipc::{self, IpcResponse};
 
 use super::context::ServiceContext;
 use super::{ClientError, ipc_or_fallback};
@@ -50,7 +48,7 @@ impl LinkClient {
                     link,
                     generated_code,
                 } => Ok(LinkCreateResult {
-                    link: link_data_to_short_link(&link),
+                    link,
                     generated_code,
                 }),
                 other => Err(unexpected_response(other)),
@@ -134,7 +132,7 @@ impl LinkClient {
         ipc_or_fallback(
             ipc::update_link(code, target, expires_at, password),
             |resp| match resp {
-                IpcResponse::LinkUpdated { link } => Ok(link_data_to_short_link(&link)),
+                IpcResponse::LinkUpdated { link } => Ok(link),
                 other => Err(unexpected_response(other)),
             },
             || async move {
@@ -152,7 +150,7 @@ impl LinkClient {
         ipc_or_fallback(
             ipc::get_link(code),
             |resp| match resp {
-                IpcResponse::LinkFound { link } => Ok(link.as_ref().map(link_data_to_short_link)),
+                IpcResponse::LinkFound { link } => Ok(link),
                 other => Err(unexpected_response(other)),
             },
             || async move {
@@ -175,11 +173,7 @@ impl LinkClient {
         ipc_or_fallback(
             ipc::list_links(page, page_size, search),
             |resp| match resp {
-                IpcResponse::LinkList { links, total, .. } => {
-                    let short_links: Vec<ShortLink> =
-                        links.iter().map(link_data_to_short_link).collect();
-                    Ok((short_links, total as u64))
-                }
+                IpcResponse::LinkList { links, total, .. } => Ok((links, total as u64)),
                 other => Err(unexpected_response(other)),
             },
             || async move {
@@ -288,7 +282,7 @@ impl LinkClient {
         if ipc::is_server_running() {
             match ipc::export_links().await {
                 Ok(links) => {
-                    return Ok(links.iter().map(link_data_to_short_link).collect());
+                    return Ok(links);
                 }
                 Err(crate::system::ipc::IpcError::ServerNotRunning) => {
                     // Fall through to fallback
@@ -362,31 +356,6 @@ fn convert_import_result(
     }
 }
 
-/// Convert IPC ShortLinkData to storage ShortLink
-fn link_data_to_short_link(data: &ShortLinkData) -> ShortLink {
-    ShortLink {
-        code: data.code.clone(),
-        target: data.target.clone(),
-        created_at: DateTime::parse_from_rfc3339(&data.created_at)
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|e| {
-                tracing::warn!(
-                    "Failed to parse 'created_at' from IPC (value: '{}'): {}",
-                    &data.created_at,
-                    e
-                );
-                Utc::now()
-            }),
-        expires_at: data.expires_at.as_ref().and_then(|s| {
-            DateTime::parse_from_rfc3339(s)
-                .map(|dt| dt.with_timezone(&Utc))
-                .ok()
-        }),
-        password: data.password.clone(),
-        click: data.click.max(0) as usize,
-    }
-}
-
 fn unexpected_response(resp: IpcResponse) -> ClientError {
     ClientError::Ipc(crate::system::ipc::IpcError::ProtocolError(format!(
         "Unexpected response: {:?}",
@@ -397,130 +366,6 @@ fn unexpected_response(resp: IpcResponse) -> ClientError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_link_data(
-        code: &str,
-        target: &str,
-        created_at: &str,
-        expires_at: Option<&str>,
-        password: Option<&str>,
-        click: i64,
-    ) -> ShortLinkData {
-        ShortLinkData {
-            code: code.into(),
-            target: target.into(),
-            created_at: created_at.into(),
-            expires_at: expires_at.map(|s| s.into()),
-            password: password.map(|s| s.into()),
-            click,
-        }
-    }
-
-    // ---- link_data_to_short_link tests ----
-
-    #[test]
-    fn test_link_data_to_short_link_basic() {
-        let data = make_link_data(
-            "abc",
-            "https://example.com",
-            "2025-01-01T00:00:00Z",
-            Some("2025-12-31T23:59:59Z"),
-            Some("hashed"),
-            42,
-        );
-        let link = link_data_to_short_link(&data);
-        assert_eq!(link.code, "abc");
-        assert_eq!(link.target, "https://example.com");
-        assert_eq!(link.click, 42);
-        assert!(link.expires_at.is_some());
-        assert_eq!(link.password, Some("hashed".into()));
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_valid_created_at() {
-        let data = make_link_data(
-            "test",
-            "https://example.com",
-            "2025-06-15T12:30:00+00:00",
-            None,
-            None,
-            0,
-        );
-        let link = link_data_to_short_link(&data);
-        assert_eq!(link.created_at.year(), 2025);
-        assert_eq!(link.created_at.month(), 6);
-        assert_eq!(link.created_at.day(), 15);
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_no_expires() {
-        let data = make_link_data(
-            "abc",
-            "https://example.com",
-            "2025-01-01T00:00:00Z",
-            None,
-            None,
-            0,
-        );
-        let link = link_data_to_short_link(&data);
-        assert!(link.expires_at.is_none());
-        assert!(link.password.is_none());
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_invalid_created_at() {
-        let data = make_link_data("abc", "https://example.com", "not-a-date", None, None, 0);
-        let link = link_data_to_short_link(&data);
-        // Invalid created_at falls back to Utc::now()
-        let now = Utc::now();
-        let diff = (now - link.created_at).num_seconds().abs();
-        assert!(diff < 5, "Expected created_at near now, diff={}s", diff);
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_invalid_expires_at() {
-        let data = make_link_data(
-            "abc",
-            "https://example.com",
-            "2025-01-01T00:00:00Z",
-            Some("also-not-a-date"),
-            None,
-            0,
-        );
-        let link = link_data_to_short_link(&data);
-        // Invalid expires_at becomes None
-        assert!(link.expires_at.is_none());
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_click_conversion() {
-        let data = make_link_data(
-            "abc",
-            "https://example.com",
-            "2025-01-01T00:00:00Z",
-            None,
-            None,
-            999999,
-        );
-        let link = link_data_to_short_link(&data);
-        assert_eq!(link.click, 999999);
-    }
-
-    #[test]
-    fn test_link_data_to_short_link_zero_click() {
-        let data = make_link_data(
-            "abc",
-            "https://example.com",
-            "2025-01-01T00:00:00Z",
-            None,
-            None,
-            0,
-        );
-        let link = link_data_to_short_link(&data);
-        assert_eq!(link.click, 0);
-    }
-
-    // ---- unexpected_response tests ----
 
     #[test]
     fn test_unexpected_response_pong() {
@@ -538,6 +383,4 @@ mod tests {
         let err = unexpected_response(IpcResponse::ShuttingDown);
         assert!(matches!(err, ClientError::Ipc(_)));
     }
-
-    use chrono::Datelike;
 }

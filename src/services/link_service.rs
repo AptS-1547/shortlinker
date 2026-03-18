@@ -627,20 +627,40 @@ impl LinkService {
         items: Vec<ImportLinkItemRich>,
         mode: ImportMode,
     ) -> Result<ImportBatchResult, ShortlinkerError> {
+        self.import_links_batch_chunked(items, mode, usize::MAX, None)
+            .await
+    }
+
+    /// 高性能批量导入链接（分块写入，带进度回调）
+    ///
+    /// 写入阶段按 `chunk_size` 分批，每批写完后调用 `on_chunk_written(processed, total)`。
+    /// `import_links_batch` 是本方法以 `usize::MAX` 为块大小的便捷封装。
+    pub async fn import_links_batch_chunked(
+        &self,
+        items: Vec<ImportLinkItemRich>,
+        mode: ImportMode,
+        chunk_size: usize,
+        on_chunk_written: Option<&(dyn Fn(usize, usize) + Send + Sync)>,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
         let mut result = ImportBatchResult::default();
 
         if items.is_empty() {
             return Ok(result);
         }
 
+        if chunk_size == 0 {
+            return Err(ShortlinkerError::internal_error(
+                "chunk_size must be greater than 0",
+            ));
+        }
+
         // 1. 收集所有 codes
         let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
 
-        // 2. 冲突检测
+        // 2. 冲突检测：Bloom filter 预筛选 + 精确查询
         let existing_codes: HashSet<String> = match mode {
             ImportMode::Overwrite => HashSet::new(),
             ImportMode::Skip | ImportMode::Error => {
-                // Bloom filter 预筛选：false = 一定不存在
                 let mut maybe_exist = Vec::new();
                 for code in &all_codes {
                     if self.cache.bloom_check(code).await {
@@ -670,7 +690,7 @@ impl LinkService {
             existing_codes.len()
         );
 
-        // 3. 用 HashMap 去重 CSV 内重复 code，处理冲突
+        // 3. CSV 内去重 + 冲突处理
         let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
         let mut processed_codes: HashSet<String> = HashSet::new();
 
@@ -692,136 +712,7 @@ impl LinkService {
                         continue;
                     }
                     ImportMode::Overwrite => {
-                        // 覆盖模式：如果是 CSV 内重复 code，修正前一条的计数
-                        if processed_codes.contains(&item.code) {
-                            // 前一条已计入 success，此条覆盖它，不重复计数
-                            result.success_count -= 1;
-                        }
-                    }
-                }
-            }
-
-            let link = ShortLink {
-                code: item.code.clone(),
-                target: item.target,
-                created_at: item.created_at,
-                expires_at: item.expires_at,
-                password: item.password,
-                click: item.click_count,
-            };
-
-            processed_codes.insert(item.code.clone());
-            links_to_insert.insert(item.code, link);
-            result.success_count += 1;
-        }
-
-        // 4. 批量写入数据库
-        let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
-        if !links_vec.is_empty() {
-            self.storage
-                .batch_set(links_vec.clone())
-                .await
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!(
-                        "Failed to batch insert links: {}",
-                        e
-                    ))
-                })?;
-
-            // 5. 批量更新缓存
-            let default_ttl = self.default_cache_ttl();
-            for link in &links_vec {
-                let ttl = link.cache_ttl(default_ttl);
-                self.cache.insert(&link.code, link.clone(), ttl).await;
-            }
-        }
-
-        info!(
-            "LinkService: import batch completed - success: {}, skipped: {}, failed: {}",
-            result.success_count,
-            result.skipped_count,
-            result.failed_items.len()
-        );
-
-        Ok(result)
-    }
-
-    /// 高性能批量导入链接（分块写入，带进度回调）
-    ///
-    /// 与 `import_links_batch` 相同的验证和冲突检测逻辑，
-    /// 但写入阶段按 `chunk_size` 分批，每批写完后调用 `on_chunk_written(processed, total)`。
-    /// 用于 IPC 流式进度报告场景。
-    pub async fn import_links_batch_chunked(
-        &self,
-        items: Vec<ImportLinkItemRich>,
-        mode: ImportMode,
-        chunk_size: usize,
-        on_chunk_written: Option<&(dyn Fn(usize, usize) + Send + Sync)>,
-    ) -> Result<ImportBatchResult, ShortlinkerError> {
-        let mut result = ImportBatchResult::default();
-
-        if items.is_empty() {
-            return Ok(result);
-        }
-
-        if chunk_size == 0 {
-            return Err(ShortlinkerError::internal_error(
-                "chunk_size must be greater than 0",
-            ));
-        }
-
-        // 1. 收集所有 codes
-        let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
-
-        // 2. 冲突检测（与 import_links_batch 相同）
-        let existing_codes: HashSet<String> = match mode {
-            ImportMode::Overwrite => HashSet::new(),
-            ImportMode::Skip | ImportMode::Error => {
-                let mut maybe_exist = Vec::new();
-                for code in &all_codes {
-                    if self.cache.bloom_check(code).await {
-                        maybe_exist.push(code.clone());
-                    }
-                }
-
-                if maybe_exist.is_empty() {
-                    HashSet::new()
-                } else {
-                    self.storage
-                        .batch_check_codes_exist(&maybe_exist)
-                        .await
-                        .map_err(|e| {
-                            ShortlinkerError::database_operation(format!(
-                                "Failed to check existing codes: {}",
-                                e
-                            ))
-                        })?
-                }
-            }
-        };
-
-        // 3. 去重 + 冲突处理（与 import_links_batch 相同）
-        let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
-        let mut processed_codes: HashSet<String> = HashSet::new();
-
-        for item in items {
-            let exists =
-                existing_codes.contains(&item.code) || processed_codes.contains(&item.code);
-            if exists {
-                match mode {
-                    ImportMode::Skip => {
-                        result.skipped_count += 1;
-                        continue;
-                    }
-                    ImportMode::Error => {
-                        result.failed_items.push(ImportBatchFailedItem {
-                            code: item.code,
-                            error: ShortlinkerError::link_already_exists("Link already exists"),
-                            row_num: item.row_num,
-                        });
-                        continue;
-                    }
-                    ImportMode::Overwrite => {
+                        // CSV 内重复 code：后一条覆盖前一条，修正计数
                         if processed_codes.contains(&item.code) {
                             result.success_count -= 1;
                         }
@@ -872,7 +763,7 @@ impl LinkService {
         }
 
         info!(
-            "LinkService: import batch chunked completed - success: {}, skipped: {}, failed: {}",
+            "LinkService: import batch completed - success: {}, skipped: {}, failed: {}",
             result.success_count,
             result.skipped_count,
             result.failed_items.len()

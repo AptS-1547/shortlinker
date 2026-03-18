@@ -54,5 +54,5 @@ pub use client::{
 pub use platform::PlatformIpc;
 pub use types::{
     ConfigImportItem, ConfigItemData, ImportErrorData, ImportLinkData, ImportPhase, IpcCommand,
-    IpcError, IpcResponse, ShortLinkData,
+    IpcError, IpcResponse,
 };

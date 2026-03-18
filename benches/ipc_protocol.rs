@@ -3,8 +3,9 @@
 use bytes::BytesMut;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use shortlinker::config::init_config;
+use shortlinker::storage::ShortLink;
 use shortlinker::system::ipc::protocol::{decode, encode};
-use shortlinker::system::ipc::types::{IpcCommand, IpcResponse, ShortLinkData};
+use shortlinker::system::ipc::types::{IpcCommand, IpcResponse};
 use shortlinker::system::reload::ReloadTarget;
 use std::sync::Once;
 
@@ -58,14 +59,14 @@ fn create_test_responses() -> Vec<IpcResponse> {
             message: "Something went wrong with a detailed error message".to_string(),
         },
         IpcResponse::LinkList {
-            links: (0..10)
-                .map(|i| ShortLinkData {
+            links: (0..10u64)
+                .map(|i| ShortLink {
                     code: format!("code_{}", i),
                     target: format!("https://example.com/{}", i),
-                    created_at: "2025-01-01T00:00:00Z".to_string(),
-                    expires_at: Some("2025-12-31T23:59:59Z".to_string()),
+                    created_at: chrono::Utc::now(),
+                    expires_at: None,
                     password: None,
-                    click: i * 100,
+                    click: (i * 100) as usize,
                 })
                 .collect(),
             total: 1000,
@@ -186,24 +187,24 @@ fn bench_batch_roundtrip(c: &mut Criterion) {
 
     // 模拟批量 link list 响应
     // 注意：MAX_MESSAGE_SIZE = 64KB，500 links (~80KB) 会超限
-    for num_links in [10, 100, 200] {
+    for num_links in [10u64, 100, 200] {
         let response = IpcResponse::LinkList {
             links: (0..num_links)
-                .map(|i| ShortLinkData {
+                .map(|i| ShortLink {
                     code: format!("code_{}", i),
                     target: format!("https://example.com/path/{}", i),
-                    created_at: "2025-01-01T00:00:00Z".to_string(),
-                    expires_at: Some("2025-12-31T23:59:59Z".to_string()),
+                    created_at: chrono::Utc::now(),
+                    expires_at: None,
                     password: None,
-                    click: i * 10,
+                    click: (i * 10) as usize,
                 })
                 .collect(),
             total: num_links as usize,
             page: 1,
-            page_size: num_links as u64,
+            page_size: num_links,
         };
 
-        group.throughput(Throughput::Elements(num_links as u64));
+        group.throughput(Throughput::Elements(num_links));
         group.bench_function(format!("roundtrip_{}_links", num_links), |b| {
             b.iter(|| {
                 let encoded = encode(&response).unwrap();

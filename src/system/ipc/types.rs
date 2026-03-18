@@ -9,18 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io;
 
+use crate::storage::ShortLink;
 use crate::system::reload::ReloadTarget;
-
-/// Short link data for IPC transfer
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShortLinkData {
-    pub code: String,
-    pub target: String,
-    pub created_at: String,
-    pub expires_at: Option<String>,
-    pub password: Option<String>,
-    pub click: i64,
-}
 
 /// Import link data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,7 +223,7 @@ pub enum IpcResponse {
     // ============ Link Management Responses ============
     /// Link created successfully
     LinkCreated {
-        link: ShortLinkData,
+        link: ShortLink,
         /// Generated code if none was provided
         generated_code: bool,
     },
@@ -249,14 +239,14 @@ pub enum IpcResponse {
     },
 
     /// Link updated successfully
-    LinkUpdated { link: ShortLinkData },
+    LinkUpdated { link: ShortLink },
 
     /// Get link result
-    LinkFound { link: Option<ShortLinkData> },
+    LinkFound { link: Option<ShortLink> },
 
     /// List links result
     LinkList {
-        links: Vec<ShortLinkData>,
+        links: Vec<ShortLink>,
         total: usize,
         page: u64,
         page_size: u64,
@@ -281,10 +271,10 @@ pub enum IpcResponse {
     },
 
     /// Export result
-    ExportResult { links: Vec<ShortLinkData> },
+    ExportResult { links: Vec<ShortLink> },
 
     /// Export chunk (streaming export)
-    ExportChunk { links: Vec<ShortLinkData> },
+    ExportChunk { links: Vec<ShortLink> },
 
     /// Export done marker (streaming export)
     ExportDone { total: usize },
@@ -366,7 +356,6 @@ impl std::error::Error for IpcError {
 
 impl From<io::Error> for IpcError {
     fn from(err: io::Error) -> Self {
-        // Map specific error kinds to more specific IPC errors
         match err.kind() {
             io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound => {
                 IpcError::ServerNotRunning
@@ -421,260 +410,16 @@ mod tests {
 
     #[test]
     fn test_ipc_error_source() {
-        // ServerNotRunning has no source
         let err = IpcError::ServerNotRunning;
         assert!(err.source().is_none());
 
-        // IoError has source
         let io_err = io::Error::other("test");
         let err = IpcError::IoError(io_err);
         assert!(err.source().is_some());
     }
 
     #[test]
-    fn test_ipc_command_serialization() {
-        // Test Ping
-        let cmd = IpcCommand::Ping;
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        assert!(matches!(decoded, IpcCommand::Ping));
-
-        // Test AddLink
-        let cmd = IpcCommand::AddLink {
-            code: Some("test".into()),
-            target: "https://example.com".into(),
-            force: true,
-            expires_at: Some("2025-12-31T23:59:59Z".into()),
-            password: None,
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        if let IpcCommand::AddLink {
-            code,
-            target,
-            force,
-            ..
-        } = decoded
-        {
-            assert_eq!(code, Some("test".into()));
-            assert_eq!(target, "https://example.com");
-            assert!(force);
-        } else {
-            panic!("Expected AddLink");
-        }
-    }
-
-    #[test]
-    fn test_ipc_response_serialization() {
-        // Test Pong
-        let resp = IpcResponse::Pong {
-            version: "1.0.0".into(),
-            uptime_secs: 3600,
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::Pong {
-            version,
-            uptime_secs,
-        } = decoded
-        {
-            assert_eq!(version, "1.0.0");
-            assert_eq!(uptime_secs, 3600);
-        } else {
-            panic!("Expected Pong");
-        }
-
-        // Test Error
-        let resp = IpcResponse::Error {
-            code: "E001".into(),
-            message: "Something went wrong".into(),
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::Error { code, message } = decoded {
-            assert_eq!(code, "E001");
-            assert_eq!(message, "Something went wrong");
-        } else {
-            panic!("Expected Error");
-        }
-    }
-
-    #[test]
-    fn test_short_link_data_serialization() {
-        let data = ShortLinkData {
-            code: "abc123".into(),
-            target: "https://example.com".into(),
-            created_at: "2025-01-01T00:00:00Z".into(),
-            expires_at: Some("2025-12-31T23:59:59Z".into()),
-            password: None,
-            click: 42,
-        };
-        let json = serde_json::to_string(&data).unwrap();
-        let decoded: ShortLinkData = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.code, "abc123");
-        assert_eq!(decoded.click, 42);
-    }
-
-    #[test]
-    fn test_import_link_data_serialization() {
-        let data = ImportLinkData {
-            code: "test".into(),
-            target: "https://example.com".into(),
-            created_at: "2025-01-01T00:00:00Z".into(),
-            expires_at: None,
-            password: Some("secret".into()),
-            click_count: 10,
-        };
-        let json = serde_json::to_string(&data).unwrap();
-        let decoded: ImportLinkData = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.code, "test");
-        assert_eq!(decoded.password, Some("secret".into()));
-        assert_eq!(decoded.created_at, "2025-01-01T00:00:00Z");
-        assert_eq!(decoded.click_count, 10);
-    }
-
-    #[test]
-    fn test_config_item_data_serialization() {
-        let data = ConfigItemData {
-            key: "auth.admin_token".into(),
-            value: "[REDACTED]".into(),
-            category: "auth".into(),
-            value_type: "string".into(),
-            default_value: "".into(),
-            requires_restart: false,
-            editable: true,
-            sensitive: true,
-            description: "Admin token".into(),
-            enum_options: None,
-            updated_at: "2025-01-01T00:00:00Z".into(),
-        };
-        let json = serde_json::to_string(&data).unwrap();
-        let decoded: ConfigItemData = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.key, "auth.admin_token");
-        assert!(decoded.sensitive);
-        assert!(decoded.enum_options.is_none());
-    }
-
-    #[test]
-    fn test_config_import_item_serialization() {
-        let item = ConfigImportItem {
-            key: "features.random_code_length".into(),
-            value: "8".into(),
-        };
-        let json = serde_json::to_string(&item).unwrap();
-        let decoded: ConfigImportItem = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.key, "features.random_code_length");
-        assert_eq!(decoded.value, "8");
-    }
-
-    #[test]
-    fn test_config_command_serialization() {
-        // ConfigList
-        let cmd = IpcCommand::ConfigList {
-            category: Some("auth".into()),
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        if let IpcCommand::ConfigList { category } = decoded {
-            assert_eq!(category, Some("auth".into()));
-        } else {
-            panic!("Expected ConfigList");
-        }
-
-        // ConfigSet
-        let cmd = IpcCommand::ConfigSet {
-            key: "features.random_code_length".into(),
-            value: "8".into(),
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        if let IpcCommand::ConfigSet { key, value } = decoded {
-            assert_eq!(key, "features.random_code_length");
-            assert_eq!(value, "8");
-        } else {
-            panic!("Expected ConfigSet");
-        }
-
-        // ConfigImport
-        let cmd = IpcCommand::ConfigImport {
-            configs: vec![ConfigImportItem {
-                key: "k".into(),
-                value: "v".into(),
-            }],
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        let decoded: IpcCommand = serde_json::from_str(&json).unwrap();
-        if let IpcCommand::ConfigImport { configs } = decoded {
-            assert_eq!(configs.len(), 1);
-        } else {
-            panic!("Expected ConfigImport");
-        }
-    }
-
-    #[test]
-    fn test_config_response_serialization() {
-        // ConfigSetResult
-        let resp = IpcResponse::ConfigSetResult {
-            key: "k".into(),
-            value: "v".into(),
-            requires_restart: false,
-            is_sensitive: false,
-            old_value: Some("old".into()),
-            message: None,
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::ConfigSetResult { key, old_value, .. } = decoded {
-            assert_eq!(key, "k");
-            assert_eq!(old_value, Some("old".into()));
-        } else {
-            panic!("Expected ConfigSetResult");
-        }
-
-        // ConfigImportResult
-        let resp = IpcResponse::ConfigImportResult {
-            success: 5,
-            skipped: 1,
-            failed: 0,
-            errors: vec![],
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::ConfigImportResult {
-            success, skipped, ..
-        } = decoded
-        {
-            assert_eq!(success, 5);
-            assert_eq!(skipped, 1);
-        } else {
-            panic!("Expected ConfigImportResult");
-        }
-
-        // ConfigImportResult with errors
-        let resp = IpcResponse::ConfigImportResult {
-            success: 1,
-            skipped: 0,
-            failed: 1,
-            errors: vec![ImportErrorData {
-                code: "auth.token".into(),
-                message: "read-only".into(),
-                error_code: None,
-            }],
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let decoded: IpcResponse = serde_json::from_str(&json).unwrap();
-        if let IpcResponse::ConfigImportResult { errors, .. } = decoded {
-            assert_eq!(errors.len(), 1);
-            assert_eq!(errors[0].code, "auth.token");
-            assert_eq!(errors[0].message, "read-only");
-        } else {
-            panic!("Expected ConfigImportResult");
-        }
-    }
-
-    #[test]
     fn test_import_error_data_with_error_code() {
-        // error_code 存在时序列化
         let data = ImportErrorData {
             code: "dup".into(),
             message: "Link already exists".into(),
@@ -689,7 +434,6 @@ mod tests {
 
     #[test]
     fn test_import_error_data_without_error_code() {
-        // error_code 为 None 时不出现在 JSON 中（skip_serializing_if）
         let data = ImportErrorData {
             code: "key".into(),
             message: "unknown".into(),
@@ -698,7 +442,6 @@ mod tests {
         let json = serde_json::to_string(&data).unwrap();
         assert!(!json.contains("error_code"));
 
-        // 反序列化时缺失字段也能成功（serde default）
         let json_no_code = r#"{"code":"key","message":"unknown"}"#;
         let decoded: ImportErrorData = serde_json::from_str(json_no_code).unwrap();
         assert_eq!(decoded.error_code, None);

@@ -9,9 +9,8 @@ use tokio::time::timeout;
 
 use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
-use super::types::{
-    ConfigImportItem, ImportLinkData, IpcCommand, IpcError, IpcResponse, ShortLinkData,
-};
+use super::types::{ConfigImportItem, ImportLinkData, IpcCommand, IpcError, IpcResponse};
+use crate::storage::ShortLink;
 use crate::system::reload::ReloadTarget;
 
 /// Check if the server is running
@@ -279,7 +278,7 @@ pub async fn import_links_streaming(
 ///
 /// Sends ExportLinks command and receives streaming ExportChunk + ExportDone responses.
 /// Returns all exported links collected from chunks.
-pub async fn export_links() -> Result<Vec<ShortLinkData>, IpcError> {
+pub async fn export_links() -> Result<Vec<ShortLink>, IpcError> {
     let config = crate::config::get_config();
     let timeout_duration = config.ipc.bulk_timeout_duration();
 
@@ -298,7 +297,7 @@ pub async fn export_links() -> Result<Vec<ShortLinkData>, IpcError> {
     // Read streaming responses
     let mut buf = BytesMut::with_capacity(4096);
     let mut read_buf = [0u8; 4096];
-    let mut all_links: Vec<ShortLinkData> = Vec::new();
+    let mut all_links: Vec<ShortLink> = Vec::new();
 
     loop {
         // Try to decode any buffered responses first
