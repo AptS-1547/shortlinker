@@ -138,6 +138,8 @@ curl -sS -b cookies.txt \
 
 ## Batch operations
 
+> All three batch endpoints (`POST/PUT/DELETE /links/batch`) accept at most `5000` items per request. Larger payloads return `400 Bad Request` + `BatchSizeTooLarge`.
+
 ### POST /links/batch - Batch create
 
 > The request body is an object with `links`, not a raw array.
@@ -156,6 +158,8 @@ curl -sS -X POST \
 ### PUT /links/batch - Batch update
 
 > The request body uses `updates`, each item includes `code` and `payload`.
+>
+> `payload.target` is required (same rule as single-link update).
 
 ```bash
 curl -sS -X PUT \
@@ -188,6 +192,8 @@ The exported CSV contains a header and these columns:
 
 Supported filters: `search`, `created_after`, `created_before`, `only_expired`, `only_active` (date params must be RFC3339).
 
+Current implementation uses **streaming export** (cursor pagination + `Transfer-Encoding: chunked`), which is suitable for large datasets.
+
 The default filename in `Content-Disposition` is: `shortlinks_export_YYYYMMDD_HHMMSS.csv`.
 
 ```bash
@@ -202,6 +208,13 @@ Multipart form fields:
 - `file`: CSV file (max 10MB; oversized uploads return `400` + `FileTooLarge`)
 - `mode` (optional): `skip` (default) / `overwrite` / `error` (invalid values fall back to `skip`)
 
+Import behavior details:
+- `mode=skip`: existing codes and duplicate codes inside the same CSV are skipped
+- `mode=overwrite`: allows overwrite; for duplicate codes inside the same CSV, the last row wins
+- `mode=error`: existing codes and duplicate codes inside the same CSV are reported as failed items
+- Invalid `created_at` falls back to current time; invalid/empty `expires_at` is treated as no expiration
+- `password`: plaintext values are Argon2-hashed; values starting with `$argon2...` are kept as pre-hashed
+
 ```bash
 curl -sS -X POST \
   -b cookies.txt -c cookies.txt \
@@ -210,4 +223,25 @@ curl -sS -X POST \
   -F "file=@./shortlinks_export.csv" \
   http://localhost:8080/admin/v1/links/import
 ```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "message": "OK",
+  "data": {
+    "total_rows": 10,
+    "success_count": 9,
+    "skipped_count": 1,
+    "failed_count": 0,
+    "failed_items": []
+  }
+}
+```
+
+`failed_items` fields:
+- `row`: CSV line number (1-based; header is line 1, so first data row is usually 2)
+- `code`: failed short code (can be empty for CSV parse failures)
+- `error`: human-readable error message
+- `error_code`: mapped server error code (optional)
 

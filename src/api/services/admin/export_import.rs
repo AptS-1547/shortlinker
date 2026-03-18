@@ -7,18 +7,15 @@ use chrono::Utc;
 use csv::{ReaderBuilder, WriterBuilder};
 use futures_util::stream::{Stream, StreamExt};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-use crate::cache::traits::CompositeCacheTrait;
 use crate::errors::ShortlinkerError;
-use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
-use crate::utils::password::process_imported_password;
-use crate::utils::url_validator::validate_url;
+use crate::services::{ImportLinkItemRaw, LinkService, validate_import_rows};
+use crate::storage::{LinkFilter, ShortLink};
 
 use super::error_code::ErrorCode;
 use super::helpers::{error_from_shortlinker, error_response, success_response};
@@ -158,7 +155,7 @@ where
 pub async fn export_links(
     _req: HttpRequest,
     query: web::Query<ExportQuery>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!(
         "Admin API: export links (streaming) with filters: {:?}",
@@ -210,7 +207,7 @@ pub async fn export_links(
     };
 
     // 获取游标分页流式数据
-    let batch_stream = storage.stream_all_filtered_cursor(filter, EXPORT_BATCH_SIZE as u64);
+    let batch_stream = service.export_links_stream(filter, EXPORT_BATCH_SIZE as u64);
 
     // 行映射：ShortLink → CsvLinkRow
     let row_mapper = |link: ShortLink| CsvLinkRow {
@@ -248,8 +245,7 @@ pub async fn export_links(
 pub async fn import_links(
     _req: HttpRequest,
     mut payload: Multipart,
-    cache: web::Data<Arc<dyn CompositeCacheTrait>>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<LinkService>>,
 ) -> ActixResult<impl Responder> {
     info!("Admin API: import links request");
 
@@ -350,184 +346,86 @@ pub async fn import_links(
         .from_reader(cursor);
 
     let mut total_rows = 0;
-    let mut success_count = 0;
-    let mut skipped_count = 0;
     let mut failed_items: Vec<ImportFailedItem> = Vec::new();
+    let mut raw_items: Vec<ImportLinkItemRaw> = Vec::new();
+    // 记录 code → CSV 行号映射，仅用于回填 service 层返回的冲突失败项行号
+    // （验证错误的行号由 ImportLinkItemRaw.row_num 直接携带，不受重复 code 影响）
+    let mut code_to_row: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
 
-    // 单次解析：收集所有行和 codes
-    let mut parsed_rows: Vec<(usize, CsvLinkRow)> = Vec::new();
-    let mut all_codes: Vec<String> = Vec::new();
-
+    // Step 1: CSV 解析，收集 raw items（CSV 解析错误留在这层）
     for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
         let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
         total_rows += 1;
 
-        match result {
-            Ok(row) => {
-                if !row.code.is_empty() {
-                    all_codes.push(row.code.clone());
-                }
-                parsed_rows.push((row_num, row));
-            }
+        let row = match result {
+            Ok(row) => row,
             Err(e) => {
                 failed_items.push(ImportFailedItem {
-                    row: row_num,
+                    row: Some(row_num),
                     code: String::new(),
                     error: format!("CSV parse error: {}", e),
                     error_code: Some(ErrorCode::CsvParseError as i32),
-                });
-            }
-        }
-    }
-
-    // 冲突检测：Overwrite 模式不需要，Skip/Error 用 Bloom 预筛选
-    let existing_codes: HashSet<String> = match mode {
-        ImportMode::Overwrite => HashSet::new(),
-        ImportMode::Skip | ImportMode::Error => {
-            // Bloom Filter 预筛选：false = 一定不存在，跳过 DB 查询
-            let mut maybe_exist = Vec::new();
-            for code in &all_codes {
-                if cache.bloom_check(code).await {
-                    maybe_exist.push(code.clone());
-                }
-            }
-
-            // 只对 Bloom 返回"可能存在"的 codes 精确查询
-            if maybe_exist.is_empty() {
-                HashSet::new()
-            } else {
-                storage
-                    .batch_check_codes_exist(&maybe_exist)
-                    .await
-                    .map_err(|e| {
-                        error!("Failed to check existing codes for import: {}", e);
-                        actix_web::error::ErrorInternalServerError(format!("Database error: {}", e))
-                    })?
-            }
-        }
-    };
-
-    // 用 HashMap 避免 Overwrite 模式下 CSV 重复 code 导致 batch_set 失败
-    let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
-    // 已处理的代码（用于检测 CSV 内重复）
-    let mut processed_codes: HashSet<String> = HashSet::new();
-
-    // 处理收集的行数据
-    for (row_num, row) in parsed_rows {
-        // 验证 code
-        if row.code.is_empty() {
-            failed_items.push(ImportFailedItem {
-                row: row_num,
-                code: row.code,
-                error: "Empty code".to_string(),
-                error_code: Some(ErrorCode::LinkEmptyCode as i32),
-            });
-            continue;
-        }
-
-        // 验证 URL
-        if let Err(e) = validate_url(&row.target) {
-            failed_items.push(ImportFailedItem {
-                row: row_num,
-                code: row.code,
-                error: format!("Invalid URL: {}", e),
-                error_code: Some(ErrorCode::LinkInvalidUrl as i32),
-            });
-            continue;
-        }
-
-        // 检查冲突
-        let exists = existing_codes.contains(&row.code) || processed_codes.contains(&row.code);
-        if exists {
-            match mode {
-                ImportMode::Skip => {
-                    skipped_count += 1;
-                    continue;
-                }
-                ImportMode::Error => {
-                    failed_items.push(ImportFailedItem {
-                        row: row_num,
-                        code: row.code,
-                        error: "Link already exists".to_string(),
-                        error_code: Some(ErrorCode::LinkAlreadyExists as i32),
-                    });
-                    continue;
-                }
-                ImportMode::Overwrite => {
-                    // 继续处理，允许覆盖
-                }
-            }
-        }
-
-        // 解析 created_at
-        let created_at = chrono::DateTime::parse_from_rfc3339(&row.created_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| {
-                warn!(
-                    "Row {}: Invalid created_at '{}', using current time",
-                    row_num, row.created_at
-                );
-                Utc::now()
-            });
-
-        // 解析 expires_at
-        let expires_at = row.expires_at.as_ref().and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                chrono::DateTime::parse_from_rfc3339(s)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-            }
-        });
-
-        // 处理密码字段（导入路径：已哈希则保留，明文则哈希）
-        let password = match process_imported_password(row.password.as_deref()) {
-            Ok(pwd) => pwd,
-            Err(e) => {
-                failed_items.push(ImportFailedItem {
-                    row: row_num,
-                    code: row.code,
-                    error: format!("Password hash error: {}", e),
-                    error_code: Some(ErrorCode::LinkPasswordHashError as i32),
                 });
                 continue;
             }
         };
 
-        let link = ShortLink {
-            code: row.code.clone(),
+        code_to_row.insert(row.code.clone(), row_num);
+        raw_items.push(ImportLinkItemRaw {
+            code: row.code,
             target: row.target,
-            created_at,
-            expires_at,
-            password,
-            click: row.click_count,
-        };
-
-        processed_codes.insert(row.code.clone());
-        links_to_insert.insert(row.code, link);
-        success_count += 1;
+            created_at: row.created_at,
+            expires_at: row.expires_at,
+            password: row.password,
+            click_count: row.click_count,
+            row_num: Some(row_num),
+        });
     }
 
-    // 批量插入数据库
-    let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
-    if !links_vec.is_empty() {
-        if let Err(e) = storage.batch_set(links_vec.clone()).await {
-            error!("Failed to batch insert links: {}", e);
-            return Ok(error_from_shortlinker(&ShortlinkerError::import_failed(
-                format!("Database error: {}", e),
-            )));
-        }
+    // Step 2: 统一验证（URL、日期、密码、空 code）
+    let (valid_items, row_errors) = validate_import_rows(raw_items);
 
-        // 更新缓存
-        let default_ttl = crate::config::get_config().cache.default_ttl;
-        for link in links_vec {
-            let code = link.code.clone();
-            let ttl = link.cache_ttl(default_ttl);
-            cache.insert(&code, link, ttl).await;
-        }
+    for err in row_errors {
+        // 验证错误直接使用 row_num（跟随原始数据，不受重复 code 影响）
+        let error_code = ErrorCode::from(err.error.clone()) as i32;
+        failed_items.push(ImportFailedItem {
+            row: err.row_num,
+            code: err.code,
+            error: err.error.message().to_string(),
+            error_code: Some(error_code),
+        });
     }
 
+    // 委托 service 处理冲突检测、去重、批量写入和缓存更新
+    let batch_result = match service.import_links_batch(valid_items, mode).await {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Failed to import links: {}", e);
+            return Ok(error_from_shortlinker(&e));
+        }
+    };
+
+    // 合并 service 返回的失败项，优先使用 item.row_num（精确），回退到 code_to_row
+    for item in batch_result.failed_items {
+        let row = item.row_num.or_else(|| {
+            let r = code_to_row.get(&item.code).copied();
+            if r.is_none() {
+                warn!("Could not find row number for code '{}'", &item.code);
+            }
+            r
+        });
+        let error_code = ErrorCode::from(item.error.clone()) as i32;
+        failed_items.push(ImportFailedItem {
+            row,
+            code: item.code,
+            error: item.error.message().to_string(),
+            error_code: Some(error_code),
+        });
+    }
+
+    let success_count = batch_result.success_count;
+    let skipped_count = batch_result.skipped_count;
     let failed_count = failed_items.len();
 
     info!(

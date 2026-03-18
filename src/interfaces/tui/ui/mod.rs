@@ -2,6 +2,9 @@
 mod add_link;
 mod batch_delete_confirm;
 mod common;
+mod config_edit;
+mod config_list;
+mod config_reset_confirm;
 mod delete_confirm;
 mod detail_panel;
 mod edit_link;
@@ -10,9 +13,13 @@ mod export_filename;
 mod export_import;
 mod file_browser;
 mod help;
+mod import_mode;
 mod inline_search;
 mod main_screen;
+mod password_reset;
 mod search;
+mod server_status;
+mod system_menu;
 mod view_details;
 pub mod widgets;
 
@@ -22,6 +29,9 @@ pub use common::{draw_footer, draw_status_bar, draw_title_bar};
 // Re-export screen drawing functions
 pub use add_link::draw_add_link_screen;
 pub use batch_delete_confirm::draw_batch_delete_confirm_screen;
+pub use config_edit::draw_config_edit_screen;
+pub use config_list::draw_config_list_screen;
+pub use config_reset_confirm::draw_config_reset_confirm_screen;
 pub use delete_confirm::draw_delete_confirm_screen;
 pub use detail_panel::draw_detail_panel;
 pub use edit_link::draw_edit_link_screen;
@@ -30,9 +40,13 @@ pub use export_filename::draw_export_filename_screen;
 pub use export_import::draw_export_import_screen;
 pub use file_browser::draw_file_browser_screen;
 pub use help::draw_help_screen;
+pub use import_mode::draw_import_mode_screen;
 pub use inline_search::draw_inline_search_bar;
 pub use main_screen::draw_main_screen;
+pub use password_reset::draw_password_reset_screen;
 pub use search::draw_search_screen;
+pub use server_status::draw_server_status_screen;
+pub use system_menu::draw_system_menu_screen;
 pub use view_details::draw_view_details_screen;
 
 use super::app::{App, CurrentScreen};
@@ -98,6 +112,15 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         CurrentScreen::ViewDetails => draw_view_details_screen(frame, app, main_chunks[1]),
         CurrentScreen::FileBrowser => draw_file_browser_screen(frame, app, main_chunks[1]),
         CurrentScreen::ExportFileName => draw_export_filename_screen(frame, app, main_chunks[1]),
+        CurrentScreen::SystemMenu => draw_system_menu_screen(frame, app, main_chunks[1]),
+        CurrentScreen::ServerStatus => draw_server_status_screen(frame, app, main_chunks[1]),
+        CurrentScreen::ConfigList => draw_config_list_screen(frame, app, main_chunks[1]),
+        CurrentScreen::ConfigEdit => draw_config_edit_screen(frame, app, main_chunks[1]),
+        CurrentScreen::ConfigResetConfirm => {
+            draw_config_reset_confirm_screen(frame, app, main_chunks[1])
+        }
+        CurrentScreen::PasswordReset => draw_password_reset_screen(frame, app, main_chunks[1]),
+        CurrentScreen::ImportModeSelect => draw_import_mode_screen(frame, app, main_chunks[1]),
     }
 
     // Inline search bar (if active)

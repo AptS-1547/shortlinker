@@ -97,6 +97,10 @@ async fn test_admin_auth_missing_token_returns_404() {
 
     let req = TestRequest::get().uri("/admin/v1/test").to_request();
     let resp = test::call_service(&app, req).await;
+
+    // Restore admin token to prevent race conditions with parallel tests
+    let _ = rt.set("api.admin_token", "test-secret-token").await;
+
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 

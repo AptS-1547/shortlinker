@@ -18,7 +18,7 @@ pub fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect) {
         ),
         Span::styled("| ", Style::default().fg(Color::DarkGray)),
         Span::styled(
-            format!("Total: {} ", app.links.len()),
+            format!("Total: {} ", app.total_count),
             Style::default().fg(Color::Yellow),
         ),
     ])];
@@ -68,12 +68,14 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let shortcuts = match app.current_screen {
         CurrentScreen::Main => vec![
             ("Up/Down", "Navigate", Color::Cyan),
+            ("/", "Prev/Next Page", Color::Cyan),
             ("/", "Search", Color::Cyan),
             ("v", "View", Color::Cyan),
             ("a", "Add", Color::Green),
             ("e", "Edit", Color::Yellow),
             ("d", "Delete", Color::Red),
             ("x", "Export / Import", Color::Magenta),
+            ("o", "System", Color::Magenta),
             ("?", "Help", Color::Blue),
             ("q", "Quit", Color::Magenta),
         ],
@@ -104,6 +106,38 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         ],
         CurrentScreen::ExportFileName => vec![
             ("Enter", "Confirm", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::SystemMenu => vec![
+            ("s", "Status", Color::Cyan),
+            ("c", "Config", Color::Yellow),
+            ("p", "Password", Color::Red),
+            ("Esc", "Back", Color::Red),
+        ],
+        CurrentScreen::ServerStatus => {
+            vec![("r", "Refresh", Color::Cyan), ("Esc", "Back", Color::Red)]
+        }
+        CurrentScreen::ConfigList => vec![
+            ("j/k", "Navigate", Color::Cyan),
+            ("e", "Edit", Color::Yellow),
+            ("r", "Reset", Color::Red),
+            ("Esc", "Back", Color::Red),
+        ],
+        CurrentScreen::ConfigEdit => vec![
+            ("Enter", "Save", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::ConfigResetConfirm => {
+            vec![("y", "Yes", Color::Green), ("n", "No", Color::Red)]
+        }
+        CurrentScreen::PasswordReset => vec![
+            ("Tab", "Switch Field", Color::Cyan),
+            ("Enter", "Save", Color::Green),
+            ("Esc", "Cancel", Color::Red),
+        ],
+        CurrentScreen::ImportModeSelect => vec![
+            ("s", "Skip", Color::Green),
+            ("o", "Overwrite", Color::Red),
             ("Esc", "Cancel", Color::Red),
         ],
     };

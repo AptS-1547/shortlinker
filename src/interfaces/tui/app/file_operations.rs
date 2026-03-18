@@ -2,27 +2,43 @@
 
 use super::state::App;
 use crate::errors::ShortlinkerError;
+use crate::services::{ImportBatchResult, ImportLinkItemRich};
 use crate::storage::ShortLink;
 use crate::utils::csv_handler;
 
 impl App {
     pub async fn export_links(&mut self) -> Result<(), ShortlinkerError> {
-        let links_vec: Vec<&ShortLink> = self.links.values().collect();
+        let links = self.link_client.export_links().await?;
+        let links_ref: Vec<&ShortLink> = links.iter().collect();
 
         // Use csv_handler to export
-        csv_handler::export_to_csv(&links_vec, &self.export_path)?;
+        csv_handler::export_to_csv(&links_ref, &self.export_path)?;
 
         Ok(())
     }
 
-    pub async fn import_links(&mut self) -> Result<(), ShortlinkerError> {
+    pub async fn import_links(
+        &mut self,
+        overwrite: bool,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
         let imported_links: Vec<ShortLink> = csv_handler::import_from_csv(&self.import_path)?;
 
-        for link in imported_links {
-            self.storage.set(link).await?;
-        }
+        let items: Vec<ImportLinkItemRich> = imported_links
+            .into_iter()
+            .map(|link| ImportLinkItemRich {
+                code: link.code,
+                target: link.target,
+                created_at: link.created_at,
+                expires_at: link.expires_at,
+                password: link.password,
+                click_count: link.click,
+                row_num: None,
+            })
+            .collect();
 
-        Ok(())
+        let result = self.link_client.import_links(items, overwrite).await?;
+
+        Ok(result)
     }
 
     /// Load directory entries for file browser

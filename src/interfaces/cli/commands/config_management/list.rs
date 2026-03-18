@@ -1,10 +1,9 @@
 //! Config list command
 
-use crate::config::definitions::{ALL_CONFIGS, categories};
+use crate::client::ConfigClient;
+use crate::config::definitions::{categories, get_def};
 use crate::interfaces::cli::CliError;
-use crate::storage::ConfigStore;
 use colored::Colorize;
-use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -24,106 +23,89 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-/// List all configurations
+/// List all configurations via ConfigClient
 pub async fn config_list(
-    db: DatabaseConnection,
+    client: &ConfigClient,
     category: Option<String>,
     json: bool,
 ) -> Result<(), CliError> {
-    let store = ConfigStore::new(db);
-    let all_configs = store
-        .get_all()
-        .await
-        .map_err(|e| CliError::StorageError(e.to_string()))?;
+    let items = client.get_all(category).await?;
 
-    // Group configs by category
+    // Group configs by category, enriching with definition metadata
     let mut grouped: BTreeMap<String, Vec<ConfigOutput>> = BTreeMap::new();
 
-    for def in ALL_CONFIGS {
-        // Filter by category if specified
-        if let Some(ref cat) = category
-            && def.category != cat.as_str()
-        {
-            continue;
-        }
-
-        let value = all_configs
-            .get(def.key)
-            .map(|item| (*item.value).clone())
-            .unwrap_or_else(|| (def.default_fn)());
-
-        // Mask sensitive values
-        let display_value = if def.is_sensitive {
-            "*****".to_string()
+    for item in &items {
+        let (cat, editable) = if let Some(def) = get_def(&item.key) {
+            (def.category.to_string(), def.editable)
         } else {
-            value
+            ("unknown".to_string(), true)
         };
 
         let output = ConfigOutput {
-            key: def.key.to_string(),
-            value: display_value,
-            category: def.category.to_string(),
-            value_type: def.value_type.to_string(),
-            requires_restart: def.requires_restart,
-            editable: def.editable,
-            sensitive: def.is_sensitive,
+            key: item.key.clone(),
+            value: item.value.clone(),
+            category: cat.clone(),
+            value_type: item.value_type.to_string(),
+            requires_restart: item.requires_restart,
+            editable,
+            sensitive: item.is_sensitive,
         };
 
-        grouped
-            .entry(def.category.to_string())
-            .or_default()
-            .push(output);
+        grouped.entry(cat).or_default().push(output);
     }
 
     if json {
-        // Flatten for JSON output
         let all: Vec<_> = grouped.into_values().flatten().collect();
         let json_str = serde_json::to_string_pretty(&all)
             .map_err(|e| CliError::CommandError(format!("Failed to serialize to JSON: {}", e)))?;
         println!("{}", json_str);
     } else {
-        // Pretty print grouped by category
-        let category_names = [
-            (categories::AUTH, "Authentication"),
-            (categories::COOKIE, "Cookie"),
-            (categories::FEATURES, "Features"),
-            (categories::ROUTES, "Routes"),
-            (categories::CORS, "CORS"),
-            (categories::TRACKING, "Tracking"),
-        ];
-
-        for (cat_key, cat_name) in &category_names {
-            if let Some(configs) = grouped.get(*cat_key) {
-                if configs.is_empty() {
-                    continue;
-                }
-
-                println!("\n{}", format!("[{}]", cat_name).bold().cyan());
-
-                for cfg in configs {
-                    let mut tags = Vec::new();
-                    if cfg.sensitive {
-                        tags.push("sensitive".yellow().to_string());
-                    }
-                    if cfg.requires_restart {
-                        tags.push("restart".red().to_string());
-                    }
-                    if !cfg.editable {
-                        tags.push("readonly".dimmed().to_string());
-                    }
-
-                    let tag_str = if tags.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" ({})", tags.join(", "))
-                    };
-
-                    println!("  {} = {}{}", cfg.key.green(), cfg.value.white(), tag_str);
-                }
-            }
-        }
-        println!();
+        print_grouped_configs(&grouped);
     }
 
     Ok(())
+}
+
+/// Pretty print configs grouped by category
+fn print_grouped_configs(grouped: &BTreeMap<String, Vec<ConfigOutput>>) {
+    let category_names = [
+        (categories::AUTH, "Authentication"),
+        (categories::COOKIE, "Cookie"),
+        (categories::FEATURES, "Features"),
+        (categories::ROUTES, "Routes"),
+        (categories::CORS, "CORS"),
+        (categories::TRACKING, "Tracking"),
+    ];
+
+    for (cat_key, cat_name) in &category_names {
+        if let Some(configs) = grouped.get(*cat_key) {
+            if configs.is_empty() {
+                continue;
+            }
+
+            println!("\n{}", format!("[{}]", cat_name).bold().cyan());
+
+            for cfg in configs {
+                let mut tags = Vec::new();
+                if cfg.sensitive {
+                    tags.push("sensitive".yellow().to_string());
+                }
+                if cfg.requires_restart {
+                    tags.push("restart".red().to_string());
+                }
+                if !cfg.editable {
+                    tags.push("readonly".dimmed().to_string());
+                }
+
+                let tag_str = if tags.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", tags.join(", "))
+                };
+
+                println!("  {} = {}{}", cfg.key.green(), cfg.value.white(), tag_str);
+            }
+        }
+    }
+    println!();
 }

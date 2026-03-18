@@ -3,10 +3,14 @@
 //! Provides unified business logic for link operations, shared between
 //! IPC handlers and HTTP handlers.
 
+use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use tracing::{error, info};
+use futures_util::Stream;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info};
 
 use crate::cache::traits::CompositeCacheTrait;
 use crate::config::{get_config, keys, try_get_runtime_config};
@@ -55,6 +59,7 @@ pub struct LinkCreateResult {
 }
 
 /// Single import item
+#[deprecated(since = "0.6.0", note = "Use `ImportLinkItemRich` instead")]
 #[derive(Debug, Clone)]
 pub struct ImportLinkItem {
     pub code: String,
@@ -64,7 +69,9 @@ pub struct ImportLinkItem {
 }
 
 /// Import conflict resolution mode
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
+#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[serde(rename_all = "lowercase")]
 pub enum ImportMode {
     /// Skip existing links
     #[default]
@@ -103,6 +110,8 @@ mod import_mode_tests {
 }
 
 /// Result of import operation
+#[deprecated(since = "0.6.0", note = "Use `ImportBatchResult` instead")]
+#[allow(deprecated)]
 #[derive(Debug, Clone, Default)]
 pub struct ImportResult {
     pub success: usize,
@@ -112,10 +121,45 @@ pub struct ImportResult {
 }
 
 /// Single import error
+#[deprecated(since = "0.6.0", note = "Use `ImportBatchFailedItem` instead")]
 #[derive(Debug, Clone)]
 pub struct ImportError {
     pub code: String,
     pub message: String,
+}
+
+// ============ Batch Import DTOs ============
+
+/// 已预处理的导入项（URL 已验证、密码已处理、日期已解析）
+///
+/// handler 负责 CSV 解析和字段验证，service 负责冲突检测、去重、写入和缓存更新。
+#[derive(Debug, Clone)]
+pub struct ImportLinkItemRich {
+    pub code: String,
+    pub target: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub password: Option<String>,
+    pub click_count: usize,
+    /// 来源行号（仅 CSV 导入路径设置），用于错误报告
+    pub row_num: Option<usize>,
+}
+
+/// 批量导入结果
+#[derive(Debug, Clone, Default)]
+pub struct ImportBatchResult {
+    pub success_count: usize,
+    pub skipped_count: usize,
+    pub failed_items: Vec<ImportBatchFailedItem>,
+}
+
+/// 批量导入失败项
+#[derive(Debug, Clone)]
+pub struct ImportBatchFailedItem {
+    pub code: String,
+    pub error: ShortlinkerError,
+    /// 来源行号，从 ImportLinkItemRich.row_num 透传
+    pub row_num: Option<usize>,
 }
 
 // ============ Batch Operation DTOs ============
@@ -400,6 +444,8 @@ impl LinkService {
     // ============ Batch Operations ============
 
     /// Import multiple links
+    #[deprecated(since = "0.6.0", note = "Use `import_links_batch` instead")]
+    #[allow(deprecated)]
     pub async fn import_links(
         &self,
         links: Vec<ImportLinkItem>,
@@ -448,6 +494,8 @@ impl LinkService {
         })?;
 
         // Step 3: Process each item with in-memory existence check
+        let mut links_to_save: Vec<ShortLink> = Vec::new();
+
         for item in valid_items {
             let existing = existing_map.get(&item.code);
 
@@ -505,28 +553,34 @@ impl LinkService {
                 (Utc::now(), 0)
             };
 
-            let new_link = ShortLink {
-                code: item.code.clone(),
+            links_to_save.push(ShortLink {
+                code: item.code,
                 target: item.target,
                 created_at,
                 expires_at,
                 password,
                 click,
-            };
+            });
+        }
 
-            // Save to storage
-            if let Err(e) = self.storage.set(new_link.clone()).await {
-                result.failed += 1;
-                result.errors.push(ImportError {
-                    code: item.code,
-                    message: format!("Failed to save: {}", e),
-                });
-                continue;
+        // Step 4: Batch save to storage (single transaction)
+        if !links_to_save.is_empty() {
+            if let Err(e) = self.storage.batch_set(links_to_save.clone()).await {
+                // If batch fails, all items in this batch are failed
+                for link in &links_to_save {
+                    result.failed += 1;
+                    result.errors.push(ImportError {
+                        code: link.code.clone(),
+                        message: format!("Failed to save: {}", e),
+                    });
+                }
+            } else {
+                result.success += links_to_save.len();
+                // Batch update cache
+                for link in &links_to_save {
+                    self.update_cache(link).await;
+                }
             }
-
-            // Update cache
-            self.update_cache(&new_link).await;
-            result.success += 1;
         }
 
         info!(
@@ -538,6 +592,7 @@ impl LinkService {
     }
 
     /// Export all links
+    #[deprecated(since = "0.6.0", note = "Use `export_links_stream` instead")]
     pub async fn export_links(&self) -> Result<Vec<ShortLink>, ShortlinkerError> {
         let links_map = self.storage.load_all().await.map_err(|e| {
             ShortlinkerError::database_operation(format!("Failed to load links: {}", e))
@@ -546,6 +601,175 @@ impl LinkService {
         let links: Vec<ShortLink> = links_map.into_values().collect();
         info!("LinkService: exported {} links", links.len());
         Ok(links)
+    }
+
+    /// 流式导出链接（游标分页）
+    ///
+    /// 返回分批数据流，支持 LinkFilter 过滤条件。
+    /// 用于大数据量导出场景，避免一次性加载全部数据到内存。
+    pub fn export_links_stream(
+        &self,
+        filter: LinkFilter,
+        batch_size: u64,
+    ) -> Pin<Box<dyn Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send + 'static>> {
+        self.storage.stream_all_filtered_cursor(filter, batch_size)
+    }
+
+    /// 高性能批量导入链接
+    ///
+    /// 使用 Bloom filter 预筛选 + batch_check_codes_exist 精确查询 + batch_set 批量写入。
+    /// 保留原始 created_at 和 click_count。
+    ///
+    /// 调用方负责 CSV 解析、URL 验证、日期解析、密码处理。
+    /// 本方法负责冲突检测、CSV 内去重、批量写入和缓存更新。
+    pub async fn import_links_batch(
+        &self,
+        items: Vec<ImportLinkItemRich>,
+        mode: ImportMode,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
+        self.import_links_batch_chunked(items, mode, usize::MAX, None)
+            .await
+    }
+
+    /// 高性能批量导入链接（分块写入，带进度回调）
+    ///
+    /// 写入阶段按 `chunk_size` 分批，每批写完后调用 `on_chunk_written(processed, total)`。
+    /// `import_links_batch` 是本方法以 `usize::MAX` 为块大小的便捷封装。
+    pub async fn import_links_batch_chunked(
+        &self,
+        items: Vec<ImportLinkItemRich>,
+        mode: ImportMode,
+        chunk_size: usize,
+        on_chunk_written: Option<&(dyn Fn(usize, usize) + Send + Sync)>,
+    ) -> Result<ImportBatchResult, ShortlinkerError> {
+        let mut result = ImportBatchResult::default();
+
+        if items.is_empty() {
+            return Ok(result);
+        }
+
+        if chunk_size == 0 {
+            return Err(ShortlinkerError::internal_error(
+                "chunk_size must be greater than 0",
+            ));
+        }
+
+        // 1. 收集所有 codes
+        let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
+
+        // 2. 冲突检测：Bloom filter 预筛选 + 精确查询
+        let existing_codes: HashSet<String> = match mode {
+            ImportMode::Overwrite => HashSet::new(),
+            ImportMode::Skip | ImportMode::Error => {
+                let mut maybe_exist = Vec::new();
+                for code in &all_codes {
+                    if self.cache.bloom_check(code).await {
+                        maybe_exist.push(code.clone());
+                    }
+                }
+
+                if maybe_exist.is_empty() {
+                    HashSet::new()
+                } else {
+                    self.storage
+                        .batch_check_codes_exist(&maybe_exist)
+                        .await
+                        .map_err(|e| {
+                            ShortlinkerError::database_operation(format!(
+                                "Failed to check existing codes: {}",
+                                e
+                            ))
+                        })?
+                }
+            }
+        };
+
+        debug!(
+            "LinkService: import batch - {} items, {} existing codes found",
+            items.len(),
+            existing_codes.len()
+        );
+
+        // 3. CSV 内去重 + 冲突处理
+        let mut links_to_insert: HashMap<String, ShortLink> = HashMap::new();
+        let mut processed_codes: HashSet<String> = HashSet::new();
+
+        for item in items {
+            let exists =
+                existing_codes.contains(&item.code) || processed_codes.contains(&item.code);
+            if exists {
+                match mode {
+                    ImportMode::Skip => {
+                        result.skipped_count += 1;
+                        continue;
+                    }
+                    ImportMode::Error => {
+                        result.failed_items.push(ImportBatchFailedItem {
+                            code: item.code,
+                            error: ShortlinkerError::link_already_exists("Link already exists"),
+                            row_num: item.row_num,
+                        });
+                        continue;
+                    }
+                    ImportMode::Overwrite => {
+                        // CSV 内重复 code：后一条覆盖前一条，修正计数
+                        if processed_codes.contains(&item.code) {
+                            result.success_count -= 1;
+                        }
+                    }
+                }
+            }
+
+            let link = ShortLink {
+                code: item.code.clone(),
+                target: item.target,
+                created_at: item.created_at,
+                expires_at: item.expires_at,
+                password: item.password,
+                click: item.click_count,
+            };
+
+            processed_codes.insert(item.code.clone());
+            links_to_insert.insert(item.code, link);
+            result.success_count += 1;
+        }
+
+        // 4. 分块写入数据库 + 缓存更新
+        let links_vec: Vec<ShortLink> = links_to_insert.into_values().collect();
+        let total = links_vec.len();
+
+        if !links_vec.is_empty() {
+            let default_ttl = self.default_cache_ttl();
+            let mut processed = 0usize;
+
+            for chunk in links_vec.chunks(chunk_size) {
+                self.storage.batch_set(chunk.to_vec()).await.map_err(|e| {
+                    ShortlinkerError::database_operation(format!(
+                        "Failed to batch insert links: {}",
+                        e
+                    ))
+                })?;
+
+                for link in chunk {
+                    let ttl = link.cache_ttl(default_ttl);
+                    self.cache.insert(&link.code, link.clone(), ttl).await;
+                }
+
+                processed += chunk.len();
+                if let Some(cb) = &on_chunk_written {
+                    cb(processed, total);
+                }
+            }
+        }
+
+        info!(
+            "LinkService: import batch completed - success: {}, skipped: {}, failed: {}",
+            result.success_count,
+            result.skipped_count,
+            result.failed_items.len()
+        );
+
+        Ok(result)
     }
 
     /// Batch create links

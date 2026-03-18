@@ -9,7 +9,7 @@ use tracing::info;
 use crate::services::{CreateLinkRequest, LinkService, UpdateLinkRequest};
 
 use super::error_code::ErrorCode;
-use super::helpers::{error_response, success_response};
+use super::helpers::{error_from_shortlinker, error_response, success_response};
 use super::types::{
     BatchCreateRequest, BatchDeleteRequest, BatchFailedItem, BatchResponse, BatchUpdateRequest,
 };
@@ -55,10 +55,10 @@ pub async fn batch_create_links(
         .collect();
 
     // 调用 LinkService 批量创建
-    let result = service
-        .batch_create_links(requests)
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let result = match service.batch_create_links(requests).await {
+        Ok(r) => r,
+        Err(e) => return Ok(error_from_shortlinker(&e)),
+    };
 
     // 转换为 API 响应格式
     let success: Vec<String> = result.success.iter().map(|s| s.code.clone()).collect();
@@ -122,10 +122,10 @@ pub async fn batch_update_links(
         .collect();
 
     // 调用 LinkService 批量更新
-    let result = service
-        .batch_update_links(updates)
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let result = match service.batch_update_links(updates).await {
+        Ok(r) => r,
+        Err(e) => return Ok(error_from_shortlinker(&e)),
+    };
 
     // 转换为 API 响应格式
     let success: Vec<String> = result.success.iter().map(|s| s.code.clone()).collect();
@@ -173,10 +173,10 @@ pub async fn batch_delete_links(
     );
 
     // 调用 LinkService 批量删除
-    let result = service
-        .batch_delete_links(batch.codes.clone())
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let result = match service.batch_delete_links(batch.codes.clone()).await {
+        Ok(r) => r,
+        Err(e) => return Ok(error_from_shortlinker(&e)),
+    };
 
     // 转换为 API 响应格式
     let success = result.deleted;

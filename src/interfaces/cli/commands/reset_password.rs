@@ -1,4 +1,9 @@
 //! 重置密码 CLI 命令
+//!
+//! DESIGN NOTE: 此命令有意使用直连 ConfigStore 而非 IPC 优先模式，原因：
+//! 1. 必须在 server 未运行时可用（紧急恢复场景）
+//! 2. 通过 IPC socket 暴露密码重置会带来安全风险
+//! 3. 这是管理员专用操作，需要直接 DB 访问权限
 
 use crate::config::runtime_config::keys;
 use crate::storage::ConfigStore;

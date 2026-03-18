@@ -108,7 +108,7 @@ impl RollupManager {
 
         // 同时更新全局小时汇总
         let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
-        let unique_links = updates.len() as i32;
+        let unique_links = updates.len().min(i32::MAX as usize) as i32;
         writer
             .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "rollup")
             .await?;
@@ -177,7 +177,7 @@ impl RollupManager {
                 .entry(record.short_code.clone())
                 .or_insert_with(|| ClickAggregation::new(0));
 
-            agg.count += record.click_count as usize;
+            agg.count = agg.count.saturating_add(record.click_count.max(0) as usize);
 
             // 合并 referrer 统计
             let referrers = super::parse_json_counts(&record.referrer_counts);
@@ -224,12 +224,14 @@ impl RollupManager {
             // 从 HashMap 查找现有记录
             if let Some(record) = existing_map.get(code) {
                 let mut active: click_stats_daily::ActiveModel = record.clone().into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count = Set(old_count + agg.count as i64);
-                }
-                active.unique_referrers = Set(Some(agg.referrers.len() as i32));
-                active.unique_countries = Set(Some(agg.countries.len() as i32));
-                active.unique_sources = Set(Some(agg.sources.len() as i32));
+                let old_count = record.click_count;
+                active.click_count =
+                    Set(old_count.saturating_add(agg.count.min(i64::MAX as usize) as i64));
+                active.unique_referrers =
+                    Set(Some(agg.referrers.len().min(i32::MAX as usize) as i32));
+                active.unique_countries =
+                    Set(Some(agg.countries.len().min(i32::MAX as usize) as i32));
+                active.unique_sources = Set(Some(agg.sources.len().min(i32::MAX as usize) as i32));
                 active.top_referrers = Set(Some(serde_json::to_string(&top_referrers)?));
                 active.top_countries = Set(Some(serde_json::to_string(&top_countries)?));
                 active.top_sources = Set(Some(serde_json::to_string(&top_sources)?));
@@ -238,10 +240,10 @@ impl RollupManager {
                 let model = click_stats_daily::ActiveModel {
                     short_code: Set(code.clone()),
                     day_bucket: Set(target_date),
-                    click_count: Set(agg.count as i64),
-                    unique_referrers: Set(Some(agg.referrers.len() as i32)),
-                    unique_countries: Set(Some(agg.countries.len() as i32)),
-                    unique_sources: Set(Some(agg.sources.len() as i32)),
+                    click_count: Set(agg.count.min(i64::MAX as usize) as i64),
+                    unique_referrers: Set(Some(agg.referrers.len().min(i32::MAX as usize) as i32)),
+                    unique_countries: Set(Some(agg.countries.len().min(i32::MAX as usize) as i32)),
+                    unique_sources: Set(Some(agg.sources.len().min(i32::MAX as usize) as i32)),
                     top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
                     top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
                     top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
@@ -279,8 +281,11 @@ impl RollupManager {
 
         // ---- 全局天汇总 ----
         // 从已聚合的 per-code 数据中计算全局统计
-        let total_clicks: i64 = aggregated.values().map(|a| a.count as i64).sum();
-        let unique_links = aggregated.len() as i32;
+        let total_clicks: i64 = aggregated
+            .values()
+            .map(|a| a.count.min(i64::MAX as usize) as i64)
+            .fold(0i64, |acc, x| acc.saturating_add(x));
+        let unique_links = aggregated.len().min(i32::MAX as usize) as i32;
 
         let mut global_referrers: HashMap<String, usize> = HashMap::new();
         let mut global_countries: HashMap<String, usize> = HashMap::new();

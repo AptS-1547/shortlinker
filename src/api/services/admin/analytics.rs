@@ -21,7 +21,6 @@ use crate::services::{
     ReferrerStats as ServiceReferrerStats, TopLink as ServiceTopLink,
     TrendData as ServiceTrendData,
 };
-use crate::storage::SeaOrmStorage;
 
 use super::export_import::create_csv_stream;
 use super::helpers::{error_from_shortlinker, success_response};
@@ -366,7 +365,7 @@ const EXPORT_BATCH_SIZE: u64 = 10000;
 pub async fn export_report(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
-    storage: web::Data<Arc<SeaOrmStorage>>,
+    service: web::Data<Arc<AnalyticsService>>,
 ) -> ActixResult<impl Responder> {
     info!(
         "Admin API: export_report (streaming) with query: {:?}",
@@ -377,7 +376,7 @@ pub async fn export_report(
         AnalyticsService::parse_date_range(query.start_date.as_deref(), query.end_date.as_deref());
 
     // 获取流式数据
-    let batch_stream = storage.stream_click_logs_cursor(start, end, EXPORT_BATCH_SIZE);
+    let batch_stream = service.export_click_logs_stream(start, end, EXPORT_BATCH_SIZE);
 
     // 行映射：click_log::Model → ClickLogCsvRow
     let row_mapper = |log: migration::entities::click_log::Model| ClickLogCsvRow {

@@ -279,22 +279,15 @@ pub struct ExportQuery {
     pub only_active: Option<bool>,
 }
 
-/// 导入模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
-#[serde(rename_all = "lowercase")]
-pub enum ImportMode {
-    #[default]
-    Skip, // 跳过已存在的
-    Overwrite, // 覆盖已存在的
-    Error,     // 遇到已存在的报错
-}
+/// 导入模式 - 从 service 层 re-export
+pub use crate::services::ImportMode;
 
 /// 导入失败项
 #[derive(Serialize, Deserialize, Clone, Debug, TS)]
 #[ts(export, export_to = TS_EXPORT_PATH)]
 pub struct ImportFailedItem {
-    pub row: usize,
+    /// CSV 行号（1-based），None 表示行号未知（如 service 层返回的冲突项无法反查行号）
+    pub row: Option<usize>,
     pub code: String,
     pub error: String,
     #[serde(skip_serializing_if = "Option::is_none")]

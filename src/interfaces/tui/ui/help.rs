@@ -124,6 +124,17 @@ pub fn draw_help_screen(frame: &mut Frame, area: Rect) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
+            "SYSTEM",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  o                ", Style::default().fg(Color::Magenta)),
+            Span::styled("System operations", Style::default().fg(Color::White)),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
             "FORM EDITING",
             Style::default()
                 .fg(Color::Yellow)

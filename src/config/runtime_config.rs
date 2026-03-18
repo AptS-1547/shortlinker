@@ -1,6 +1,7 @@
+use parking_lot::RwLock;
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, OnceLock};
 use tracing::info;
 
 use crate::errors::{Result, ShortlinkerError};
@@ -19,7 +20,7 @@ static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 /// 提供从数据库加载配置并缓存到内存的功能，
 /// 支持热更新和实时重载。
 pub struct RuntimeConfig {
-    cache: Arc<RwLock<HashMap<String, ConfigItem>>>,
+    cache: RwLock<HashMap<String, ConfigItem>>,
     store: Arc<ConfigStore>,
 }
 
@@ -27,7 +28,7 @@ impl RuntimeConfig {
     /// 创建新的运行时配置实例
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
-            cache: Arc::new(RwLock::new(HashMap::new())),
+            cache: RwLock::new(HashMap::new()),
             store: Arc::new(ConfigStore::new(db)),
         }
     }
@@ -39,9 +40,7 @@ impl RuntimeConfig {
 
         // 更新内部缓存
         {
-            let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
-            })?;
+            let mut cache = self.cache.write();
             *cache = configs;
         }
 
@@ -56,9 +55,7 @@ impl RuntimeConfig {
 
         // 更新内部缓存
         {
-            let mut cache = self.cache.write().map_err(|_| {
-                ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
-            })?;
+            let mut cache = self.cache.write();
             *cache = configs;
         }
 
@@ -68,28 +65,19 @@ impl RuntimeConfig {
 
     /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
-        let cache = self
-            .cache
-            .read()
-            .expect("Runtime config cache lock poisoned - this is a fatal error");
+        let cache = self.cache.read();
         cache.get(key).map(|item| (*item.value).clone())
     }
 
     /// 获取配置的完整信息
     pub fn get_full(&self, key: &str) -> Option<ConfigItem> {
-        let cache = self
-            .cache
-            .read()
-            .expect("Runtime config cache lock poisoned - this is a fatal error");
+        let cache = self.cache.read();
         cache.get(key).cloned()
     }
 
     /// 获取所有配置
     pub fn get_all(&self) -> HashMap<String, ConfigItem> {
-        self.cache
-            .read()
-            .expect("Runtime config cache lock poisoned - this is a fatal error")
-            .clone()
+        self.cache.read().clone()
     }
 
     /// 获取 bool 类型配置
@@ -196,9 +184,7 @@ impl RuntimeConfig {
         }
 
         // 更新内部缓存（必须成功，保证一致性）
-        let mut cache = self.cache.write().map_err(|_| {
-            ShortlinkerError::internal_error("Runtime config cache lock poisoned".to_string())
-        })?;
+        let mut cache = self.cache.write();
 
         if let Some(item) = cache.get_mut(key) {
             item.value = std::sync::Arc::new(value.to_string());
