@@ -224,10 +224,9 @@ impl RollupManager {
             // 从 HashMap 查找现有记录
             if let Some(record) = existing_map.get(code) {
                 let mut active: click_stats_daily::ActiveModel = record.clone().into();
-                if let Set(old_count) = active.click_count {
-                    active.click_count =
-                        Set(old_count.saturating_add(agg.count.min(i64::MAX as usize) as i64));
-                }
+                let old_count = record.click_count;
+                active.click_count =
+                    Set(old_count.saturating_add(agg.count.min(i64::MAX as usize) as i64));
                 active.unique_referrers =
                     Set(Some(agg.referrers.len().min(i32::MAX as usize) as i32));
                 active.unique_countries =

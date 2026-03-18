@@ -393,11 +393,15 @@ impl App {
     pub fn clamp_selection(&mut self) {
         if self.page_links.is_empty() {
             self.selected_index = 0;
-        } else if self.selected_index >= self.page_links.len() {
-            self.selected_index = self.page_links.len() - 1;
+            self.adjust_scroll_offset();
+            self.table_state.select(None);
+        } else {
+            if self.selected_index >= self.page_links.len() {
+                self.selected_index = self.page_links.len() - 1;
+            }
+            self.adjust_scroll_offset();
+            self.table_state.select(Some(self.selected_index));
         }
-        self.adjust_scroll_offset();
-        self.table_state.select(Some(self.selected_index));
     }
 }
 

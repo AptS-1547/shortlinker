@@ -631,6 +631,7 @@ impl AnalyticsService {
                 + 'static,
         >,
     > {
+        let batch_size = batch_size.max(1);
         self.storage
             .stream_click_logs_cursor(start, end, batch_size)
     }

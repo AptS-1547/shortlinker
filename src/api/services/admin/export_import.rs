@@ -371,7 +371,7 @@ pub async fn import_links(
             }
         };
 
-        code_to_row.entry(row.code.clone()).or_insert(row_num);
+        code_to_row.insert(row.code.clone(), row_num);
         raw_items.push(ImportLinkItemRaw {
             code: row.code,
             target: row.target,
