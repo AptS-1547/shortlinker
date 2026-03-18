@@ -170,6 +170,32 @@ pub enum IpcCommand {
     ConfigImport { configs: Vec<ConfigImportItem> },
 }
 
+impl IpcCommand {
+    /// 返回命令名称（不含敏感字段），用于日志
+    pub fn name(&self) -> &'static str {
+        match self {
+            IpcCommand::Ping => "Ping",
+            IpcCommand::Reload { .. } => "Reload",
+            IpcCommand::GetStatus => "GetStatus",
+            IpcCommand::Shutdown => "Shutdown",
+            IpcCommand::AddLink { .. } => "AddLink",
+            IpcCommand::RemoveLink { .. } => "RemoveLink",
+            IpcCommand::BatchDeleteLinks { .. } => "BatchDeleteLinks",
+            IpcCommand::UpdateLink { .. } => "UpdateLink",
+            IpcCommand::GetLink { .. } => "GetLink",
+            IpcCommand::ListLinks { .. } => "ListLinks",
+            IpcCommand::ImportLinks { .. } => "ImportLinks",
+            IpcCommand::ExportLinks => "ExportLinks",
+            IpcCommand::GetLinkStats => "GetLinkStats",
+            IpcCommand::ConfigList { .. } => "ConfigList",
+            IpcCommand::ConfigGet { .. } => "ConfigGet",
+            IpcCommand::ConfigSet { .. } => "ConfigSet",
+            IpcCommand::ConfigReset { .. } => "ConfigReset",
+            IpcCommand::ConfigImport { .. } => "ConfigImport",
+        }
+    }
+}
+
 /// IPC responses sent from server to client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcResponse {

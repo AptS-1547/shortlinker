@@ -100,28 +100,32 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         // MySQL: click_count = click_count + VALUES(click_count)
         let on_conflict = match backend {
             DatabaseBackend::MySql => {
-                // MySQL 语法：VALUES(column)
+                // MySQL 语法：VALUES(column)，用 LEAST 防止溢出
                 OnConflict::columns([
                     click_stats_hourly::Column::ShortCode,
                     click_stats_hourly::Column::HourBucket,
                 ])
                 .value(
                     click_stats_hourly::Column::ClickCount,
-                    Expr::col(click_stats_hourly::Column::ClickCount)
-                        .add(Expr::cust("VALUES(click_count)")),
+                    Expr::cust(format!(
+                        "LEAST(click_count + VALUES(click_count), {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned()
             }
             _ => {
-                // SQLite/PostgreSQL 语法：excluded.column
+                // SQLite/PostgreSQL 语法：excluded.column，用 MIN 防止溢出
                 OnConflict::columns([
                     click_stats_hourly::Column::ShortCode,
                     click_stats_hourly::Column::HourBucket,
                 ])
                 .value(
                     click_stats_hourly::Column::ClickCount,
-                    Expr::col(click_stats_hourly::Column::ClickCount)
-                        .add(Expr::cust("excluded.click_count")),
+                    Expr::cust(format!(
+                        "MIN(click_count + excluded.click_count, {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned()
             }
@@ -399,22 +403,26 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             ..Default::default()
         };
 
-        // 构建 upsert：total_clicks 累加，unique_links 不累加（取最新值）
+        // 构建 upsert：total_clicks 累加（带溢出保护），unique_links 不累加（取最新值）
         let on_conflict = match backend {
             DatabaseBackend::MySql => {
                 OnConflict::column(click_stats_global_hourly::Column::HourBucket)
                     .value(
                         click_stats_global_hourly::Column::TotalClicks,
-                        Expr::col(click_stats_global_hourly::Column::TotalClicks)
-                            .add(Expr::cust("VALUES(total_clicks)")),
+                        Expr::cust(format!(
+                            "LEAST(total_clicks + VALUES(total_clicks), {})",
+                            i64::MAX
+                        )),
                     )
                     .to_owned()
             }
             _ => OnConflict::column(click_stats_global_hourly::Column::HourBucket)
                 .value(
                     click_stats_global_hourly::Column::TotalClicks,
-                    Expr::col(click_stats_global_hourly::Column::TotalClicks)
-                        .add(Expr::cust("excluded.total_clicks")),
+                    Expr::cust(format!(
+                        "MIN(total_clicks + excluded.total_clicks, {})",
+                        i64::MAX
+                    )),
                 )
                 .to_owned(),
         };

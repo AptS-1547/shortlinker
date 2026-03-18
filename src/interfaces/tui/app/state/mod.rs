@@ -216,6 +216,7 @@ impl App {
 
     /// 加载指定页数据
     pub async fn load_page(&mut self, page: u64) -> Result<(), ShortlinkerError> {
+        let page = page.max(1);
         let (links, total) = self
             .link_client
             .list_links(page, self.page_size, self.search_query.clone())
@@ -228,6 +229,7 @@ impl App {
         self.total_count = total;
         self.current_page = page;
         self.apply_sort();
+        self.clamp_selection();
         Ok(())
     }
 

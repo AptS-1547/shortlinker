@@ -84,7 +84,7 @@ fn get_config_service() -> Result<&'static Arc<ConfigService>, IpcResponse> {
 
 /// Handle an IPC command and return a response
 pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
-    debug!("Handling IPC command: {:?}", cmd);
+    debug!("Handling IPC command: {}", cmd.name());
 
     match cmd {
         IpcCommand::Ping => IpcResponse::Pong {

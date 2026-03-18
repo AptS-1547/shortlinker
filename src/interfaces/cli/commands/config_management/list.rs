@@ -41,9 +41,15 @@ pub async fn config_list(
             ("unknown".to_string(), true)
         };
 
+        let value = if item.is_sensitive {
+            "*****".to_string()
+        } else {
+            item.value.clone()
+        };
+
         let output = ConfigOutput {
             key: item.key.clone(),
-            value: item.value.clone(),
+            value,
             category: cat.clone(),
             value_type: item.value_type.to_string(),
             requires_restart: item.requires_restart,
@@ -68,43 +74,48 @@ pub async fn config_list(
 
 /// Pretty print configs grouped by category
 fn print_grouped_configs(grouped: &BTreeMap<String, Vec<ConfigOutput>>) {
-    let category_names = [
+    let category_names: BTreeMap<&str, &str> = [
         (categories::AUTH, "Authentication"),
         (categories::COOKIE, "Cookie"),
         (categories::FEATURES, "Features"),
         (categories::ROUTES, "Routes"),
         (categories::CORS, "CORS"),
         (categories::TRACKING, "Tracking"),
-    ];
+    ]
+    .into_iter()
+    .collect();
 
-    for (cat_key, cat_name) in &category_names {
-        if let Some(configs) = grouped.get(*cat_key) {
-            if configs.is_empty() {
-                continue;
+    for (cat_key, configs) in grouped {
+        if configs.is_empty() {
+            continue;
+        }
+
+        let display_name = category_names
+            .get(cat_key.as_str())
+            .copied()
+            .unwrap_or(cat_key.as_str());
+
+        println!("\n{}", format!("[{}]", display_name).bold().cyan());
+
+        for cfg in configs {
+            let mut tags = Vec::new();
+            if cfg.sensitive {
+                tags.push("sensitive".yellow().to_string());
+            }
+            if cfg.requires_restart {
+                tags.push("restart".red().to_string());
+            }
+            if !cfg.editable {
+                tags.push("readonly".dimmed().to_string());
             }
 
-            println!("\n{}", format!("[{}]", cat_name).bold().cyan());
+            let tag_str = if tags.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", tags.join(", "))
+            };
 
-            for cfg in configs {
-                let mut tags = Vec::new();
-                if cfg.sensitive {
-                    tags.push("sensitive".yellow().to_string());
-                }
-                if cfg.requires_restart {
-                    tags.push("restart".red().to_string());
-                }
-                if !cfg.editable {
-                    tags.push("readonly".dimmed().to_string());
-                }
-
-                let tag_str = if tags.is_empty() {
-                    String::new()
-                } else {
-                    format!(" ({})", tags.join(", "))
-                };
-
-                println!("  {} = {}{}", cfg.key.green(), cfg.value.white(), tag_str);
-            }
+            println!("  {} = {}{}", cfg.key.green(), cfg.value.white(), tag_str);
         }
     }
     println!();

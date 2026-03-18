@@ -75,7 +75,7 @@ impl From<ClientError> for ShortlinkerError {
             ClientError::Ipc(e) => ShortlinkerError::internal_error(format!("IPC: {}", e)),
             ClientError::InitFailed(msg) => ShortlinkerError::database_operation(msg),
             ClientError::ServerError { code, message } => {
-                ShortlinkerError::internal_error(format!("{}: {}", code, message))
+                ShortlinkerError::from_error_code(&code, message)
             }
         }
     }

@@ -313,17 +313,52 @@ impl ShortlinkerError {
     /// 根据 IPC 传输的 error_code 重建具体错误变体
     ///
     /// 用于 IPC 客户端：将序列化传输的 (error_code, message) 还原为对应的枚举变体，
-    /// 而不是一律包装成 `ImportFailed`。未识别的 code 回退到 `ImportFailed`。
+    /// 而不是一律包装成 `ImportFailed`。未识别的 code 回退到 `InternalError`。
     pub fn from_error_code(error_code: &str, message: String) -> Self {
         match error_code {
+            // 基础设施
+            "E001" => ShortlinkerError::CacheConnection(message),
+            "E002" => ShortlinkerError::CachePluginNotFound(message),
+            "E003" => ShortlinkerError::DatabaseConfig(message),
+            "E004" => ShortlinkerError::DatabaseConnection(message),
+            "E005" => ShortlinkerError::DatabaseOperation(message),
+            "E006" => ShortlinkerError::FileOperation(message),
+            "E007" => ShortlinkerError::Validation(message),
+            "E008" => ShortlinkerError::NotFound(message),
+            "E009" => ShortlinkerError::Serialization(message),
+            "E010" => ShortlinkerError::NotifyServer(message),
+            // 认证
+            "E011" => ShortlinkerError::AuthPasswordInvalid(message),
+            "E012" => ShortlinkerError::AuthTokenExpired(message),
+            "E013" => ShortlinkerError::AuthTokenInvalid(message),
+            "E014" => ShortlinkerError::AuthRateLimitExceeded(message),
+            // 链接业务
             "E020" => ShortlinkerError::LinkInvalidUrl(message),
             "E021" => ShortlinkerError::LinkAlreadyExists(message),
             "E022" => ShortlinkerError::LinkInvalidExpireTime(message),
             "E023" => ShortlinkerError::LinkPasswordHashError(message),
             "E024" => ShortlinkerError::LinkInvalidCode(message),
             "E025" => ShortlinkerError::LinkReservedCode(message),
+            // 导入导出
+            "E030" => ShortlinkerError::CsvParseFailed(message),
+            "E031" => ShortlinkerError::CsvGenerationFailed(message),
+            "E032" => ShortlinkerError::CsvFileMissing(message),
             "E033" => ShortlinkerError::ImportFailed(message),
-            _ => ShortlinkerError::ImportFailed(message),
+            "E034" => ShortlinkerError::ExportFailed(message),
+            "E035" => ShortlinkerError::InvalidMultipartData(message),
+            "E036" => ShortlinkerError::FileReadError(message),
+            // 配置
+            "E040" => ShortlinkerError::ConfigNotFound(message),
+            "E041" => ShortlinkerError::ConfigUpdateFailed(message),
+            "E042" => ShortlinkerError::ConfigReloadFailed(message),
+            // 通用 HTTP
+            "E050" => ShortlinkerError::ServiceUnavailable(message),
+            "E051" => ShortlinkerError::InternalError(message),
+            // Analytics
+            "E060" => ShortlinkerError::AnalyticsQueryFailed(message),
+            "E061" => ShortlinkerError::AnalyticsLinkNotFound(message),
+            "E062" => ShortlinkerError::AnalyticsInvalidDateRange(message),
+            _ => ShortlinkerError::InternalError(message),
         }
     }
 }
@@ -597,9 +632,9 @@ mod tests {
 
     #[test]
     fn test_from_error_code_unknown_fallback() {
-        // 未知错误码回退到 ImportFailed
+        // 未知错误码回退到 InternalError
         let err = ShortlinkerError::from_error_code("E999", "unknown".into());
-        assert_eq!(err.code(), "E033"); // ImportFailed
+        assert_eq!(err.code(), "E051"); // InternalError
         assert_eq!(err.message(), "unknown");
     }
 

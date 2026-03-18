@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use futures_util::Stream;
+use futures_util::{Stream, StreamExt};
 use sea_orm::{DbBackend, sea_query::Expr};
 use tracing::{debug, info};
 
@@ -626,14 +626,24 @@ impl AnalyticsService {
         batch_size: u64,
     ) -> Pin<
         Box<
-            dyn Stream<Item = anyhow::Result<Vec<migration::entities::click_log::Model>>>
+            dyn Stream<Item = Result<Vec<migration::entities::click_log::Model>, ShortlinkerError>>
                 + Send
                 + 'static,
         >,
     > {
         let batch_size = batch_size.max(1);
-        self.storage
-            .stream_click_logs_cursor(start, end, batch_size)
+        Box::pin(
+            self.storage
+                .stream_click_logs_cursor(start, end, batch_size)
+                .map(|result| {
+                    result.map_err(|e| {
+                        ShortlinkerError::analytics_query_failed(format!(
+                            "Failed to export click logs: {}",
+                            e
+                        ))
+                    })
+                }),
+        )
     }
 
     // ============ v2 查询方法（从汇总表读取） ============

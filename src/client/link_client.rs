@@ -252,6 +252,9 @@ impl LinkClient {
                 }) => {
                     return Ok(convert_import_result(success, skipped, errors));
                 }
+                Ok(IpcResponse::Error { code, message }) => {
+                    return Err(ClientError::ServerError { code, message });
+                }
                 Ok(other) => return Err(unexpected_response(other)),
                 Err(crate::system::ipc::IpcError::ServerNotRunning) => {
                     // Fall through to fallback

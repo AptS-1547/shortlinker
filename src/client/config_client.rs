@@ -157,7 +157,7 @@ fn config_data_to_view(data: ConfigItemData) -> ConfigItemView {
                     &data.updated_at,
                     e
                 );
-                chrono::Utc::now()
+                chrono::DateTime::UNIX_EPOCH
             }),
     }
 }
@@ -336,12 +336,10 @@ mod tests {
     }
 
     #[test]
-    fn test_config_data_to_view_invalid_date_falls_back_to_now() {
+    fn test_config_data_to_view_invalid_date_falls_back_to_epoch() {
         let data = make_config_data("k", "v", "string", false, false, "not-a-date");
         let view = config_data_to_view(data);
-        let now = chrono::Utc::now();
-        let diff = (now - view.updated_at).num_seconds().abs();
-        assert!(diff < 5, "Expected updated_at near now, diff={}s", diff);
+        assert_eq!(view.updated_at, chrono::DateTime::UNIX_EPOCH);
     }
 
     #[test]

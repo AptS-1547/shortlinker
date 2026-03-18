@@ -9,7 +9,9 @@ pub fn model_to_shortlink(model: short_link::Model) -> ShortLink {
         created_at: model.created_at,
         expires_at: model.expires_at,
         password: model.password,
-        click: model.click_count.max(0) as usize,
+        click: std::cmp::max(model.click_count, 0)
+            .try_into()
+            .unwrap_or(usize::MAX),
     }
 }
 
@@ -24,7 +26,7 @@ pub fn shortlink_to_active_model(link: &ShortLink, is_new: bool) -> short_link::
         expires_at: Set(link.expires_at),
         password: Set(link.password.clone()),
         click_count: if is_new {
-            Set(link.click as i64)
+            Set(i64::try_from(link.click).unwrap_or(i64::MAX))
         } else {
             NotSet
         },
@@ -64,7 +66,7 @@ mod tests {
         let model = create_test_model();
         let expected_code = model.short_code.clone();
         let expected_target = model.target_url.clone();
-        let expected_click = model.click_count as usize;
+        let expected_click: usize = model.click_count.try_into().unwrap();
 
         let link = model_to_shortlink(model);
 
@@ -127,7 +129,7 @@ mod tests {
             assert_eq!(target, link.target);
         }
         if let ActiveValue::Set(click) = active_model.click_count {
-            assert_eq!(click, link.click as i64);
+            assert_eq!(click, i64::try_from(link.click).unwrap());
         }
     }
 

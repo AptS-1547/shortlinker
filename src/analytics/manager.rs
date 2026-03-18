@@ -396,7 +396,25 @@ impl ClickManager {
         loop {
             // 先检查 shutdown 信号（非阻塞）
             if shutdown_rx.has_changed().unwrap_or(true) {
-                debug!("ClickManager: Shutdown signal received, stopping event processor");
+                debug!("ClickManager: Shutdown signal received, draining remaining events");
+
+                // Drain channel 中剩余的事件，避免丢失详细点击信息
+                let mut drained = 0;
+                while let Ok(event) = rx.try_recv() {
+                    let detail = process_fn(event);
+                    if let Some(ref buffer) = self.detailed_buffer {
+                        buffer.push(detail);
+                        drained += 1;
+                    }
+                }
+
+                if drained > 0 {
+                    debug!(
+                        "ClickManager: Drained {} events from channel before shutdown",
+                        drained
+                    );
+                }
+
                 break;
             }
 
@@ -438,7 +456,7 @@ impl ClickManager {
             }
         }
 
-        debug!("ClickManager: Event processor stopped (channel closed)");
+        debug!("ClickManager: Event processor stopped");
     }
 
     /// 手动触发刷盘（阻塞直到完成）

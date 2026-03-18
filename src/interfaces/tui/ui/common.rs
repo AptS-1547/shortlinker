@@ -68,7 +68,7 @@ pub fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let shortcuts = match app.current_screen {
         CurrentScreen::Main => vec![
             ("Up/Down", "Navigate", Color::Cyan),
-            ("/", "Prev/Next Page", Color::Cyan),
+            ("[/]", "Prev/Next Page", Color::Cyan),
             ("/", "Search", Color::Cyan),
             ("v", "View", Color::Cyan),
             ("a", "Add", Color::Green),
