@@ -62,6 +62,26 @@ fn error_response(err: ShortlinkerError) -> IpcResponse {
     }
 }
 
+/// Get the LinkService or return a service-unavailable error response
+#[allow(clippy::result_large_err)]
+fn get_link_service() -> Result<&'static Arc<LinkService>, IpcResponse> {
+    LINK_SERVICE.get().ok_or_else(|| {
+        error_response(ShortlinkerError::service_unavailable(
+            "Service not initialized",
+        ))
+    })
+}
+
+/// Get the ConfigService or return a service-unavailable error response
+#[allow(clippy::result_large_err)]
+fn get_config_service() -> Result<&'static Arc<ConfigService>, IpcResponse> {
+    CONFIG_SERVICE.get().ok_or_else(|| {
+        error_response(ShortlinkerError::service_unavailable(
+            "ConfigService not initialized",
+        ))
+    })
+}
+
 /// Handle an IPC command and return a response
 pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
     debug!("Handling IPC command: {:?}", cmd);
@@ -229,10 +249,9 @@ async fn handle_add_link(
     expires_at: Option<String>,
     password: Option<String>,
 ) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let req = CreateLinkRequest {
@@ -253,10 +272,9 @@ async fn handle_add_link(
 }
 
 async fn handle_remove_link(code: String) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.delete_link(&code).await {
@@ -266,10 +284,9 @@ async fn handle_remove_link(code: String) -> IpcResponse {
 }
 
 async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.batch_delete_links(codes).await {
@@ -296,10 +313,9 @@ async fn handle_update_link(
     expires_at: Option<String>,
     password: Option<String>,
 ) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let req = UpdateLinkRequest {
@@ -315,10 +331,9 @@ async fn handle_update_link(
 }
 
 async fn handle_get_link(code: String) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.get_link(&code).await {
@@ -328,10 +343,9 @@ async fn handle_get_link(code: String) -> IpcResponse {
 }
 
 async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let filter = LinkFilter {
@@ -354,10 +368,9 @@ async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) ->
 }
 
 async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     // Convert IPC ImportLinkData to ImportLinkItemRaw, then validate via shared logic
@@ -411,10 +424,9 @@ pub fn export_links_stream() -> Option<LinkBatchStream> {
 }
 
 async fn handle_get_stats() -> IpcResponse {
-    let Some(service) = LINK_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ));
+    let service = match get_link_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.get_stats().await {
@@ -542,6 +554,25 @@ use crate::config::schema::get_schema;
 use crate::config::validators;
 use crate::services::ConfigItemView;
 
+/// Validate that a config key exists and is editable.
+/// Returns the definition on success, or an IpcResponse::Error on failure.
+#[allow(clippy::result_large_err)]
+fn validate_editable_key(
+    key: &str,
+) -> Result<&'static crate::config::definitions::ConfigDef, IpcResponse> {
+    let def = get_def(key).ok_or_else(|| IpcResponse::Error {
+        code: "CONFIG_NOT_FOUND".to_string(),
+        message: format!("Unknown configuration key: '{}'", key),
+    })?;
+    if !def.editable {
+        return Err(IpcResponse::Error {
+            code: "CONFIG_READONLY".to_string(),
+            message: format!("Configuration '{}' is read-only", key),
+        });
+    }
+    Ok(def)
+}
+
 /// Build ConfigItemData from a ConfigItemView by enriching with definition metadata
 fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
     let def = get_def(&view.key);
@@ -568,10 +599,9 @@ fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
 }
 
 async fn handle_config_list(category: Option<String>) -> IpcResponse {
-    let Some(service) = CONFIG_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ));
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let all = service.get_all();
@@ -593,10 +623,9 @@ async fn handle_config_list(category: Option<String>) -> IpcResponse {
 }
 
 async fn handle_config_get(key: String) -> IpcResponse {
-    let Some(service) = CONFIG_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ));
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     match service.get(&key) {
@@ -608,29 +637,15 @@ async fn handle_config_get(key: String) -> IpcResponse {
 }
 
 async fn handle_config_set(key: String, value: String) -> IpcResponse {
-    let Some(service) = CONFIG_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ));
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
-    // Validate key exists and is editable
-    let def = match get_def(&key) {
-        Some(d) => d,
-        None => {
-            return IpcResponse::Error {
-                code: "CONFIG_NOT_FOUND".to_string(),
-                message: format!("Unknown configuration key: '{}'", key),
-            };
-        }
+    let _def = match validate_editable_key(&key) {
+        Ok(d) => d,
+        Err(e) => return e,
     };
-
-    if !def.editable {
-        return IpcResponse::Error {
-            code: "CONFIG_READONLY".to_string(),
-            message: format!("Configuration '{}' is read-only", key),
-        };
-    }
 
     // Validate value
     if let Err(e) = validators::validate_config_value(&key, &value) {
@@ -657,28 +672,15 @@ async fn handle_config_set(key: String, value: String) -> IpcResponse {
 }
 
 async fn handle_config_reset(key: String) -> IpcResponse {
-    let Some(service) = CONFIG_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ));
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
-    let def = match get_def(&key) {
-        Some(d) => d,
-        None => {
-            return IpcResponse::Error {
-                code: "CONFIG_NOT_FOUND".to_string(),
-                message: format!("Unknown configuration key: '{}'", key),
-            };
-        }
+    let def = match validate_editable_key(&key) {
+        Ok(d) => d,
+        Err(e) => return e,
     };
-
-    if !def.editable {
-        return IpcResponse::Error {
-            code: "CONFIG_READONLY".to_string(),
-            message: format!("Configuration '{}' is read-only", key),
-        };
-    }
 
     let default_value = (def.default_fn)();
 
@@ -698,10 +700,9 @@ async fn handle_config_reset(key: String) -> IpcResponse {
 }
 
 async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> IpcResponse {
-    let Some(service) = CONFIG_SERVICE.get() else {
-        return error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ));
+    let service = match get_config_service() {
+        Ok(s) => s,
+        Err(e) => return e,
     };
 
     let mut success = 0usize;
