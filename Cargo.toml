@@ -70,7 +70,7 @@ dashmap = "6.1.0"
 crossbeam-channel = "0.5"
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "ansi", "json"] }
 tracing-appender = "0.2.4"
-moka = { version = "0.12.14", default-features = false, features = ["future", "sync"] }
+moka = { version = "0.12.15", default-features = false, features = ["future", "sync"] }
 colored = "3.1.1"
 num_cpus = { version = "1.17.0", default-features = false }
 bloomfilter = "3.0.1"
@@ -81,7 +81,7 @@ ctor = "0.6"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 rust-embed = "8.11.0"
 uuid = { version = "1.22", features = ["v4"] }
-redis = { version = "1.0.5", features = ["tokio-comp", "tokio-rustls-comp", "connection-manager"] }
+redis = { version = "1.1.0", features = ["tokio-comp", "tokio-rustls-comp", "connection-manager"] }
 rustls = "0.23.37"
 toml = "1.0"
 color-eyre = { version = "0.6.5", optional = true }
@@ -108,7 +108,7 @@ rpassword = "7"
 subtle = "2"
 base64 = "0.22"
 maxminddb = "0.27"
-ureq = { version = "3.2.0", features = ["json"] }
+ureq = { version = "3.3.0", features = ["json"] }
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 woothee = "0.13"
 urlencoding = "2.1.3"
