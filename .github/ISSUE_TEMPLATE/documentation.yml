@@ -35,7 +35,7 @@ body:
       options:
         - First-time deployers
         - Administrators / operators
-        - CLI / TUI users
+        - CLI users
         - API users
         - Admin Panel users
         - Contributors

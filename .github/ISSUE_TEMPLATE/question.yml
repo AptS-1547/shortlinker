@@ -27,7 +27,7 @@ body:
         - Configuration
         - Short links / HTTP API
         - Admin Panel
-        - CLI / TUI
+        - CLI
         - Docker
         - Reverse proxy
         - Troubleshooting

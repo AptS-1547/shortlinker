@@ -51,7 +51,7 @@ See [Storage Backends](/en/config/storage) for URL formats.
 
 | TOML key | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ipc.enabled` | Boolean | `true` | Enable IPC server (required for CLI/TUI communication with a running server) |
+| `ipc.enabled` | Boolean | `true` | Enable IPC server (required for CLI communication with a running server) |
 | `ipc.socket_path` | String | *(platform default)* | Custom IPC path (Unix socket / Windows named pipe) |
 | `ipc.max_message_size` | Integer | `65536` | Max IPC message size in bytes |
 | `ipc.timeout` | Integer | `5` | Default IPC timeout (seconds) |
@@ -61,7 +61,7 @@ See [Storage Backends](/en/config/storage) for URL formats.
 > Notes:
 > - Path priority: CLI `--socket` > `ipc.socket_path` > platform default. Defaults are Unix `./shortlinker.sock`, Windows `\\.\\pipe\\shortlinker`.
 > - On Unix, the IPC socket file permission is fixed to `0600` (owner-only read/write).
-> - If `ipc.enabled=false`, `./shortlinker status` and CLI/TUI IPC sync are unavailable; use Admin API `POST /admin/v1/config/reload` or restart to apply runtime config changes.
+> - If `ipc.enabled=false`, `./shortlinker status` and CLI IPC sync are unavailable; use Admin API `POST /admin/v1/config/reload` or restart to apply runtime config changes.
 
 ### GeoIP (startup)
 

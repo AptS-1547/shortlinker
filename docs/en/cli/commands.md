@@ -7,10 +7,6 @@ Detailed command-line usage and options for day-to-day management.
 - **First-time usage**: `add` → `list` → `update` → `remove`
 - **Bulk migration**: `import` / `export`
 - **Operations**: `config` / `reset-password`
-- **Interactive management**: `tui`
-
-> If you prefer visual management, start with the [TUI guide](/en/cli/tui).
-
 ## Global Options
 
 All CLI subcommands support:
@@ -202,30 +198,6 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 # From CLI arg (not recommended: visible in shell history)
 ./shortlinker reset-password --password "my_new_secure_password"
 ```
-
-## Interactive Interface
-
-### tui - Launch Terminal UI
-
-```bash
-./shortlinker tui
-```
-
-**TUI features**:
-- interactive visual interface
-- real-time link list view
-- keyboard-based navigation and actions
-- link details (clicks, expiration, etc.)
-
-**Keyboard shortcuts**:
-- `↑/↓` or `j/k`: move selection
-- `Enter` or `v`: view details
-- `/`: search
-- `?` (or `h`): help
-- `x`: export/import
-- `q`: quit (`Esc` is commonly used for back/cancel/clear)
-
-> For full details, see the [TUI guide](/en/cli/tui).
 
 ## Advanced and Automation
 

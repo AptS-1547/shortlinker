@@ -27,7 +27,6 @@ A minimalist URL shortener service supporting HTTP 307 redirection, built with R
 - Password-protected links
 - Admin API with Bearer token authentication
 - Web admin panel
-- TUI mode for terminal users
 - Docker and Unix socket support
 
 ## Quick Start
@@ -50,7 +49,6 @@ cargo run
 
 ```bash
 ./shortlinker                                    # Start server
-./shortlinker tui                                # TUI mode (requires 'tui' feature)
 ./shortlinker add github https://github.com     # Custom code
 ./shortlinker add https://example.com           # Random code
 ./shortlinker add secret https://example.com --password mypass  # Password protected

@@ -1,6 +1,6 @@
 //! CSV 导入导出共享逻辑
 //!
-//! 提供统一的 CSV 读写功能，供 CLI、TUI 和 Web Admin 使用
+//! 提供统一的 CSV 读写功能，供 CLI 和 Web Admin 使用
 
 use chrono::Utc;
 use csv::{ReaderBuilder, WriterBuilder};

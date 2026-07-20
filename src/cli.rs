@@ -21,10 +21,6 @@ pub struct Cli {
 /// Available commands
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Start TUI mode
-    #[cfg(feature = "tui")]
-    Tui,
-
     /// Add a short link
     ///
     /// Usage: add [SHORT_CODE] <TARGET_URL>

@@ -141,8 +141,5 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
         Commands::ResetPassword { .. } => unreachable!("handled above"),
 
         Commands::Config { .. } => unreachable!("handled above"),
-
-        #[cfg(feature = "tui")]
-        Commands::Tui => unreachable!("TUI handled in main"),
     }
 }

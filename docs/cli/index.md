@@ -35,7 +35,6 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 | `config generate` | 生成配置模板 | `./shortlinker config generate` |
 | `reset-password` | 重置管理员密码 | `./shortlinker reset-password` |
 | `config` | 运行时配置管理（数据库） | `./shortlinker config list` |
-| `tui` | 启动 TUI 界面（需编译启用） | `./shortlinker tui` |
 
 ## 快速示例
 
@@ -71,8 +70,6 @@ Shortlinker 提供了直观易用的命令行工具，用于管理短链接。
 # 强制覆盖
 ./shortlinker add docs https://new-docs.com --force
 
-# 启动 TUI 界面
-./shortlinker tui
 ```
 
 ## 下一步

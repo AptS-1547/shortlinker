@@ -13,10 +13,6 @@ pub fn show_help() {
         program_name.cyan()
     );
     println!(
-        "  {} tui                      # start TUI mode (requires 'tui' feature)",
-        program_name.cyan()
-    );
-    println!(
         "  {} help                     # show help",
         program_name.cyan()
     );

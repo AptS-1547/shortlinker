@@ -2,7 +2,7 @@
 //!
 //! Provides different panic handling strategies based on running mode:
 //! - Server mode: Display detailed stack trace, log to crash.log
-//! - CLI/TUI mode: Display simple message, log to crash.log
+//! - CLI mode: Display simple message, log to crash.log
 
 use chrono::Utc;
 use std::fs::OpenOptions;
@@ -14,7 +14,6 @@ use std::panic;
 pub enum RunMode {
     Server,
     Cli,
-    Tui,
 }
 
 /// Install custom panic hook
@@ -53,8 +52,8 @@ pub fn install_panic_hook(mode: RunMode) {
                 #[cfg(not(feature = "server"))]
                 display_simple_panic(&message);
             }
-            RunMode::Cli | RunMode::Tui => {
-                // CLI/TUI mode: Simple message
+            RunMode::Cli => {
+                // CLI mode: Simple message
                 display_simple_panic(&message);
             }
         }
@@ -100,7 +99,7 @@ fn display_server_panic(message: &str, location: &str, backtrace: &std::backtrac
     eprintln!();
 }
 
-/// CLI/TUI mode: Display simple error message
+/// CLI mode: Display simple error message
 fn display_simple_panic(message: &str) {
     eprintln!();
     eprintln!("Program panicked: {}", message);

@@ -1,4 +1,4 @@
-//! Client layer for CLI/TUI interfaces
+//! Client layer for CLI interfaces
 //!
 //! Provides IPC-first with Service-fallback execution model.
 //! API handlers do NOT use this layer — they call services directly.
@@ -6,8 +6,8 @@
 //! # Architecture
 //!
 //! ```text
-//! CLI/TUI → Client Layer ──→ IPC (server running)
-//!                          └→ Services (server not running, lazy init)
+//! CLI → Client Layer ──→ IPC (server running)
+//!                    └→ Services (server not running, lazy init)
 //! ```
 //!
 //! # Fallback Policy
@@ -81,6 +81,7 @@ impl From<ClientError> for ShortlinkerError {
     }
 }
 
+#[cfg(feature = "cli")]
 impl From<ClientError> for crate::interfaces::cli::CliError {
     fn from(err: ClientError) -> Self {
         use crate::interfaces::cli::CliError;
@@ -130,8 +131,10 @@ where
 mod tests {
     use super::*;
     use crate::errors::ShortlinkerError;
-    use crate::interfaces::cli::CliError;
     use crate::system::ipc::IpcError;
+
+    #[cfg(feature = "cli")]
+    use crate::interfaces::cli::CliError;
 
     // ---- ClientError Display tests ----
 
@@ -203,6 +206,7 @@ mod tests {
     // ---- From<ClientError> for CliError ----
 
     #[test]
+    #[cfg(feature = "cli")]
     fn test_client_error_to_cli_error_ipc() {
         let ce = ClientError::Ipc(IpcError::Timeout);
         let cli_err: CliError = ce.into();
@@ -213,6 +217,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cli")]
     fn test_client_error_to_cli_error_service() {
         let ce = ClientError::Service(ShortlinkerError::config_not_found("test"));
         let cli_err: CliError = ce.into();
@@ -223,6 +228,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cli")]
     fn test_client_error_to_cli_error_init_failed() {
         let ce = ClientError::InitFailed("db failed".into());
         let cli_err: CliError = ce.into();
@@ -233,6 +239,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cli")]
     fn test_client_error_to_cli_error_server_error() {
         let ce = ClientError::ServerError {
             code: "E001".into(),

@@ -36,14 +36,6 @@ pub struct RouteConfig {
     pub enable_frontend: bool,
 }
 
-/// CLI / TUI 模式预处理（预留扩展点）
-///
-/// 当前为空实现，供未来 CLI/TUI 特定初始化使用。
-#[cfg(any(feature = "cli", feature = "tui"))]
-pub async fn cli_tui_pre_startup() {
-    // Reserved for future CLI/TUI-specific initialization
-}
-
 /// 准备服务器启动的上下文
 /// 包括存储、缓存和路由配置等
 pub async fn prepare_server_startup() -> Result<StartupContext> {
@@ -263,7 +255,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
 
     // Initialize IPC start time and start IPC server
     crate::system::ipc::handler::init_start_time();
-    #[cfg(any(feature = "cli", feature = "tui"))]
+    #[cfg(feature = "cli")]
     {
         let config = crate::config::get_config();
         if config.ipc.enabled {

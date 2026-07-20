@@ -26,7 +26,7 @@ body:
       options:
         - Short-link redirect / HTTP API
         - Admin Panel
-        - CLI / TUI
+        - CLI
         - Configuration
         - Database / migrations
         - Docker / deployment

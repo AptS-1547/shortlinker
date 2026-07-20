@@ -64,16 +64,13 @@ cd shortlinker
 # Default build (server + CLI)
 cargo build --release
 
-# Server only (no CLI/TUI)
+# Server only (no CLI)
 cargo build --release --no-default-features --features server
 
 # Enable Prometheus metrics (exported at /health/metrics; compile-time feature)
 cargo build --release --features metrics
 
-# Compile with TUI interface
-cargo build --release --features tui
-
-# Full build (server + CLI + TUI + Metrics)
+# Full build (server + CLI + Metrics)
 cargo build --release --features full
 
 # 4. Run

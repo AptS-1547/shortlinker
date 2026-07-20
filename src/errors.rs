@@ -106,7 +106,7 @@ impl ShortlinkerError {
         )
     }
 
-    /// 格式化为简洁输出（用于 CLI/TUI 模式）
+    /// 格式化为简洁输出（用于 CLI 模式）
     pub fn format_simple(&self) -> String {
         format!("{}: {}", self.error_type(), self.message())
     }

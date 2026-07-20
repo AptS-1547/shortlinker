@@ -6,7 +6,6 @@
 //! # Features
 //! - **server**: HTTP server mode (default)
 //! - **cli**: Command-line interface
-//! - **tui**: Terminal user interface
 //! - **metrics**: Prometheus metrics export
 //! - **full**: All features enabled
 //!
@@ -15,7 +14,7 @@
 //! - `storage`: Storage backends and data access
 //! - `analytics`: Click tracking and statistics
 //! - `api`: HTTP services and middleware
-//! - `interfaces`: User interfaces (CLI, TUI)
+//! - `interfaces`: Command-line interface
 //! - `config`: Configuration management
 //! - `runtime`: Application lifecycle and execution modes
 //! - `system`: Platform abstraction and system utilities

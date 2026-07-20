@@ -1,6 +1,6 @@
 //! Null (no-op) implementation of CompositeCacheTrait
 //!
-//! Used by TUI and other contexts that need a LinkService but don't require caching.
+//! Used by CLI fallback and tests that need a LinkService without caching.
 
 use std::collections::HashMap;
 use std::sync::Arc;

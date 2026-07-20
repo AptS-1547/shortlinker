@@ -30,7 +30,7 @@ body:
         - Short links / redirects
         - HTTP / Admin API
         - Admin Panel
-        - CLI / TUI
+        - CLI
         - Configuration / migrations
         - Authentication / security
         - Performance / observability

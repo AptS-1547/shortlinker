@@ -64,16 +64,13 @@ cd shortlinker
 # 默认编译（server + CLI）
 cargo build --release
 
-# 仅服务器（不包含 CLI/TUI）
+# 仅服务器（不包含 CLI）
 cargo build --release --no-default-features --features server
 
 # 启用 Prometheus metrics（导出到 /health/metrics，需要编译时启用）
 cargo build --release --features metrics
 
-# 包含 TUI 界面编译
-cargo build --release --features tui
-
-# 全功能编译（服务器 + CLI + TUI + Metrics）
+# 全功能编译（服务器 + CLI + Metrics）
 cargo build --release --features full
 
 # 4. 运行

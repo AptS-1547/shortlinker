@@ -34,7 +34,7 @@ features:
     details: Add/remove short links at runtime without restarting the server
   - icon: 🎯
     title: Smart Management
-    details: Custom short codes, random generation, expiration time, CLI tool management, TUI interface
+    details: Custom short codes, random generation, expiration time, and CLI tool management
 ---
 
 ## Design Philosophy
@@ -56,7 +56,6 @@ Command line tool management, TOML startup config + DB runtime config, one-click
 - **Smart Expiration**: Supports flexible time format settings, automatic expiration and cleanup
 - **Cross-platform Support**: Windows, Linux, macOS, smart process locking to prevent duplicate startup
 - **Container Optimization**: Docker image deployment with container restart detection support
-- **TUI Interface**: Terminal user interface for interactive management and monitoring
 - **TOML Configuration**: Startup config (server/database/cache/logging/analytics/ipc) + DB runtime config (auth/routes/features, etc.)
 
 ## Quick Experience
@@ -75,8 +74,6 @@ docker run -d \
 # Access short link
 curl -L http://localhost:8080/github
 
-# Launch TUI interface (if compiled with TUI feature)
-./shortlinker tui
 ```
 
 ## Use Cases

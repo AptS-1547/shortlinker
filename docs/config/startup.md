@@ -53,7 +53,7 @@
 
 | TOML 键 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `ipc.enabled` | Boolean | `true` | 是否启用 IPC 服务端（CLI/TUI 与运行中服务通信依赖它） |
+| `ipc.enabled` | Boolean | `true` | 是否启用 IPC 服务端（CLI 与运行中服务通信依赖它） |
 | `ipc.socket_path` | String | *(平台默认)* | 自定义 IPC 路径（Unix socket / Windows named pipe） |
 | `ipc.max_message_size` | Integer | `65536` | IPC 消息最大字节数 |
 | `ipc.timeout` | Integer | `5` | 常规 IPC 操作超时（秒） |
@@ -63,7 +63,7 @@
 > 说明：
 > - 路径优先级：CLI `--socket` > `ipc.socket_path` > 平台默认值。默认值为 Unix `./shortlinker.sock`，Windows `\\.\\pipe\\shortlinker`。
 > - Unix 下 IPC socket 文件权限固定为 `0600`（仅属主读写）。
-> - 若 `ipc.enabled=false`，`./shortlinker status` 与 CLI/TUI 的 IPC 同步能力不可用；运行时配置需通过 Admin API `POST /admin/v1/config/reload` 或重启生效。
+> - 若 `ipc.enabled=false`，`./shortlinker status` 与 CLI 的 IPC 同步能力不可用；运行时配置需通过 Admin API `POST /admin/v1/config/reload` 或重启生效。
 
 ### GeoIP（分析）配置
 

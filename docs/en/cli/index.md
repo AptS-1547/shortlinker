@@ -35,7 +35,6 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 | `config generate` | Generate config template | `./shortlinker config generate` |
 | `reset-password` | Reset admin password | `./shortlinker reset-password` |
 | `config` | Runtime config management (DB) | `./shortlinker config list` |
-| `tui` | Launch TUI interface (requires build feature) | `./shortlinker tui` |
 
 ## Quick Examples
 
@@ -75,8 +74,6 @@ Shortlinker provides an intuitive and easy-to-use command line tool for managing
 # Force overwrite
 ./shortlinker add docs https://new-docs.com --force
 
-# Launch TUI interface
-./shortlinker tui
 ```
 
 ## Output Description

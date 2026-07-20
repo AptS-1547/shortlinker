@@ -13,9 +13,9 @@ use crate::storage::{SeaOrmStorage, StorageFactory};
 
 use super::ClientError;
 
-/// Lazy-initialized service context for CLI/TUI fallback mode.
+/// Lazy-initialized service context for CLI fallback mode.
 ///
-/// Created once per CLI invocation or TUI session.
+/// Created once per CLI invocation.
 /// Storage and services are only initialized when first needed (i.e., when
 /// the server is not running and we fall back to local operations).
 pub struct ServiceContext {
@@ -40,7 +40,7 @@ impl ServiceContext {
         }
     }
 
-    /// Create a context with pre-injected storage (TUI usage — already has storage)
+    /// Create a context with pre-injected storage (primarily for tests).
     pub fn with_storage(storage: Arc<SeaOrmStorage>) -> Self {
         let ctx = Self::new();
         let _ = ctx.storage.set(storage);

@@ -77,7 +77,6 @@ Shortlinker has two kinds of hot reload / hot apply:
 
 1. **Short-link data sync / hot reload**:
    - CLI link commands (`add/update/remove/import/export/list`) execute through IPC in the server process when IPC is reachable.
-   - TUI writes to DB locally, then triggers `ReloadTarget::Data` via IPC to refresh caches.
 2. **Runtime config hot apply**:
    - No-restart keys usually apply immediately when updated through Admin API.
    - CLI `config set/reset` auto-attempts `ReloadTarget::Config` via IPC only for no-restart keys.
@@ -99,7 +98,7 @@ Shortlinker has two kinds of hot reload / hot apply:
 ### Check and manual reload
 
 ```bash
-# 1) Check IPC connectivity (CLI/TUI <-> server sync)
+# 1) Check IPC connectivity (CLI <-> server sync)
 ./shortlinker status
 # If you use a custom socket/pipe path:
 ./shortlinker --socket /tmp/shortlinker.sock status

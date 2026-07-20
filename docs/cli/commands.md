@@ -7,10 +7,6 @@
 - **第一次上手**：`add` → `list` → `update` → `remove`
 - **批量迁移**：`import` / `export`
 - **运维管理**：`config` / `reset-password`
-- **交互管理**：`tui`
-
-> 如果你只想快速可视化管理，建议直接使用 [TUI 界面](/cli/tui)。
-
 ## 全局参数
 
 所有 CLI 子命令都支持以下全局参数：
@@ -202,30 +198,6 @@ echo "my_new_secure_password" | ./shortlinker reset-password --stdin
 # 通过参数传入（不推荐：会出现在 shell history）
 ./shortlinker reset-password --password "my_new_secure_password"
 ```
-
-## 交互界面
-
-### tui - 启动终端用户界面
-
-```bash
-./shortlinker tui
-```
-
-**TUI 模式特点**：
-- 交互式可视化界面
-- 实时查看所有短链接列表
-- 支持键盘导航和操作
-- 显示链接详细信息（点击数、过期时间等）
-
-**快捷键**：
-- `↑/↓` 或 `j/k`：上下移动选择
-- `Enter` 或 `v`：查看详情
-- `/`：搜索
-- `?`（或 `h`）：帮助
-- `x`：导出/导入
-- `q`：退出（`Esc` 常用于返回/取消/清除搜索）
-
-> 💡 详细使用说明请参考 [TUI 使用指南](/cli/tui)。
 
 ## 进阶与自动化
 

@@ -142,7 +142,6 @@ export default {
           items: [
             { text: 'CLI 概述', link: '/cli/' },
             { text: '命令参考', link: '/cli/commands' },
-            { text: 'TUI 终端界面', link: '/cli/tui' }
           ]
         }
       ],
@@ -246,8 +245,7 @@ export default {
           text: 'CLI Tools',
           items: [
             { text: 'CLI Overview', link: '/en/cli/' },
-            { text: 'Command Reference', link: '/en/cli/commands' },
-            { text: 'TUI Interface', link: '/en/cli/tui' }
+            { text: 'Command Reference', link: '/en/cli/commands' }
           ]
         }
       ],

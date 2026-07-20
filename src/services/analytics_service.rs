@@ -1,7 +1,7 @@
 //! Analytics service layer
 //!
 //! Provides unified business logic for analytics queries, shared between
-//! HTTP API, IPC, CLI and TUI interfaces.
+//! HTTP API, IPC and CLI interfaces.
 //!
 //! # Query Strategies
 //!

@@ -78,7 +78,6 @@ Shortlinker 的“热重载/热生效”主要分两类：
 
 1. **短链接数据同步/热重载**：
    - CLI 链接命令（`add/update/remove/import/export/list`）在服务运行且 IPC 可达时，会通过 IPC 在服务进程内执行。
-   - TUI 在本地写库后，会通过 IPC 触发 `ReloadTarget::Data` 刷新缓存。
 2. **运行时配置热生效**：
    - Admin API 直接更新“无需重启”的配置时，通常会立即生效。
    - CLI `config set/reset` 仅在“无需重启”的配置上自动尝试通过 IPC 触发 `ReloadTarget::Config`。
@@ -100,7 +99,7 @@ Shortlinker 的“热重载/热生效”主要分两类：
 ### 检查与手动重载
 
 ```bash
-# 1) 检查 IPC 通信是否正常（用于 CLI/TUI 与服务同步）
+# 1) 检查 IPC 通信是否正常（用于 CLI 与服务同步）
 ./shortlinker status
 # 如果你使用了自定义路径：
 ./shortlinker --socket /tmp/shortlinker.sock status

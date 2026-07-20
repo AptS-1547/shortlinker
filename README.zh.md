@@ -27,7 +27,6 @@
 - 链接密码保护
 - Bearer Token 认证的管理 API
 - Web 管理面板
-- 终端 TUI 模式
 - Docker 和 Unix Socket 支持
 
 ## 快速开始
@@ -50,7 +49,6 @@ cargo run
 
 ```bash
 ./shortlinker                                    # 启动服务器
-./shortlinker tui                                # TUI 模式（需要 'tui' feature）
 ./shortlinker add github https://github.com     # 自定义短码
 ./shortlinker add https://example.com           # 随机短码
 ./shortlinker add secret https://example.com --password mypass  # 密码保护

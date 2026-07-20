@@ -151,7 +151,7 @@ geoip_api_url = "http://ip-api.com/json/{ip}?fields=status,countryCode,city"
 # IPC Configuration
 # ==============================================================================
 [ipc]
-# Enable IPC server for CLI/TUI communication
+# Enable IPC server for CLI communication
 # When disabled, CLI commands like `status`, `reload` will not work
 enabled = true
 
