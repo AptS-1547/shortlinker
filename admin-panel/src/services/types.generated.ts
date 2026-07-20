@@ -25,19 +25,19 @@ export type ActionType = "generate_token";
 /**
  * Analytics 查询参数
  */
-export type AnalyticsQuery = {
+export type AnalyticsQuery = { 
 /**
  * 开始日期 (ISO 8601)
  */
-start_date: string | null,
+start_date: string | null, 
 /**
  * 结束日期 (ISO 8601)
  */
-end_date: string | null,
+end_date: string | null, 
 /**
  * 分组方式
  */
-group_by: GroupBy | null,
+group_by: GroupBy | null, 
 /**
  * 返回数量限制
  */
@@ -83,7 +83,7 @@ export type ConfigHistoryResponse = { id: number, config_key: string, old_value:
 /**
  * 配置项响应
  */
-export type ConfigItemResponse = { key: string, value: string,
+export type ConfigItemResponse = { key: string, value: string, 
 /**
  * 值类型
  */
@@ -92,11 +92,11 @@ value_type: ValueType, requires_restart: boolean, is_sensitive: boolean, updated
 /**
  * 配置项的 schema 元信息
  */
-export type ConfigSchema = { key: string, value_type: ValueType, default_value: string, description: string, category?: string, enum_options?: Array<EnumOption>, requires_restart: boolean, editable: boolean,
+export type ConfigSchema = { key: string, value_type: ValueType, default_value: string, description: string, category?: string, enum_options?: Array<EnumOption>, requires_restart: boolean, editable: boolean, 
 /**
  * 排序顺序（基于 definitions.rs 中 ALL_CONFIGS 的索引）
  */
-order: number,
+order: number, 
 /**
  * 可执行的 action（如生成 token）
  */
@@ -177,7 +177,7 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | 
 /**
  * 导入失败项
  */
-export type ImportFailedItem = {
+export type ImportFailedItem = { 
 /**
  * CSV 行号（1-based），None 表示行号未知（如 service 层返回的冲突项无法反查行号）
  */
@@ -239,11 +239,11 @@ export type TopLink = { code: string, clicks: bigint, };
 /**
  * 点击趋势数据
  */
-export type TrendData = {
+export type TrendData = { 
 /**
  * 时间标签
  */
-labels: Array<string>,
+labels: Array<string>, 
 /**
  * 点击数
  */

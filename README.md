@@ -110,7 +110,6 @@ See [Configuration docs](docs/en/config/index.md) for all options.
 
 - [Web Admin Panel](admin-panel/) - GUI for link management
 - [Custom Frontend Template](https://github.com/AptS-1547/shortlinker-frontend/) - Build your own frontend
-- [Cloudflare Worker](cf-worker/) - Serverless version
 
 ### Custom Frontend
 

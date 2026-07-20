@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Docker Image
 
 on:
   push:
@@ -6,9 +6,14 @@ on:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 env:
   REGISTRY_IMAGE_DOCKERHUB: e1saps/shortlinker
@@ -16,105 +21,98 @@ env:
 
 jobs:
   build-and-push:
+    name: Build and push ${{ matrix.variant }}
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+    timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
         include:
           - variant: default
-            features: "cli"
+            features: cli
             suffix: ""
           - variant: metrics
-            features: "cli,metrics"
+            features: cli,metrics
             suffix: "-metrics"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    # - name: Set up QEMU
-    #   uses: docker/setup-qemu-action@v3
-    #   with:
-    #     platforms: arm64,386
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      with:
-        driver-opts: |
-          network=host
-        buildkitd-flags: |
-          --allow-insecure-entitlement security.insecure
-          --allow-insecure-entitlement network.host
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ env.REGISTRY_IMAGE_DOCKERHUB }}
+            ${{ env.REGISTRY_IMAGE_GHCR }}
+          tags: |
+            type=ref,event=tag,suffix=${{ matrix.suffix }}
+            type=raw,value=latest${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+            type=raw,value=stable${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+            type=raw,value=edge${{ matrix.suffix }},enable=${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+            type=semver,pattern=v{{major}},suffix=${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
+          labels: |
+            org.opencontainers.image.title=Shortlinker
+            org.opencontainers.image.description=A simple, fast, and secure URL shortener written in Rust
+            org.opencontainers.image.vendor=AptS-1547
 
-    - name: Extract metadata for Docker
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: |
-          ${{ env.REGISTRY_IMAGE_DOCKERHUB }}
-          ${{ env.REGISTRY_IMAGE_GHCR }}
-        tags: |
-          # 版本号 tag（如 v1.0.0-metrics、v1.0.0-alpha.1-metrics）
-          type=ref,event=tag,suffix=${{ matrix.suffix }}
-          # latest 始终指向最新构建
-          type=raw,value=latest${{ matrix.suffix }}
-          # 正式版本打 stable
-          type=raw,value=stable${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
-          # 预发布版本打 edge
-          type=raw,value=edge${{ matrix.suffix }},enable=${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          # 主版本号 tag（如 v1、v1-metrics），仅正式版本
-          type=semver,pattern=v{{major}},suffix=${{ matrix.suffix }},enable=${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
-        labels: |
-          org.opencontainers.image.title=Shortlinker
-          org.opencontainers.image.description=A simple, fast, and secure URL shortener written in Rust
-          org.opencontainers.image.vendor=AptS-1547
+      - name: Build and push Docker image
+        id: build-push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=docker-image-${{ matrix.variant }}
+            type=registry,ref=${{ env.REGISTRY_IMAGE_GHCR }}:buildcache-${{ matrix.variant }}
+          cache-to: |
+            type=gha,mode=max,scope=docker-image-${{ matrix.variant }}
+            type=registry,ref=${{ env.REGISTRY_IMAGE_GHCR }}:buildcache-${{ matrix.variant }},mode=max
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+            CARGO_FEATURES=${{ matrix.features }}
+          provenance: true
+          sbom: true
 
-    - name: Build and push Docker images
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        # platforms: linux/amd64,linux/arm64,linux/386
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        # 启用多层缓存策略（按变体隔离缓存）
-        cache-from: |
-          type=gha,scope=${{ matrix.variant }}
-          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache-${{ matrix.variant }}
-          type=registry,ref=${{ env.REGISTRY_IMAGE_GHCR }}:buildcache-${{ matrix.variant }}
-        cache-to: |
-          type=gha,mode=max,scope=${{ matrix.variant }}
-          type=registry,ref=${{ env.REGISTRY_IMAGE_DOCKERHUB }}:buildcache-${{ matrix.variant }},mode=max
-        build-args: |
-          VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
-          CARGO_FEATURES=${{ matrix.features }}
-        # 启用构建记录和证明
-        provenance: true
-        sbom: true
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
 
-    # 可选：构建总结和通知
-    - name: Build Summary
-      if: always()
-      run: |
-        echo "## Docker Build Summary (${{ matrix.variant }})" >> $GITHUB_STEP_SUMMARY
-        echo "- **Variant**: ${{ matrix.variant }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Features**: ${{ matrix.features }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platforms**: linux/amd64" >> $GITHUB_STEP_SUMMARY
-        echo "- **Images**:" >> $GITHUB_STEP_SUMMARY
-        echo "  - Docker Hub: ${{ env.REGISTRY_IMAGE_DOCKERHUB }}" >> $GITHUB_STEP_SUMMARY
-        echo "  - GitHub CR: ${{ env.REGISTRY_IMAGE_GHCR }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+      - name: Sign Docker images
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: |
+          cosign sign --yes "${REGISTRY_IMAGE_DOCKERHUB}@${DIGEST}"
+          cosign sign --yes "${REGISTRY_IMAGE_GHCR}@${DIGEST}"
+
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## Docker Build Summary (${{ matrix.variant }})"
+            echo "- **Features**: ${{ matrix.features }}"
+            echo "- **Version**: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}"
+            echo "- **Platform**: linux/amd64"
+            echo "- **Docker Hub**: ${{ env.REGISTRY_IMAGE_DOCKERHUB }}"
+            echo "- **GHCR**: ${{ env.REGISTRY_IMAGE_GHCR }}"
+            echo "- **Status**: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

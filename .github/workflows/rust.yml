@@ -2,80 +2,108 @@ name: Rust CI
 
 on:
   push:
+    branches: [master]
     paths:
       - '**/*.rs'
-      - 'Cargo.toml'
+      - '**/Cargo.toml'
       - 'Cargo.lock'
-    branches: [ "master" ]
+      - 'rust-toolchain.toml'
+      - '.github/workflows/rust.yml'
   pull_request:
+    branches: [master, develop]
     paths:
       - '**/*.rs'
-      - 'Cargo.toml'
+      - '**/Cargo.toml'
       - 'Cargo.lock'
-    branches: [ "master" ]
+      - 'rust-toolchain.toml'
+      - '.github/workflows/rust.yml'
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_TEST_CODEGEN_UNITS: '16'
+  CARGO_PROFILE_TEST_DEBUG: '0'
 
 jobs:
-  build:
+  format-and-clippy:
+    name: Format and Clippy
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
-    - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-    - name: Setup Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy-v1
 
-    - name: Build
-      run: cargo build --verbose
+      - name: Format check
+        run: cargo fmt --all -- --check
 
-    - name: Run tests
-      run: cargo test --verbose
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  coverage:
+  tests-and-coverage:
+    name: Tests and coverage
     runs-on: ubuntu-latest
-    needs: build
+    timeout-minutes: 120
 
     steps:
-    - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-    - name: Setup Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
 
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
 
-    - name: Install cargo-tarpaulin
-      run: cargo install cargo-tarpaulin
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage-v1
 
-    - name: Generate coverage report
-      run: cargo tarpaulin --out Xml --output-dir coverage
+      - name: Prepare coverage directory
+        run: mkdir -p coverage/rust
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        files: coverage/cobertura.xml
-        fail_ci_if_error: false
-        verbose: true
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Run tests with coverage
+        run: cargo llvm-cov --workspace --no-fail-fast --lcov --output-path coverage/rust/lcov.info
+
+      - name: Generate HTML coverage report
+        if: success()
+        run: cargo llvm-cov report --html --output-dir coverage/rust/html
+
+      - name: Upload coverage reports to Codecov
+        if: always() && hashFiles('coverage/rust/lcov.info') != ''
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage/rust/lcov.info
+          flags: rust
+          name: rust-backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rust-coverage
+          if-no-files-found: ignore
+          path: coverage/rust

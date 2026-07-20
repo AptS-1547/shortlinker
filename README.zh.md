@@ -110,7 +110,6 @@ curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 - [Web 管理面板](admin-panel/) - 图形化链接管理
 - [自定义前端模版](https://github.com/AptS-1547/shortlinker-frontend/) - 构建你自己的前端
-- [Cloudflare Worker](cf-worker/) - Serverless 版本
 
 ### 自定义前端
 

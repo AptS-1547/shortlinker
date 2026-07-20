@@ -91,4 +91,4 @@ curl -L http://localhost:8080/github
 
 准备好了吗？查看 [快速开始指南](/guide/getting-started) 开始您的 Shortlinker 之旅。
 
-更多组件：[Web 管理界面](/admin-panel/) | [Cloudflare Worker 版本](/cf-worker/)。
+更多组件：[Web 管理界面](/admin-panel/)。

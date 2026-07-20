@@ -1,149 +1,139 @@
-name: 🐛 Bug 报告
-description: 报告一个 bug 以帮助我们改进
+name: Bug Report
+description: Report a reproducible problem in Shortlinker
 title: "[Bug]: "
-labels: ["bug", "needs-triage"]
+labels: ["Bug", "Wait For More Info"]
 assignees:
   - AptS-1547
 body:
   - type: markdown
     attributes:
       value: |
-        感谢您花时间填写这个 bug 报告！
+        Thanks for taking the time to report a bug. Remove passwords, tokens, cookies, database credentials, and private hostnames from all logs and configuration snippets.
+
+  - type: input
+    id: version
+    attributes:
+      label: Shortlinker version
+      description: Provide the release version, Docker tag, or commit SHA that exhibits the problem.
+      placeholder: e.g. v0.5.2, stable, or 1a2b3c4
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - Short-link redirect / HTTP API
+        - Admin Panel
+        - CLI / TUI
+        - Configuration
+        - Database / migrations
+        - Docker / deployment
+        - Metrics / observability
+        - Other or not sure
+    validations:
+      required: true
 
   - type: textarea
     id: what-happened
     attributes:
-      label: 描述 bug
-      description: 简短而清晰地描述这个 bug 是什么。
-      placeholder: 告诉我们发生了什么！
+      label: What happened?
+      description: Describe the problem and its user-visible impact.
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: 重现步骤
-      description: 重现此行为的步骤
-      placeholder: |
-        1. 运行命令 '...'
-        2. 访问链接 '...'
-        3. 看到错误
+      label: Steps to reproduce
       value: |
-        1. 
-        2. 
-        3. 
+        1.
+        2.
+        3.
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: 预期行为
-      description: 清晰而简洁地描述您期望发生的情况。
+      label: Expected behavior
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: 实际行为
-      description: 清晰而简洁地描述实际发生的情况。
+      label: Actual behavior
     validations:
       required: true
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: 错误信息/日志
-      description: 如果适用，请添加错误信息或日志来帮助解释您的问题。
-      render: shell
-
-  - type: dropdown
-    id: version
-    attributes:
-      label: Shortlinker 版本
-      description: 您使用的是哪个版本？
-      options:
-        - v0.1.7-alpha.4 (最新)
-        - v0.1.7-alpha.3
-        - v0.1.7-alpha.2
-        - v0.1.7-alpha.1
-        - v0.1.6
-        - v0.1.5
-        - v0.1.4
-        - v0.1.3
-        - master 分支 (开发版)
-        - 其他 (请在下方说明)
-    validations:
-      required: true
-
-  - type: dropdown
-    id: os
-    attributes:
-      label: 操作系统
-      description: 您在什么操作系统上运行？
-      options:
-        - Ubuntu
-        - Debian
-        - CentOS/RHEL
-        - Arch Linux
-        - macOS
-        - Windows 10
-        - Windows 11
-        - Docker (请在下方说明基础镜像)
-        - 其他 (请在下方说明)
-    validations:
-      required: true
-
-  - type: input
-    id: rust-version
-    attributes:
-      label: Rust 版本
-      description: 如果从源码编译，您使用的 Rust 版本是什么？
-      placeholder: 例如：1.82.0
 
   - type: dropdown
     id: installation
     attributes:
-      label: 安装方式
-      description: 您是如何安装 Shortlinker 的？
+      label: Installation method
       options:
-        - 预编译二进制
-        - Docker
-        - 源码编译
-        - 其他 (请在下方说明)
+        - Docker / Docker Compose
+        - Pre-built binary from GitHub Releases
+        - Homebrew
+        - Cargo Binstall
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database backend
+      options:
+        - SQLite
+        - PostgreSQL
+        - MySQL
+        - Not database-related
+        - Not sure
     validations:
       required: true
 
   - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - OS / distribution:
+        - CPU architecture:
+        - Browser (for Admin Panel issues):
+        - Reverse proxy:
+        - Other deployment details:
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages / logs
+      description: Include only logs related to the problem and remove sensitive values before posting.
+      render: shell
+
+  - type: textarea
     id: config
     attributes:
-      label: 配置信息
-      description: 您的配置文件内容（请移除敏感信息如 token）
-      render: bash
-      placeholder: |
-        SERVER_HOST=127.0.0.1
-        SERVER_PORT=8080
-        # ... 其他配置
+      label: Relevant configuration
+      description: Include only relevant settings and replace sensitive values with placeholders.
+      render: toml
 
   - type: textarea
     id: context
     attributes:
-      label: 额外信息
-      description: |
-        在此处添加有关问题的任何其他信息。
-        
-        提示：您可以通过点击此区域来附加图像或日志文件。
+      label: Additional context
+      description: Add screenshots, recordings, a minimal reproduction, or troubleshooting results if available.
 
   - type: checkboxes
     id: terms
     attributes:
-      label: 检查清单
-      description: 在提交之前，请确认：
+      label: Checklist
       options:
-        - label: 我已经搜索了现有的 issues，没有发现重复的问题
+        - label: I have searched existing issues for duplicates
           required: true
-        - label: 我已经查看了文档和 FAQ
+        - label: I have checked the relevant documentation and troubleshooting guides
           required: true
-        - label: 我已经提供了足够的信息来重现这个问题
+        - label: I have removed credentials and other sensitive information from this report
           required: true

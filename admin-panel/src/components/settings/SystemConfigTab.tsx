@@ -31,6 +31,18 @@ interface SystemConfigTabProps {
   isActive?: boolean
 }
 
+const CATEGORY_ORDER = [
+  'auth',
+  'cookie',
+  'features',
+  'routes',
+  'cors',
+  'tracking',
+  'analytics',
+  'cache',
+  'other',
+]
+
 export function SystemConfigTab({ isActive = true }: SystemConfigTabProps) {
   const { t } = useTranslation()
   const {
@@ -69,20 +81,9 @@ export function SystemConfigTab({ isActive = true }: SystemConfigTabProps) {
   }, [configs, schemas])
 
   // 分组排序（按预定义顺序）
-  const categoryOrder = [
-    'auth',
-    'cookie',
-    'features',
-    'routes',
-    'cors',
-    'tracking',
-    'analytics',
-    'cache',
-    'other',
-  ]
   const sortedCategories = useMemo(() => {
     return Object.keys(groupedConfigs).sort(
-      (a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b),
+      (a, b) => CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b),
     )
   }, [groupedConfigs])
 

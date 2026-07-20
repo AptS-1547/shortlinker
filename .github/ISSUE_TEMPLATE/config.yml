@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 📚 查看文档
+  - name: Documentation
     url: https://esap.cc/docs
-    about: 查看完整的使用文档和 API 参考
-  - name: 💬 社区讨论
+    about: Read the complete usage and API documentation
+  - name: Discussions
     url: https://github.com/AptS-1547/shortlinker/discussions
-    about: 参与社区讨论，分享想法和经验
-  - name: 🔧 贡献指南
+    about: Ask general questions and share ideas with the community
+  - name: Contributing guide
     url: https://github.com/AptS-1547/shortlinker/blob/master/CONTRIBUTING.md
-    about: 了解如何为项目做贡献
+    about: Learn how to contribute to Shortlinker

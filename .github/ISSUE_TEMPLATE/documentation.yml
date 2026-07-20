@@ -1,0 +1,52 @@
+name: Documentation
+description: Report missing, outdated, incorrect, or confusing documentation
+title: "[Docs]: "
+labels: ["Documentation", "Wait For More Info"]
+assignees:
+  - AptS-1547
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Page or section
+      description: Provide the page URL, heading, or repository file path.
+      placeholder: e.g. docs/guide/installation.md, README.md, or a deployment guide section
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Explain what is incorrect, outdated, incomplete, confusing, or hard to find.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Suggested improvement
+      description: If you know the correct content or a clearer structure, describe it here.
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who is affected?
+      options:
+        - First-time deployers
+        - Administrators / operators
+        - CLI / TUI users
+        - API users
+        - Admin Panel users
+        - Contributors
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for similar documentation reports
+          required: true

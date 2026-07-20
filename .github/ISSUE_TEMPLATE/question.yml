@@ -1,91 +1,78 @@
-name: ❓ 使用问题
-description: 询问如何使用 Shortlinker 或寻求帮助
+name: Question
+description: Ask about installing, configuring, or using Shortlinker
 title: "[Question]: "
-labels: ["question", "needs-triage"]
+labels: ["Wait For More Info"]
 assignees:
   - AptS-1547
 body:
   - type: markdown
     attributes:
       value: |
-        有问题？我们来帮助您！
-        
-        💡 **提示**: 如果是一般性讨论或想法分享，建议使用 [Discussions](https://github.com/AptS-1547/shortlinker/discussions)
+        General discussion and experience sharing are better suited to [Discussions](https://github.com/AptS-1547/shortlinker/discussions). Use the bug report form for reproducible unexpected behavior.
 
   - type: textarea
     id: question
     attributes:
-      label: 您的问题
-      description: 请详细描述您遇到的问题或需要帮助的地方。
-      placeholder: 请尽可能详细地描述您的问题...
+      label: Your question
+      description: Explain what you are trying to accomplish and where you are stuck.
     validations:
       required: true
 
   - type: dropdown
     id: category
     attributes:
-      label: 问题类别
-      description: 您的问题属于哪个类别？
+      label: Category
       options:
-        - 安装和部署
-        - 配置问题
-        - CLI 工具使用
-        - Admin API 使用
-        - Docker 部署
-        - 反向代理配置
-        - 性能问题
-        - 故障排除
-        - 其他
+        - Installation / deployment
+        - Configuration
+        - Short links / HTTP API
+        - Admin Panel
+        - CLI / TUI
+        - Docker
+        - Reverse proxy
+        - Troubleshooting
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Shortlinker version
+      description: Provide the release version, Docker tag, or commit SHA you are using.
+      placeholder: e.g. v0.5.2, stable, or 1a2b3c4
     validations:
       required: true
 
   - type: textarea
     id: what-tried
     attributes:
-      label: 已尝试的方法
-      description: 请告诉我们您已经尝试了什么来解决这个问题。
-      placeholder: |
-        1. 我尝试了...
-        2. 我查看了...
-        3. 我参考了...
+      label: What have you tried?
+      description: List the documentation, commands, and troubleshooting steps you have already tried.
 
   - type: textarea
     id: environment
     attributes:
-      label: 环境信息
-      description: 请提供您的环境信息
+      label: Environment
       value: |
-        - **操作系统**: 
-        - **Shortlinker 版本**: 
-        - **安装方式**: 
-        - **Rust 版本** (如果从源码编译): 
-        - **其他相关信息**: 
-    validations:
-      required: true
-
-  - type: textarea
-    id: config
-    attributes:
-      label: 配置信息
-      description: 如果与配置相关，请提供您的配置（移除敏感信息）
-      render: bash
+        - OS / distribution:
+        - Installation method:
+        - Database backend:
+        - Reverse proxy:
 
   - type: textarea
     id: logs
     attributes:
-      label: 相关日志
-      description: 如果有错误信息或日志，请粘贴在这里
+      label: Relevant logs
+      description: Remove passwords, tokens, cookies, and database credentials before posting.
       render: shell
 
   - type: checkboxes
     id: checklist
     attributes:
-      label: 检查清单
-      description: 在提交之前，请确认：
+      label: Checklist
       options:
-        - label: 我已经查看了文档
+        - label: I have checked the project documentation
           required: true
-        - label: 我已经搜索了现有的 issues 和 discussions
-          required: true
-        - label: 我已经尝试了基本的故障排除步骤
+        - label: I have searched existing issues and discussions
           required: true

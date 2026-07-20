@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! declare_existence_filter_plugin {
     ($name:expr, $ty:ty) => {
-        #[ctor::ctor]
+        #[ctor::ctor(unsafe)]
         fn __register_l1_plugin() {
             use std::sync::Arc;
             use $crate::cache::register::register_filter_plugin;
@@ -28,7 +28,7 @@ macro_rules! declare_existence_filter_plugin {
 #[macro_export]
 macro_rules! declare_object_cache_plugin {
     ($name:expr, $ty:ty) => {
-        #[ctor::ctor]
+        #[ctor::ctor(unsafe)]
         fn __register_cache_plugin() {
             use std::sync::Arc;
             use $crate::cache::register::register_object_cache_plugin;

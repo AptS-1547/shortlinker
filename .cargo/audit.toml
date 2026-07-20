@@ -1,0 +1,11 @@
+# Ignore advisories only after confirming that the affected operation is not
+# reachable from Shortlinker's production code paths.
+
+[advisories]
+ignore = [
+    # rsa 0.9.10 Marvin Attack timing side channel. The crate is pulled in by
+    # jsonwebtoken's rust_crypto feature, while Shortlinker creates and verifies
+    # JWTs exclusively with HS256 and shared secrets. No RSA private-key signing
+    # or decryption oracle is exposed, and upstream has no fixed release yet.
+    "RUSTSEC-2023-0071",
+]

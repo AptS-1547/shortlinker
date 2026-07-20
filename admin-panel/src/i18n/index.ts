@@ -131,8 +131,6 @@ i18n.use(initReactI18next).init({
   },
   // 不预加载资源，使用懒加载
   resources: {},
-  // 关掉 i18next 的广告
-  showSupportNotice: false,
 })
 
 // 初始加载默认语言和英语（作为 fallback）

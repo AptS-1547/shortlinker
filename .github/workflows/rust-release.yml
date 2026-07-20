@@ -6,15 +6,20 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build-frontend:
+    name: Build admin panel
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
     - uses: actions/checkout@v6
 
@@ -37,18 +42,23 @@ jobs:
       with:
         name: frontend-dist
         path: admin-panel/dist
+        if-no-files-found: error
         retention-days: 1
 
     - uses: actions/upload-artifact@v7
       with:
         name: frontend-package
         path: shortlinker-admin-panel_*.tar.gz
+        if-no-files-found: error
         retention-days: 1
 
   build-linux-windows:
+    name: Build ${{ matrix.target }}
     needs: build-frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
@@ -61,7 +71,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: frontend-dist
         path: admin-panel/dist
@@ -104,14 +114,18 @@ jobs:
       with:
         name: binary-${{ matrix.name }}
         path: shortlinker_*
+        if-no-files-found: error
+        retention-days: 1
 
   build-arm64:
+    name: Build aarch64-unknown-linux-gnu
     needs: build-frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
     - uses: actions/checkout@v6
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: frontend-dist
         path: admin-panel/dist
@@ -142,11 +156,16 @@ jobs:
       with:
         name: binary-linux_aarch64
         path: shortlinker_*
+        if-no-files-found: error
+        retention-days: 1
 
   build-macos:
+    name: Build ${{ matrix.target }}
     needs: build-frontend
     runs-on: macos-latest
+    timeout-minutes: 120
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-darwin
@@ -156,7 +175,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         name: frontend-dist
         path: admin-panel/dist
@@ -183,17 +202,23 @@ jobs:
       with:
         name: binary-${{ matrix.name }}
         path: shortlinker_*
+        if-no-files-found: error
+        retention-days: 1
 
   release:
+    name: Publish GitHub release
     needs: [build-linux-windows, build-arm64, build-macos]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 0
         fetch-tags: true
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         path: artifacts
 
@@ -207,7 +232,7 @@ jobs:
       id: changelog
       run: |
         VERSION="${GITHUB_REF#refs/tags/}"
-        # 从 CHANGELOG.md 提取当前版本的内容
+        # Extract the current version section from CHANGELOG.md.
         CONTENT=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[v/{if(flag) exit} flag" CHANGELOG.md)
         if [ -z "$CONTENT" ]; then
           CONTENT="Release ${VERSION}"
@@ -261,7 +286,8 @@ jobs:
     name: Update Homebrew Tap
     needs: release
     runs-on: ubuntu-latest
-    # 只在非预发布版本时更新 Homebrew
+    timeout-minutes: 15
+    # Update Homebrew only for stable releases.
     if: ${{ !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') }}
     steps:
     - name: Download release assets and calculate SHA256
@@ -270,10 +296,10 @@ jobs:
         VERSION="${GITHUB_REF#refs/tags/}"
         BASE_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}"
 
-        curl -sL "${BASE_URL}/shortlinker_${VERSION}_macos_aarch64" -o macos-arm64
-        curl -sL "${BASE_URL}/shortlinker_${VERSION}_macos_x86_64" -o macos-amd64
-        curl -sL "${BASE_URL}/shortlinker_${VERSION}_linux_aarch64" -o linux-arm64
-        curl -sL "${BASE_URL}/shortlinker_${VERSION}_linux_x86_64" -o linux-amd64
+        curl -fsSL "${BASE_URL}/shortlinker_${VERSION}_macos_aarch64" -o macos-arm64
+        curl -fsSL "${BASE_URL}/shortlinker_${VERSION}_macos_x86_64" -o macos-amd64
+        curl -fsSL "${BASE_URL}/shortlinker_${VERSION}_linux_aarch64" -o linux-arm64
+        curl -fsSL "${BASE_URL}/shortlinker_${VERSION}_linux_x86_64" -o linux-amd64
 
         echo "macos_arm64=$(sha256sum macos-arm64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT
         echo "macos_amd64=$(sha256sum macos-amd64 | cut -d' ' -f1)" >> $GITHUB_OUTPUT

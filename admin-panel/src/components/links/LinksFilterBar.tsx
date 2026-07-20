@@ -82,7 +82,7 @@ export const LinksFilterBar = memo(function LinksFilterBar({
             mode="single"
             selected={createdAfter}
             onSelect={onCreatedAfterChange}
-            initialFocus
+            autoFocus
           />
         </PopoverContent>
       </Popover>
@@ -118,7 +118,7 @@ export const LinksFilterBar = memo(function LinksFilterBar({
             mode="single"
             selected={createdBefore}
             onSelect={onCreatedBeforeChange}
-            initialFocus
+            autoFocus
           />
         </PopoverContent>
       </Popover>

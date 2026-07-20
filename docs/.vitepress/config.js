@@ -222,15 +222,6 @@ export default {
           ]
         }
       ],
-      '/cf-worker/': [
-        {
-          text: 'Cloudflare Worker',
-          items: [
-            { text: '概述', link: '/cf-worker/' }
-          ]
-        }
-      ],
-
       // English sidebar
       '/en/': [
         {
@@ -336,14 +327,6 @@ export default {
           ]
         }
       ],
-      '/en/cf-worker/': [
-        {
-          text: 'Cloudflare Worker',
-          items: [
-            { text: 'Overview', link: '/en/cf-worker/' }
-          ]
-        }
-      ]
     },
 
     socialLinks: [
