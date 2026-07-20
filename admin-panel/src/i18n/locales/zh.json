@@ -1,0 +1,671 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "cancel": "取消",
+    "save": "保存",
+    "saving": "保存中...",
+    "delete": "删除",
+    "deleting": "删除中...",
+    "edit": "编辑",
+    "create": "创建",
+    "search": "搜索",
+    "filter": "筛选",
+    "reset": "重置",
+    "apply": "应用",
+    "refresh": "刷新",
+    "copy": "复制",
+    "copied": "已复制！",
+    "retry": "重试",
+    "previous": "上一页",
+    "next": "下一页",
+    "yes": "是",
+    "no": "否",
+    "more": "更多",
+    "close": "关闭",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "actions": "操作",
+    "addItem": "添加项目..."
+  },
+  "auth": {
+    "title": "管理员登录",
+    "description": "请输入密码以访问管理面板",
+    "password": "密码",
+    "passwordPlaceholder": "请输入管理员密码",
+    "login": "登录",
+    "authenticating": "认证中...",
+    "verifying": "验证中...",
+    "processing": "处理中...",
+    "serverConnection": "服务器连接",
+    "serverConnectionDesc": "请确保 ShortLinker 服务正在 {{url}} 上运行",
+    "errors": {
+      "passwordRequired": "请输入密码",
+      "networkError": "无法连接到服务器。请检查服务是否正在运行。",
+      "unauthorized": "密码无效或未授权访问",
+      "notFound": "未找到认证端点。请检查服务器配置。",
+      "serverError": "服务器错误。请稍后重试。",
+      "authFailed": "认证失败。请重试。"
+    }
+  },
+  "dashboard": {
+    "title": "仪表板",
+    "description": "欢迎回来！这是您的短链接概览。",
+    "serviceStatus": "服务状态",
+    "totalLinks": "总链接数",
+    "activeLinks": "活跃链接",
+    "responseTime": "响应时间",
+    "noLinks": "暂无链接",
+    "noLinksDesc": "创建您的第一个短链接以开始使用。",
+    "createLink": "创建链接",
+    "viewAllLinks": "查看所有链接",
+    "systemHealth": "系统健康状态",
+    "storage": "存储",
+    "lastCheck": "最后检查",
+    "healthy": "健康",
+    "unknown": "未知",
+    "never": "从未",
+    "stats": {
+      "totalLinks": "总链接数",
+      "linksCreated": "已创建链接",
+      "totalClicks": "总点击数",
+      "clicksTracked": "已跟踪点击",
+      "activeLinks": "活跃链接",
+      "notExpired": "未过期",
+      "uptime": "运行时间",
+      "systemHealth": "系统健康",
+      "todayClicks": "今日点击",
+      "vsYesterday": "较昨日",
+      "clickTrend": "点击趋势",
+      "last7Days": "最近 7 天"
+    },
+    "recentLinks": {
+      "title": "最近链接",
+      "description": "您最近创建的短链接",
+      "clicks": "次点击",
+      "noLinks": "暂无链接"
+    }
+  },
+  "links": {
+    "title": "链接管理",
+    "description": "创建、编辑和管理您的短链接。",
+    "filterTitle": "筛选链接",
+    "filterDescription": "搜索和筛选您的短链接",
+    "createTitle": "创建新链接",
+    "editTitle": "编辑链接",
+    "createDescription": "向您的收藏中添加新的短链接",
+    "editDescription": "更新您的短链接详情",
+    "shortCode": "短代码",
+    "shortCodeOptional": "短代码（可选）",
+    "shortCodePlaceholder": "留空自动生成",
+    "shortCodeHelp": "自定义短代码（字母、数字、连字符、下划线，或路径如 abc/def）",
+    "targetUrl": "目标网址",
+    "targetUrlRequired": "目标网址 *",
+    "targetUrlPlaceholder": "https://example.com/your-long-url",
+    "targetUrlHelp": "用户将被重定向到的目标网址",
+    "expiresAt": "过期时间",
+    "expiresAtOptional": "过期时间（可选）",
+    "expiresAtHelp": "留空表示永久链接",
+    "passwordOptional": "密码（可选）",
+    "passwordPlaceholder": "输入密码保护此链接",
+    "passwordHelp": "设置密码以保护此链接的访问",
+    "passwordProtected": "密码保护",
+    "created": "创建时间",
+    "actions": "操作",
+    "active": "活跃",
+    "expired": "已过期",
+    "permanent": "永久",
+    "creating": "创建中...",
+    "updating": "更新中...",
+    "createLink": "创建链接",
+    "createNew": "新建链接",
+    "editLink": "编辑链接",
+    "updateLink": "更新链接",
+    "clearEdit": "清除编辑",
+    "shortLinks": "短链接",
+    "noLinks": "暂无链接",
+    "noLinksTitle": "暂无链接",
+    "noLinksDescription": "创建您的第一个短链接以开始使用",
+    "noMatchingLinks": "没有匹配的链接",
+    "noLinksYet": "暂无链接",
+    "noMatchingLinksDesc": "尝试调整筛选条件或创建新链接。",
+    "noLinksYetDesc": "使用上方表单创建您的第一个短链接。",
+    "clearFilters": "清除筛选",
+    "createFirstLink": "创建您的第一个链接",
+    "createNewLink": "创建新链接",
+    "deleteLink": "删除链接",
+    "deleteSuccess": "链接删除成功",
+    "deleteError": "删除链接失败",
+    "createSuccess": "链接创建成功",
+    "createError": "创建链接失败",
+    "updateSuccess": "链接更新成功",
+    "updateError": "更新链接失败",
+    "copySuccess": "链接已复制到剪贴板",
+    "copyError": "复制链接失败",
+    "batchDeleteSuccess": "成功删除 {{count}} 个链接",
+    "batchDeletePartial": "已删除 {{success}} 个链接，{{failed}} 个失败",
+    "batchDeleteError": "批量删除失败",
+    "openInNewTab": "在新标签页中打开",
+    "deleteConfirmation": "确定要删除链接 {{code}} 吗？此操作无法撤销。",
+    "deleting": "删除中...",
+    "copyLinkTitle": "点击复制短链接",
+    "copyPasswordProtectedLink": "点击复制密码保护链接（包含密码）",
+    "linkCopied": "短链接已复制！",
+    "passwordParameterAdded": "已复制包含密码的保护链接",
+    "createdAfter": "创建时间晚于",
+    "createdBefore": "创建时间早于",
+    "pageSize": "页面大小",
+    "searchPlaceholder": "搜索链接...",
+    "tableTitle": "链接列表",
+    "filterOptions": {
+      "allLinks": "所有链接",
+      "activeOnly": "仅活跃",
+      "expiredOnly": "仅过期",
+      "permanentLinks": "永久链接",
+      "temporaryLinks": "临时链接"
+    },
+    "pagination": {
+      "showing": "显示 {{from}}-{{to}}，共 {{total}} 条",
+      "page": "第 {{current}} 页，共 {{total}} 页",
+      "perPage": "每页"
+    },
+    "search": {
+      "placeholder": "按代码或网址搜索...",
+      "createdAfter": "创建时间晚于",
+      "createdBefore": "创建时间早于",
+      "pageSize": "页面大小"
+    },
+    "table": {
+      "code": "代码",
+      "target": "目标网址",
+      "targetUrl": "目标网址",
+      "clicks": "点击数",
+      "status": "状态",
+      "created": "创建时间",
+      "expires": "过期时间",
+      "actions": "操作"
+    },
+    "status": {
+      "active": "活跃",
+      "expired": "已过期",
+      "protected": "已保护"
+    },
+    "form": {
+      "code": "短代码",
+      "codePlaceholder": "留空自动生成",
+      "target": "目标网址",
+      "targetPlaceholder": "https://example.com/your-long-url",
+      "password": "密码（可选）",
+      "passwordPlaceholder": "输入密码保护此链接",
+      "invalidUrl": "URL 必须以 http:// 或 https:// 开头"
+    },
+    "deleteConfirm": {
+      "title": "确认删除",
+      "description": "确定要删除链接 {{code}} 吗？此操作无法撤销。"
+    },
+    "activeFilters": "{{count}} 个筛选条件",
+    "filtered": "（已筛选）",
+    "editing": "正在编辑：{{code}}",
+    "batch": {
+      "selectAll": "全选",
+      "selectRow": "选择此行",
+      "selected": "已选中 {{count}} 项",
+      "delete": "删除",
+      "clear": "取消选择",
+      "deleteTitle": "确认批量删除",
+      "deleteDescription": "确定要删除选中的 {{count}} 个链接吗？此操作无法撤销。",
+      "deletePartial": "已删除 {{success}} 个链接，{{failed}} 个失败",
+      "deleteSuccess": "成功删除 {{count}} 个链接"
+    },
+    "columns": {
+      "configure": "列",
+      "title": "显示/隐藏列"
+    },
+    "expand": {
+      "shortUrl": "短链接",
+      "passwordProtection": "密码保护"
+    },
+    "import": {
+      "button": "导入",
+      "title": "导入链接",
+      "file": "CSV 文件",
+      "dragOrClick": "拖放 CSV 文件到此处，或点击选择",
+      "maxFileSize": "最大文件大小: {{size}}",
+      "fileTooLarge": "文件过大，最大支持 {{maxSize}}",
+      "mode": "导入模式",
+      "modeSkip": "跳过重复 - 遇到已存在的链接时跳过",
+      "modeOverwrite": "覆盖 - 遇到已存在的链接时全量覆盖",
+      "modeError": "报错 - 遇到已存在的链接时返回错误",
+      "import": "导入",
+      "importing": "导入中...",
+      "uploading": "上传中...",
+      "success": "导入完成",
+      "error": "导入失败",
+      "totalRows": "总行数: {{count}}",
+      "successCount": "成功: {{count}}",
+      "skippedCount": "跳过: {{count}}",
+      "failedCount": "失败: {{count}}",
+      "failedDetails": "失败详情:",
+      "failedItem": "第 {{row}} 行 ({{code}}): {{error}}",
+      "andMore": "...还有 {{count}} 条"
+    },
+    "export": {
+      "button": "导出",
+      "exporting": "导出中...",
+      "success": "导出成功",
+      "error": "导出失败"
+    },
+    "qr": {
+      "code": "二维码",
+      "download": "下载二维码",
+      "downloading": "下载中...",
+      "preview": "二维码预览",
+      "size": "尺寸",
+      "margin": "边距",
+      "foreground": "前景色",
+      "background": "背景色",
+      "errorLevel": "纠错级别",
+      "downloadPng": "下载 PNG",
+      "generateFailed": "生成失败",
+      "logo": "Logo（可选）",
+      "logoSize": "大小",
+      "logoHint": "推荐：方形 PNG，透明背景",
+      "errorLevelWarning": "提示：添加 Logo 时建议使用 H 级纠错"
+    }
+  },
+  "analytics": {
+    "title": "数据分析",
+    "description": "查看您的短链接统计和分析数据。",
+    "totalLinks": "总链接数",
+    "totalClicks": "总点击数",
+    "thisWeek": "本周",
+    "activeLinks": "活跃链接",
+    "featureComingSoon": "功能即将推出",
+    "recentActivity": "最近活动",
+    "recentActivityTitle": "最近活动",
+    "loadingActivity": "加载活动中...",
+    "noActivityYet": "暂无活动",
+    "noActivityDesc": "创建一些链接以查看分析数据。",
+    "linkStatusDistribution": "链接状态分布",
+    "activeLinksCard": "活跃链接",
+    "expiredLinksCard": "过期链接",
+    "permanentLinksCard": "永久链接",
+    "ofTotal": "占总数",
+    "analyticsFeatures": "分析功能",
+    "analyticsFeaturesDesc": "点击跟踪和详细分析功能即将推出！目前显示基本链接统计。",
+    "clicks": "次点击",
+    "expires": "过期时间",
+    "created": "创建时间",
+    "averageClicks": "平均点击数",
+    "clicksPerLink": "每链接点击数",
+    "na": "暂无",
+    "export": "导出",
+    "noData": "暂无数据",
+    "noGeoData": "暂无地理位置数据",
+    "topLinksCount": "热门链接数",
+    "referrersCount": "来源数",
+    "countriesCount": "国家/地区数",
+    "clickTrends": "点击趋势",
+    "clickTrendsDesc": "查看所选时间范围内的点击趋势",
+    "topLinks": "热门链接",
+    "topLinksDesc": "点击数最高的链接排行",
+    "referrers": "来源分布",
+    "referrersDesc": "访客访问链接的来源网站",
+    "geoDistribution": "地理分布",
+    "geoDistributionDesc": "访客的地理位置分布",
+    "dateRange": {
+      "7d": "近 7 天",
+      "30d": "近 30 天",
+      "90d": "近 90 天",
+      "1y": "近 1 年"
+    },
+    "groupBy": {
+      "hour": "按小时",
+      "day": "按天",
+      "week": "按周",
+      "month": "按月"
+    },
+    "error": {
+      "fetchFailed": "获取分析数据失败"
+    },
+    "devices": "设备与浏览器",
+    "devicesDesc": "访客的浏览器、操作系统和设备类型分布",
+    "browsers": "浏览器分布",
+    "operatingSystems": "操作系统",
+    "deviceCategories": "设备类型",
+    "botTraffic": "Bot 流量",
+    "viewAnalytics": "查看分析",
+    "comingSoon": {
+      "title": "功能开发中",
+      "description": "详细的分析功能即将推出！敬请期待。"
+    },
+    "features": {
+      "clickTrends": "点击趋势",
+      "clickTrendsDesc": "查看您链接的点击趋势和模式",
+      "visitors": "访客分析",
+      "visitorsDesc": "了解谁在访问您的链接",
+      "geography": "地理分布",
+      "geographyDesc": "查看访客的地理位置分布",
+      "topLinks": "热门链接",
+      "topLinksDesc": "发现您最受欢迎的链接"
+    }
+  },
+  "linkDetail": {
+    "title": "链接详情",
+    "description": "查看此链接的完整统计分析",
+    "info": "链接信息",
+    "targetUrl": "目标网址",
+    "totalClicks": "总点击数",
+    "createdAt": "创建时间",
+    "expiresAt": "过期时间",
+    "status": "状态",
+    "viewFull": "完整分析",
+    "notFound": "未找到此链接",
+    "fetchFailed": "获取链接数据失败",
+    "noCode": "未指定链接代码"
+  },
+  "layout": {
+    "title": "ShortLinker 管理面板",
+    "subtitle": "管理面板",
+    "logout": "退出登录",
+    "navigation": {
+      "title": "导航",
+      "dashboard": "仪表板",
+      "links": "链接管理",
+      "analytics": "数据分析",
+      "config": "系统配置",
+      "settings": "设置"
+    },
+    "system": {
+      "title": "系统"
+    },
+    "health": {
+      "healthy": "健康",
+      "unhealthy": "异常",
+      "unknown": "未知"
+    },
+    "language": {
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語"
+    }
+  },
+  "health": {
+    "title": "系统健康状态",
+    "description": "实时服务监控",
+    "close": "关闭",
+    "refresh": "刷新",
+    "loadingData": "加载健康数据中...",
+    "overallStatus": "总体状态",
+    "responseTime": "响应时间",
+    "uptime": "运行时间",
+    "sinceLast": "自上次重启",
+    "totalLinks": "总链接数",
+    "activeLinks": "活跃短链接",
+    "storageBackend": "存储后端",
+    "cacheSystem": "缓存系统",
+    "cacheType": "缓存类型",
+    "bloomFilter": "布隆过滤器",
+    "negativeCache": "负缓存",
+    "type": "类型",
+    "status": "状态",
+    "clickTracking": "点击跟踪",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "lastUpdated": "最后更新",
+    "healthy": "健康",
+    "unhealthy": "异常",
+    "degraded": "降级",
+    "unknown": "未知"
+  },
+  "langswitcher": {
+    "title": "选择语言",
+    "language": {
+      "switch": "切换语言",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "theme": {
+    "switchTheme": "切换主题",
+    "light": "浅色主题",
+    "dark": "深色主题",
+    "system": "系统主题"
+  },
+  "settings": {
+    "title": "设置",
+    "description": "自定义您的偏好设置",
+    "tabs": {
+      "appearance": "外观",
+      "language": "语言",
+      "preferences": "偏好设置",
+      "system": "系统",
+      "about": "关于"
+    },
+    "theme": {
+      "title": "主题",
+      "description": "选择界面主题"
+    },
+    "language": {
+      "title": "语言",
+      "description": "选择界面语言"
+    },
+    "about": {
+      "title": "关于",
+      "description": "项目信息和链接",
+      "tagline": "快速优雅地管理链接",
+      "openSource": "开源项目",
+      "docs": "文档",
+      "builtWith": "怀着",
+      "forCommunity": "为开源社区构建"
+    }
+  },
+  "errors": {
+    "boundary": {
+      "title": "糟糕！出错了",
+      "description": "遇到了意外错误。请尝试重新加载页面或返回主页。",
+      "technicalDetails": "技术详情",
+      "reload": "重新加载",
+      "goHome": "返回首页",
+      "persistentIssue": "如果问题持续存在，请联系技术支持。"
+    },
+    "network": "网络错误 - 请检查您的连接",
+    "badRequest": "错误的请求 - 请检查您的输入",
+    "unauthorized": "未授权 - 请重新登录",
+    "forbidden": "禁止访问 - 您没有访问此资源的权限",
+    "notFound": "资源未找到",
+    "tooManyRequests": "请求过于频繁 - 请稍后重试",
+    "serverError": "服务器错误 - 请稍后重试",
+    "serviceUnavailable": "服务暂时不可用 - 请稍后重试",
+    "unknown": "发生未知错误",
+    "conflict": "资源冲突",
+    "authFailed": "认证失败 - 密码错误",
+    "tokenExpired": "登录已过期 - 请重新登录",
+    "tokenInvalid": "登录凭证无效",
+    "csrfInvalid": "安全验证失败 - 请刷新页面重试",
+    "linkNotFound": "链接不存在",
+    "linkAlreadyExists": "短代码已存在",
+    "linkInvalidUrl": "目标网址格式无效",
+    "linkInvalidExpireTime": "过期时间无效",
+    "linkPasswordHashError": "密码处理失败",
+    "linkDatabaseError": "数据库操作失败",
+    "batchSizeTooLarge": "批量操作数量过大（最多 5000 条）",
+    "fileTooLarge": "文件过大（最大 10MB）",
+    "invalidDateFormat": "日期格式无效（使用 RFC3339，如 2024-01-01T00:00:00Z）",
+    "importFailed": "导入失败",
+    "exportFailed": "导出失败",
+    "invalidMultipartData": "无效的上传数据格式",
+    "fileReadError": "文件读取失败",
+    "csvFileMissing": "未提供 CSV 文件",
+    "csvParseError": "CSV 解析错误",
+    "csvGenerationError": "CSV 生成错误",
+    "linkEmptyCode": "短代码不能为空",
+    "linkInvalidCode": "短代码格式无效（仅支持字母、数字、下划线、连字符、点和斜杠）",
+    "linkReservedCode": "短代码与系统保留路由冲突",
+    "configNotFound": "配置项不存在",
+    "configUpdateFailed": "配置更新失败",
+    "configReloadFailed": "配置重载失败",
+    "analyticsQueryFailed": "分析数据查询失败",
+    "analyticsLinkNotFound": "链接不存在，无法查询统计数据",
+    "analyticsInvalidDateRange": "日期范围无效"
+  },
+  "config": {
+    "title": "系统配置",
+    "description": "管理系统运行时配置",
+    "groups": {
+      "all": "全部",
+      "routes": "路由",
+      "api": "API",
+      "features": "功能",
+      "click": "点击追踪",
+      "cors": "跨域配置",
+      "analytics": "分析统计",
+      "cache": "缓存",
+      "other": "其他"
+    },
+    "keys": {
+      "routes.admin_prefix": "管理 API 前缀",
+      "routes.health_prefix": "健康检查前缀",
+      "routes.frontend_prefix": "前端面板前缀",
+      "api.admin_token": "管理 Token",
+      "api.health_token": "健康检查 Token",
+      "api.jwt_secret": "JWT 密钥",
+      "api.access_token_minutes": "Access Token 有效期(分钟)",
+      "api.refresh_token_days": "Refresh Token 有效期(天)",
+      "api.cookie_secure": "Cookie 安全传输",
+      "api.cookie_same_site": "Cookie SameSite 策略",
+      "api.cookie_domain": "Cookie 域名",
+      "api.trusted_proxies": "信任的代理服务器",
+      "features.enable_admin_panel": "启用管理面板",
+      "features.random_code_length": "随机短码长度",
+      "features.default_url": "默认跳转 URL",
+      "click.enable_tracking": "启用点击统计",
+      "click.flush_interval": "刷新间隔(秒)",
+      "click.max_clicks_before_flush": "刷新阈值(点击数)",
+      "cors.enabled": "启用 CORS 配置",
+      "cors.allow_credentials": "允许凭据（不能与通配符来源同时使用）",
+      "cors.allowed_origins": "允许的来源（使用 [\"*\"] 允许任意来源，留空则仅同源）",
+      "cors.allowed_methods": "允许的方法",
+      "cors.allowed_headers": "允许的请求头",
+      "cors.max_age": "最大缓存时间(秒)",
+      "analytics.enable_detailed_logging": "启用详细点击日志",
+      "analytics.log_retention_days": "原始日志保留天数",
+      "analytics.enable_ip_logging": "记录访客 IP 地址",
+      "analytics.enable_geo_lookup": "启用 IP 地理位置查询",
+      "analytics.hourly_retention_days": "小时汇总数据保留天数",
+      "analytics.daily_retention_days": "日汇总数据保留天数",
+      "analytics.enable_auto_rollup": "启用自动数据汇总清理",
+      "analytics.sample_rate": "点击日志采样率 (0.0-1.0)",
+      "analytics.max_log_rows": "最大点击日志行数 (0=不限)",
+      "analytics.max_rows_action": "超出最大行数时的处理",
+      "utm.enable_passthrough": "启用 UTM 参数透传",
+      "cache.bloom_rebuild_interval": "布隆过滤器重建间隔(秒)"
+    },
+    "key": "配置键",
+    "value": "配置值",
+    "type": "类型",
+    "requiresRestart": "需要重启",
+    "requiresRestartHint": "此配置修改后需要重启服务才能生效",
+    "edit": "编辑",
+    "history": "历史",
+    "reload": "重载配置",
+    "reloadSuccess": "配置已重新加载",
+    "reloadError": "重载配置失败",
+    "updateSuccess": "配置更新成功",
+    "editConfig": "编辑配置",
+    "formatJSON": "格式化 JSON",
+    "noConfigs": "暂无配置项",
+    "emptyValue": "(未设置)",
+    "noHistory": "暂无历史记录",
+    "historyTitle": "配置历史",
+    "savedNeedRestart": "配置已保存，请重启服务以使更改生效",
+    "searchPlaceholder": "搜索配置键...",
+    "allTypes": "所有类型",
+    "category": {
+      "auth": "身份认证",
+      "cookie": "Cookie 设置",
+      "features": "功能开关",
+      "routes": "路由配置",
+      "cors": "CORS 设置",
+      "tracking": "点击追踪",
+      "analytics": "分析统计",
+      "cache": "缓存设置",
+      "other": "其他"
+    },
+    "placeholder": {
+      "trustedProxies": "IP 或 CIDR（如 192.168.1.0/24）",
+      "allowedOrigins": "来源 URL（如 https://example.com 或 *）",
+      "allowedHeaders": "Header 名称（如 Content-Type）"
+    },
+    "error": {
+      "invalidIpCidr": "无效的 IP/CIDR 格式",
+      "invalidUrl": "无效的 URL 格式",
+      "invalidHeader": "无效的 Header 名称"
+    },
+    "generateAndSaveHint": "点击按钮将自动生成并保存新的安全密钥",
+    "generating": "生成中...",
+    "generateAndSave": "生成并保存"
+  },
+  "enums": {
+    "sameSite": {
+      "strict": {
+        "label": "Strict",
+        "description": "最严格，仅同站请求携带 Cookie"
+      },
+      "lax": {
+        "label": "Lax",
+        "description": "默认，允许顶级导航携带 Cookie"
+      },
+      "none": {
+        "label": "None",
+        "description": "无限制，需配合 Secure 使用"
+      }
+    },
+    "httpMethod": {
+      "get": {
+        "label": "GET",
+        "description": "从服务器获取数据"
+      },
+      "post": {
+        "label": "POST",
+        "description": "向服务器提交数据"
+      },
+      "put": {
+        "label": "PUT",
+        "description": "更新现有资源"
+      },
+      "delete": {
+        "label": "DELETE",
+        "description": "从服务器删除资源"
+      },
+      "patch": {
+        "label": "PATCH",
+        "description": "部分更新资源"
+      },
+      "head": {
+        "label": "HEAD",
+        "description": "仅获取响应头"
+      },
+      "options": {
+        "label": "OPTIONS",
+        "description": "获取支持的方法"
+      }
+    },
+    "maxRowsAction": {
+      "cleanup": {
+        "label": "自动清理",
+        "description": "超出限制时删除最旧的记录"
+      },
+      "stop": {
+        "label": "停止记录",
+        "description": "超出限制时停止记录新点击"
+      }
+    }
+  },
+  "pwa": {
+    "updateAvailable": "有新版本可用",
+    "refresh": "刷新"
+  }
+}

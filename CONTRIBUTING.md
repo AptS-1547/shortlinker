@@ -27,6 +27,7 @@
 ### 前置要求
 
 - **Rust**: >= 1.82.0
+- **Bun**: 1.3.14（管理面板开发）
 - **Git**: 最新版本
 - **Docker**: (可选) 用于容器化测试
 
@@ -65,6 +66,12 @@ cargo install cross
 ### 第一次运行
 
 ```bash
+# 安装并构建管理面板
+cd admin-panel
+bun install --frozen-lockfile --registry https://registry.npmjs.org
+bun run build
+cd ..
+
 # 编译项目
 cargo build
 
@@ -87,6 +94,9 @@ shortlinker/
 │   ├── storage.rs           # 数据存储
 │   ├── admin.rs             # Admin API
 │   └── utils.rs             # 工具函数
+├── admin-panel/             # React 管理面板
+│   ├── src/                 # 前端源码
+│   └── package.json         # 前端依赖与脚本
 ├── docs/                    # 文档源码 (VitePress)
 ├── .github/
 │   └── workflows/           # GitHub Actions 工作流

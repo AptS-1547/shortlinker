@@ -1,0 +1,673 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "cancel": "Annuler",
+    "save": "Sauvegarder",
+    "saving": "Sauvegarde...",
+    "delete": "Supprimer",
+    "deleting": "Suppression...",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "reset": "Réinitialiser",
+    "apply": "Appliquer",
+    "refresh": "Actualiser",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "retry": "Réessayer",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "yes": "Oui",
+    "no": "Non",
+    "more": "Plus",
+    "close": "Fermer",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "actions": "Actions",
+    "addItem": "Ajouter un élément..."
+  },
+  "auth": {
+    "title": "Connexion administrateur",
+    "description": "Veuillez saisir le mot de passe pour accéder au panneau d'administration",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "Veuillez saisir le mot de passe administrateur",
+    "login": "Se connecter",
+    "authenticating": "Authentification...",
+    "verifying": "Vérification...",
+    "processing": "Traitement...",
+    "serverConnection": "Connexion au serveur",
+    "serverConnectionDesc": "Veuillez vous assurer que le service ShortLinker fonctionne sur {{url}}",
+    "errors": {
+      "passwordRequired": "Veuillez saisir le mot de passe",
+      "networkError": "Impossible de se connecter au serveur. Veuillez vérifier que le service fonctionne.",
+      "unauthorized": "Mot de passe invalide ou accès non autorisé",
+      "notFound": "Point d'authentification non trouvé. Veuillez vérifier la configuration du serveur.",
+      "serverError": "Erreur du serveur. Veuillez réessayer plus tard.",
+      "authFailed": "Échec de l'authentification. Veuillez réessayer."
+    }
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "description": "Bienvenue ! Voici votre aperçu des liens courts.",
+    "serviceStatus": "État du service",
+    "totalLinks": "Total des liens",
+    "activeLinks": "Liens actifs",
+    "responseTime": "Temps de réponse",
+    "noLinks": "Aucun lien",
+    "noLinksDesc": "Créez votre premier lien court pour commencer.",
+    "createLink": "Créer un lien",
+    "viewAllLinks": "Voir tous les liens",
+    "systemHealth": "État de santé du système",
+    "storage": "Stockage",
+    "lastCheck": "Dernière vérification",
+    "healthy": "Sain",
+    "unknown": "Inconnu",
+    "never": "Jamais",
+    "stats": {
+      "totalLinks": "Total des liens",
+      "linksCreated": "Liens créés",
+      "totalClicks": "Total des clics",
+      "clicksTracked": "Clics suivis",
+      "activeLinks": "Liens actifs",
+      "notExpired": "Non expirés",
+      "uptime": "Temps de fonctionnement",
+      "systemHealth": "Santé du système",
+      "todayClicks": "Clics aujourd'hui",
+      "vsYesterday": "vs hier",
+      "clickTrend": "Tendance des clics",
+      "last7Days": "7 derniers jours"
+    },
+    "recentLinks": {
+      "title": "Liens récents",
+      "description": "Vos liens courts récemment créés",
+      "clicks": "clics",
+      "noLinks": "Aucun lien"
+    }
+  },
+  "links": {
+    "title": "Gestion des liens",
+    "description": "Créez, modifiez et gérez vos liens courts.",
+    "filterTitle": "Filtrer les liens",
+    "filterDescription": "Recherchez et filtrez vos liens courts",
+    "createTitle": "Créer un nouveau lien",
+    "editTitle": "Modifier le lien",
+    "createDescription": "Ajoutez un nouveau lien court à votre collection",
+    "editDescription": "Mettez à jour les détails de votre lien court",
+    "shortCode": "Code court",
+    "shortCodeOptional": "Code court (optionnel)",
+    "shortCodePlaceholder": "Laisser vide pour génération automatique",
+    "shortCodeHelp": "Code court personnalisé (lettres, chiffres, tirets, underscores, ou chemins comme abc/def)",
+    "targetUrl": "URL cible",
+    "targetUrlRequired": "URL cible *",
+    "targetUrlPlaceholder": "https://example.com/votre-url-longue",
+    "targetUrlHelp": "L'URL cible vers laquelle les utilisateurs seront redirigés",
+    "expiresAt": "Date d'expiration",
+    "expiresAtOptional": "Date d'expiration (optionnelle)",
+    "expiresAtHelp": "Laisser vide pour un lien permanent",
+    "passwordOptional": "Mot de passe (optionnel)",
+    "passwordPlaceholder": "Entrez un mot de passe pour protéger ce lien",
+    "passwordHelp": "Définir un mot de passe pour protéger l'accès à ce lien",
+    "passwordProtected": "Protégé par mot de passe",
+    "created": "Date de création",
+    "actions": "Actions",
+    "active": "Actif",
+    "expired": "Expiré",
+    "permanent": "Permanent",
+    "creating": "Création...",
+    "updating": "Mise à jour...",
+    "createLink": "Créer le lien",
+    "createNew": "Nouveau lien",
+    "editLink": "Modifier le lien",
+    "updateLink": "Mettre à jour le lien",
+    "clearEdit": "Effacer la modification",
+    "shortLinks": "Liens courts",
+    "noLinks": "Aucun lien",
+    "noLinksTitle": "Aucun lien",
+    "noLinksDescription": "Commencez par créer votre premier lien court",
+    "noMatchingLinks": "Aucun lien correspondant",
+    "noLinksYet": "Aucun lien pour le moment",
+    "noMatchingLinksDesc": "Essayez d'ajuster les critères de filtrage ou créez un nouveau lien.",
+    "noLinksYetDesc": "Utilisez le formulaire ci-dessus pour créer votre premier lien court.",
+    "clearFilters": "Effacer les filtres",
+    "createFirstLink": "Créez votre premier lien",
+    "createNewLink": "Créer un nouveau lien",
+    "deleteLink": "Supprimer le lien",
+    "deleteSuccess": "Lien supprimé avec succès",
+    "deleteError": "Échec de la suppression du lien",
+    "createSuccess": "Lien créé avec succès",
+    "createError": "Échec de la création du lien",
+    "updateSuccess": "Lien mis à jour avec succès",
+    "updateError": "Échec de la mise à jour du lien",
+    "copySuccess": "Lien copié dans le presse-papiers",
+    "copyError": "Échec de la copie du lien",
+    "batchDeleteSuccess": "{{count}} liens supprimés avec succès",
+    "batchDeletePartial": "{{success}} liens supprimés, {{failed}} échecs",
+    "batchDeleteError": "Échec de la suppression des liens",
+    "openInNewTab": "Ouvrir dans un nouvel onglet",
+    "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer le lien {{code}} ? Cette action est irréversible.",
+    "deleting": "Suppression...",
+    "copyLinkTitle": "Cliquez pour copier le lien court",
+    "copyPasswordProtectedLink": "Cliquez pour copier le lien protégé par mot de passe (inclut le mot de passe)",
+    "linkCopied": "Lien court copié !",
+    "passwordParameterAdded": "Lien protégé copié avec le mot de passe",
+    "createdAfter": "Créé après",
+    "createdBefore": "Créé avant",
+    "pageSize": "Taille de page",
+    "searchPlaceholder": "Rechercher des liens...",
+    "tableTitle": "Liens",
+    "filterOptions": {
+      "allLinks": "Tous les liens",
+      "activeOnly": "Actifs seulement",
+      "expiredOnly": "Expirés seulement",
+      "permanentLinks": "Liens permanents",
+      "temporaryLinks": "Liens temporaires"
+    },
+    "pagination": {
+      "showing": "Affichage de {{from}}-{{to}} sur {{total}}",
+      "page": "Page {{current}} sur {{total}}",
+      "perPage": "Par page"
+    },
+    "search": {
+      "placeholder": "Rechercher par code ou URL...",
+      "createdAfter": "Créé après",
+      "createdBefore": "Créé avant",
+      "pageSize": "Taille de page"
+    },
+    "table": {
+      "code": "Code",
+      "target": "URL cible",
+      "targetUrl": "URL cible",
+      "clicks": "Clics",
+      "status": "Statut",
+      "created": "Créé",
+      "expires": "Expiration",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "expired": "Expiré",
+      "protected": "Protégé"
+    },
+    "form": {
+      "code": "Code court",
+      "codePlaceholder": "Laisser vide pour génération automatique",
+      "target": "URL cible",
+      "targetPlaceholder": "https://example.com/votre-url-longue",
+      "password": "Mot de passe (optionnel)",
+      "passwordPlaceholder": "Entrez un mot de passe pour protéger ce lien",
+      "invalidUrl": "L'URL doit commencer par http:// ou https://"
+    },
+    "deleteConfirm": {
+      "title": "Confirmer la suppression",
+      "description": "Êtes-vous sûr de vouloir supprimer le lien {{code}} ? Cette action est irréversible."
+    },
+    "activeFilters": "{{count}} filtres",
+    "filtered": "(filtré)",
+    "editing": "Modification : {{code}}",
+    "batch": {
+      "selectAll": "Tout sélectionner",
+      "selectRow": "Sélectionner cette ligne",
+      "selected": "{{count}} sélectionné(s)",
+      "delete": "Supprimer",
+      "clear": "Effacer la sélection",
+      "deleteTitle": "Confirmer la suppression en lot",
+      "deleteDescription": "Êtes-vous sûr de vouloir supprimer {{count}} lien(s) sélectionné(s) ? Cette action est irréversible.",
+      "deletePartial": "{{success}} liens supprimés, {{failed}} échecs",
+      "deleteSuccess": "{{count}} liens supprimés avec succès"
+    },
+    "columns": {
+      "configure": "Colonnes",
+      "title": "Afficher/masquer les colonnes"
+    },
+    "expand": {
+      "shortUrl": "URL courte",
+      "passwordProtection": "Protection par mot de passe"
+    },
+    "export": {
+      "button": "Exporter",
+      "exporting": "Exportation...",
+      "success": "Exportation réussie",
+      "error": "Échec de l'exportation"
+    },
+    "import": {
+      "button": "Importer",
+      "title": "Importer des liens",
+      "file": "Fichier CSV",
+      "dragOrClick": "Glissez-déposez le fichier CSV ici, ou cliquez pour sélectionner",
+      "maxFileSize": "Taille maximale du fichier : {{size}}",
+      "fileTooLarge": "Fichier trop volumineux, taille maximale : {{maxSize}}",
+      "mode": "Mode d'importation",
+      "modeSkip": "Ignorer les doublons - Ignorer les liens existants",
+      "modeOverwrite": "Écraser - Remplacer entièrement les liens existants",
+      "modeError": "Erreur - Retourner une erreur pour les liens existants",
+      "import": "Importer",
+      "importing": "Importation...",
+      "uploading": "Téléchargement...",
+      "success": "Importation terminée",
+      "error": "Échec de l'importation",
+      "totalRows": "Total des lignes: {{count}}",
+      "successCount": "Succès: {{count}}",
+      "skippedCount": "Ignorés: {{count}}",
+      "failedCount": "Échoués: {{count}}",
+      "failedDetails": "Détails des échecs:",
+      "failedItem": "Ligne {{row}}: {{code}} - {{error}}",
+      "andMore": "...et {{count}} de plus"
+    },
+    "qr": {
+      "code": "Code QR",
+      "download": "Télécharger le code QR",
+      "downloading": "Téléchargement...",
+      "preview": "Aperçu du code QR",
+      "size": "Taille",
+      "margin": "Marge",
+      "foreground": "Premier plan",
+      "background": "Arrière-plan",
+      "errorLevel": "Correction d'erreur",
+      "downloadPng": "Télécharger PNG",
+      "generateFailed": "Échec de la génération",
+      "logo": "Logo (optionnel)",
+      "logoSize": "Taille",
+      "logoHint": "Recommandé : PNG carré avec fond transparent",
+      "errorLevelWarning": "Conseil : utilisez le niveau « H » avec un logo"
+    }
+  },
+  "analytics": {
+    "title": "Analytiques",
+    "description": "Consultez vos statistiques et données analytiques de liens courts.",
+    "totalLinks": "Total des liens",
+    "totalClicks": "Total des clics",
+    "thisWeek": "Cette semaine",
+    "activeLinks": "Liens actifs",
+    "featureComingSoon": "Fonctionnalité à venir",
+    "recentActivity": "Activité récente",
+    "recentActivityTitle": "Activité récente",
+    "loadingActivity": "Chargement de l'activité...",
+    "noActivityYet": "Aucune activité pour le moment",
+    "noActivityDesc": "Créez quelques liens pour voir les données analytiques.",
+    "linkStatusDistribution": "Distribution du statut des liens",
+    "activeLinksCard": "Liens actifs",
+    "expiredLinksCard": "Liens expirés",
+    "permanentLinksCard": "Liens permanents",
+    "ofTotal": "du total",
+    "analyticsFeatures": "Fonctionnalités analytiques",
+    "analyticsFeaturesDesc": "Le suivi des clics et les analyses détaillées arrivent bientôt ! Affichage actuellement des statistiques de base des liens.",
+    "clicks": "clics",
+    "expires": "Expire",
+    "created": "Créé",
+    "averageClicks": "Clics moyens",
+    "clicksPerLink": "clics par lien",
+    "na": "N/A",
+    "export": "Exporter",
+    "noData": "Aucune donnée disponible",
+    "noGeoData": "Aucune donnée géographique disponible",
+    "topLinksCount": "Liens populaires",
+    "referrersCount": "Référents",
+    "countriesCount": "Pays",
+    "clickTrends": "Tendances des clics",
+    "clickTrendsDesc": "Tendances des clics sur la période sélectionnée",
+    "topLinks": "Liens populaires",
+    "topLinksDesc": "Liens avec le plus grand nombre de clics",
+    "referrers": "Référents",
+    "referrersDesc": "Sites web qui redirigent les visiteurs vers vos liens",
+    "geoDistribution": "Distribution géographique",
+    "geoDistributionDesc": "Distribution géographique de vos visiteurs",
+    "dateRange": {
+      "7d": "7 derniers jours",
+      "30d": "30 derniers jours",
+      "90d": "90 derniers jours",
+      "1y": "Dernière année"
+    },
+    "groupBy": {
+      "hour": "Par heure",
+      "day": "Par jour",
+      "week": "Par semaine",
+      "month": "Par mois"
+    },
+    "error": {
+      "fetchFailed": "Échec de récupération des données analytiques"
+    },
+    "devices": "Appareils et navigateurs",
+    "devicesDesc": "Distribution des navigateurs, OS et types d'appareils des visiteurs",
+    "browsers": "Navigateurs",
+    "operatingSystems": "Systèmes d'exploitation",
+    "deviceCategories": "Types d'appareils",
+    "botTraffic": "Trafic Bot",
+    "viewAnalytics": "Voir les analyses",
+    "comingSoon": {
+      "title": "Bientôt disponible",
+      "description": "Les fonctionnalités d'analyse détaillées arrivent bientôt ! Restez à l'écoute."
+    },
+    "features": {
+      "clickTrends": "Tendances des clics",
+      "clickTrendsDesc": "Visualisez les tendances et les modèles de clics de vos liens",
+      "visitors": "Analyse des visiteurs",
+      "visitorsDesc": "Comprenez qui visite vos liens",
+      "geography": "Distribution géographique",
+      "geographyDesc": "Voyez où se trouvent vos visiteurs",
+      "topLinks": "Liens populaires",
+      "topLinksDesc": "Découvrez vos liens les plus populaires"
+    }
+  },
+  "linkDetail": {
+    "title": "Détails du lien",
+    "description": "Afficher les statistiques complètes de ce lien",
+    "info": "Informations du lien",
+    "targetUrl": "URL cible",
+    "totalClicks": "Clics totaux",
+    "createdAt": "Créé le",
+    "expiresAt": "Expire le",
+    "status": "Statut",
+    "viewFull": "Analyse complète",
+    "notFound": "Lien non trouvé",
+    "fetchFailed": "Échec de la récupération des données du lien",
+    "noCode": "Aucun code de lien spécifié"
+  },
+  "layout": {
+    "title": "Panneau d'administration ShortLinker",
+    "subtitle": "Panneau d'administration",
+    "logout": "Se déconnecter",
+    "navigation": {
+      "title": "Navigation",
+      "dashboard": "Tableau de bord",
+      "links": "Gestion des liens",
+      "analytics": "Analyse des données",
+      "config": "Configuration",
+      "settings": "Paramètres"
+    },
+    "system": {
+      "title": "Système"
+    },
+    "health": {
+      "healthy": "Sain",
+      "unhealthy": "Malsain",
+      "unknown": "Inconnu"
+    },
+    "language": {
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "health": {
+    "title": "État de santé du système",
+    "description": "Surveillance en temps réel du service",
+    "close": "Fermer",
+    "refresh": "Actualiser",
+    "loadingData": "Chargement des données de santé...",
+    "overallStatus": "Statut général",
+    "responseTime": "Temps de réponse",
+    "uptime": "Temps de fonctionnement",
+    "sinceLast": "Depuis le dernier redémarrage",
+    "totalLinks": "Total des liens",
+    "activeLinks": "Liens courts actifs",
+    "storageBackend": "Backend de stockage",
+    "cacheSystem": "Système de cache",
+    "cacheType": "Type de cache",
+    "bloomFilter": "Filtre de Bloom",
+    "negativeCache": "Cache négatif",
+    "type": "Type",
+    "status": "Statut",
+    "clickTracking": "Suivi des clics",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "lastUpdated": "Dernière mise à jour",
+    "healthy": "Sain",
+    "unhealthy": "Malsain",
+    "degraded": "Dégradé",
+    "unknown": "Inconnu"
+  },
+  "langswitcher": {
+    "title": "Sélectionner la langue",
+    "language": {
+      "switch": "Changer de langue",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "theme": {
+    "switchTheme": "Changer de thème",
+    "light": "Thème clair",
+    "dark": "Thème sombre",
+    "system": "Thème système"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "description": "Personnalisez vos préférences",
+    "tabs": {
+      "appearance": "Apparence",
+      "language": "Langue",
+      "preferences": "Préférences",
+      "system": "Système",
+      "about": "À propos"
+    },
+    "theme": {
+      "title": "Thème",
+      "description": "Choisissez le thème de l'interface"
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez la langue de l'interface"
+    },
+    "about": {
+      "title": "À propos",
+      "description": "Informations et liens du projet",
+      "tagline": "Gérez vos liens avec rapidité et style",
+      "openSource": "Open Source",
+      "docs": "Documentation",
+      "builtWith": "Construit avec",
+      "forCommunity": "pour la communauté open source"
+    }
+  },
+  "errors": {
+    "boundary": {
+      "title": "Oups ! Une erreur s'est produite",
+      "description": "Nous avons rencontré une erreur inattendue. Veuillez recharger la page ou retourner à l'accueil.",
+      "technicalDetails": "Détails techniques",
+      "reload": "Recharger la page",
+      "goHome": "Retour à l'accueil",
+      "persistentIssue": "Si le problème persiste, veuillez contacter le support."
+    },
+    "network": "Erreur réseau - veuillez vérifier votre connexion",
+    "badRequest": "Requête incorrecte - veuillez vérifier votre saisie",
+    "unauthorized": "Non autorisé - veuillez vous reconnecter",
+    "forbidden": "Interdit - vous n'avez pas la permission d'accéder à cette ressource",
+    "notFound": "Ressource non trouvée",
+    "tooManyRequests": "Trop de requêtes - veuillez réessayer plus tard",
+    "serverError": "Erreur serveur - veuillez réessayer plus tard",
+    "serviceUnavailable": "Service temporairement indisponible - veuillez réessayer plus tard",
+    "unknown": "Une erreur inconnue s'est produite",
+    "conflict": "Conflit de ressource",
+    "authFailed": "Échec d'authentification - mot de passe incorrect",
+    "tokenExpired": "Session expirée - veuillez vous reconnecter",
+    "tokenInvalid": "Jeton de session invalide",
+    "csrfInvalid": "Échec de vérification de sécurité - veuillez actualiser la page",
+    "linkNotFound": "Lien non trouvé",
+    "linkAlreadyExists": "Le code court existe déjà",
+    "linkInvalidUrl": "Format d'URL cible invalide",
+    "linkInvalidExpireTime": "Date d'expiration invalide",
+    "linkPasswordHashError": "Échec du traitement du mot de passe",
+    "linkDatabaseError": "Échec de l'opération de base de données",
+    "batchSizeTooLarge": "Taille du lot trop grande (max 5000 éléments)",
+    "fileTooLarge": "Fichier trop volumineux (max 10 Mo)",
+    "invalidDateFormat": "Format de date invalide (utilisez RFC3339, ex: 2024-01-01T00:00:00Z)",
+    "importFailed": "Échec de l'importation",
+    "exportFailed": "Échec de l'exportation",
+    "invalidMultipartData": "Format de données d'upload invalide",
+    "fileReadError": "Échec de lecture du fichier",
+    "csvFileMissing": "Aucun fichier CSV fourni",
+    "csvParseError": "Erreur d'analyse CSV",
+    "csvGenerationError": "Erreur de génération CSV",
+    "linkEmptyCode": "Le code court ne peut pas être vide",
+    "linkInvalidCode": "Format de code court invalide (seuls les caractères alphanumériques, tiret bas, tiret, point et barre oblique sont autorisés)",
+    "linkReservedCode": "Le code court entre en conflit avec les routes système réservées",
+    "configNotFound": "Configuration non trouvée",
+    "configUpdateFailed": "Échec de la mise à jour de la configuration",
+    "configReloadFailed": "Échec du rechargement de la configuration",
+    "analyticsQueryFailed": "Échec de la requête d'analyse",
+    "analyticsLinkNotFound": "Lien non trouvé, impossible de récupérer les analyses",
+    "analyticsInvalidDateRange": "Plage de dates invalide"
+  },
+  "config": {
+    "title": "Configuration Système",
+    "description": "Gérer les paramètres de configuration d'exécution",
+    "groups": {
+      "all": "Tout",
+      "routes": "Routes",
+      "api": "API",
+      "features": "Fonctionnalités",
+      "click": "Suivi des Clics",
+      "cors": "CORS",
+      "analytics": "Analytiques",
+      "cache": "Cache",
+      "other": "Autre"
+    },
+    "keys": {
+      "routes.admin_prefix": "Préfixe API Admin",
+      "routes.health_prefix": "Préfixe Vérification Santé",
+      "routes.frontend_prefix": "Préfixe Panneau Frontend",
+      "api.admin_token": "Token Admin",
+      "api.health_token": "Token Vérification Santé",
+      "api.jwt_secret": "Secret JWT",
+      "api.access_token_minutes": "Durée Access Token (minutes)",
+      "api.refresh_token_days": "Durée Refresh Token (jours)",
+      "api.cookie_secure": "Cookie Sécurisé (HTTPS uniquement)",
+      "api.cookie_same_site": "Politique Cookie SameSite",
+      "api.cookie_domain": "Domaine Cookie",
+      "api.trusted_proxies": "Proxies de Confiance",
+      "features.enable_admin_panel": "Activer Panneau Admin",
+      "features.random_code_length": "Longueur Code Aléatoire",
+      "features.default_url": "URL de Redirection par Défaut",
+      "click.enable_tracking": "Activer Suivi des Clics",
+      "click.flush_interval": "Intervalle de Vidage (secondes)",
+      "click.max_clicks_before_flush": "Max Clics Avant Vidage",
+      "cors.enabled": "Activer la configuration CORS",
+      "cors.allow_credentials": "Autoriser les identifiants (incompatible avec origines wildcard)",
+      "cors.allowed_origins": "Origines autorisées ([\"*\"] = toutes, vide = même origine)",
+      "cors.allowed_methods": "Méthodes Autorisées",
+      "cors.allowed_headers": "En-têtes Autorisés",
+      "cors.max_age": "Durée Maximale (secondes)",
+      "analytics.enable_detailed_logging": "Activer les logs de clics détaillés",
+      "analytics.log_retention_days": "Rétention des logs bruts (jours)",
+      "analytics.enable_ip_logging": "Enregistrer les adresses IP",
+      "analytics.enable_geo_lookup": "Activer la géolocalisation IP",
+      "analytics.hourly_retention_days": "Rétention agrégation horaire (jours)",
+      "analytics.daily_retention_days": "Rétention agrégation journalière (jours)",
+      "analytics.enable_auto_rollup": "Activer agrégation et nettoyage auto",
+      "analytics.sample_rate": "Taux d'échantillonnage des clics (0.0-1.0)",
+      "analytics.max_log_rows": "Lignes max du journal des clics (0=illimité)",
+      "analytics.max_rows_action": "Action si limite dépassée",
+      "utm.enable_passthrough": "Activer le passthrough des paramètres UTM",
+      "cache.bloom_rebuild_interval": "Intervalle de reconstruction du filtre Bloom (secondes)"
+    },
+    "key": "Clé",
+    "value": "Valeur",
+    "type": "Type",
+    "requiresRestart": "Redémarrage",
+    "requiresRestartHint": "Les modifications nécessitent un redémarrage du serveur",
+    "edit": "Modifier",
+    "history": "Historique",
+    "reload": "Recharger",
+    "reloadSuccess": "Configuration rechargée avec succès",
+    "reloadError": "Échec du rechargement de la configuration",
+    "updateSuccess": "Configuration mise à jour avec succès",
+    "editConfig": "Modifier la Configuration",
+    "formatJSON": "Formater JSON",
+    "noConfigs": "Aucune configuration trouvée",
+    "emptyValue": "(non défini)",
+    "noHistory": "Pas d'historique",
+    "historyTitle": "Historique de Configuration",
+    "savedNeedRestart": "Configuration sauvegardée. Veuillez redémarrer le serveur pour appliquer les changements.",
+    "searchPlaceholder": "Rechercher par clé...",
+    "allTypes": "Tous les types",
+    "category": {
+      "auth": "Authentification",
+      "cookie": "Paramètres des cookies",
+      "features": "Indicateurs de fonctionnalité",
+      "routes": "Configuration des routes",
+      "cors": "Paramètres CORS",
+      "tracking": "Suivi des clics",
+      "analytics": "Analytiques",
+      "cache": "Paramètres du cache",
+      "other": "Autre"
+    },
+    "placeholder": {
+      "trustedProxies": "IP ou CIDR (ex: 192.168.1.0/24)",
+      "allowedOrigins": "URL d'origine (ex: https://example.com ou *)",
+      "allowedHeaders": "Nom d'en-tête (ex: Content-Type)"
+    },
+    "error": {
+      "invalidIpCidr": "Format IP/CIDR invalide",
+      "invalidUrl": "Format URL invalide",
+      "invalidHeader": "Nom d'en-tête invalide"
+    },
+    "generateAndSaveHint": "Cliquez sur le bouton pour générer et enregistrer automatiquement une nouvelle clé de sécurité",
+    "generating": "Génération en cours...",
+    "generateAndSave": "Générer et enregistrer"
+  },
+  "enums": {
+    "sameSite": {
+      "strict": {
+        "label": "Strict",
+        "description": "Le plus sécurisé, seules les requêtes du même site envoient des cookies"
+      },
+      "lax": {
+        "label": "Lax",
+        "description": "Par défaut, permet la navigation de niveau supérieur d'envoyer des cookies"
+      },
+      "none": {
+        "label": "None",
+        "description": "Aucune restriction, nécessite l'attribut Secure"
+      }
+    },
+    "httpMethod": {
+      "get": {
+        "label": "GET",
+        "description": "Récupérer des données du serveur"
+      },
+      "post": {
+        "label": "POST",
+        "description": "Soumettre des données au serveur"
+      },
+      "put": {
+        "label": "PUT",
+        "description": "Mettre à jour une ressource existante"
+      },
+      "delete": {
+        "label": "DELETE",
+        "description": "Supprimer une ressource du serveur"
+      },
+      "patch": {
+        "label": "PATCH",
+        "description": "Mettre à jour partiellement une ressource"
+      },
+      "head": {
+        "label": "HEAD",
+        "description": "Récupérer uniquement les en-têtes"
+      },
+      "options": {
+        "label": "OPTIONS",
+        "description": "Obtenir les méthodes supportées"
+      }
+    },
+    "maxRowsAction": {
+      "cleanup": {
+        "label": "Nettoyage",
+        "description": "Supprimer les enregistrements les plus anciens si limite dépassée"
+      },
+      "stop": {
+        "label": "Arrêter",
+        "description": "Arrêter l'enregistrement des clics si limite dépassée"
+      }
+    }
+  },
+  "pwa": {
+    "updateAvailable": "Nouvelle version disponible",
+    "refresh": "Actualiser"
+  }
+}

@@ -12,7 +12,7 @@ fn main() {
     if !dist_path.exists() {
         eprintln!("Warning: admin-panel/dist directory not found!");
         eprintln!("Please build the admin panel first:");
-        eprintln!("  cd admin-panel && npm run build");
+        eprintln!("  cd admin-panel && bun install && bun run build");
 
         create_fallback_files(&dist_path);
     }
@@ -56,7 +56,7 @@ fn create_fallback_files(dist_path: &Path) {
         <h2>⚠️ Admin Panel Not Built</h2>
         <p>The admin panel needs to be built before running the server.</p>
         <p>Please run the following commands:</p>
-        <p><code>cd admin-panel && yarn && yarn build</code></p>
+        <p><code>cd admin-panel &amp;&amp; bun install &amp;&amp; bun run build</code></p>
     </div>
 </body>
 </html>"#;

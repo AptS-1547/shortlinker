@@ -1,4 +1,7 @@
 target/
+**/node_modules
+admin-panel/dist
+admin-panel/coverage
 Dockerfile
 .dockerignore
 .gitignore

@@ -1,3 +1,4 @@
 {
-    "oxc.enable": true
+  "rust-analyzer.check.allTargets": false,
+  "rust-analyzer.cargo.targetDir": true
 }

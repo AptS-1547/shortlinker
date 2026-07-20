@@ -1,12 +1,15 @@
 {
   "recommendations": [
-    "Vue.volar",
-    "vitest.explorer",
-    "dbaeumer.vscode-eslint",
-    "EditorConfig.EditorConfig",
-    "oxc.oxc-vscode",
-    "esbenp.prettier-vscode",
     "rust-lang.rust-analyzer",
-    "tamasfe.even-better-toml"
+    "vadimcn.vscode-lldb",
+    "tamasfe.even-better-toml",
+    "biomejs.biome",
+    "typescriptteam.native-preview",
+    "bradlc.vscode-tailwindcss",
+    "ms-playwright.playwright"
+  ],
+  "unwantedRecommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
   ]
 }

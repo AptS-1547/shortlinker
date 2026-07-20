@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="base-path" content="%BASE_PATH%">
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#3b82f6">
+    <title>ShortLinker Admin</title>
+    <!-- 主题初始化 - 必须在第一次绘制前同步执行，防止闪烁 -->
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem('theme');
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const isDark = savedTheme === 'dark' || (savedTheme !== 'light' && prefersDark);
+
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#0f172a';
+          } else {
+            document.documentElement.style.backgroundColor = '#f8fafc';
+          }
+        } catch {}
+      })();
+    </script>
+    <script>
+      window.__APP_CONFIG__ = {
+        basePath: '%BASE_PATH%',
+        adminRoutePrefix: '%ADMIN_ROUTE_PREFIX%',
+        healthRoutePrefix: '%HEALTH_ROUTE_PREFIX%',
+        shortlinkerVersion: '%SHORTLINKER_VERSION%'
+      };
+    </script>
+    <!-- 首屏加载样式 -->
+    <style>
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      #root:empty::after {
+        content: '';
+        width: 32px;
+        height: 32px;
+        border: 3px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        opacity: 0.5;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

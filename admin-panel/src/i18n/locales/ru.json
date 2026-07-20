@@ -1,0 +1,673 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "saving": "Сохранение...",
+    "delete": "Удалить",
+    "deleting": "Удаление...",
+    "edit": "Редактировать",
+    "create": "Создать",
+    "search": "Поиск",
+    "filter": "Фильтр",
+    "reset": "Сброс",
+    "apply": "Применить",
+    "refresh": "Обновить",
+    "copy": "Копировать",
+    "copied": "Скопировано!",
+    "retry": "Повторить",
+    "previous": "Предыдущая",
+    "next": "Следующая",
+    "yes": "Да",
+    "no": "Нет",
+    "more": "Ещё",
+    "close": "Закрыть",
+    "enabled": "Включено",
+    "disabled": "Отключено",
+    "actions": "Действия",
+    "addItem": "Добавить элемент..."
+  },
+  "auth": {
+    "title": "Вход администратора",
+    "description": "Пожалуйста, введите пароль для доступа к панели администрирования",
+    "password": "Пароль",
+    "passwordPlaceholder": "Введите пароль администратора",
+    "login": "Войти",
+    "authenticating": "Аутентификация...",
+    "verifying": "Проверка...",
+    "processing": "Обработка...",
+    "serverConnection": "Подключение к серверу",
+    "serverConnectionDesc": "Убедитесь, что служба ShortLinker запущена на {{url}}",
+    "errors": {
+      "passwordRequired": "Пожалуйста, введите пароль",
+      "networkError": "Не удается подключиться к серверу. Проверьте, что служба запущена.",
+      "unauthorized": "Неверный пароль или нет доступа",
+      "notFound": "Точка аутентификации не найдена. Проверьте конфигурацию сервера.",
+      "serverError": "Ошибка сервера. Попробуйте позже.",
+      "authFailed": "Ошибка аутентификации. Попробуйте снова."
+    }
+  },
+  "dashboard": {
+    "title": "Панель управления",
+    "description": "Добро пожаловать! Это обзор ваших коротких ссылок.",
+    "serviceStatus": "Статус службы",
+    "totalLinks": "Всего ссылок",
+    "activeLinks": "Активные ссылки",
+    "responseTime": "Время отклика",
+    "noLinks": "Нет ссылок",
+    "noLinksDesc": "Создайте свою первую короткую ссылку для начала работы.",
+    "createLink": "Создать ссылку",
+    "viewAllLinks": "Показать все ссылки",
+    "systemHealth": "Состояние системы",
+    "storage": "Хранилище",
+    "lastCheck": "Последняя проверка",
+    "healthy": "Здоров",
+    "unknown": "Неизвестно",
+    "never": "Никогда",
+    "stats": {
+      "totalLinks": "Всего ссылок",
+      "linksCreated": "Создано ссылок",
+      "totalClicks": "Всего кликов",
+      "clicksTracked": "Отслежено кликов",
+      "activeLinks": "Активные ссылки",
+      "notExpired": "Не истекшие",
+      "uptime": "Время работы",
+      "systemHealth": "Состояние системы",
+      "todayClicks": "Клики сегодня",
+      "vsYesterday": "по сравнению со вчера",
+      "clickTrend": "Тренд кликов",
+      "last7Days": "Последние 7 дней"
+    },
+    "recentLinks": {
+      "title": "Недавние ссылки",
+      "description": "Ваши недавно созданные короткие ссылки",
+      "clicks": "кликов",
+      "noLinks": "Нет ссылок"
+    }
+  },
+  "links": {
+    "title": "Управление ссылками",
+    "description": "Создавайте, редактируйте и управляйте вашими короткими ссылками.",
+    "filterTitle": "Фильтр ссылок",
+    "filterDescription": "Поиск и фильтрация ваших коротких ссылок",
+    "createTitle": "Создать новую ссылку",
+    "editTitle": "Редактировать ссылку",
+    "createDescription": "Добавить новую короткую ссылку в вашу коллекцию",
+    "editDescription": "Обновить детали вашей короткой ссылки",
+    "shortCode": "Короткий код",
+    "shortCodeOptional": "Короткий код (необязательно)",
+    "shortCodePlaceholder": "Оставьте пустым для автогенерации",
+    "shortCodeHelp": "Пользовательский короткий код (буквы, цифры, дефисы, подчеркивания или пути как abc/def)",
+    "targetUrl": "Целевой URL",
+    "targetUrlRequired": "Целевой URL *",
+    "targetUrlPlaceholder": "https://example.com/ваш-длинный-url",
+    "targetUrlHelp": "Целевой URL, на который будут перенаправлены пользователи",
+    "expiresAt": "Срок истечения",
+    "expiresAtOptional": "Срок истечения (необязательно)",
+    "expiresAtHelp": "Оставьте пустым для постоянной ссылки",
+    "passwordOptional": "Пароль (необязательно)",
+    "passwordPlaceholder": "Введите пароль для защиты этой ссылки",
+    "passwordHelp": "Установить пароль для защиты доступа к этой ссылке",
+    "passwordProtected": "Защищено паролем",
+    "created": "Создано",
+    "actions": "Действия",
+    "active": "Активная",
+    "expired": "Истекшая",
+    "permanent": "Постоянная",
+    "creating": "Создание...",
+    "updating": "Обновление...",
+    "createLink": "Создать ссылку",
+    "createNew": "Создать",
+    "editLink": "Редактировать ссылку",
+    "updateLink": "Обновить ссылку",
+    "clearEdit": "Очистить редактирование",
+    "shortLinks": "Короткие ссылки",
+    "noLinks": "Нет ссылок",
+    "noLinksTitle": "Ссылок пока нет",
+    "noLinksDescription": "Начните с создания вашей первой короткой ссылки",
+    "noMatchingLinks": "Нет соответствующих ссылок",
+    "noLinksYet": "Пока нет ссылок",
+    "noMatchingLinksDesc": "Попробуйте изменить критерии фильтрации или создать новую ссылку.",
+    "noLinksYetDesc": "Используйте форму выше для создания вашей первой короткой ссылки.",
+    "clearFilters": "Очистить фильтры",
+    "createFirstLink": "Создайте вашу первую ссылку",
+    "createNewLink": "Создать новую ссылку",
+    "deleteLink": "Удалить ссылку",
+    "deleteSuccess": "Ссылка успешно удалена",
+    "deleteError": "Не удалось удалить ссылку",
+    "createSuccess": "Ссылка успешно создана",
+    "createError": "Не удалось создать ссылку",
+    "updateSuccess": "Ссылка успешно обновлена",
+    "updateError": "Не удалось обновить ссылку",
+    "copySuccess": "Ссылка скопирована в буфер обмена",
+    "copyError": "Не удалось скопировать ссылку",
+    "batchDeleteSuccess": "Успешно удалено {{count}} ссылок",
+    "batchDeletePartial": "Удалено {{success}} ссылок, {{failed}} не удалось",
+    "batchDeleteError": "Не удалось удалить ссылки",
+    "openInNewTab": "Открыть в новой вкладке",
+    "deleteConfirmation": "Вы уверены, что хотите удалить ссылку {{code}}? Это действие нельзя отменить.",
+    "deleting": "Удаление...",
+    "copyLinkTitle": "Нажмите, чтобы скопировать короткую ссылку",
+    "copyPasswordProtectedLink": "Нажмите, чтобы скопировать ссылку, защищенную паролем (включает пароль)",
+    "linkCopied": "Короткая ссылка скопирована!",
+    "passwordParameterAdded": "Защищенная ссылка скопирована с паролем",
+    "createdAfter": "Создано после",
+    "createdBefore": "Создано до",
+    "searchPlaceholder": "Поиск ссылок...",
+    "tableTitle": "Ссылки",
+    "filterOptions": {
+      "allLinks": "Все ссылки",
+      "activeOnly": "Только активные",
+      "expiredOnly": "Только истекшие",
+      "permanentLinks": "Постоянные ссылки",
+      "temporaryLinks": "Временные ссылки"
+    },
+    "pagination": {
+      "showing": "Показано {{from}}-{{to}} из {{total}}",
+      "page": "Страница {{current}} из {{total}}",
+      "perPage": "На странице"
+    },
+    "search": {
+      "placeholder": "Поиск по коду или URL...",
+      "createdAfter": "Создано после",
+      "createdBefore": "Создано до",
+      "pageSize": "Размер страницы"
+    },
+    "table": {
+      "code": "Код",
+      "target": "Целевой URL",
+      "targetUrl": "Целевой URL",
+      "clicks": "Клики",
+      "status": "Статус",
+      "created": "Создано",
+      "expires": "Истекает",
+      "actions": "Действия"
+    },
+    "status": {
+      "active": "Активная",
+      "expired": "Истекшая",
+      "protected": "Защищенная"
+    },
+    "form": {
+      "code": "Короткий код",
+      "codePlaceholder": "Оставьте пустым для автогенерации",
+      "target": "Целевой URL",
+      "targetPlaceholder": "https://example.com/ваш-длинный-url",
+      "password": "Пароль (необязательно)",
+      "passwordPlaceholder": "Введите пароль для защиты этой ссылки",
+      "invalidUrl": "URL должен начинаться с http:// или https://"
+    },
+    "deleteConfirm": {
+      "title": "Подтверждение удаления",
+      "description": "Вы уверены, что хотите удалить ссылку {{code}}? Это действие нельзя отменить."
+    },
+    "activeFilters": "{{count}} фильтров",
+    "filtered": "(отфильтровано)",
+    "editing": "Редактирование: {{code}}",
+    "batch": {
+      "selectAll": "Выбрать все",
+      "selectRow": "Выбрать эту строку",
+      "selected": "Выбрано: {{count}}",
+      "delete": "Удалить",
+      "clear": "Снять выбор",
+      "deleteTitle": "Подтверждение массового удаления",
+      "deleteDescription": "Вы уверены, что хотите удалить {{count}} выбранных ссылок? Это действие нельзя отменить.",
+      "deletePartial": "Удалено {{success}} ссылок, {{failed}} не удалось",
+      "deleteSuccess": "Успешно удалено {{count}} ссылок"
+    },
+    "columns": {
+      "configure": "Столбцы",
+      "title": "Показать/скрыть столбцы"
+    },
+    "expand": {
+      "shortUrl": "Короткая ссылка",
+      "passwordProtection": "Защита паролем"
+    },
+    "export": {
+      "button": "Экспорт",
+      "exporting": "Экспортирование...",
+      "success": "Экспорт успешен",
+      "error": "Ошибка экспорта"
+    },
+    "import": {
+      "button": "Импорт",
+      "title": "Импорт ссылок",
+      "file": "CSV файл",
+      "dragOrClick": "Перетащите CSV файл сюда или нажмите для выбора",
+      "maxFileSize": "Максимальный размер файла: {{size}}",
+      "fileTooLarge": "Файл слишком большой, максимальный размер: {{maxSize}}",
+      "mode": "Режим импорта",
+      "modeSkip": "Пропустить дубликаты - Пропустить существующие ссылки",
+      "modeOverwrite": "Перезаписать - Полностью заменить существующие ссылки",
+      "modeError": "Ошибка - Вернуть ошибку для существующих ссылок",
+      "import": "Импорт",
+      "importing": "Импорт...",
+      "uploading": "Загрузка...",
+      "success": "Импорт завершён",
+      "error": "Ошибка импорта",
+      "totalRows": "Всего строк: {{count}}",
+      "successCount": "Успешно: {{count}}",
+      "skippedCount": "Пропущено: {{count}}",
+      "failedCount": "Неудачно: {{count}}",
+      "failedDetails": "Детали ошибок:",
+      "failedItem": "Строка {{row}}: {{code}} - {{error}}",
+      "andMore": "...и ещё {{count}}"
+    },
+    "pageSize": "Показать",
+    "qr": {
+      "code": "QR-код",
+      "download": "Скачать QR-код",
+      "downloading": "Скачивание...",
+      "preview": "Предпросмотр QR-кода",
+      "size": "Размер",
+      "margin": "Отступ",
+      "foreground": "Передний план",
+      "background": "Фон",
+      "errorLevel": "Коррекция ошибок",
+      "downloadPng": "Скачать PNG",
+      "generateFailed": "Ошибка генерации",
+      "logo": "Логотип (необязательно)",
+      "logoSize": "Размер",
+      "logoHint": "Рекомендуется: квадратный PNG с прозрачным фоном",
+      "errorLevelWarning": "Совет: используйте уровень «H» при добавлении логотипа"
+    }
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "description": "Просматривайте статистику и аналитические данные ваших коротких ссылок.",
+    "totalLinks": "Всего ссылок",
+    "totalClicks": "Всего кликов",
+    "thisWeek": "На этой неделе",
+    "activeLinks": "Активные ссылки",
+    "featureComingSoon": "Функция скоро появится",
+    "recentActivity": "Недавняя активность",
+    "recentActivityTitle": "Недавняя активность",
+    "loadingActivity": "Загрузка активности...",
+    "noActivityYet": "Пока нет активности",
+    "noActivityDesc": "Создайте несколько ссылок, чтобы увидеть аналитические данные.",
+    "linkStatusDistribution": "Распределение статуса ссылок",
+    "activeLinksCard": "Активные ссылки",
+    "expiredLinksCard": "Истекшие ссылки",
+    "permanentLinksCard": "Постоянные ссылки",
+    "ofTotal": "от общего",
+    "analyticsFeatures": "Функции аналитики",
+    "analyticsFeaturesDesc": "Отслеживание кликов и детальная аналитика скоро появятся! Сейчас отображается базовая статистика ссылок.",
+    "clicks": "кликов",
+    "expires": "Истекает",
+    "created": "Создано",
+    "averageClicks": "Средние клики",
+    "clicksPerLink": "кликов на ссылку",
+    "na": "Н/Д",
+    "export": "Экспорт",
+    "noData": "Нет данных",
+    "noGeoData": "Нет географических данных",
+    "topLinksCount": "Популярные ссылки",
+    "referrersCount": "Источники",
+    "countriesCount": "Страны",
+    "clickTrends": "Тренды кликов",
+    "clickTrendsDesc": "Тренды кликов за выбранный период",
+    "topLinks": "Популярные ссылки",
+    "topLinksDesc": "Ссылки с наибольшим количеством кликов",
+    "referrers": "Источники",
+    "referrersDesc": "Сайты, которые перенаправляют посетителей на ваши ссылки",
+    "geoDistribution": "Географическое распределение",
+    "geoDistributionDesc": "Географическое распределение ваших посетителей",
+    "dateRange": {
+      "7d": "Последние 7 дней",
+      "30d": "Последние 30 дней",
+      "90d": "Последние 90 дней",
+      "1y": "Последний год"
+    },
+    "groupBy": {
+      "hour": "По часам",
+      "day": "По дням",
+      "week": "По неделям",
+      "month": "По месяцам"
+    },
+    "error": {
+      "fetchFailed": "Ошибка загрузки аналитических данных"
+    },
+    "devices": "Устройства и браузеры",
+    "devicesDesc": "Распределение браузеров, ОС и типов устройств посетителей",
+    "browsers": "Браузеры",
+    "operatingSystems": "Операционные системы",
+    "deviceCategories": "Типы устройств",
+    "botTraffic": "Бот-трафик",
+    "viewAnalytics": "Просмотр аналитики",
+    "comingSoon": {
+      "title": "Скоро появится",
+      "description": "Детальные функции аналитики скоро появятся! Следите за обновлениями."
+    },
+    "features": {
+      "clickTrends": "Тренды кликов",
+      "clickTrendsDesc": "Просмотр трендов и шаблонов кликов для ваших ссылок",
+      "visitors": "Аналитика посетителей",
+      "visitorsDesc": "Узнайте, кто посещает ваши ссылки",
+      "geography": "Географическое распределение",
+      "geographyDesc": "Смотрите, где находятся ваши посетители",
+      "topLinks": "Популярные ссылки",
+      "topLinksDesc": "Откройте для себя ваши самые популярные ссылки"
+    }
+  },
+  "linkDetail": {
+    "title": "Детали ссылки",
+    "description": "Просмотр полной статистики этой ссылки",
+    "info": "Информация о ссылке",
+    "targetUrl": "Целевой URL",
+    "totalClicks": "Всего кликов",
+    "createdAt": "Создано",
+    "expiresAt": "Истекает",
+    "status": "Статус",
+    "viewFull": "Полная аналитика",
+    "notFound": "Ссылка не найдена",
+    "fetchFailed": "Не удалось загрузить данные ссылки",
+    "noCode": "Код ссылки не указан"
+  },
+  "layout": {
+    "title": "Панель администрирования ShortLinker",
+    "subtitle": "Панель администрирования",
+    "logout": "Выйти",
+    "navigation": {
+      "title": "Навигация",
+      "dashboard": "Панель управления",
+      "links": "Управление ссылками",
+      "analytics": "Анализ данных",
+      "config": "Конфигурация",
+      "settings": "Настройки"
+    },
+    "system": {
+      "title": "Система"
+    },
+    "health": {
+      "healthy": "Здоров",
+      "unhealthy": "Нездоров",
+      "unknown": "Неизвестно"
+    },
+    "language": {
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "health": {
+    "title": "Состояние системы",
+    "description": "Мониторинг службы в реальном времени",
+    "close": "Закрыть",
+    "refresh": "Обновить",
+    "loadingData": "Загрузка данных о состоянии...",
+    "overallStatus": "Общий статус",
+    "responseTime": "Время отклика",
+    "uptime": "Время работы",
+    "sinceLast": "С последнего перезапуска",
+    "totalLinks": "Всего ссылок",
+    "activeLinks": "Активные короткие ссылки",
+    "storageBackend": "Бэкенд хранилища",
+    "cacheSystem": "Система кэширования",
+    "cacheType": "Тип кэша",
+    "bloomFilter": "Фильтр Блума",
+    "negativeCache": "Негативный кэш",
+    "type": "Тип",
+    "status": "Статус",
+    "clickTracking": "Отслеживание кликов",
+    "enabled": "Включено",
+    "disabled": "Отключено",
+    "lastUpdated": "Последнее обновление",
+    "healthy": "Здоров",
+    "unhealthy": "Нездоров",
+    "degraded": "Деградировал",
+    "unknown": "Неизвестно"
+  },
+  "langswitcher": {
+    "title": "Выбор языка",
+    "language": {
+      "switch": "Переключить язык",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "theme": {
+    "switchTheme": "Переключить тему",
+    "light": "Светлая тема",
+    "dark": "Темная тема",
+    "system": "Системная тема"
+  },
+  "settings": {
+    "title": "Настройки",
+    "description": "Настройте ваши предпочтения",
+    "tabs": {
+      "appearance": "Внешний вид",
+      "language": "Язык",
+      "preferences": "Настройки",
+      "system": "Система",
+      "about": "О проекте"
+    },
+    "theme": {
+      "title": "Тема",
+      "description": "Выберите тему интерфейса"
+    },
+    "language": {
+      "title": "Язык",
+      "description": "Выберите язык интерфейса"
+    },
+    "about": {
+      "title": "О проекте",
+      "description": "Информация о проекте и ссылки",
+      "tagline": "Управляйте ссылками быстро и стильно",
+      "openSource": "Открытый исходный код",
+      "docs": "Документация",
+      "builtWith": "Создано с",
+      "forCommunity": "для сообщества открытого исходного кода"
+    }
+  },
+  "errors": {
+    "boundary": {
+      "title": "Ой! Что-то пошло не так",
+      "description": "Произошла непредвиденная ошибка. Попробуйте перезагрузить страницу или вернуться на главную.",
+      "technicalDetails": "Технические детали",
+      "reload": "Перезагрузить страницу",
+      "goHome": "На главную",
+      "persistentIssue": "Если проблема сохраняется, обратитесь в службу поддержки."
+    },
+    "network": "Ошибка сети - проверьте подключение",
+    "badRequest": "Неверный запрос - проверьте введённые данные",
+    "unauthorized": "Не авторизован - войдите снова",
+    "forbidden": "Доступ запрещён - у вас нет прав доступа к этому ресурсу",
+    "notFound": "Ресурс не найден",
+    "tooManyRequests": "Слишком много запросов - попробуйте позже",
+    "serverError": "Ошибка сервера - попробуйте позже",
+    "serviceUnavailable": "Сервис временно недоступен - попробуйте позже",
+    "unknown": "Произошла неизвестная ошибка",
+    "conflict": "Конфликт ресурса",
+    "authFailed": "Ошибка аутентификации - неверный пароль",
+    "tokenExpired": "Сессия истекла - войдите снова",
+    "tokenInvalid": "Недействительный токен сессии",
+    "csrfInvalid": "Ошибка проверки безопасности - обновите страницу",
+    "linkNotFound": "Ссылка не найдена",
+    "linkAlreadyExists": "Короткий код уже существует",
+    "linkInvalidUrl": "Неверный формат целевого URL",
+    "linkInvalidExpireTime": "Неверный срок истечения",
+    "linkPasswordHashError": "Ошибка обработки пароля",
+    "linkDatabaseError": "Ошибка операции с базой данных",
+    "batchSizeTooLarge": "Размер пакета слишком большой (макс. 5000 элементов)",
+    "fileTooLarge": "Файл слишком большой (макс. 10 МБ)",
+    "invalidDateFormat": "Неверный формат даты (используйте RFC3339, например: 2024-01-01T00:00:00Z)",
+    "importFailed": "Ошибка импорта",
+    "exportFailed": "Ошибка экспорта",
+    "invalidMultipartData": "Неверный формат загружаемых данных",
+    "fileReadError": "Ошибка чтения файла",
+    "csvFileMissing": "CSV файл не предоставлен",
+    "csvParseError": "Ошибка разбора CSV",
+    "csvGenerationError": "Ошибка генерации CSV",
+    "linkEmptyCode": "Короткий код не может быть пустым",
+    "linkInvalidCode": "Недопустимый формат короткого кода (разрешены только буквы, цифры, подчёркивание, дефис, точка и косая черта)",
+    "linkReservedCode": "Короткий код конфликтует с зарезервированными системными маршрутами",
+    "configNotFound": "Конфигурация не найдена",
+    "configUpdateFailed": "Ошибка обновления конфигурации",
+    "configReloadFailed": "Ошибка перезагрузки конфигурации",
+    "analyticsQueryFailed": "Ошибка запроса аналитики",
+    "analyticsLinkNotFound": "Ссылка не найдена, невозможно получить аналитику",
+    "analyticsInvalidDateRange": "Недопустимый диапазон дат"
+  },
+  "config": {
+    "title": "Системные Настройки",
+    "description": "Управление настройками времени выполнения",
+    "groups": {
+      "all": "Все",
+      "routes": "Маршруты",
+      "api": "API",
+      "features": "Функции",
+      "click": "Отслеживание Кликов",
+      "cors": "CORS",
+      "analytics": "Аналитика",
+      "cache": "Кэш",
+      "other": "Другое"
+    },
+    "keys": {
+      "routes.admin_prefix": "Префикс Admin API",
+      "routes.health_prefix": "Префикс Проверки Здоровья",
+      "routes.frontend_prefix": "Префикс Фронтенд Панели",
+      "api.admin_token": "Токен Администратора",
+      "api.health_token": "Токен Проверки Здоровья",
+      "api.jwt_secret": "JWT Секрет",
+      "api.access_token_minutes": "Срок Access Token (минуты)",
+      "api.refresh_token_days": "Срок Refresh Token (дни)",
+      "api.cookie_secure": "Безопасная Cookie (только HTTPS)",
+      "api.cookie_same_site": "Политика Cookie SameSite",
+      "api.cookie_domain": "Домен Cookie",
+      "api.trusted_proxies": "Доверенные Прокси",
+      "features.enable_admin_panel": "Включить Админ Панель",
+      "features.random_code_length": "Длина Случайного Кода",
+      "features.default_url": "URL Перенаправления по Умолчанию",
+      "click.enable_tracking": "Включить Отслеживание Кликов",
+      "click.flush_interval": "Интервал Сброса (секунды)",
+      "click.max_clicks_before_flush": "Макс. Кликов до Сброса",
+      "cors.enabled": "Включить настройку CORS",
+      "cors.allow_credentials": "Разрешить учетные данные (несовместимо с wildcard)",
+      "cors.allowed_origins": "Разрешенные источники ([\"*\"] = любые, пусто = только свой)",
+      "cors.allowed_methods": "Разрешенные Методы",
+      "cors.allowed_headers": "Разрешенные Заголовки",
+      "cors.max_age": "Макс. Время Кэша (секунды)",
+      "analytics.enable_detailed_logging": "Включить детальное логирование кликов",
+      "analytics.log_retention_days": "Хранение сырых логов (дни)",
+      "analytics.enable_ip_logging": "Записывать IP-адреса посетителей",
+      "analytics.enable_geo_lookup": "Включить геолокацию по IP",
+      "analytics.hourly_retention_days": "Хранение почасовой агрегации (дни)",
+      "analytics.daily_retention_days": "Хранение ежедневной агрегации (дни)",
+      "analytics.enable_auto_rollup": "Включить автоагрегацию и очистку",
+      "analytics.sample_rate": "Частота выборки кликов (0.0-1.0)",
+      "analytics.max_log_rows": "Макс. строк журнала кликов (0=без лимита)",
+      "analytics.max_rows_action": "Действие при превышении лимита",
+      "utm.enable_passthrough": "Включить сквозную передачу UTM-параметров",
+      "cache.bloom_rebuild_interval": "Интервал перестройки фильтра Блума (секунды)"
+    },
+    "key": "Ключ",
+    "value": "Значение",
+    "type": "Тип",
+    "requiresRestart": "Перезапуск",
+    "requiresRestartHint": "Изменения требуют перезапуска сервера",
+    "edit": "Редактировать",
+    "history": "История",
+    "reload": "Перезагрузить",
+    "reloadSuccess": "Конфигурация успешно перезагружена",
+    "reloadError": "Ошибка перезагрузки конфигурации",
+    "updateSuccess": "Конфигурация успешно обновлена",
+    "editConfig": "Редактировать Конфигурацию",
+    "formatJSON": "Форматировать JSON",
+    "noConfigs": "Конфигурации не найдены",
+    "emptyValue": "(не задано)",
+    "noHistory": "Нет истории",
+    "historyTitle": "История Конфигурации",
+    "savedNeedRestart": "Конфигурация сохранена. Перезапустите сервер для применения изменений.",
+    "searchPlaceholder": "Поиск по ключу...",
+    "allTypes": "Все типы",
+    "category": {
+      "auth": "Аутентификация",
+      "cookie": "Настройки Cookie",
+      "features": "Функциональные флаги",
+      "routes": "Конфигурация маршрутов",
+      "cors": "Настройки CORS",
+      "tracking": "Отслеживание кликов",
+      "analytics": "Аналитика",
+      "cache": "Настройки кэша",
+      "other": "Другое"
+    },
+    "placeholder": {
+      "trustedProxies": "IP или CIDR (например, 192.168.1.0/24)",
+      "allowedOrigins": "URL источника (например, https://example.com или *)",
+      "allowedHeaders": "Имя заголовка (например, Content-Type)"
+    },
+    "error": {
+      "invalidIpCidr": "Неверный формат IP/CIDR",
+      "invalidUrl": "Неверный формат URL",
+      "invalidHeader": "Неверное имя заголовка"
+    },
+    "generateAndSaveHint": "Нажмите кнопку, чтобы автоматически сгенерировать и сохранить новый ключ безопасности",
+    "generating": "Генерация...",
+    "generateAndSave": "Сгенерировать и сохранить"
+  },
+  "enums": {
+    "sameSite": {
+      "strict": {
+        "label": "Strict",
+        "description": "Максимальная безопасность, только запросы с того же сайта отправляют cookies"
+      },
+      "lax": {
+        "label": "Lax",
+        "description": "По умолчанию, разрешает навигацию верхнего уровня отправлять cookies"
+      },
+      "none": {
+        "label": "None",
+        "description": "Без ограничений, требуется атрибут Secure"
+      }
+    },
+    "httpMethod": {
+      "get": {
+        "label": "GET",
+        "description": "Получить данные с сервера"
+      },
+      "post": {
+        "label": "POST",
+        "description": "Отправить данные на сервер"
+      },
+      "put": {
+        "label": "PUT",
+        "description": "Обновить существующий ресурс"
+      },
+      "delete": {
+        "label": "DELETE",
+        "description": "Удалить ресурс с сервера"
+      },
+      "patch": {
+        "label": "PATCH",
+        "description": "Частично обновить ресурс"
+      },
+      "head": {
+        "label": "HEAD",
+        "description": "Получить только заголовки"
+      },
+      "options": {
+        "label": "OPTIONS",
+        "description": "Получить поддерживаемые методы"
+      }
+    },
+    "maxRowsAction": {
+      "cleanup": {
+        "label": "Очистка",
+        "description": "Удалить старые записи при превышении лимита"
+      },
+      "stop": {
+        "label": "Остановить",
+        "description": "Прекратить запись кликов при превышении лимита"
+      }
+    }
+  },
+  "pwa": {
+    "updateAvailable": "Доступна новая версия",
+    "refresh": "Обновить"
+  }
+}

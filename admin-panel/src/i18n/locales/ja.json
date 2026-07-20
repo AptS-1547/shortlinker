@@ -1,0 +1,671 @@
+{
+  "common": {
+    "loading": "読み込み中...",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "saving": "保存中...",
+    "delete": "削除",
+    "deleting": "削除中...",
+    "edit": "編集",
+    "create": "作成",
+    "search": "検索",
+    "filter": "フィルター",
+    "reset": "リセット",
+    "apply": "適用",
+    "refresh": "更新",
+    "copy": "コピー",
+    "copied": "コピーしました！",
+    "retry": "再試行",
+    "previous": "前へ",
+    "next": "次へ",
+    "yes": "はい",
+    "no": "いいえ",
+    "more": "その他",
+    "close": "閉じる",
+    "enabled": "有効",
+    "disabled": "無効",
+    "actions": "アクション",
+    "addItem": "項目を追加..."
+  },
+  "auth": {
+    "title": "管理者ログイン",
+    "description": "管理パネルにアクセスするためにパスワードを入力してください",
+    "password": "パスワード",
+    "passwordPlaceholder": "管理者パスワードを入力",
+    "login": "ログイン",
+    "authenticating": "認証中...",
+    "verifying": "検証中...",
+    "processing": "処理中...",
+    "serverConnection": "サーバー接続",
+    "serverConnectionDesc": "ShortLinkerサービスが {{url}} で実行されていることを確認してください",
+    "errors": {
+      "passwordRequired": "パスワードを入力してください",
+      "networkError": "サーバーに接続できません。サービスが実行されているか確認してください。",
+      "unauthorized": "無効なパスワードまたは未認証のアクセス",
+      "notFound": "認証エンドポイントが見つかりません。サーバー設定を確認してください。",
+      "serverError": "サーバーエラー。後でもう一度お試しください。",
+      "authFailed": "認証に失敗しました。もう一度お試しください。"
+    }
+  },
+  "dashboard": {
+    "title": "ダッシュボード",
+    "description": "お帰りなさい！ショートリンクの概要をご覧ください。",
+    "serviceStatus": "サービス状態",
+    "totalLinks": "総リンク数",
+    "activeLinks": "アクティブリンク",
+    "responseTime": "応答時間",
+    "noLinks": "リンクがありません",
+    "noLinksDesc": "最初のショートリンクを作成して始めましょう。",
+    "createLink": "リンク作成",
+    "viewAllLinks": "すべてのリンクを表示",
+    "systemHealth": "システムヘルス",
+    "storage": "ストレージ",
+    "lastCheck": "最終チェック",
+    "healthy": "正常",
+    "unknown": "不明",
+    "never": "なし",
+    "stats": {
+      "totalLinks": "総リンク数",
+      "linksCreated": "作成されたリンク",
+      "totalClicks": "総クリック数",
+      "clicksTracked": "追跡されたクリック",
+      "activeLinks": "アクティブリンク",
+      "notExpired": "未期限切れ",
+      "uptime": "稼働時間",
+      "systemHealth": "システムヘルス",
+      "todayClicks": "今日のクリック",
+      "vsYesterday": "昨日比",
+      "clickTrend": "クリックトレンド",
+      "last7Days": "過去7日間"
+    },
+    "recentLinks": {
+      "title": "最近のリンク",
+      "description": "最近作成されたショートリンク",
+      "clicks": "クリック",
+      "noLinks": "リンクがありません"
+    }
+  },
+  "links": {
+    "title": "リンク管理",
+    "description": "ショートリンクの作成、編集、管理を行います。",
+    "filterTitle": "リンクをフィルター",
+    "filterDescription": "ショートリンクを検索・フィルターします",
+    "createTitle": "新しいリンクを作成",
+    "editTitle": "リンクを編集",
+    "createDescription": "コレクションに新しいショートリンクを追加",
+    "editDescription": "ショートリンクの詳細を更新",
+    "shortCode": "ショートコード",
+    "shortCodeOptional": "ショートコード（任意）",
+    "shortCodePlaceholder": "空白で自動生成",
+    "shortCodeHelp": "カスタムショートコード（文字、数字、ハイフン、アンダースコア、または abc/def のようなパス）",
+    "targetUrl": "ターゲットURL",
+    "targetUrlRequired": "ターゲットURL *",
+    "targetUrlPlaceholder": "https://example.com/your-long-url",
+    "targetUrlHelp": "ユーザーがリダイレクトされる先のURL",
+    "expiresAt": "有効期限",
+    "expiresAtOptional": "有効期限（任意）",
+    "expiresAtHelp": "永続リンクの場合は空白のままにする",
+    "passwordOptional": "パスワード（任意）",
+    "passwordPlaceholder": "このリンクを保護するパスワードを入力",
+    "passwordHelp": "このリンクへのアクセスを保護するパスワードを設定",
+    "passwordProtected": "パスワード保護",
+    "created": "作成日時",
+    "actions": "アクション",
+    "active": "アクティブ",
+    "expired": "期限切れ",
+    "permanent": "永続",
+    "creating": "作成中...",
+    "updating": "更新中...",
+    "createLink": "リンク作成",
+    "createNew": "新規作成",
+    "editLink": "リンクを編集",
+    "updateLink": "リンク更新",
+    "clearEdit": "編集をクリア",
+    "shortLinks": "ショートリンク",
+    "noLinks": "リンクがありません",
+    "noLinksTitle": "リンクがありません",
+    "noLinksDescription": "最初の短縮リンクを作成して始めましょう",
+    "noMatchingLinks": "一致するリンクがありません",
+    "noLinksYet": "リンクがありません",
+    "noMatchingLinksDesc": "フィルター条件を調整するか、新しいリンクを作成してください。",
+    "noLinksYetDesc": "上記のフォームを使用して最初のショートリンクを作成してください。",
+    "clearFilters": "フィルターをクリア",
+    "createFirstLink": "最初のリンクを作成",
+    "createNewLink": "新しいリンクを作成",
+    "deleteLink": "リンクを削除",
+    "deleteSuccess": "リンクを削除しました",
+    "deleteError": "リンクの削除に失敗しました",
+    "createSuccess": "リンクを作成しました",
+    "createError": "リンクの作成に失敗しました",
+    "updateSuccess": "リンクを更新しました",
+    "updateError": "リンクの更新に失敗しました",
+    "copySuccess": "リンクをクリップボードにコピーしました",
+    "copyError": "リンクのコピーに失敗しました",
+    "batchDeleteSuccess": "{{count}}件のリンクを削除しました",
+    "batchDeletePartial": "{{success}}件のリンクを削除、{{failed}}件が失敗",
+    "batchDeleteError": "リンクの削除に失敗しました",
+    "openInNewTab": "新しいタブで開く",
+    "deleteConfirmation": "リンク {{code}} を削除してもよろしいですか？この操作は取り消せません。",
+    "deleting": "削除中...",
+    "copyLinkTitle": "ショートリンクをコピー",
+    "copyPasswordProtectedLink": "パスワード保護されたリンクをコピー（パスワード含む）",
+    "linkCopied": "ショートリンクをコピーしました！",
+    "passwordParameterAdded": "パスワード付き保護リンクをコピーしました",
+    "createdAfter": "作成日以降",
+    "createdBefore": "作成日以前",
+    "pageSize": "ページサイズ",
+    "searchPlaceholder": "リンクを検索...",
+    "tableTitle": "リンク一覧",
+    "filterOptions": {
+      "allLinks": "すべてのリンク",
+      "activeOnly": "アクティブのみ",
+      "expiredOnly": "期限切れのみ",
+      "permanentLinks": "永続リンク",
+      "temporaryLinks": "一時リンク"
+    },
+    "pagination": {
+      "showing": "{{total}}件中 {{from}}-{{to}}件を表示",
+      "page": "{{total}}ページ中 {{current}}ページ",
+      "perPage": "件/ページ"
+    },
+    "search": {
+      "placeholder": "コードまたはURLで検索...",
+      "createdAfter": "作成日以降",
+      "createdBefore": "作成日以前",
+      "pageSize": "ページサイズ"
+    },
+    "table": {
+      "code": "コード",
+      "target": "ターゲットURL",
+      "targetUrl": "ターゲットURL",
+      "clicks": "クリック数",
+      "status": "状態",
+      "created": "作成日時",
+      "expires": "有効期限",
+      "actions": "アクション"
+    },
+    "status": {
+      "active": "アクティブ",
+      "expired": "期限切れ",
+      "protected": "保護済み"
+    },
+    "form": {
+      "code": "ショートコード",
+      "codePlaceholder": "空白で自動生成",
+      "target": "ターゲットURL",
+      "targetPlaceholder": "https://example.com/your-long-url",
+      "password": "パスワード（任意）",
+      "passwordPlaceholder": "このリンクを保護するパスワードを入力",
+      "invalidUrl": "URLは http:// または https:// で始まる必要があります"
+    },
+    "deleteConfirm": {
+      "title": "削除の確認",
+      "description": "リンク {{code}} を削除してもよろしいですか？この操作は取り消せません。"
+    },
+    "activeFilters": "{{count}}個のフィルター",
+    "filtered": "（フィルター済み）",
+    "editing": "編集中: {{code}}",
+    "batch": {
+      "selectAll": "すべて選択",
+      "selectRow": "この行を選択",
+      "selected": "{{count}}件選択中",
+      "delete": "削除",
+      "clear": "選択解除",
+      "deleteTitle": "一括削除の確認",
+      "deleteDescription": "選択した{{count}}件のリンクを削除してもよろしいですか？この操作は取り消せません。",
+      "deletePartial": "{{success}}件のリンクを削除、{{failed}}件が失敗",
+      "deleteSuccess": "{{count}}件のリンクを削除しました"
+    },
+    "columns": {
+      "configure": "列",
+      "title": "列の表示/非表示"
+    },
+    "expand": {
+      "shortUrl": "短縮URL",
+      "passwordProtection": "パスワード保護"
+    },
+    "export": {
+      "button": "エクスポート",
+      "exporting": "エクスポート中...",
+      "success": "エクスポート成功",
+      "error": "エクスポート失敗"
+    },
+    "import": {
+      "button": "インポート",
+      "title": "リンクをインポート",
+      "file": "CSVファイル",
+      "dragOrClick": "CSVファイルをここにドラッグ＆ドロップ、またはクリックして選択",
+      "maxFileSize": "最大ファイルサイズ: {{size}}",
+      "fileTooLarge": "ファイルが大きすぎます。最大サイズは {{maxSize}} です",
+      "mode": "インポートモード",
+      "modeSkip": "重複をスキップ - 既存のリンクをスキップ",
+      "modeOverwrite": "上書き - 既存のリンクを完全に置き換え",
+      "modeError": "エラー - 既存のリンクでエラーを返す",
+      "import": "インポート",
+      "importing": "インポート中...",
+      "uploading": "アップロード中...",
+      "success": "インポート完了",
+      "error": "インポート失敗",
+      "totalRows": "総行数: {{count}}",
+      "successCount": "成功: {{count}}",
+      "skippedCount": "スキップ: {{count}}",
+      "failedCount": "失敗: {{count}}",
+      "failedDetails": "失敗の詳細:",
+      "failedItem": "行 {{row}}: {{code}} - {{error}}",
+      "andMore": "...他 {{count}} 件"
+    },
+    "qr": {
+      "code": "QRコード",
+      "download": "QRコードをダウンロード",
+      "downloading": "ダウンロード中...",
+      "preview": "QRコードプレビュー",
+      "size": "サイズ",
+      "margin": "余白",
+      "foreground": "前景色",
+      "background": "背景色",
+      "errorLevel": "誤り訂正",
+      "downloadPng": "PNGをダウンロード",
+      "generateFailed": "生成に失敗しました",
+      "logo": "ロゴ（任意）",
+      "logoSize": "サイズ",
+      "logoHint": "推奨：透明背景の正方形PNG",
+      "errorLevelWarning": "ヒント：ロゴを追加する場合はHレベルを推奨"
+    }
+  },
+  "analytics": {
+    "title": "分析",
+    "description": "ショートリンクの洞察と統計を表示します。",
+    "totalLinks": "総リンク数",
+    "totalClicks": "総クリック数",
+    "thisWeek": "今週",
+    "activeLinks": "アクティブリンク",
+    "featureComingSoon": "機能準備中",
+    "recentActivity": "最近のアクティビティ",
+    "recentActivityTitle": "最近のアクティビティ",
+    "loadingActivity": "アクティビティを読み込み中...",
+    "noActivityYet": "アクティビティがありません",
+    "noActivityDesc": "分析データを見るためにリンクを作成してください。",
+    "linkStatusDistribution": "リンク状態分布",
+    "activeLinksCard": "アクティブリンク",
+    "expiredLinksCard": "期限切れリンク",
+    "permanentLinksCard": "永続リンク",
+    "ofTotal": "全体の",
+    "analyticsFeatures": "分析機能",
+    "analyticsFeaturesDesc": "クリック追跡と詳細分析は近日公開予定です！現在は基本的なリンク統計を表示しています。",
+    "clicks": "クリック",
+    "expires": "有効期限",
+    "created": "作成日時",
+    "averageClicks": "平均クリック数",
+    "clicksPerLink": "リンクあたりのクリック数",
+    "na": "N/A",
+    "export": "エクスポート",
+    "noData": "データがありません",
+    "noGeoData": "地理データがありません",
+    "topLinksCount": "人気リンク数",
+    "referrersCount": "リファラー数",
+    "countriesCount": "国/地域数",
+    "clickTrends": "クリックトレンド",
+    "clickTrendsDesc": "選択した期間のクリックトレンド",
+    "topLinks": "人気リンク",
+    "topLinksDesc": "クリック数が最も多いリンク",
+    "referrers": "リファラー",
+    "referrersDesc": "訪問者の参照元サイト",
+    "geoDistribution": "地理分布",
+    "geoDistributionDesc": "訪問者の地理的分布",
+    "dateRange": {
+      "7d": "過去7日間",
+      "30d": "過去30日間",
+      "90d": "過去90日間",
+      "1y": "過去1年間"
+    },
+    "groupBy": {
+      "hour": "時間別",
+      "day": "日別",
+      "week": "週別",
+      "month": "月別"
+    },
+    "error": {
+      "fetchFailed": "分析データの取得に失敗しました"
+    },
+    "devices": "デバイスとブラウザ",
+    "devicesDesc": "訪問者のブラウザ、OS、デバイスタイプの分布",
+    "browsers": "ブラウザ分布",
+    "operatingSystems": "オペレーティングシステム",
+    "deviceCategories": "デバイスタイプ",
+    "botTraffic": "Botトラフィック",
+    "viewAnalytics": "分析を表示",
+    "comingSoon": {
+      "title": "近日公開",
+      "description": "詳細な分析機能は近日公開予定です！お楽しみに。"
+    },
+    "features": {
+      "clickTrends": "クリックトレンド",
+      "clickTrendsDesc": "リンクのクリックトレンドとパターンを表示",
+      "visitors": "訪問者分析",
+      "visitorsDesc": "リンクにアクセスしている訪問者を理解",
+      "geography": "地理的分布",
+      "geographyDesc": "訪問者の所在地を確認",
+      "topLinks": "人気リンク",
+      "topLinksDesc": "最も人気のあるリンクを発見"
+    }
+  },
+  "linkDetail": {
+    "title": "リンク詳細",
+    "description": "このリンクの完全な統計分析を表示",
+    "info": "リンク情報",
+    "targetUrl": "ターゲットURL",
+    "totalClicks": "総クリック数",
+    "createdAt": "作成日時",
+    "expiresAt": "有効期限",
+    "status": "ステータス",
+    "viewFull": "完全な分析",
+    "notFound": "リンクが見つかりません",
+    "fetchFailed": "リンクデータの取得に失敗しました",
+    "noCode": "リンクコードが指定されていません"
+  },
+  "layout": {
+    "title": "ShortLinker 管理",
+    "subtitle": "管理パネル",
+    "logout": "ログアウト",
+    "navigation": {
+      "title": "ナビゲーション",
+      "dashboard": "ダッシュボード",
+      "links": "リンク",
+      "analytics": "分析",
+      "config": "設定",
+      "settings": "設定"
+    },
+    "system": {
+      "title": "システム"
+    },
+    "health": {
+      "healthy": "正常",
+      "unhealthy": "異常",
+      "unknown": "不明"
+    },
+    "language": {
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語"
+    }
+  },
+  "health": {
+    "title": "システムヘルス状態",
+    "description": "リアルタイムサービス監視",
+    "close": "閉じる",
+    "refresh": "更新",
+    "loadingData": "ヘルスデータを読み込み中...",
+    "overallStatus": "全体状態",
+    "responseTime": "応答時間",
+    "uptime": "稼働時間",
+    "sinceLast": "最終再起動から",
+    "totalLinks": "総リンク数",
+    "activeLinks": "アクティブショートリンク",
+    "storageBackend": "ストレージバックエンド",
+    "cacheSystem": "キャッシュシステム",
+    "cacheType": "キャッシュタイプ",
+    "bloomFilter": "ブルームフィルター",
+    "negativeCache": "ネガティブキャッシュ",
+    "type": "タイプ",
+    "status": "状態",
+    "clickTracking": "クリック追跡",
+    "enabled": "有効",
+    "disabled": "無効",
+    "lastUpdated": "最終更新",
+    "healthy": "正常",
+    "unhealthy": "異常",
+    "degraded": "劣化",
+    "unknown": "不明"
+  },
+  "langswitcher": {
+    "title": "言語を選択",
+    "language": {
+      "switch": "言語を切り替え",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "theme": {
+    "switchTheme": "テーマを切り替え",
+    "light": "ライトテーマ",
+    "dark": "ダークテーマ",
+    "system": "システムテーマ"
+  },
+  "settings": {
+    "title": "設定",
+    "description": "お好みの設定をカスタマイズ",
+    "tabs": {
+      "appearance": "外観",
+      "language": "言語",
+      "preferences": "設定",
+      "system": "システム",
+      "about": "情報"
+    },
+    "theme": {
+      "title": "テーマ",
+      "description": "インターフェースのテーマを選択"
+    },
+    "language": {
+      "title": "言語",
+      "description": "インターフェースの言語を選択"
+    },
+    "about": {
+      "title": "このアプリについて",
+      "description": "プロジェクト情報とリンク",
+      "tagline": "スピードとスタイルでリンクを管理",
+      "openSource": "オープンソース",
+      "docs": "ドキュメント",
+      "builtWith": "",
+      "forCommunity": "を込めてオープンソースコミュニティのために構築"
+    }
+  },
+  "errors": {
+    "boundary": {
+      "title": "おっと！エラーが発生しました",
+      "description": "予期しないエラーが発生しました。ページを再読み込みするか、ホームページに戻ってください。",
+      "technicalDetails": "技術詳細",
+      "reload": "再読み込み",
+      "goHome": "ホームに戻る",
+      "persistentIssue": "問題が解決しない場合は、サポートにお問い合わせください。"
+    },
+    "network": "ネットワークエラー - 接続を確認してください",
+    "badRequest": "リクエストエラー - 入力内容を確認してください",
+    "unauthorized": "認証エラー - 再度ログインしてください",
+    "forbidden": "アクセス拒否 - このリソースへのアクセス権限がありません",
+    "notFound": "リソースが見つかりません",
+    "tooManyRequests": "リクエストが多すぎます - しばらくしてから再試行してください",
+    "serverError": "サーバーエラー - しばらくしてから再試行してください",
+    "serviceUnavailable": "サービスが一時的に利用できません - しばらくしてから再試行してください",
+    "unknown": "不明なエラーが発生しました",
+    "conflict": "リソース競合",
+    "authFailed": "認証失敗 - パスワードが間違っています",
+    "tokenExpired": "セッション期限切れ - 再度ログインしてください",
+    "tokenInvalid": "無効なセッショントークン",
+    "csrfInvalid": "セキュリティ検証失敗 - ページを更新してください",
+    "linkNotFound": "リンクが見つかりません",
+    "linkAlreadyExists": "ショートコードは既に存在します",
+    "linkInvalidUrl": "無効なターゲットURL形式",
+    "linkInvalidExpireTime": "無効な有効期限",
+    "linkPasswordHashError": "パスワード処理失敗",
+    "linkDatabaseError": "データベース操作失敗",
+    "batchSizeTooLarge": "バッチサイズが大きすぎます（最大 5000 件）",
+    "fileTooLarge": "ファイルが大きすぎます（最大 10MB）",
+    "invalidDateFormat": "日付形式が無効です（RFC3339 形式、例: 2024-01-01T00:00:00Z）",
+    "importFailed": "インポート失敗",
+    "exportFailed": "エクスポート失敗",
+    "invalidMultipartData": "無効なアップロードデータ形式",
+    "fileReadError": "ファイル読み取り失敗",
+    "csvFileMissing": "CSVファイルが提供されていません",
+    "csvParseError": "CSV解析エラー",
+    "csvGenerationError": "CSV生成エラー",
+    "linkEmptyCode": "ショートコードは空にできません",
+    "linkInvalidCode": "無効なショートコード形式（英数字、アンダースコア、ハイフン、ドット、スラッシュのみ使用可能）",
+    "linkReservedCode": "ショートコードがシステム予約ルートと競合しています",
+    "configNotFound": "設定が見つかりません",
+    "configUpdateFailed": "設定更新失敗",
+    "configReloadFailed": "設定リロード失敗",
+    "analyticsQueryFailed": "分析クエリに失敗しました",
+    "analyticsLinkNotFound": "リンクが見つかりません。分析データを取得できません",
+    "analyticsInvalidDateRange": "日付範囲が無効です"
+  },
+  "config": {
+    "title": "システム設定",
+    "description": "ランタイム設定を管理",
+    "groups": {
+      "all": "すべて",
+      "routes": "ルート",
+      "api": "API",
+      "features": "機能",
+      "click": "クリック追跡",
+      "cors": "CORS",
+      "analytics": "分析統計",
+      "cache": "キャッシュ",
+      "other": "その他"
+    },
+    "keys": {
+      "routes.admin_prefix": "管理APIプレフィックス",
+      "routes.health_prefix": "ヘルスチェックプレフィックス",
+      "routes.frontend_prefix": "フロントエンドパネルプレフィックス",
+      "api.admin_token": "管理トークン",
+      "api.health_token": "ヘルスチェックトークン",
+      "api.jwt_secret": "JWTシークレット",
+      "api.access_token_minutes": "アクセストークン有効期限(分)",
+      "api.refresh_token_days": "リフレッシュトークン有効期限(日)",
+      "api.cookie_secure": "Cookie安全転送(HTTPSのみ)",
+      "api.cookie_same_site": "Cookie SameSiteポリシー",
+      "api.cookie_domain": "Cookieドメイン",
+      "api.trusted_proxies": "信頼されたプロキシサーバー",
+      "features.enable_admin_panel": "管理パネルを有効化",
+      "features.random_code_length": "ランダムコード長",
+      "features.default_url": "デフォルトリダイレクトURL",
+      "click.enable_tracking": "クリック追跡を有効化",
+      "click.flush_interval": "フラッシュ間隔(秒)",
+      "click.max_clicks_before_flush": "フラッシュ前の最大クリック数",
+      "cors.enabled": "CORS設定を有効化",
+      "cors.allow_credentials": "資格情報を許可（ワイルドカードオリジンと併用不可）",
+      "cors.allowed_origins": "許可されたオリジン（[\"*\"]で任意、空は同一オリジンのみ）",
+      "cors.allowed_methods": "許可されたメソッド",
+      "cors.allowed_headers": "許可されたヘッダー",
+      "cors.max_age": "最大キャッシュ時間(秒)",
+      "analytics.enable_detailed_logging": "詳細クリックログを有効化",
+      "analytics.log_retention_days": "生ログ保持日数",
+      "analytics.enable_ip_logging": "訪問者IPアドレスを記録",
+      "analytics.enable_geo_lookup": "IP地理位置検索を有効化",
+      "analytics.hourly_retention_days": "時間別集計データ保持日数",
+      "analytics.daily_retention_days": "日別集計データ保持日数",
+      "analytics.enable_auto_rollup": "自動集計・クリーンアップを有効化",
+      "analytics.sample_rate": "クリックログサンプリング率 (0.0-1.0)",
+      "analytics.max_log_rows": "最大クリックログ行数 (0=無制限)",
+      "analytics.max_rows_action": "最大行数超過時の動作",
+      "utm.enable_passthrough": "UTMパラメータパススルーを有効化",
+      "cache.bloom_rebuild_interval": "ブルームフィルタ再構築間隔(秒)"
+    },
+    "key": "キー",
+    "value": "値",
+    "type": "タイプ",
+    "requiresRestart": "再起動",
+    "requiresRestartHint": "変更を有効にするにはサーバーの再起動が必要です",
+    "edit": "編集",
+    "history": "履歴",
+    "reload": "リロード",
+    "reloadSuccess": "設定を再読み込みしました",
+    "reloadError": "設定の再読み込みに失敗しました",
+    "updateSuccess": "設定を更新しました",
+    "editConfig": "設定を編集",
+    "formatJSON": "JSONをフォーマット",
+    "noConfigs": "設定項目がありません",
+    "emptyValue": "(未設定)",
+    "noHistory": "履歴がありません",
+    "historyTitle": "設定履歴",
+    "savedNeedRestart": "設定を保存しました。変更を有効にするにはサーバーを再起動してください。",
+    "searchPlaceholder": "キーで検索...",
+    "allTypes": "すべてのタイプ",
+    "category": {
+      "auth": "認証",
+      "cookie": "Cookie設定",
+      "features": "機能フラグ",
+      "routes": "ルート設定",
+      "cors": "CORS設定",
+      "tracking": "クリック追跡",
+      "analytics": "分析統計",
+      "cache": "キャッシュ設定",
+      "other": "その他"
+    },
+    "placeholder": {
+      "trustedProxies": "IPまたはCIDR（例: 192.168.1.0/24）",
+      "allowedOrigins": "オリジンURL（例: https://example.com または *）",
+      "allowedHeaders": "ヘッダー名（例: Content-Type）"
+    },
+    "error": {
+      "invalidIpCidr": "無効なIP/CIDR形式",
+      "invalidUrl": "無効なURL形式",
+      "invalidHeader": "無効なヘッダー名"
+    },
+    "generateAndSaveHint": "ボタンをクリックすると、新しいセキュリティキーが自動生成および保存されます",
+    "generating": "生成中...",
+    "generateAndSave": "生成して保存"
+  },
+  "enums": {
+    "sameSite": {
+      "strict": {
+        "label": "Strict",
+        "description": "最も安全、同一サイトのリクエストのみCookieを送信"
+      },
+      "lax": {
+        "label": "Lax",
+        "description": "デフォルト、トップレベルナビゲーションでCookieを送信可能"
+      },
+      "none": {
+        "label": "None",
+        "description": "制限なし、Secure属性と併用が必要"
+      }
+    },
+    "httpMethod": {
+      "get": {
+        "label": "GET",
+        "description": "サーバーからデータを取得"
+      },
+      "post": {
+        "label": "POST",
+        "description": "サーバーにデータを送信"
+      },
+      "put": {
+        "label": "PUT",
+        "description": "既存のリソースを更新"
+      },
+      "delete": {
+        "label": "DELETE",
+        "description": "サーバーからリソースを削除"
+      },
+      "patch": {
+        "label": "PATCH",
+        "description": "リソースを部分的に更新"
+      },
+      "head": {
+        "label": "HEAD",
+        "description": "ヘッダーのみを取得"
+      },
+      "options": {
+        "label": "OPTIONS",
+        "description": "サポートされているメソッドを取得"
+      }
+    },
+    "maxRowsAction": {
+      "cleanup": {
+        "label": "自動クリーンアップ",
+        "description": "制限超過時に最も古いレコードを削除"
+      },
+      "stop": {
+        "label": "記録停止",
+        "description": "制限超過時に新しいクリックの記録を停止"
+      }
+    }
+  },
+  "pwa": {
+    "updateAvailable": "新しいバージョンが利用可能です",
+    "refresh": "更新"
+  }
+}

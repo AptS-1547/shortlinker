@@ -10,7 +10,7 @@ WORKDIR /app/admin-panel
 
 # 复制前端依赖文件
 COPY ./admin-panel /app/admin-panel
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --registry https://registry.npmjs.org
 RUN bun run build
 
 # 多阶段构建 - 构建阶段

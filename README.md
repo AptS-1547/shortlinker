@@ -42,6 +42,7 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data e1saps/shortlinker
 
 ```bash
 git clone https://github.com/AptS-1547/shortlinker && cd shortlinker
+cd admin-panel && bun install --frozen-lockfile --registry https://registry.npmjs.org && bun run build && cd ..
 cargo run
 ```
 

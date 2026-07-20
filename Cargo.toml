@@ -15,28 +15,49 @@ tui = ["server", "dep:color-eyre", "dep:crossterm", "dep:ratatui", "dep:arboard"
 metrics = ["server", "dep:prometheus", "dep:sysinfo"]  # Prometheus 指标导出
 full = ["server", "cli", "tui", "metrics"]  # 全功能版本
 
-# 优化配置
+# 开发构建优先缩短「改代码 -> 编译/测试」的反馈时间。
+# 工作区代码保持 O0 以避免每次修改后重做优化；第三方依赖单独使用 O1，
+# 避免 crypto/image/compression 等依赖在 debug/test 运行时过慢。
 [profile.dev]
-opt-level = 1
+opt-level = 0
 lto = false
-codegen-units = 16
+codegen-units = 256
+debug = 1
 panic = "unwind"
 strip = false
 incremental = true
 
+[profile.dev.package."*"]
+opt-level = 1
+debug = false
+
 [profile.release]
-opt-level = "s"
+opt-level = 2
 lto = true
 codegen-units = 1
-panic = "abort"
+# Keep ordinary request/task panics from taking down every HTTP worker. Stack overflow and OOM
+# remain process-fatal and must be prevented at their input/allocation boundaries.
+panic = "unwind"
 strip = true
 
-[profile.release-debug]
+# 压测/火焰图采样用：接近 release，但保留符号并关闭 LTO，方便 perf 展开栈。
+# frame pointer 需要通过 RUSTFLAGS 传入：
+# RUSTFLAGS="-C force-frame-pointers=yes" cargo build --profile profiling
+[profile.profiling]
 inherits = "release"
+opt-level = 2
 codegen-units = 1
 debug = true
 strip = false
 lto = false
+panic = "unwind"
+
+[profile.release-performance]
+inherits = "release"
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = true
 
 # 添加库配置
 [lib]

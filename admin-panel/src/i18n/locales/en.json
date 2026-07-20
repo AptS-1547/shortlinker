@@ -1,0 +1,671 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "delete": "Delete",
+    "deleting": "Deleting...",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "reset": "Reset",
+    "apply": "Apply",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "retry": "Retry",
+    "previous": "Previous",
+    "next": "Next",
+    "yes": "Yes",
+    "no": "No",
+    "more": "More",
+    "close": "Close",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "actions": "Actions",
+    "addItem": "Add item..."
+  },
+  "auth": {
+    "title": "Admin Login",
+    "description": "Enter your password to access the admin panel",
+    "password": "Password",
+    "passwordPlaceholder": "Enter admin password",
+    "login": "Login",
+    "authenticating": "Authenticating...",
+    "verifying": "Verifying...",
+    "processing": "Processing...",
+    "serverConnection": "Server Connection",
+    "serverConnectionDesc": "Make sure the ShortLinker service is running on {{url}}",
+    "errors": {
+      "passwordRequired": "Please enter a password",
+      "networkError": "Cannot connect to server. Please check if the service is running.",
+      "unauthorized": "Invalid password or unauthorized access",
+      "notFound": "Authentication endpoint not found. Please check server configuration.",
+      "serverError": "Server error. Please try again later.",
+      "authFailed": "Authentication failed. Please try again."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "description": "Welcome back! Here's an overview of your short links.",
+    "serviceStatus": "Service Status",
+    "totalLinks": "Total Links",
+    "activeLinks": "Active Links",
+    "responseTime": "Response Time",
+    "noLinks": "No links yet",
+    "noLinksDesc": "Create your first short link to get started.",
+    "createLink": "Create Link",
+    "viewAllLinks": "View all links",
+    "systemHealth": "System Health",
+    "storage": "Storage",
+    "lastCheck": "Last Check",
+    "healthy": "Healthy",
+    "unknown": "Unknown",
+    "never": "Never",
+    "stats": {
+      "totalLinks": "Total Links",
+      "linksCreated": "Links Created",
+      "totalClicks": "Total Clicks",
+      "clicksTracked": "Clicks Tracked",
+      "activeLinks": "Active Links",
+      "notExpired": "Not Expired",
+      "uptime": "Uptime",
+      "systemHealth": "System Health",
+      "todayClicks": "Today's Clicks",
+      "vsYesterday": "vs yesterday",
+      "clickTrend": "Click Trend",
+      "last7Days": "Last 7 days"
+    },
+    "recentLinks": {
+      "title": "Recent Links",
+      "description": "Your recently created short links",
+      "clicks": "clicks",
+      "noLinks": "No links yet"
+    }
+  },
+  "links": {
+    "title": "Link Management",
+    "description": "Create, edit, and manage your short links.",
+    "filterTitle": "Filter Links",
+    "filterDescription": "Search and filter your short links",
+    "createTitle": "Create New Link",
+    "editTitle": "Edit Link",
+    "createDescription": "Add a new short link to your collection",
+    "editDescription": "Update the details of your short link",
+    "shortCode": "Short Code",
+    "shortCodeOptional": "Short Code (optional)",
+    "shortCodePlaceholder": "Leave empty for auto-generation",
+    "shortCodeHelp": "Custom short code (letters, numbers, hyphens, underscores, or paths like abc/def)",
+    "targetUrl": "Target URL",
+    "targetUrlRequired": "Target URL *",
+    "targetUrlPlaceholder": "https://example.com/your-long-url",
+    "targetUrlHelp": "The destination URL where users will be redirected",
+    "expiresAt": "Expires At",
+    "expiresAtOptional": "Expires At (optional)",
+    "expiresAtHelp": "Leave empty for permanent links",
+    "passwordOptional": "Password (optional)",
+    "passwordPlaceholder": "Enter password to protect this link",
+    "passwordHelp": "Set a password to protect access to this link",
+    "passwordProtected": "Password Protected",
+    "created": "Created",
+    "actions": "Actions",
+    "active": "Active",
+    "expired": "Expired",
+    "permanent": "Permanent",
+    "creating": "Creating...",
+    "updating": "Updating...",
+    "createLink": "Create Link",
+    "createNew": "Create New",
+    "editLink": "Edit Link",
+    "updateLink": "Update Link",
+    "clearEdit": "Clear Edit",
+    "shortLinks": "Short Links",
+    "noLinks": "No links yet",
+    "noLinksTitle": "No links yet",
+    "noLinksDescription": "Get started by creating your first short link",
+    "noMatchingLinks": "No matching links",
+    "noLinksYet": "No links yet",
+    "noMatchingLinksDesc": "Try adjusting your filters or create a new link.",
+    "noLinksYetDesc": "Create your first short link using the form above.",
+    "clearFilters": "Clear Filters",
+    "createFirstLink": "Create Your First Link",
+    "createNewLink": "Create New Link",
+    "deleteLink": "Delete Link",
+    "deleteSuccess": "Link deleted successfully",
+    "deleteError": "Failed to delete link",
+    "createSuccess": "Link created successfully",
+    "createError": "Failed to create link",
+    "updateSuccess": "Link updated successfully",
+    "updateError": "Failed to update link",
+    "copySuccess": "Link copied to clipboard",
+    "copyError": "Failed to copy link",
+    "batchDeleteSuccess": "Successfully deleted {{count}} links",
+    "batchDeletePartial": "Deleted {{success}} links, {{failed}} failed",
+    "batchDeleteError": "Failed to delete links",
+    "openInNewTab": "Open in New Tab",
+    "deleteConfirmation": "Are you sure you want to delete the link {{code}}? This action cannot be undone.",
+    "deleting": "Deleting...",
+    "copyLinkTitle": "Click to copy short link",
+    "copyPasswordProtectedLink": "Click to copy password-protected link (includes password)",
+    "linkCopied": "Short link copied!",
+    "passwordParameterAdded": "Password-protected link copied with password",
+    "createdAfter": "Created After",
+    "createdBefore": "Created Before",
+    "pageSize": "Page Size",
+    "searchPlaceholder": "Search links...",
+    "tableTitle": "Links",
+    "filterOptions": {
+      "allLinks": "All Links",
+      "activeOnly": "Active Only",
+      "expiredOnly": "Expired Only",
+      "permanentLinks": "Permanent Links",
+      "temporaryLinks": "Temporary Links"
+    },
+    "pagination": {
+      "showing": "Showing {{from}}-{{to}} of {{total}}",
+      "page": "Page {{current}} of {{total}}",
+      "perPage": "per page"
+    },
+    "search": {
+      "placeholder": "Search by code or URL...",
+      "createdAfter": "Created After",
+      "createdBefore": "Created Before",
+      "pageSize": "Page Size"
+    },
+    "table": {
+      "code": "Code",
+      "target": "Target URL",
+      "targetUrl": "Target URL",
+      "clicks": "Clicks",
+      "status": "Status",
+      "created": "Created",
+      "expires": "Expires",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "expired": "Expired",
+      "protected": "Protected"
+    },
+    "form": {
+      "code": "Short Code",
+      "codePlaceholder": "Leave empty for auto-generation",
+      "target": "Target URL",
+      "targetPlaceholder": "https://example.com/your-long-url",
+      "password": "Password (optional)",
+      "passwordPlaceholder": "Enter password to protect this link",
+      "invalidUrl": "URL must start with http:// or https://"
+    },
+    "deleteConfirm": {
+      "title": "Confirm Delete",
+      "description": "Are you sure you want to delete the link {{code}}? This action cannot be undone."
+    },
+    "activeFilters": "{{count}} active",
+    "filtered": "(filtered)",
+    "editing": "Editing: {{code}}",
+    "batch": {
+      "selectAll": "Select all",
+      "selectRow": "Select this row",
+      "selected": "{{count}} selected",
+      "delete": "Delete",
+      "clear": "Clear selection",
+      "deleteTitle": "Confirm Batch Delete",
+      "deleteDescription": "Are you sure you want to delete {{count}} selected links? This action cannot be undone.",
+      "deletePartial": "Deleted {{success}} links, {{failed}} failed",
+      "deleteSuccess": "Successfully deleted {{count}} links"
+    },
+    "columns": {
+      "configure": "Columns",
+      "title": "Toggle columns"
+    },
+    "expand": {
+      "shortUrl": "Short URL",
+      "passwordProtection": "Password Protection"
+    },
+    "import": {
+      "button": "Import",
+      "title": "Import Links",
+      "file": "CSV File",
+      "dragOrClick": "Drag and drop CSV file here, or click to select",
+      "maxFileSize": "Maximum file size: {{size}}",
+      "fileTooLarge": "File too large, maximum size is {{maxSize}}",
+      "mode": "Import Mode",
+      "modeSkip": "Skip duplicates - Skip existing links",
+      "modeOverwrite": "Overwrite - Fully replace existing links",
+      "modeError": "Error - Return error on existing links",
+      "import": "Import",
+      "importing": "Importing...",
+      "uploading": "Uploading...",
+      "success": "Import completed",
+      "error": "Import failed",
+      "totalRows": "Total rows: {{count}}",
+      "successCount": "Success: {{count}}",
+      "skippedCount": "Skipped: {{count}}",
+      "failedCount": "Failed: {{count}}",
+      "failedDetails": "Failed details:",
+      "failedItem": "Row {{row}} ({{code}}): {{error}}",
+      "andMore": "...and {{count}} more"
+    },
+    "export": {
+      "button": "Export",
+      "exporting": "Exporting...",
+      "success": "Export successful",
+      "error": "Export failed"
+    },
+    "qr": {
+      "code": "QR Code",
+      "download": "Download QR Code",
+      "downloading": "Downloading...",
+      "preview": "QR Code Preview",
+      "size": "Size",
+      "margin": "Margin",
+      "foreground": "Foreground",
+      "background": "Background",
+      "errorLevel": "Error Correction",
+      "downloadPng": "Download PNG",
+      "generateFailed": "Failed to generate",
+      "logo": "Logo (optional)",
+      "logoSize": "Size",
+      "logoHint": "Recommended: Square PNG with transparent background",
+      "errorLevelWarning": "Recommended: Use \"H\" level when adding a logo"
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "description": "View insights and statistics about your short links.",
+    "totalLinks": "Total Links",
+    "totalClicks": "Total Clicks",
+    "thisWeek": "This Week",
+    "activeLinks": "Active links",
+    "featureComingSoon": "Feature coming soon",
+    "recentActivity": "Recent activity",
+    "recentActivityTitle": "Recent Activity",
+    "loadingActivity": "Loading activity...",
+    "noActivityYet": "No activity yet",
+    "noActivityDesc": "Create some links to see analytics here.",
+    "linkStatusDistribution": "Link Status Distribution",
+    "activeLinksCard": "Active Links",
+    "expiredLinksCard": "Expired Links",
+    "permanentLinksCard": "Permanent Links",
+    "ofTotal": "of total",
+    "analyticsFeatures": "Analytics Features",
+    "analyticsFeaturesDesc": "Click tracking and detailed analytics are coming soon! Currently showing basic link statistics.",
+    "clicks": "clicks",
+    "expires": "Expires",
+    "created": "Created",
+    "averageClicks": "Average Clicks",
+    "clicksPerLink": "clicks per link",
+    "na": "N/A",
+    "export": "Export",
+    "noData": "No data available",
+    "noGeoData": "No geographic data available",
+    "topLinksCount": "Top Links",
+    "referrersCount": "Referrers",
+    "countriesCount": "Countries",
+    "clickTrends": "Click Trends",
+    "clickTrendsDesc": "Click trends over the selected time range",
+    "topLinks": "Top Links",
+    "topLinksDesc": "Links with the highest click counts",
+    "referrers": "Referrers",
+    "referrersDesc": "Websites that refer visitors to your links",
+    "geoDistribution": "Geographic Distribution",
+    "geoDistributionDesc": "Geographic distribution of your visitors",
+    "dateRange": {
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      "1y": "Last year"
+    },
+    "groupBy": {
+      "hour": "Hourly",
+      "day": "Daily",
+      "week": "Weekly",
+      "month": "Monthly"
+    },
+    "error": {
+      "fetchFailed": "Failed to fetch analytics data"
+    },
+    "devices": "Devices & Browsers",
+    "devicesDesc": "Browser, OS, and device type distribution of visitors",
+    "browsers": "Browsers",
+    "operatingSystems": "Operating Systems",
+    "deviceCategories": "Device Types",
+    "botTraffic": "Bot Traffic",
+    "viewAnalytics": "View Analytics",
+    "comingSoon": {
+      "title": "Coming Soon",
+      "description": "Detailed analytics features are coming soon! Stay tuned."
+    },
+    "features": {
+      "clickTrends": "Click Trends",
+      "clickTrendsDesc": "View click trends and patterns for your links",
+      "visitors": "Visitor Analytics",
+      "visitorsDesc": "Understand who is visiting your links",
+      "geography": "Geographic Distribution",
+      "geographyDesc": "See where your visitors are located",
+      "topLinks": "Top Links",
+      "topLinksDesc": "Discover your most popular links"
+    }
+  },
+  "linkDetail": {
+    "title": "Link Details",
+    "description": "View complete analytics for this link",
+    "info": "Link Information",
+    "targetUrl": "Target URL",
+    "totalClicks": "Total Clicks",
+    "createdAt": "Created At",
+    "expiresAt": "Expires At",
+    "status": "Status",
+    "viewFull": "Full Analytics",
+    "notFound": "Link not found",
+    "fetchFailed": "Failed to fetch link data",
+    "noCode": "No link code specified"
+  },
+  "layout": {
+    "title": "ShortLinker Admin",
+    "subtitle": "Admin Panel",
+    "logout": "Logout",
+    "navigation": {
+      "title": "Navigation",
+      "dashboard": "Dashboard",
+      "links": "Links",
+      "analytics": "Analytics",
+      "config": "Configuration",
+      "settings": "Settings"
+    },
+    "system": {
+      "title": "System"
+    },
+    "health": {
+      "healthy": "Healthy",
+      "unhealthy": "Unhealthy",
+      "unknown": "Unknown"
+    },
+    "language": {
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語"
+    }
+  },
+  "health": {
+    "title": "System Health Status",
+    "description": "Real-time service monitoring",
+    "close": "Close",
+    "refresh": "Refresh",
+    "loadingData": "Loading health data...",
+    "overallStatus": "Overall Status",
+    "responseTime": "Response Time",
+    "uptime": "Uptime",
+    "sinceLast": "Since last restart",
+    "totalLinks": "Total Links",
+    "activeLinks": "Active short links",
+    "storageBackend": "Storage Backend",
+    "cacheSystem": "Cache System",
+    "cacheType": "Cache Type",
+    "bloomFilter": "Bloom Filter",
+    "negativeCache": "Negative Cache",
+    "type": "Type",
+    "status": "Status",
+    "clickTracking": "Click Tracking",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "lastUpdated": "Last Updated",
+    "healthy": "Healthy",
+    "unhealthy": "Unhealthy",
+    "degraded": "Degraded",
+    "unknown": "Unknown"
+  },
+  "langswitcher": {
+    "title": "Select Language",
+    "language": {
+      "switch": "Switch Language",
+      "english": "English",
+      "chinese": "中文",
+      "japanese": "日本語",
+      "french": "Français",
+      "russian": "Русский"
+    }
+  },
+  "theme": {
+    "switchTheme": "Switch Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System Default"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Customize your preferences",
+    "tabs": {
+      "appearance": "Appearance",
+      "language": "Language",
+      "preferences": "Preferences",
+      "system": "System",
+      "about": "About"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose your interface theme"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Choose your interface language"
+    },
+    "about": {
+      "title": "About",
+      "description": "Project information and links",
+      "tagline": "Manage links with speed and style",
+      "openSource": "Open Source",
+      "docs": "Documentation",
+      "builtWith": "Built with",
+      "forCommunity": "for the open source community"
+    }
+  },
+  "errors": {
+    "boundary": {
+      "title": "Oops! Something went wrong",
+      "description": "We encountered an unexpected error. Please try reloading the page or go back to the home page.",
+      "technicalDetails": "Technical Details",
+      "reload": "Reload Page",
+      "goHome": "Go to Home",
+      "persistentIssue": "If the problem persists, please contact support."
+    },
+    "network": "Network error - please check your connection",
+    "badRequest": "Bad request - please check your input",
+    "unauthorized": "Unauthorized - please log in again",
+    "forbidden": "Forbidden - you don't have permission to access this resource",
+    "notFound": "Resource not found",
+    "tooManyRequests": "Too many requests - please try again later",
+    "serverError": "Server error - please try again later",
+    "serviceUnavailable": "Service temporarily unavailable - please try again later",
+    "unknown": "An unknown error occurred",
+    "conflict": "Resource conflict",
+    "authFailed": "Authentication failed - wrong password",
+    "tokenExpired": "Session expired - please log in again",
+    "tokenInvalid": "Invalid session token",
+    "csrfInvalid": "Security verification failed - please refresh the page",
+    "linkNotFound": "Link not found",
+    "linkAlreadyExists": "Short code already exists",
+    "linkInvalidUrl": "Invalid target URL format",
+    "linkInvalidExpireTime": "Invalid expiration time",
+    "linkPasswordHashError": "Password processing failed",
+    "linkDatabaseError": "Database operation failed",
+    "batchSizeTooLarge": "Batch size too large (max 5000 items)",
+    "fileTooLarge": "File too large (max 10MB)",
+    "invalidDateFormat": "Invalid date format (use RFC3339, e.g., 2024-01-01T00:00:00Z)",
+    "importFailed": "Import failed",
+    "exportFailed": "Export failed",
+    "invalidMultipartData": "Invalid upload data format",
+    "fileReadError": "Failed to read file",
+    "csvFileMissing": "No CSV file provided",
+    "csvParseError": "CSV parse error",
+    "csvGenerationError": "CSV generation error",
+    "linkEmptyCode": "Short code cannot be empty",
+    "linkInvalidCode": "Invalid short code format (only alphanumeric, underscore, hyphen, dot, and slash allowed)",
+    "linkReservedCode": "Short code conflicts with reserved system routes",
+    "configNotFound": "Configuration not found",
+    "configUpdateFailed": "Configuration update failed",
+    "configReloadFailed": "Configuration reload failed",
+    "analyticsQueryFailed": "Analytics query failed",
+    "analyticsLinkNotFound": "Link not found, cannot query analytics",
+    "analyticsInvalidDateRange": "Invalid date range"
+  },
+  "config": {
+    "title": "System Configuration",
+    "description": "Manage runtime configuration settings",
+    "groups": {
+      "all": "All",
+      "routes": "Routes",
+      "api": "API",
+      "features": "Features",
+      "click": "Click Tracking",
+      "cors": "CORS",
+      "analytics": "Analytics",
+      "cache": "Cache",
+      "other": "Other"
+    },
+    "keys": {
+      "routes.admin_prefix": "Admin API Prefix",
+      "routes.health_prefix": "Health Check Prefix",
+      "routes.frontend_prefix": "Frontend Panel Prefix",
+      "api.admin_token": "Admin Token",
+      "api.health_token": "Health Check Token",
+      "api.jwt_secret": "JWT Secret",
+      "api.access_token_minutes": "Access Token Lifetime (minutes)",
+      "api.refresh_token_days": "Refresh Token Lifetime (days)",
+      "api.cookie_secure": "Cookie Secure (HTTPS only)",
+      "api.cookie_same_site": "Cookie SameSite Policy",
+      "api.cookie_domain": "Cookie Domain",
+      "api.trusted_proxies": "Trusted Proxies",
+      "features.enable_admin_panel": "Enable Admin Panel",
+      "features.random_code_length": "Random Code Length",
+      "features.default_url": "Default Redirect URL",
+      "click.enable_tracking": "Enable Click Tracking",
+      "click.flush_interval": "Flush Interval (seconds)",
+      "click.max_clicks_before_flush": "Max Clicks Before Flush",
+      "cors.enabled": "Enable CORS Configuration",
+      "cors.allow_credentials": "Allow Credentials (incompatible with wildcard origins)",
+      "cors.allowed_origins": "Allowed Origins (use [\"*\"] for any, empty = same-origin only)",
+      "cors.allowed_methods": "Allowed Methods",
+      "cors.allowed_headers": "Allowed Headers",
+      "cors.max_age": "Max Age (seconds)",
+      "analytics.enable_detailed_logging": "Enable Detailed Click Logging",
+      "analytics.log_retention_days": "Raw Log Retention (Days)",
+      "analytics.enable_ip_logging": "Log Visitor IP Addresses",
+      "analytics.enable_geo_lookup": "Enable IP Geo Lookup",
+      "analytics.hourly_retention_days": "Hourly Rollup Retention (Days)",
+      "analytics.daily_retention_days": "Daily Rollup Retention (Days)",
+      "analytics.enable_auto_rollup": "Enable Auto Rollup & Cleanup",
+      "analytics.sample_rate": "Click Log Sampling Rate (0.0-1.0)",
+      "analytics.max_log_rows": "Max Click Log Rows (0 = unlimited)",
+      "analytics.max_rows_action": "Max Rows Exceeded Action",
+      "utm.enable_passthrough": "Enable UTM Parameter Passthrough",
+      "cache.bloom_rebuild_interval": "Bloom Filter Rebuild Interval (seconds)"
+    },
+    "key": "Key",
+    "value": "Value",
+    "type": "Type",
+    "requiresRestart": "Restart",
+    "requiresRestartHint": "Changes require server restart to take effect",
+    "edit": "Edit",
+    "history": "History",
+    "reload": "Reload",
+    "reloadSuccess": "Configuration reloaded successfully",
+    "reloadError": "Failed to reload configuration",
+    "updateSuccess": "Configuration updated successfully",
+    "editConfig": "Edit Configuration",
+    "formatJSON": "Format JSON",
+    "noConfigs": "No configurations found",
+    "emptyValue": "(not set)",
+    "noHistory": "No history records",
+    "historyTitle": "Configuration History",
+    "savedNeedRestart": "Configuration saved. Please restart the server for changes to take effect.",
+    "searchPlaceholder": "Search by key...",
+    "allTypes": "All types",
+    "category": {
+      "auth": "Authentication",
+      "cookie": "Cookie Settings",
+      "features": "Feature Flags",
+      "routes": "Route Configuration",
+      "cors": "CORS Settings",
+      "tracking": "Click Tracking",
+      "analytics": "Analytics",
+      "cache": "Cache Settings",
+      "other": "Other"
+    },
+    "placeholder": {
+      "trustedProxies": "IP or CIDR (e.g., 192.168.1.0/24)",
+      "allowedOrigins": "Origin URL (e.g., https://example.com or *)",
+      "allowedHeaders": "Header name (e.g., Content-Type)"
+    },
+    "error": {
+      "invalidIpCidr": "Invalid IP/CIDR format",
+      "invalidUrl": "Invalid URL format",
+      "invalidHeader": "Invalid header name"
+    },
+    "generateAndSaveHint": "Click the button to automatically generate and save a new security key",
+    "generating": "Generating...",
+    "generateAndSave": "Generate and Save"
+  },
+  "enums": {
+    "sameSite": {
+      "strict": {
+        "label": "Strict",
+        "description": "Most secure, only same-site requests carry cookies"
+      },
+      "lax": {
+        "label": "Lax",
+        "description": "Default, allows top-level navigation to carry cookies"
+      },
+      "none": {
+        "label": "None",
+        "description": "No restrictions, requires Secure attribute"
+      }
+    },
+    "httpMethod": {
+      "get": {
+        "label": "GET",
+        "description": "Retrieve data from server"
+      },
+      "post": {
+        "label": "POST",
+        "description": "Submit data to server"
+      },
+      "put": {
+        "label": "PUT",
+        "description": "Update existing resource"
+      },
+      "delete": {
+        "label": "DELETE",
+        "description": "Remove resource from server"
+      },
+      "patch": {
+        "label": "PATCH",
+        "description": "Partially update resource"
+      },
+      "head": {
+        "label": "HEAD",
+        "description": "Retrieve headers only"
+      },
+      "options": {
+        "label": "OPTIONS",
+        "description": "Get supported methods"
+      }
+    },
+    "maxRowsAction": {
+      "cleanup": {
+        "label": "Cleanup",
+        "description": "Delete oldest records when limit exceeded"
+      },
+      "stop": {
+        "label": "Stop",
+        "description": "Stop logging new clicks when limit exceeded"
+      }
+    }
+  },
+  "pwa": {
+    "updateAvailable": "New version available",
+    "refresh": "Refresh"
+  }
+}
