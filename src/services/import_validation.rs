@@ -10,7 +10,6 @@ use crate::errors::ShortlinkerError;
 use crate::services::ImportLinkItemRich;
 use crate::system::ipc::types::ImportLinkData;
 use crate::utils::password::process_imported_password;
-use crate::utils::url_validator::validate_url;
 
 /// 原始导入项（string 日期，未处理的密码）
 ///
@@ -71,7 +70,7 @@ pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich,
     }
 
     // 2. URL 验证
-    if let Err(e) = validate_url(&raw.target) {
+    if let Err(e) = aster_forge_utils::url::parse_http_url(&raw.target, "target URL") {
         return Err(ImportRowError {
             code: raw.code,
             error: ShortlinkerError::link_invalid_url(format!("Invalid URL: {}", e)),

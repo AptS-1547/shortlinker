@@ -11,7 +11,7 @@ use tempfile::TempDir;
 
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
-use shortlinker::storage::backend::{connect_sqlite, run_migrations};
+use shortlinker::storage::backend::run_migrations;
 
 // =============================================================================
 // Test Setup
@@ -37,7 +37,7 @@ async fn init_test_runtime_config() {
             let db_path = temp_dir.path().join("cors_test.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-            let db = connect_sqlite(&db_url)
+            let db = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&db_url))
                 .await
                 .expect("Failed to connect to SQLite");
             run_migrations(&db).await.expect("Failed to run migrations");

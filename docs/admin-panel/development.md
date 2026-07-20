@@ -64,7 +64,7 @@ COPY admin-panel/ ./
 RUN bun install --frozen-lockfile
 RUN bun run build
 
-FROM rust:1.92-slim AS backend-builder
+FROM rust:1.94-slim AS backend-builder
 # ... Rust 构建步骤（使用 musl 静态链接）...
 
 FROM scratch

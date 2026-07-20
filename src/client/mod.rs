@@ -82,9 +82,9 @@ impl From<ClientError> for ShortlinkerError {
 }
 
 #[cfg(feature = "cli")]
-impl From<ClientError> for crate::interfaces::cli::CliError {
+impl From<ClientError> for crate::cli::CliError {
     fn from(err: ClientError) -> Self {
-        use crate::interfaces::cli::CliError;
+        use crate::cli::CliError;
         match err {
             ClientError::Ipc(e) => CliError::CommandError(format!("IPC error: {}", e)),
             ClientError::Service(e) => CliError::CommandError(e.format_simple()),
@@ -134,7 +134,7 @@ mod tests {
     use crate::system::ipc::IpcError;
 
     #[cfg(feature = "cli")]
-    use crate::interfaces::cli::CliError;
+    use crate::cli::CliError;
 
     // ---- ClientError Display tests ----
 

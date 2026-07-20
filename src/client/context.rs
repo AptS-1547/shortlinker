@@ -5,10 +5,9 @@
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 
-use crate::cache::NullCompositeCache;
 use crate::errors::ShortlinkerError;
-use crate::metrics_core::NoopMetrics;
-use crate::services::{ConfigService, LinkService};
+use crate::metrics::NoopMetrics;
+use crate::services::{ConfigService, ForgeLinkCache, LinkService};
 use crate::storage::{SeaOrmStorage, StorageFactory};
 
 use super::ClientError;
@@ -64,7 +63,11 @@ impl ServiceContext {
         let storage = self.get_storage().await?.clone();
         self.link_service
             .get_or_try_init(|| async {
-                let cache = NullCompositeCache::arc();
+                let cache = ForgeLinkCache::create(NoopMetrics::arc(), storage.clone())
+                    .await
+                    .map_err(|error| {
+                        ClientError::InitFailed(format!("Cache init failed: {error}"))
+                    })?;
                 Ok(Arc::new(LinkService::new(storage, cache)))
             })
             .await

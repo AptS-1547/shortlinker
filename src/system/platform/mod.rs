@@ -42,6 +42,27 @@ pub trait PlatformOps {
     fn cleanup_lockfile();
 }
 
+pub struct ProcessGuard;
+
+impl ProcessGuard {
+    pub fn acquire() -> std::io::Result<Self> {
+        #[cfg(unix)]
+        unix::UnixPlatform::init_lockfile()?;
+        #[cfg(windows)]
+        windows::WindowsPlatform::init_lockfile()?;
+        Ok(Self)
+    }
+}
+
+impl Drop for ProcessGuard {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        unix::UnixPlatform::cleanup_lockfile();
+        #[cfg(windows)]
+        windows::WindowsPlatform::cleanup_lockfile();
+    }
+}
+
 /// Get the platform name for logging/debugging
 pub fn platform_name() -> &'static str {
     #[cfg(unix)]

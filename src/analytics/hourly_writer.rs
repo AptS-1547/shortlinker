@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveValue::Set,
-    ConnectionTrait, DatabaseBackend, EntityTrait, ExprTrait,
+    ConnectionTrait, DatabaseBackend, EntityTrait, ExprTrait, TransactionTrait,
     sea_query::{Expr, OnConflict, Query},
 };
 use tracing::debug;
 
-use crate::storage::backend::retry::{self, RetryConfig};
+use aster_forge_db::retry::RetryConfig;
 use migration::entities::{click_stats_global_hourly, click_stats_hourly};
 
 use super::{ClickAggregation, to_json_string, truncate_to_hour};
@@ -43,12 +43,12 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
     /// - `updates`: (short_code, click_count) 列表
     /// - `timestamp`: 时间戳，用于确定 hour_bucket
     /// - `op_prefix`: 操作名前缀，用于重试日志（如 "sink" 或 "rollup"）
-    pub async fn upsert_hourly_counts(
+    async fn upsert_hourly_counts(
         &self,
         updates: &[(String, usize)],
         timestamp: DateTime<Utc>,
         op_prefix: &str,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), sea_orm::DbErr> {
         if updates.is_empty() {
             return Ok(());
         }
@@ -56,13 +56,8 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         let hour_bucket = truncate_to_hour(timestamp);
         let backend = self.db.get_database_backend();
 
-        // 批量 upsert：单条 SQL 处理所有记录
-        let op_name = format!("{}_upsert_hourly_counts", op_prefix);
-        retry::with_retry(&op_name, self.retry_config, || async {
-            self.batch_upsert_counts(updates, hour_bucket, backend)
-                .await
-        })
-        .await?;
+        self.batch_upsert_counts(updates, hour_bucket, backend)
+            .await?;
 
         debug!(
             "[{}] Hourly counts updated: {} links (bucket: {})",
@@ -146,11 +141,11 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
     /// # Arguments
     /// - `aggregated`: 已聚合的点击数据，key 为 (short_code, hour_bucket)
     /// - `op_prefix`: 操作名前缀
-    pub async fn upsert_hourly_with_details(
+    async fn write_hourly_with_details(
         &self,
         aggregated: &HashMap<(String, DateTime<Utc>), ClickAggregation>,
         op_prefix: &str,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), sea_orm::DbErr> {
         if aggregated.is_empty() {
             return Ok(());
         }
@@ -178,25 +173,15 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             }
         }
 
-        // 批量插入新记录
         if !to_insert.is_empty() {
-            let op_name = format!("{}_insert_hourly_detailed", op_prefix);
-            retry::with_retry(&op_name, self.retry_config, || async {
-                self.batch_insert_detailed(&to_insert).await
-            })
-            .await?;
+            self.batch_insert_detailed(&to_insert).await?;
         }
 
         // 批量更新现有记录（分批处理，避免超出 SQL 变量限制）
         if !to_update.is_empty() {
             const UPDATE_BATCH_SIZE: usize = 100;
             for chunk in to_update.chunks(UPDATE_BATCH_SIZE) {
-                let op_name = format!("{}_update_hourly_detailed", op_prefix);
-                let chunk_vec = chunk.to_vec();
-                retry::with_retry(&op_name, self.retry_config, || async {
-                    self.batch_update_detailed(&chunk_vec, backend).await
-                })
-                .await?;
+                self.batch_update_detailed(chunk, backend).await?;
             }
         }
 
@@ -215,7 +200,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
     async fn batch_fetch_hourly_records(
         &self,
         keys: &[&(String, DateTime<Utc>)],
-    ) -> anyhow::Result<HashMap<(String, DateTime<Utc>), click_stats_hourly::Model>> {
+    ) -> Result<HashMap<(String, DateTime<Utc>), click_stats_hourly::Model>, sea_orm::DbErr> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
         if keys.is_empty() {
@@ -385,13 +370,13 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
     /// - `clicks`: 点击数
     /// - `unique_links`: 唯一链接数
     /// - `op_prefix`: 操作名前缀
-    pub async fn upsert_global_hourly(
+    async fn upsert_global_hourly(
         &self,
         hour_bucket: DateTime<Utc>,
         clicks: usize,
         unique_links: i32,
-        op_prefix: &str,
-    ) -> anyhow::Result<()> {
+        _op_prefix: &str,
+    ) -> Result<(), sea_orm::DbErr> {
         let backend = self.db.get_database_backend();
 
         let model = click_stats_global_hourly::ActiveModel {
@@ -427,13 +412,92 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
                 .to_owned(),
         };
 
-        let op_name = format!("{}_upsert_global_hourly", op_prefix);
-        retry::with_retry(&op_name, self.retry_config, || async {
-            click_stats_global_hourly::Entity::insert(model.clone())
-                .on_conflict(on_conflict.clone())
-                .exec(self.db)
-                .await
-        })
+        click_stats_global_hourly::Entity::insert(model)
+            .on_conflict(on_conflict)
+            .exec(self.db)
+            .await?;
+
+        Ok(())
+    }
+}
+
+impl<'a, C> HourlyRollupWriter<'a, C>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    pub async fn increment_hourly_counts(
+        &self,
+        updates: &[(String, usize)],
+        timestamp: DateTime<Utc>,
+        op_prefix: &str,
+    ) -> anyhow::Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let updates = updates.to_vec();
+        let operation_name = op_prefix.to_string();
+        aster_forge_db::transaction::with_transaction_retry(
+            self.db,
+            &self.retry_config,
+            |txn| {
+                let updates = updates.clone();
+                let operation_name = operation_name.clone();
+                Box::pin(async move {
+                    let writer = HourlyRollupWriter::new(txn, RetryConfig::deadlock());
+                    writer
+                        .upsert_hourly_counts(&updates, timestamp, &operation_name)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)?;
+
+                    let total_clicks = updates.iter().fold(0usize, |total, (_, count)| {
+                        total.saturating_add((*count).min(i64::MAX as usize))
+                    });
+                    writer
+                        .upsert_global_hourly(
+                            truncate_to_hour(timestamp),
+                            total_clicks,
+                            i32::try_from(updates.len()).unwrap_or(i32::MAX),
+                            &operation_name,
+                        )
+                        .await
+                        .map_err(aster_forge_db::DbError::from)?;
+                    Ok(())
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn upsert_hourly_with_details(
+        &self,
+        aggregated: &HashMap<(String, DateTime<Utc>), ClickAggregation>,
+        op_prefix: &str,
+    ) -> anyhow::Result<()> {
+        if aggregated.is_empty() {
+            return Ok(());
+        }
+
+        let aggregated = aggregated.clone();
+        let operation_name = op_prefix.to_string();
+        aster_forge_db::transaction::with_transaction_retry(
+            self.db,
+            &self.retry_config,
+            |txn| {
+                let aggregated = aggregated.clone();
+                let operation_name = operation_name.clone();
+                Box::pin(async move {
+                    HourlyRollupWriter::new(txn, RetryConfig::deadlock())
+                        .write_hourly_with_details(&aggregated, &operation_name)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
         .await?;
 
         Ok(())

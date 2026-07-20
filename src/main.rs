@@ -6,10 +6,11 @@
 //!
 //! Mode selection is based on command-line arguments and compile-time features.
 
+use aster_forge_logging::{LoggingConfig as ForgeLoggingConfig, init_logging};
+use aster_forge_panic::PanicHookConfig;
 use clap::Parser;
 
 use shortlinker::cli::Cli;
-use shortlinker::system::panic_handler::RunMode;
 
 /// Application entry point
 ///
@@ -30,12 +31,14 @@ async fn main() -> anyhow::Result<()> {
     // Parse command-line arguments using clap
     let cli = Cli::parse();
 
-    // Determine run mode for panic handler
-    let panic_mode = match &cli.command {
-        Some(_) => RunMode::Cli,
-        None => RunMode::Server,
-    };
-    shortlinker::system::panic_handler::install_panic_hook(panic_mode);
+    aster_forge_panic::install_panic_hook(
+        PanicHookConfig::new(
+            "shortlinker",
+            env!("CARGO_PKG_VERSION"),
+            "https://github.com/AptS-1547/shortlinker",
+        )
+        .with_crash_log_path("crash.log"),
+    );
 
     // Initialize configuration system
     shortlinker::config::init_config();
@@ -51,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
         Some(cmd) => {
             #[cfg(feature = "cli")]
             {
-                if let Err(e) = shortlinker::interfaces::cli::run_cli_command(cmd).await {
+                if let Err(e) = shortlinker::cli::run_cli_command(cmd).await {
                     eprintln!("{}", e.format_colored());
                     std::process::exit(1);
                 }
@@ -70,13 +73,19 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "server")]
             {
                 // Initialize logging system based on config
-                let log_result = shortlinker::system::logging::init_logging(&config);
+                let log_result = init_logging(&ForgeLoggingConfig {
+                    level: config.logging.level.clone(),
+                    format: config.logging.format.clone(),
+                    file: config.logging.file.clone().unwrap_or_default(),
+                    enable_rotation: config.logging.enable_rotation,
+                    max_backups: config.logging.max_backups,
+                });
                 let _log_guard = log_result.guard;
                 if let Some(warning) = log_result.warning {
                     eprintln!("Warning: {}", warning);
                 }
 
-                if let Err(e) = shortlinker::runtime::modes::run_server().await {
+                if let Err(e) = shortlinker::runtime::run_server().await {
                     eprintln!("Server error: {:#}", e);
                     std::process::exit(1);
                 }

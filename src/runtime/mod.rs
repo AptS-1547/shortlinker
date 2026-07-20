@@ -1,5 +1,6 @@
-pub mod lifetime;
-pub mod modes;
+mod assembly;
+pub mod components;
+pub mod startup;
+mod tasks;
 
-pub use lifetime::{shutdown, startup};
-pub use modes::*;
+pub use assembly::run_server;

@@ -16,14 +16,14 @@ use shortlinker::api::services::admin::auth::{
 };
 use shortlinker::api::services::admin::routes::links_routes;
 use shortlinker::api::services::admin::{ApiResponse, MessageResponse};
-use shortlinker::cache::CacheHealthStatus;
-use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
+use shortlinker::services::LinkCacheHealth;
 use shortlinker::services::LinkService;
+use shortlinker::services::{LinkCache, LinkCacheLookup};
 use shortlinker::storage::ShortLink;
-use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
+use shortlinker::storage::backend::{SeaOrmStorage, run_migrations};
 
 use std::sync::Once;
 use tempfile::TempDir;
@@ -52,7 +52,9 @@ async fn init_test_env() {
             let db_path = temp_dir.path().join("auth_test.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-            let db = connect_sqlite(&db_url).await.expect("连接 SQLite 失败");
+            let db = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&db_url))
+                .await
+                .expect("连接 SQLite 失败");
             run_migrations(&db).await.expect("运行迁移失败");
             init_runtime_config(db)
                 .await
@@ -87,14 +89,14 @@ impl MockCache {
     }
 }
 #[async_trait]
-impl CompositeCacheTrait for MockCache {
-    async fn get(&self, key: &str) -> CacheResult {
+impl LinkCache for MockCache {
+    async fn get(&self, key: &str) -> LinkCacheLookup {
         if self.not_found.read().await.contains(key) {
-            return CacheResult::NotFound;
+            return LinkCacheLookup::NotFound;
         }
         match self.data.read().await.get(key) {
-            Some(link) => CacheResult::Found(link.clone()),
-            None => CacheResult::Miss,
+            Some(link) => LinkCacheLookup::Found(link.clone()),
+            None => LinkCacheLookup::Miss,
         }
     }
     async fn insert(&self, key: &str, value: ShortLink, _ttl: Option<u64>) {
@@ -115,21 +117,11 @@ impl CompositeCacheTrait for MockCache {
     async fn mark_not_found(&self, key: &str) {
         self.not_found.write().await.insert(key.to_string());
     }
-    async fn load_cache(&self, links: HashMap<String, ShortLink>) {
-        let mut data = self.data.write().await;
-        for (k, v) in links {
-            data.insert(k, v);
-        }
-    }
-    async fn load_bloom(&self, _codes: &[String]) {}
-    async fn reconfigure(&self, _config: BloomConfig) -> shortlinker::errors::Result<()> {
-        Ok(())
-    }
     async fn bloom_check(&self, key: &str) -> bool {
         self.data.read().await.contains_key(key)
     }
-    async fn health_check(&self) -> CacheHealthStatus {
-        CacheHealthStatus {
+    async fn health_check(&self) -> LinkCacheHealth {
+        LinkCacheHealth {
             status: "healthy".to_string(),
             cache_type: "mock".to_string(),
             bloom_filter_enabled: false,
@@ -259,7 +251,7 @@ mod export_tests {
     async fn test_export_empty_db() {
         init_test_env().await;
         let storage = get_storage();
-        let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
         let service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
         let app = test::init_service(
@@ -287,7 +279,7 @@ mod export_tests {
     async fn test_export_with_invalid_date() {
         init_test_env().await;
         let storage = get_storage();
-        let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
         let service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
         let app = test::init_service(
@@ -308,7 +300,7 @@ mod export_tests {
     async fn test_export_with_filters() {
         init_test_env().await;
         let storage = get_storage();
-        let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
         let service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
         let app = test::init_service(
@@ -361,7 +353,7 @@ mod import_tests {
     async fn test_import_valid_csv_skip_mode() {
         init_test_env().await;
         let storage = get_storage();
-        let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
         let service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
         let app = test::init_service(
@@ -397,7 +389,7 @@ mod import_tests {
     async fn test_import_no_file() {
         init_test_env().await;
         let storage = get_storage();
-        let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
         let service = Arc::new(LinkService::new(storage.clone(), cache.clone()));
 
         let app = test::init_service(

@@ -9,9 +9,11 @@ pub fn model_to_shortlink(model: short_link::Model) -> ShortLink {
         created_at: model.created_at,
         expires_at: model.expires_at,
         password: model.password,
-        click: std::cmp::max(model.click_count, 0)
-            .try_into()
-            .unwrap_or(usize::MAX),
+        click: aster_forge_utils::numbers::i64_to_usize(
+            std::cmp::max(model.click_count, 0),
+            "click_count",
+        )
+        .unwrap_or(usize::MAX),
     }
 }
 
@@ -26,7 +28,10 @@ pub fn shortlink_to_active_model(link: &ShortLink, is_new: bool) -> short_link::
         expires_at: Set(link.expires_at),
         password: Set(link.password.clone()),
         click_count: if is_new {
-            Set(i64::try_from(link.click).unwrap_or(i64::MAX))
+            Set(
+                aster_forge_utils::numbers::usize_to_i64(link.click, "click_count")
+                    .unwrap_or(i64::MAX),
+            )
         } else {
             NotSet
         },

@@ -17,10 +17,10 @@ use shortlinker::api::services::admin::routes::stats_routes;
 use shortlinker::api::services::admin::{
     ApiResponse, LinkResponse, PaginatedResponse, PostNewLink,
 };
-use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::init_config;
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
 use shortlinker::services::LinkService;
+use shortlinker::services::{LinkCache, LinkCacheLookup};
 use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::SeaOrmStorage;
 
@@ -58,7 +58,7 @@ async fn init_admin_test_env() {
                     .expect("Failed to create storage"),
             );
 
-            let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+            let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
             let service = Arc::new(LinkService::new(storage, cache));
 
             let _ = SERVICE.set(service);
@@ -87,14 +87,14 @@ impl MockCache {
 }
 
 #[async_trait]
-impl CompositeCacheTrait for MockCache {
-    async fn get(&self, key: &str) -> CacheResult {
+impl LinkCache for MockCache {
+    async fn get(&self, key: &str) -> LinkCacheLookup {
         if self.not_found.read().await.contains(key) {
-            return CacheResult::NotFound;
+            return LinkCacheLookup::NotFound;
         }
         match self.data.read().await.get(key) {
-            Some(link) => CacheResult::Found(link.clone()),
-            None => CacheResult::Miss,
+            Some(link) => LinkCacheLookup::Found(link.clone()),
+            None => LinkCacheLookup::Miss,
         }
     }
     async fn insert(&self, key: &str, value: ShortLink, _ttl_secs: Option<u64>) {
@@ -116,21 +116,11 @@ impl CompositeCacheTrait for MockCache {
     async fn mark_not_found(&self, key: &str) {
         self.not_found.write().await.insert(key.to_string());
     }
-    async fn load_cache(&self, links: HashMap<String, ShortLink>) {
-        let mut data = self.data.write().await;
-        for (k, v) in links {
-            data.insert(k, v);
-        }
-    }
-    async fn load_bloom(&self, _codes: &[String]) {}
-    async fn reconfigure(&self, _config: BloomConfig) -> shortlinker::errors::Result<()> {
-        Ok(())
-    }
     async fn bloom_check(&self, key: &str) -> bool {
         self.data.read().await.contains_key(key)
     }
-    async fn health_check(&self) -> shortlinker::cache::CacheHealthStatus {
-        shortlinker::cache::CacheHealthStatus {
+    async fn health_check(&self) -> shortlinker::services::LinkCacheHealth {
+        shortlinker::services::LinkCacheHealth {
             status: "healthy".to_string(),
             cache_type: "mock".to_string(),
             bloom_filter_enabled: false,

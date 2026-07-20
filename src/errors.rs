@@ -370,6 +370,12 @@ impl From<sea_orm::DbErr> for ShortlinkerError {
     }
 }
 
+impl From<aster_forge_db::DbError> for ShortlinkerError {
+    fn from(err: aster_forge_db::DbError) -> Self {
+        ShortlinkerError::DatabaseOperation(err.to_string())
+    }
+}
+
 impl From<std::io::Error> for ShortlinkerError {
     fn from(err: std::io::Error) -> Self {
         ShortlinkerError::FileOperation(err.to_string())

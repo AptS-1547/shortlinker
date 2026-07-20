@@ -1,7 +1,6 @@
 pub mod admin;
 pub mod frontend;
 pub mod health;
-pub mod metrics;
 pub mod redirect;
 
 pub use frontend::{FrontendService, frontend_routes};

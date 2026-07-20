@@ -8,15 +8,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shortlinker::cache::CacheHealthStatus;
-use shortlinker::cache::traits::{BloomConfig, CacheResult, CompositeCacheTrait};
 use shortlinker::config::{init_config, set_ipc_socket_override};
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
+use shortlinker::services::LinkCacheHealth;
 use shortlinker::services::LinkService;
+use shortlinker::services::{LinkCache, LinkCacheLookup};
 use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::SeaOrmStorage;
 use shortlinker::system::ipc::handler::{init_link_service, init_start_time};
-use shortlinker::system::ipc::server::start_ipc_server;
+use shortlinker::system::ipc::server::run_ipc_server;
 use shortlinker::system::ipc::types::{ImportLinkData, IpcCommand, IpcResponse};
 use shortlinker::system::ipc::{export_links, is_server_running, send_command};
 
@@ -73,13 +73,11 @@ fn init_all() {
                         .await
                         .expect("Failed to create storage"),
                 );
-                let cache: Arc<dyn CompositeCacheTrait> = Arc::new(MockCache::new());
+                let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
                 let service = Arc::new(LinkService::new(storage, cache));
                 init_link_service(service);
 
-                start_ipc_server()
-                    .await
-                    .expect("Failed to start IPC server");
+                tokio::spawn(run_ipc_server(tokio_util::sync::CancellationToken::new()));
             });
         });
         handle.join().expect("Init thread panicked");
@@ -113,14 +111,14 @@ impl MockCache {
 }
 
 #[async_trait]
-impl CompositeCacheTrait for MockCache {
-    async fn get(&self, key: &str) -> CacheResult {
+impl LinkCache for MockCache {
+    async fn get(&self, key: &str) -> LinkCacheLookup {
         if self.not_found.read().await.contains(key) {
-            return CacheResult::NotFound;
+            return LinkCacheLookup::NotFound;
         }
         match self.data.read().await.get(key) {
-            Some(link) => CacheResult::Found(link.clone()),
-            None => CacheResult::Miss,
+            Some(link) => LinkCacheLookup::Found(link.clone()),
+            None => LinkCacheLookup::Miss,
         }
     }
     async fn insert(&self, key: &str, value: ShortLink, _ttl_secs: Option<u64>) {
@@ -142,21 +140,11 @@ impl CompositeCacheTrait for MockCache {
     async fn mark_not_found(&self, key: &str) {
         self.not_found.write().await.insert(key.to_string());
     }
-    async fn load_cache(&self, links: HashMap<String, ShortLink>) {
-        let mut data = self.data.write().await;
-        for (k, v) in links {
-            data.insert(k, v);
-        }
-    }
-    async fn load_bloom(&self, _codes: &[String]) {}
-    async fn reconfigure(&self, _config: BloomConfig) -> shortlinker::errors::Result<()> {
-        Ok(())
-    }
     async fn bloom_check(&self, key: &str) -> bool {
         self.data.read().await.contains_key(key)
     }
-    async fn health_check(&self) -> CacheHealthStatus {
-        CacheHealthStatus {
+    async fn health_check(&self) -> LinkCacheHealth {
+        LinkCacheHealth {
             status: "healthy".to_string(),
             cache_type: "mock".to_string(),
             bloom_filter_enabled: false,

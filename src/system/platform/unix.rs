@@ -26,7 +26,10 @@ impl PlatformOps for UnixPlatform {
         if PlatformIpc::is_server_running() {
             error!("Server already running (IPC socket active)");
             error!("You can check with: ./shortlinker status");
-            std::process::exit(1);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "server is already running (IPC active)",
+            ));
         }
 
         // Clean up any stale IPC socket file
@@ -56,7 +59,10 @@ impl PlatformOps for UnixPlatform {
                                 "Please stop it manually before restarting: kill {}",
                                 old_pid
                             );
-                            std::process::exit(1);
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::AlreadyExists,
+                                format!("server process {old_pid} is already running"),
+                            ));
                         } else {
                             // Process is dead, clean up stale PID file
                             info!("Stale PID file detected, cleaning up...");
@@ -85,9 +91,11 @@ impl PlatformOps for UnixPlatform {
 
     fn cleanup_lockfile() {
         let pid_file = "shortlinker.pid";
-        if let Err(e) = fs::remove_file(pid_file) {
+        if let Err(e) = fs::remove_file(pid_file)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
             error!("Failed to delete PID file: {}", e);
-        } else {
+        } else if std::path::Path::new(pid_file).exists() {
             info!("PID file cleaned: {}", pid_file);
         }
 
@@ -95,16 +103,4 @@ impl PlatformOps for UnixPlatform {
         PlatformIpc::cleanup();
         info!("IPC socket cleaned");
     }
-}
-
-// Export convenience functions for backwards compatibility
-
-/// Initialize the PID file
-pub fn init_lockfile() -> std::io::Result<()> {
-    UnixPlatform::init_lockfile()
-}
-
-/// Clean up the PID file
-pub fn cleanup_lockfile() {
-    UnixPlatform::cleanup_lockfile()
 }

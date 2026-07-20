@@ -4,13 +4,12 @@
 
 use std::collections::HashSet;
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait, sea_query::OnConflict};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::OnConflict};
 use tracing::info;
 
 use super::SeaOrmStorage;
 use super::converters::shortlink_to_active_model;
 use super::operations::upsert;
-use super::retry;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
 
@@ -20,7 +19,7 @@ impl SeaOrmStorage {
     pub async fn set(&self, link: ShortLink) -> Result<()> {
         let db = &self.db;
 
-        retry::with_retry(
+        aster_forge_db::retry::with_sea_orm_retry(
             &format!("set({})", link.code),
             self.retry_config,
             || async {
@@ -38,16 +37,24 @@ impl SeaOrmStorage {
     }
 
     pub async fn remove(&self, code: &str) -> Result<()> {
-        let db = &self.db;
         let code_owned = code.to_string();
 
-        let result = retry::with_retry(&format!("remove({})", code), self.retry_config, || async {
-            short_link::Entity::delete_by_id(&code_owned).exec(db).await
-        })
+        let result = aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &self.retry_config,
+            |txn| {
+                let code = code_owned.clone();
+                Box::pin(async move {
+                    short_link::Entity::delete_by_id(code)
+                        .exec(txn)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
         .await
-        .map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to delete short link: {}", e))
-        })?;
+        .map_err(ShortlinkerError::from)?;
 
         if result.rows_affected == 0 {
             return Err(ShortlinkerError::not_found(format!(
@@ -68,54 +75,41 @@ impl SeaOrmStorage {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        // 使用事务确保查询和删除的原子性
-        let txn = self.db.begin().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
-        })?;
+        let requested = codes.to_vec();
+        let (existing, not_found) = aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &self.retry_config,
+            |txn| {
+                let requested = requested.clone();
+                Box::pin(async move {
+                    let existing: Vec<String> = short_link::Entity::find()
+                        .filter(short_link::Column::ShortCode.is_in(requested.iter().cloned()))
+                        .all(txn)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)?
+                        .into_iter()
+                        .map(|model| model.short_code)
+                        .collect();
+                    let existing_set: HashSet<&String> = existing.iter().collect();
+                    let not_found = requested
+                        .into_iter()
+                        .filter(|code| !existing_set.contains(code))
+                        .collect();
 
-        // 在事务内查询哪些存在
-        let existing: Vec<String> = short_link::Entity::find()
-            .filter(short_link::Column::ShortCode.is_in(codes.iter().cloned()))
-            .all(&txn)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to query existing links: {}",
-                    e
-                ))
-            })?
-            .into_iter()
-            .map(|m| m.short_code)
-            .collect();
-
-        // 使用 HashSet 优化 contains 查找（O(1) vs O(n)）
-        let existing_set: HashSet<&String> = existing.iter().collect();
-        let not_found: Vec<String> = codes
-            .iter()
-            .filter(|c| !existing_set.contains(c))
-            .cloned()
-            .collect();
-
-        if existing.is_empty() {
-            // 没有需要删除的，直接提交空事务
-            txn.commit().await.map_err(|e| {
-                ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
-            })?;
-            return Ok((Vec::new(), not_found));
-        }
-
-        // 在事务内批量删除
-        short_link::Entity::delete_many()
-            .filter(short_link::Column::ShortCode.is_in(existing.iter().cloned()))
-            .exec(&txn)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("Batch delete failed: {}", e))
-            })?;
-
-        txn.commit().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
-        })?;
+                    if !existing.is_empty() {
+                        short_link::Entity::delete_many()
+                            .filter(short_link::Column::ShortCode.is_in(existing.iter().cloned()))
+                            .exec(txn)
+                            .await
+                            .map_err(aster_forge_db::DbError::from)?;
+                    }
+                    Ok((existing, not_found))
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
+        .await
+        .map_err(ShortlinkerError::from)?;
 
         self.invalidate_count_cache();
         info!("Batch deleted {} links", existing.len());
@@ -129,38 +123,38 @@ impl SeaOrmStorage {
             return Ok(());
         }
 
-        let txn = self.db.begin().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
-        })?;
-
-        // 构建批量 ActiveModel
-        let active_models: Vec<short_link::ActiveModel> = links
-            .iter()
-            .map(|link| shortlink_to_active_model(link, true))
-            .collect();
-
-        // 使用 insert_many with on_conflict
-        short_link::Entity::insert_many(active_models)
-            .on_conflict(
-                OnConflict::column(short_link::Column::ShortCode)
-                    .update_columns([
-                        short_link::Column::TargetUrl,
-                        short_link::Column::ExpiresAt,
-                        short_link::Column::Password,
-                        short_link::Column::CreatedAt,
-                        short_link::Column::ClickCount,
-                    ])
-                    .to_owned(),
-            )
-            .exec(&txn)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("Batch insert failed: {}", e))
-            })?;
-
-        txn.commit().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
-        })?;
+        aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &self.retry_config,
+            |txn| {
+                let links = links.clone();
+                Box::pin(async move {
+                    let active_models = links
+                        .iter()
+                        .map(|link| shortlink_to_active_model(link, true))
+                        .collect::<Vec<_>>();
+                    short_link::Entity::insert_many(active_models)
+                        .on_conflict(
+                            OnConflict::column(short_link::Column::ShortCode)
+                                .update_columns([
+                                    short_link::Column::TargetUrl,
+                                    short_link::Column::ExpiresAt,
+                                    short_link::Column::Password,
+                                    short_link::Column::CreatedAt,
+                                    short_link::Column::ClickCount,
+                                ])
+                                .to_owned(),
+                        )
+                        .exec(txn)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)?;
+                    Ok(())
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
+        .await
+        .map_err(ShortlinkerError::from)?;
 
         self.invalidate_count_cache();
         info!("Batch inserted {} links", links.len());

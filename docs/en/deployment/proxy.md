@@ -9,8 +9,8 @@ In production environments, it's recommended to expose Shortlinker service throu
 ::: warning Important: Reverse Proxy Configuration Requirements
 When deploying behind a reverse proxy, it's recommended to set `X-Real-IP` and `X-Forwarded-For` so the server can extract the real client IP (used by login rate limiting and analytics).
 
-- **TCP reverse proxy**: if missing, login usually still works, but rate limiting degrades to the proxy IP (all users share the same limiter key).
-- **Unix socket mode** (when `server.unix_socket` is configured): `X-Forwarded-For` is **required**; otherwise the login rate limiter cannot extract a key and login will return HTTP 500.
+- **TCP reverse proxy**: also add the direct proxy address to `api.trusted_proxies`; otherwise Shortlinker ignores these headers and uses the proxy peer IP for rate limiting and analytics.
+- **Unix socket mode** (when `server.unix_socket` is configured): the local proxy transport is trusted automatically. Without `X-Forwarded-For`, login still works but falls back to the loopback IP, so all users share one limiter key.
 :::
 
 ## Caddy Configuration

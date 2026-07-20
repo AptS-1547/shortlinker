@@ -10,7 +10,6 @@ pub(crate) mod converters;
 mod mutations;
 mod operations;
 mod query;
-pub mod retry;
 
 pub use analytics::{GeoRow, GroupBy, ReferrerRow, TopLinkRow, TrendRow, UaStatsRow};
 
@@ -26,9 +25,9 @@ use crate::analytics::ClickSink;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::models::StorageConfig;
 
-use crate::metrics_core::MetricsRecorder;
+use crate::metrics::MetricsRecorder;
 
-pub use connection::{connect_generic, connect_sqlite, run_migrations};
+pub use connection::run_migrations;
 pub use converters::{model_to_shortlink, shortlink_to_active_model};
 pub use operations::upsert;
 
@@ -83,9 +82,7 @@ pub struct SeaOrmStorage {
     /// 分页 COUNT 缓存（TTL 30秒）
     count_cache: Cache<String, u64>,
     /// 重试配置
-    retry_config: retry::RetryConfig,
-    /// Metrics recorder for dependency injection
-    pub(crate) metrics: Arc<dyn MetricsRecorder>,
+    retry_config: aster_forge_db::retry::RetryConfig,
 }
 
 impl SeaOrmStorage {
@@ -102,18 +99,23 @@ impl SeaOrmStorage {
 
         // 读取重试配置
         let config = crate::config::get_config();
-        let retry_config = retry::RetryConfig {
+        let retry_config = aster_forge_db::retry::RetryConfig {
             max_retries: config.database.retry_count,
             base_delay_ms: config.database.retry_base_delay_ms,
             max_delay_ms: config.database.retry_max_delay_ms,
         };
 
-        // 根据不同数据库类型配置连接选项
-        let db = if backend_name == "sqlite" {
-            connect_sqlite(database_url).await?
-        } else {
-            connect_generic(database_url, backend_name).await?
-        };
+        let mut forge_config = aster_forge_db::DatabaseConfig::new(database_url);
+        forge_config.pool_size = config.database.pool_size;
+        forge_config.retry_count = config.database.retry_count;
+        let db = aster_forge_db::connect_with_metrics(&forge_config, metrics.forge_recorder())
+            .await
+            .map_err(|error| {
+                ShortlinkerError::database_connection(format!(
+                    "Failed to connect to {} database: {error}",
+                    backend_name.to_uppercase()
+                ))
+            })?;
 
         let storage = SeaOrmStorage {
             db,
@@ -123,7 +125,6 @@ impl SeaOrmStorage {
                 .max_capacity(1000)
                 .build(),
             retry_config,
-            metrics,
         };
 
         // 运行迁移
@@ -134,18 +135,6 @@ impl SeaOrmStorage {
             storage.backend_name.to_uppercase()
         );
         Ok(storage)
-    }
-
-    /// Reload storage state (placeholder for future extensions)
-    ///
-    /// Currently this is a no-op. The actual data reload is handled by
-    /// `ReloadCoordinator` which refreshes the cache layer directly.
-    pub async fn reload(&self) -> Result<()> {
-        tracing::info!(
-            "Reloading links from {} storage",
-            self.backend_name.to_uppercase()
-        );
-        Ok(())
     }
 
     /// 获取数据库连接引用（用于需要直接访问SeaORM API的场景）

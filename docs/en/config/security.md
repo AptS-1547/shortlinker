@@ -4,20 +4,23 @@ This page focuses on config-related security recommendations, including login ra
 
 ### Login Rate-Limit IP Extraction
 
-Shortlinker uses smart proxy detection to balance security and usability when extracting client IPs for login rate limiting.
+Shortlinker trusts `X-Forwarded-For` only on explicitly trusted proxy connections. The resolved client IP is shared by login rate limiting and detailed click analytics.
 
 **Direct deployment** (no reverse proxy):
-- No extra config needed; public source IPs do not trust `X-Forwarded-For` by default.
+- No extra config is needed. Shortlinker uses the TCP peer IP and ignores client-supplied `X-Forwarded-For`.
 
 **Reverse proxy deployment** (Nginx/Caddy/Docker):
-- **Auto-detect** (recommended): leave `api.trusted_proxies` empty. Connections from private/local addresses automatically trust `X-Forwarded-For` (IPv4: 10.x, 172.16-31.x, 192.168.x, 127.0.0.1; IPv6: `::1`, `fc00::/7`, `fe80::/10`).
-- **Explicit config**: if you need strict control, set `api.trusted_proxies` to trusted proxy IPs/CIDRs in Admin config.
+- Configure `api.trusted_proxies` in Admin config with the proxy IPs or CIDRs that connect directly to Shortlinker.
+- `X-Forwarded-For` is accepted only when the direct peer matches that list; otherwise rate limiting and analytics use the proxy peer IP.
 
 **Unix socket mode** (nginx on same machine):
-- `X-Forwarded-For` is always used for client IP extraction.
+- Shortlinker automatically trusts the local Unix socket proxy transport.
 - Ensure nginx sets `proxy_set_header X-Forwarded-For $remote_addr;`.
+- Without that header, login still works, but requests fall back to the loopback IP and share one rate-limit bucket.
 
 Optional config examples:
+
+Restart Shortlinker after saving `api.trusted_proxies` so login rate limiting and detailed click analytics use the same proxy rules.
 
 ```bash
 CSRF_TOKEN=$(awk '$6=="csrf_token"{print $7}' cookies.txt | tail -n 1)
@@ -38,9 +41,9 @@ curl -X PUT -b cookies.txt \
 ```
 
 > Notes:
-> - **Auto-detect mode** fits most setups, but if Shortlinker listens on an internal/private IP without a reverse proxy, prefer explicit `trusted_proxies` to avoid spoofing risk.
-> - **Explicit mode** misconfiguration may cause users to share one rate-limit bucket (proxy not matched) or reintroduce bypass risk (over-trusting unsafe proxies).
-> - Check startup logs for active mode: `Login rate limiting: Auto-detect mode enabled` or `Login rate limiting: Explicit trusted proxies configured`.
+> - Do not trust an entire VPC merely because the proxy is internal; prefer the direct proxy addresses seen by Shortlinker.
+> - Misconfiguration may cause users to share one rate-limit bucket (proxy not matched) or permit spoofing (trust range too broad).
+> - Check startup logs for the active mode: `Client IP extraction: direct peer mode enabled` or `Client IP extraction: explicit trusted proxies configured`.
 
 ### IPC Socket Permissions
 

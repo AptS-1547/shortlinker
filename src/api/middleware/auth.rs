@@ -15,7 +15,7 @@ use crate::api::constants;
 use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
-use crate::metrics_core::MetricsRecorder;
+use crate::metrics::MetricsRecorder;
 
 /// 认证方式标记，用于 CSRF 中间件判断是否跳过验证
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -199,7 +199,7 @@ where
             let metrics: Arc<dyn MetricsRecorder> = req
                 .app_data::<web::Data<Arc<dyn MetricsRecorder>>>()
                 .map(|d| d.get_ref().clone())
-                .unwrap_or_else(|| crate::metrics_core::NoopMetrics::arc());
+                .unwrap_or_else(|| crate::metrics::NoopMetrics::arc());
 
             // Check if admin token is configured
             if admin_token.is_empty() {

@@ -5,13 +5,12 @@
 //! 2. 批量查询 (batch_check) - 中间方案
 //! 3. Bloom 预筛选 (bloom_prefilter) - 当前方案
 
+use aster_forge_cache::bloom::{BloomConfig, BloomFilter};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use csv::{ReaderBuilder, WriterBuilder};
-use shortlinker::cache::ExistenceFilter;
-use shortlinker::cache::existence_filter::bloom::BloomExistenceFilterPlugin;
+
 use std::collections::HashSet;
 use std::io::Cursor;
-use std::sync::Arc;
 
 /// 生成测试用 CSV 数据
 fn generate_csv_data(num_rows: usize) -> Vec<u8> {
@@ -74,18 +73,15 @@ fn bench_csv_prescan(c: &mut Criterion) {
 // ============== Bloom 预筛选 vs 全量 HashSet 查找 ==============
 
 fn bench_bloom_prefilter(c: &mut Criterion) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("import/bloom_prefilter");
 
     // 场景：DB 有 db_size 条记录，CSV 有 csv_size 条（全新 code）
     for (db_size, csv_size) in [(0, 1000), (10000, 100), (100000, 1000)] {
-        let filter = Arc::new(BloomExistenceFilterPlugin::new().unwrap());
+        let filter = BloomFilter::new(BloomConfig::new(100_000, 0.001)).unwrap();
 
         // 模拟 DB 中已有的 codes 加入 Bloom Filter
-        rt.block_on(async {
-            let keys: Vec<String> = (0..db_size).map(|i| format!("existing_{}", i)).collect();
-            filter.bulk_set(&keys).await;
-        });
+        let keys: Vec<String> = (0..db_size).map(|i| format!("existing_{}", i)).collect();
+        filter.insert_many(keys.iter().map(String::as_str));
 
         // CSV 中的 codes（全新，不在 DB 中）
         let csv_codes: Vec<String> = (0..csv_size).map(|i| format!("new_code_{}", i)).collect();
@@ -94,21 +90,16 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
         group.throughput(Throughput::Elements(csv_size as u64));
 
         // 方案 A：Bloom 预筛选
-        let f = Arc::clone(&filter);
         let codes = csv_codes.clone();
         group.bench_with_input(BenchmarkId::new("bloom_filter", &label), &(), |b, _| {
-            b.to_async(&rt).iter(|| {
-                let f = Arc::clone(&f);
-                let codes = codes.clone();
-                async move {
-                    let mut maybe_exist = Vec::new();
-                    for code in &codes {
-                        if f.check(code).await {
-                            maybe_exist.push(code.clone());
-                        }
+            b.iter(|| {
+                let mut maybe_exist = Vec::new();
+                for code in &codes {
+                    if filter.contains(code) {
+                        maybe_exist.push(code.clone());
                     }
-                    maybe_exist
                 }
+                maybe_exist
             });
         });
 
@@ -134,7 +125,6 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
 // ============== 冲突检测：有冲突场景 ==============
 
 fn bench_bloom_with_conflicts(c: &mut Criterion) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("import/bloom_conflicts");
 
     // 场景：CSV 中有 conflict_pct% 的 code 已存在于 DB
@@ -142,16 +132,14 @@ fn bench_bloom_with_conflicts(c: &mut Criterion) {
         let conflict_count = csv_size * conflict_pct / 100;
         let new_count = csv_size - conflict_count;
 
-        let filter = Arc::new(BloomExistenceFilterPlugin::new().unwrap());
+        let filter = BloomFilter::new(BloomConfig::new(100_000, 0.001)).unwrap();
 
         // DB 中的 codes
         let db_codes: Vec<String> = (0..conflict_count)
             .map(|i| format!("shared_code_{}", i))
             .collect();
 
-        rt.block_on(async {
-            filter.bulk_set(&db_codes).await;
-        });
+        filter.insert_many(db_codes.iter().map(String::as_str));
 
         // CSV codes = 冲突部分 + 新增部分
         let mut csv_codes: Vec<String> = (0..conflict_count)
@@ -162,21 +150,16 @@ fn bench_bloom_with_conflicts(c: &mut Criterion) {
         let label = format!("csv{}_conflict{}pct", csv_size, conflict_pct);
         group.throughput(Throughput::Elements(csv_size as u64));
 
-        let f = Arc::clone(&filter);
         let codes = csv_codes.clone();
         group.bench_with_input(BenchmarkId::new("bloom_prefilter", &label), &(), |b, _| {
-            b.to_async(&rt).iter(|| {
-                let f = Arc::clone(&f);
-                let codes = codes.clone();
-                async move {
-                    let mut maybe_exist = Vec::new();
-                    for code in &codes {
-                        if f.check(code).await {
-                            maybe_exist.push(code.clone());
-                        }
+            b.iter(|| {
+                let mut maybe_exist = Vec::new();
+                for code in &codes {
+                    if filter.contains(code) {
+                        maybe_exist.push(code.clone());
                     }
-                    maybe_exist.len()
                 }
+                maybe_exist.len()
             });
         });
     }
@@ -186,18 +169,15 @@ fn bench_bloom_with_conflicts(c: &mut Criterion) {
 // ============== 全流程对比（模拟） ==============
 
 fn bench_conflict_strategy(c: &mut Criterion) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("import/strategy");
 
     let db_size = 50000;
     let csv_size = 500;
 
     // 准备 Bloom Filter（模拟启动时加载）
-    let filter = Arc::new(BloomExistenceFilterPlugin::new().unwrap());
+    let filter = BloomFilter::new(BloomConfig::new(100_000, 0.001)).unwrap();
     let db_codes: Vec<String> = (0..db_size).map(|i| format!("db_code_{}", i)).collect();
-    rt.block_on(async {
-        filter.bulk_set(&db_codes).await;
-    });
+    filter.insert_many(db_codes.iter().map(String::as_str));
 
     // CSV 数据（全新 codes）
     let csv_data = generate_csv_data(csv_size);
@@ -214,29 +194,23 @@ fn bench_conflict_strategy(c: &mut Criterion) {
     });
 
     // 策略 2：Bloom 预筛选 + 精确查询
-    let f = Arc::clone(&filter);
     let codes = csv_codes.clone();
     group.bench_function("skip_bloom_prefilter", |b| {
-        b.to_async(&rt).iter(|| {
-            let f = Arc::clone(&f);
-            let codes = codes.clone();
-            async move {
-                // Step 1: 预扫描（已完成，直接用 codes）
-                // Step 2: Bloom 预筛选
-                let mut maybe_exist = Vec::new();
-                for code in &codes {
-                    if f.check(code).await {
-                        maybe_exist.push(code.clone());
-                    }
+        b.iter(|| {
+            // Step 1: 预扫描（已完成，直接用 codes）
+            // Step 2: Bloom 预筛选
+            let mut maybe_exist = Vec::new();
+            for code in &codes {
+                if filter.contains(code) {
+                    maybe_exist.push(code.clone());
                 }
-                // Step 3: 模拟 batch_check（这里用 HashSet 模拟）
-                let db_set: HashSet<&str> = HashSet::new(); // 空集（全新 codes）
-                let existing: HashSet<String> = maybe_exist
-                    .into_iter()
-                    .filter(|c| db_set.contains(c.as_str()))
-                    .collect();
-                existing
             }
+            // Step 3: 模拟 batch_check（这里用 HashSet 模拟）
+            let db_set: HashSet<&str> = HashSet::new(); // 空集（全新 codes）
+            maybe_exist
+                .into_iter()
+                .filter(|code| db_set.contains(code.as_str()))
+                .collect::<HashSet<String>>()
         });
     });
 

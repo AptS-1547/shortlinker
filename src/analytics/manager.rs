@@ -15,11 +15,11 @@ use std::sync::{
 };
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink, RawClickEvent};
 
-use crate::metrics_core::MetricsRecorder;
+use crate::metrics::MetricsRecorder;
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -516,6 +516,15 @@ impl ClickManager {
                 true
             }
             Err(e) => {
+                if commit_outcome_is_unknown(&e) {
+                    error!(
+                        error = %e,
+                        entries = count,
+                        "ClickManager: click flush commit outcome is unknown; not restoring entries to avoid duplicate counts"
+                    );
+                    metrics.inc_clicks_flush(trigger, "outcome_unknown");
+                    return true;
+                }
                 // 刷盘失败，恢复数据到 buffer
                 buffer.restore(updates);
                 warn!(
@@ -550,6 +559,14 @@ impl ClickManager {
                     success_count += chunk.len();
                 }
                 Err(e) => {
+                    if commit_outcome_is_unknown(&e) {
+                        error!(
+                            error = %e,
+                            entries = chunk.len(),
+                            "ClickManager: detailed log commit outcome is unknown; not restoring entries to avoid duplicate rows"
+                        );
+                        continue;
+                    }
                     warn!(
                         "ClickManager: log_clicks_batch failed: {}, {} entries will be restored",
                         e,
@@ -583,15 +600,32 @@ impl ClickManager {
     }
 }
 
+fn commit_outcome_is_unknown(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<aster_forge_db::DbError>()
+        .is_some_and(aster_forge_db::DbError::commit_outcome_is_unknown)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use async_trait::async_trait;
 
-    use crate::metrics_core::NoopMetrics;
+    use crate::metrics::NoopMetrics;
 
     struct MockSink {
         flushed: std::sync::Mutex<Vec<(String, usize)>>,
+    }
+
+    struct UnknownCommitSink;
+
+    #[async_trait]
+    impl ClickSink for UnknownCommitSink {
+        async fn flush_clicks(&self, _updates: Vec<(String, usize)>) -> anyhow::Result<()> {
+            Err(anyhow::Error::new(
+                aster_forge_db::DbError::commit_outcome_unknown("lost commit response", None),
+            ))
+        }
     }
 
     impl MockSink {
@@ -644,6 +678,17 @@ mod tests {
         assert_eq!(manager.buffer_size(), 0);
         let flushed = sink.get_flushed();
         assert_eq!(flushed.len(), 2); // 2 个唯一 key
+    }
+
+    #[tokio::test]
+    async fn test_unknown_commit_outcome_is_not_restored() {
+        let manager = create_test_manager(Arc::new(UnknownCommitSink), 100);
+        manager.increment("key1");
+        manager.increment("key1");
+
+        manager.flush().await;
+
+        assert_eq!(manager.buffer_size(), 0);
     }
 
     /// 测试并发 increment 不会丢失点击

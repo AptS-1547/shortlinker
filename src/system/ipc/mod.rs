@@ -17,10 +17,10 @@
 //! ## Server side
 //!
 //! ```ignore
-//! use crate::system::ipc::server::start_ipc_server;
+//! use crate::system::ipc::server::run_ipc_server;
+//! use tokio_util::sync::CancellationToken;
 //!
-//! // Start IPC server (typically in startup.rs)
-//! start_ipc_server().await;
+//! run_ipc_server(CancellationToken::new()).await;
 //! ```
 //!
 //! ## Client side

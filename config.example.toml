@@ -11,10 +11,11 @@
 #   3. Start the server
 #
 # Security Notes:
-# - Login rate limiting uses smart proxy detection: when api.trusted_proxies is not
-#   configured and connections come from private IPs (Docker/nginx), X-Forwarded-For
-#   headers are automatically trusted. This works for most reverse proxy setups.
-# - For precise control, configure api.trusted_proxies in Admin Panel (supports IP and CIDR).
+# - TCP connections trust X-Forwarded-For only when the direct proxy IP or CIDR is
+#   configured in api.trusted_proxies through the Admin Panel.
+# - Unix socket mode trusts the local proxy transport automatically; configure the
+#   proxy to set X-Forwarded-For for per-client rate limiting and analytics.
+# - api.trusted_proxies supports individual IPs and CIDRs.
 #   Example: Docker deployments can use ["172.16.0.0/12"], nginx can use the proxy server IP.
 # - IPC socket permissions are restricted to 0600 (owner access only).
 

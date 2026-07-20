@@ -331,29 +331,4 @@ impl DataRetentionTask {
 
         Ok(total_deleted)
     }
-
-    /// 启动后台清理任务
-    ///
-    /// 每隔指定时间运行一次清理
-    pub fn spawn_background_task(self: Arc<Self>, interval_hours: u64) {
-        tokio::spawn(async move {
-            let interval = StdDuration::from_secs(interval_hours * 60 * 60);
-
-            // 首次运行延迟 5 分钟
-            tokio::time::sleep(StdDuration::from_secs(300)).await;
-
-            loop {
-                if let Err(e) = self.run_cleanup().await {
-                    error!("Data cleanup task failed: {}", e);
-                }
-
-                tokio::time::sleep(interval).await;
-            }
-        });
-
-        info!(
-            "Data cleanup background task started (interval: {} hours)",
-            interval_hours
-        );
-    }
 }

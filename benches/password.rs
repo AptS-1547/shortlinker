@@ -1,23 +1,24 @@
 //! Argon2 密码哈希性能基准测试
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use shortlinker::utils::password::{hash_password, is_argon2_hash, verify_password};
+use shortlinker::utils::password::is_argon2_hash;
 
 fn bench_hash_password(c: &mut Criterion) {
     c.bench_function("password/hash", |b| {
         b.iter(|| {
-            let _ = hash_password("test_password_123");
+            let _ = aster_forge_crypto::hash_password("test_password_123");
         });
     });
 }
 
 fn bench_verify_password_correct(c: &mut Criterion) {
     let password = "correct_password_456";
-    let hash = hash_password(password).expect("hash should succeed");
+    let hash = aster_forge_crypto::hash_password(password).expect("hash should succeed");
 
     c.bench_function("password/verify_correct", |b| {
         b.iter(|| {
-            let result = verify_password(password, &hash).expect("verify should succeed");
+            let result = aster_forge_crypto::verify_password(password, &hash)
+                .expect("verify should succeed");
             assert!(result);
         });
     });
@@ -25,11 +26,12 @@ fn bench_verify_password_correct(c: &mut Criterion) {
 
 fn bench_verify_password_wrong(c: &mut Criterion) {
     let password = "correct_password_789";
-    let hash = hash_password(password).expect("hash should succeed");
+    let hash = aster_forge_crypto::hash_password(password).expect("hash should succeed");
 
     c.bench_function("password/verify_wrong", |b| {
         b.iter(|| {
-            let result = verify_password("wrong_password", &hash).expect("verify should succeed");
+            let result = aster_forge_crypto::verify_password("wrong_password", &hash)
+                .expect("verify should succeed");
             assert!(!result);
         });
     });

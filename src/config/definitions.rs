@@ -294,7 +294,7 @@ pub static ALL_CONFIGS: &[ConfigDef] = &[
         value_type: ValueType::StringArray,
         rust_type: RustType::VecString,
         default_fn: default_trusted_proxies,
-        requires_restart: false,
+        requires_restart: true,
         is_sensitive: false,
         editable: true,
         category: categories::AUTH,

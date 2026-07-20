@@ -46,12 +46,19 @@ pub fn validate_config_value(key: &str, value: &str) -> Result<(), String> {
 
     // StringArray: 只验证是否为有效的字符串数组
     if schema.value_type == ValueType::StringArray {
-        let _items: Vec<String> = serde_json::from_str(value).map_err(|e| {
+        let items: Vec<String> = serde_json::from_str(value).map_err(|e| {
             format!(
                 "Invalid JSON format: {}. Expected array like [\"item1\", \"item2\", ...]",
                 e
             )
         })?;
+        if key == super::keys::API_TRUSTED_PROXIES
+            && aster_forge_utils::net::parse_trusted_proxies(&items).len() != items.len()
+        {
+            return Err(
+                "Trusted proxies must contain only valid IP addresses or CIDRs".to_string(),
+            );
+        }
         return Ok(());
     }
 
@@ -151,8 +158,11 @@ mod tests {
             .is_ok()
         );
         assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"[]"#).is_ok());
-        // 任意字符串都合法（格式验证由前端负责）
-        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["any", "string"]"#).is_ok());
+        assert!(validate_config_value(keys::API_TRUSTED_PROXIES, r#"["any", "string"]"#).is_err());
+        assert!(
+            validate_config_value(keys::API_TRUSTED_PROXIES, r#"["2001:db8::1", "::1/128"]"#)
+                .is_ok()
+        );
 
         // 非法 JSON 格式
         assert!(validate_config_value(keys::API_TRUSTED_PROXIES, "not json").is_err());

@@ -7,13 +7,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use sea_orm::sea_query::{CaseStatement, Expr, SimpleExpr};
-use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{debug, info};
 
 use super::HourlyRollupWriter;
 use crate::storage::backend::SeaOrmStorage;
-use crate::storage::backend::retry::{self, RetryConfig};
+use aster_forge_db::retry::RetryConfig;
 use migration::entities::{
     click_stats_daily, click_stats_global_daily, click_stats_global_hourly, click_stats_hourly,
 };
@@ -77,7 +77,7 @@ impl RollupManager {
     }
 
     /// 创建 HourlyRollupWriter 实例
-    fn hourly_writer(&self) -> HourlyRollupWriter<'_, impl sea_orm::ConnectionTrait> {
+    fn hourly_writer(&self) -> HourlyRollupWriter<'_, sea_orm::DatabaseConnection> {
         HourlyRollupWriter::new(self.storage.get_db(), self.retry_config)
     }
 
@@ -98,20 +98,14 @@ impl RollupManager {
             return Ok(());
         }
 
-        let hour_bucket = super::truncate_to_hour(timestamp);
         let writer = self.hourly_writer();
 
-        // 更新各链接的小时汇总
         writer
-            .upsert_hourly_counts(updates, timestamp, "rollup")
+            .increment_hourly_counts(updates, timestamp, "rollup")
             .await?;
 
-        // 更新全局小时汇总
-        let total_clicks: usize = updates.iter().map(|(_, c)| c).sum();
-        let unique_links = i32::try_from(updates.len()).unwrap_or(i32::MAX);
-        writer
-            .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "rollup")
-            .await?;
+        let hour_bucket = super::truncate_to_hour(timestamp);
+        let total_clicks: usize = updates.iter().map(|(_, count)| count).sum();
 
         debug!(
             "Hourly rollup updated: {} links, {} clicks (bucket: {})",
@@ -200,90 +194,55 @@ impl RollupManager {
             }
         }
 
-        // 写入天汇总
-        // 先批量查询现有记录，避免 N+1 查询
-        let codes: Vec<&String> = aggregated.keys().collect();
-        let existing_records = click_stats_daily::Entity::find()
-            .filter(click_stats_daily::Column::ShortCode.is_in(codes.iter().map(|s| s.as_str())))
-            .filter(click_stats_daily::Column::DayBucket.eq(target_date))
-            .all(db)
-            .await?;
-
-        let existing_map: HashMap<String, click_stats_daily::Model> = existing_records
-            .into_iter()
-            .map(|r| (r.short_code.clone(), r))
-            .collect();
-
-        // 分离需要插入和更新的记录
-        let mut to_insert: Vec<click_stats_daily::ActiveModel> = Vec::new();
-        let mut to_update: Vec<click_stats_daily::ActiveModel> = Vec::new();
-
+        let mut daily_models = Vec::with_capacity(aggregated.len());
         for (code, agg) in &aggregated {
             let top_referrers = Self::get_top_n(&agg.referrers, 10);
             let top_countries = Self::get_top_n(&agg.countries, 10);
             let top_sources = Self::get_top_n(&agg.sources, 10);
-
-            // 从 HashMap 查找现有记录
-            if let Some(record) = existing_map.get(code) {
-                let mut active: click_stats_daily::ActiveModel = record.clone().into();
-                let old_count = record.click_count;
-                let count_to_add = i64::try_from(agg.count).unwrap_or(i64::MAX);
-                active.click_count = Set(old_count.saturating_add(count_to_add));
-                active.unique_referrers =
-                    Set(Some(i32::try_from(agg.referrers.len()).unwrap_or(i32::MAX)));
-                active.unique_countries =
-                    Set(Some(i32::try_from(agg.countries.len()).unwrap_or(i32::MAX)));
-                active.unique_sources =
-                    Set(Some(i32::try_from(agg.sources.len()).unwrap_or(i32::MAX)));
-                active.top_referrers = Set(Some(serde_json::to_string(&top_referrers)?));
-                active.top_countries = Set(Some(serde_json::to_string(&top_countries)?));
-                active.top_sources = Set(Some(serde_json::to_string(&top_sources)?));
-                to_update.push(active);
-            } else {
-                let model = click_stats_daily::ActiveModel {
-                    short_code: Set(code.clone()),
-                    day_bucket: Set(target_date),
-                    click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
-                    unique_referrers: Set(Some(
-                        i32::try_from(agg.referrers.len()).unwrap_or(i32::MAX),
-                    )),
-                    unique_countries: Set(Some(
-                        i32::try_from(agg.countries.len()).unwrap_or(i32::MAX),
-                    )),
-                    unique_sources: Set(Some(i32::try_from(agg.sources.len()).unwrap_or(i32::MAX))),
-                    top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
-                    top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
-                    top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
-                    ..Default::default()
-                };
-                to_insert.push(model);
-            }
+            daily_models.push(click_stats_daily::ActiveModel {
+                short_code: Set(code.clone()),
+                day_bucket: Set(target_date),
+                click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
+                unique_referrers: Set(Some(i32::try_from(agg.referrers.len()).unwrap_or(i32::MAX))),
+                unique_countries: Set(Some(i32::try_from(agg.countries.len()).unwrap_or(i32::MAX))),
+                unique_sources: Set(Some(i32::try_from(agg.sources.len()).unwrap_or(i32::MAX))),
+                top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
+                top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
+                top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
+                ..Default::default()
+            });
         }
 
         let processed = aggregated.len() as u64;
 
-        // 批量插入新记录
-        if !to_insert.is_empty() {
-            let insert_count = to_insert.len();
-            retry::with_retry("rollup_insert_daily_batch", self.retry_config, || async {
-                click_stats_daily::Entity::insert_many(to_insert.clone())
-                    .exec(db)
-                    .await
-            })
+        if !daily_models.is_empty() {
+            aster_forge_db::retry::with_sea_orm_retry(
+                "rollup_upsert_daily_batch",
+                self.retry_config,
+                || async {
+                    click_stats_daily::Entity::insert_many(daily_models.clone())
+                        .on_conflict(
+                            OnConflict::columns([
+                                click_stats_daily::Column::ShortCode,
+                                click_stats_daily::Column::DayBucket,
+                            ])
+                            .update_columns([
+                                click_stats_daily::Column::ClickCount,
+                                click_stats_daily::Column::UniqueReferrers,
+                                click_stats_daily::Column::UniqueCountries,
+                                click_stats_daily::Column::UniqueSources,
+                                click_stats_daily::Column::TopReferrers,
+                                click_stats_daily::Column::TopCountries,
+                                click_stats_daily::Column::TopSources,
+                            ])
+                            .to_owned(),
+                        )
+                        .exec(db)
+                        .await
+                },
+            )
             .await?;
-            debug!("Batch inserted {} daily rollup records", insert_count);
-        }
-
-        // 批量更新现有记录（使用 CASE WHEN 替代逐条 UPDATE）
-        if !to_update.is_empty() {
-            const BATCH_SIZE: usize = 100;
-            for chunk in to_update.chunks(BATCH_SIZE) {
-                retry::with_retry("rollup_update_daily_batch", self.retry_config, || async {
-                    self.batch_update_daily(db, chunk).await
-                })
-                .await?;
-            }
-            debug!("Batch updated {} daily rollup records", to_update.len());
+            debug!("Upserted {} daily rollup records", daily_models.len());
         }
 
         // ---- 全局天汇总 ----
@@ -314,44 +273,36 @@ impl RollupManager {
         let top_countries_json = serde_json::to_string(&Self::get_top_n(&global_countries, 10))?;
         let top_sources_json = serde_json::to_string(&Self::get_top_n(&global_sources, 10))?;
 
-        // 覆盖式 upsert（rollup 是从 hourly 完整重算的，应该幂等）
-        let existing_global = click_stats_global_daily::Entity::find()
-            .filter(click_stats_global_daily::Column::DayBucket.eq(target_date))
-            .one(db)
-            .await?;
-
-        if let Some(existing) = existing_global {
-            let mut active: click_stats_global_daily::ActiveModel = existing.into();
-            active.total_clicks = Set(total_clicks);
-            active.unique_links = Set(Some(unique_links));
-            active.top_referrers = Set(Some(top_referrers_json));
-            active.top_countries = Set(Some(top_countries_json));
-            active.top_sources = Set(Some(top_sources_json));
-
-            retry::with_retry("rollup_update_global_daily", self.retry_config, || async {
-                click_stats_global_daily::Entity::update(active.clone())
+        let global_model = click_stats_global_daily::ActiveModel {
+            day_bucket: Set(target_date),
+            total_clicks: Set(total_clicks),
+            unique_links: Set(Some(unique_links)),
+            top_referrers: Set(Some(top_referrers_json)),
+            top_countries: Set(Some(top_countries_json)),
+            top_sources: Set(Some(top_sources_json)),
+            ..Default::default()
+        };
+        aster_forge_db::retry::with_sea_orm_retry(
+            "rollup_upsert_global_daily",
+            self.retry_config,
+            || async {
+                click_stats_global_daily::Entity::insert(global_model.clone())
+                    .on_conflict(
+                        OnConflict::column(click_stats_global_daily::Column::DayBucket)
+                            .update_columns([
+                                click_stats_global_daily::Column::TotalClicks,
+                                click_stats_global_daily::Column::UniqueLinks,
+                                click_stats_global_daily::Column::TopReferrers,
+                                click_stats_global_daily::Column::TopCountries,
+                                click_stats_global_daily::Column::TopSources,
+                            ])
+                            .to_owned(),
+                    )
                     .exec(db)
                     .await
-            })
-            .await?;
-        } else {
-            let model = click_stats_global_daily::ActiveModel {
-                day_bucket: Set(target_date),
-                total_clicks: Set(total_clicks),
-                unique_links: Set(Some(unique_links)),
-                top_referrers: Set(Some(top_referrers_json)),
-                top_countries: Set(Some(top_countries_json)),
-                top_sources: Set(Some(top_sources_json)),
-                ..Default::default()
-            };
-
-            retry::with_retry("rollup_insert_global_daily", self.retry_config, || async {
-                click_stats_global_daily::Entity::insert(model.clone())
-                    .exec(db)
-                    .await
-            })
-            .await?;
-        }
+            },
+        )
+        .await?;
 
         info!(
             "Hourly-to-daily rollup completed: {} links (date: {})",
@@ -407,120 +358,9 @@ impl RollupManager {
 
     // ============ 辅助方法 ============
 
-    /// 使用 CASE WHEN 批量更新 daily 记录
-    async fn batch_update_daily(
-        &self,
-        db: &impl ConnectionTrait,
-        records: &[click_stats_daily::ActiveModel],
-    ) -> Result<(), sea_orm::DbErr> {
-        if records.is_empty() {
-            return Ok(());
-        }
-
-        // 一次循环同时收集 ids 和构建 CASE WHEN
-        let mut ids: Vec<i64> = Vec::with_capacity(records.len());
-        let mut click_count_case = CaseStatement::new();
-        let mut unique_referrers_case = CaseStatement::new();
-        let mut unique_countries_case = CaseStatement::new();
-        let mut unique_sources_case = CaseStatement::new();
-        let mut top_referrers_case = CaseStatement::new();
-        let mut top_countries_case = CaseStatement::new();
-        let mut top_sources_case = CaseStatement::new();
-
-        for record in records {
-            if let Set(id) = &record.id {
-                ids.push(*id);
-
-                // 使用 ColumnTrait.eq() 返回 SimpleExpr，可直接 clone
-                let id_cond = click_stats_daily::Column::Id.eq(*id);
-
-                if let Set(click_count) = &record.click_count {
-                    click_count_case = click_count_case
-                        .case(id_cond.clone(), SimpleExpr::Value((*click_count).into()));
-                }
-                if let Set(Some(ur)) = &record.unique_referrers {
-                    unique_referrers_case = unique_referrers_case
-                        .case(id_cond.clone(), SimpleExpr::Value((*ur).into()));
-                }
-                if let Set(Some(uc)) = &record.unique_countries {
-                    unique_countries_case = unique_countries_case
-                        .case(id_cond.clone(), SimpleExpr::Value((*uc).into()));
-                }
-                if let Set(Some(us)) = &record.unique_sources {
-                    unique_sources_case =
-                        unique_sources_case.case(id_cond.clone(), SimpleExpr::Value((*us).into()));
-                }
-                if let Set(Some(tr)) = &record.top_referrers {
-                    top_referrers_case = top_referrers_case
-                        .case(id_cond.clone(), SimpleExpr::Value(tr.clone().into()));
-                }
-                if let Set(Some(tc)) = &record.top_countries {
-                    top_countries_case = top_countries_case
-                        .case(id_cond.clone(), SimpleExpr::Value(tc.clone().into()));
-                }
-                if let Set(Some(ts)) = &record.top_sources {
-                    top_sources_case =
-                        top_sources_case.case(id_cond, SimpleExpr::Value(ts.clone().into()));
-                }
-            }
-        }
-
-        // 添加默认值（保持原值）
-        click_count_case =
-            click_count_case.finally(Expr::col(click_stats_daily::Column::ClickCount));
-        unique_referrers_case =
-            unique_referrers_case.finally(Expr::col(click_stats_daily::Column::UniqueReferrers));
-        unique_countries_case =
-            unique_countries_case.finally(Expr::col(click_stats_daily::Column::UniqueCountries));
-        unique_sources_case =
-            unique_sources_case.finally(Expr::col(click_stats_daily::Column::UniqueSources));
-        top_referrers_case =
-            top_referrers_case.finally(Expr::col(click_stats_daily::Column::TopReferrers));
-        top_countries_case =
-            top_countries_case.finally(Expr::col(click_stats_daily::Column::TopCountries));
-        top_sources_case =
-            top_sources_case.finally(Expr::col(click_stats_daily::Column::TopSources));
-
-        // 使用 SeaORM 官方 update_many API
-        click_stats_daily::Entity::update_many()
-            .col_expr(
-                click_stats_daily::Column::ClickCount,
-                click_count_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::UniqueReferrers,
-                unique_referrers_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::UniqueCountries,
-                unique_countries_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::UniqueSources,
-                unique_sources_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::TopReferrers,
-                top_referrers_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::TopCountries,
-                top_countries_case.into(),
-            )
-            .col_expr(
-                click_stats_daily::Column::TopSources,
-                top_sources_case.into(),
-            )
-            .filter(click_stats_daily::Column::Id.is_in(ids))
-            .exec(db)
-            .await?;
-
-        Ok(())
-    }
-
     fn get_top_n(map: &HashMap<String, usize>, n: usize) -> Vec<(String, usize)> {
         let mut items: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
-        items.sort_by(|a, b| b.1.cmp(&a.1));
+        items.sort_by_key(|item| std::cmp::Reverse(item.1));
         items.truncate(n);
         items
     }

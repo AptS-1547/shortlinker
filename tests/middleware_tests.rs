@@ -11,8 +11,8 @@ use std::sync::Arc;
 use shortlinker::api::middleware::{AdminAuth, CsrfGuard};
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
-use shortlinker::metrics_core::NoopMetrics;
-use shortlinker::storage::backend::{connect_sqlite, run_migrations};
+use shortlinker::metrics::NoopMetrics;
+use shortlinker::storage::backend::run_migrations;
 
 use std::sync::Once;
 use tempfile::TempDir;
@@ -42,7 +42,7 @@ async fn init_test_runtime_config() {
             let db_path = temp_dir.path().join("middleware_test.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-            let db = connect_sqlite(&db_url)
+            let db = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&db_url))
                 .await
                 .expect("Failed to connect to SQLite");
             run_migrations(&db).await.expect("Failed to run migrations");
@@ -85,7 +85,7 @@ async fn test_admin_auth_missing_token_returns_404() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -115,7 +115,7 @@ async fn test_admin_auth_allows_login_endpoint() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -140,7 +140,7 @@ async fn test_admin_auth_allows_refresh_endpoint() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -167,7 +167,7 @@ async fn test_admin_auth_allows_logout_endpoint() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -194,7 +194,7 @@ async fn test_admin_auth_handles_options() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -222,7 +222,7 @@ async fn test_admin_auth_rejects_no_token() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -250,7 +250,7 @@ async fn test_admin_auth_valid_bearer_token() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")
@@ -278,7 +278,7 @@ async fn test_admin_auth_invalid_bearer_token() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(
-                NoopMetrics::arc() as Arc<dyn shortlinker::metrics_core::MetricsRecorder>
+                NoopMetrics::arc() as Arc<dyn shortlinker::metrics::MetricsRecorder>
             ))
             .service(
                 web::scope("/admin")

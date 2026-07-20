@@ -27,7 +27,7 @@ For production operations details:
 
 - **OS**: Linux, macOS, Windows
 - **Architecture**: x86_64, ARM64
-- **For source builds**: Rust `>= 1.88.0` (Edition 2024), Git
+- **For source builds**: Rust `>= 1.94.0` (Edition 2024), Git
 
 ## Deployment Architecture
 

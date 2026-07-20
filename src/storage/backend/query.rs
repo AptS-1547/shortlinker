@@ -4,9 +4,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
-use std::time::Instant;
-
-use std::sync::Arc;
 
 use chrono::Utc;
 use futures_util::stream::Stream;
@@ -16,7 +13,7 @@ use sea_orm::{
 };
 use tracing::{debug, info};
 
-use super::{LinkFilter, SeaOrmStorage, retry};
+use super::{LinkFilter, SeaOrmStorage};
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::ShortLink;
 use crate::storage::models::LinkStats;
@@ -24,15 +21,6 @@ use crate::storage::models::LinkStats;
 use migration::entities::short_link;
 
 use super::converters::model_to_shortlink;
-
-use crate::metrics_core::MetricsRecorder;
-
-/// Record database query metrics
-fn record_db_metrics(metrics: &Arc<dyn MetricsRecorder>, operation: &str, start: Instant) {
-    let duration = start.elapsed().as_secs_f64();
-    metrics.observe_db_query(operation, duration);
-    metrics.inc_db_query(operation);
-}
 
 /// 根据 LinkFilter 构建 SeaORM 查询条件
 fn build_filter_condition(filter: &LinkFilter, now: chrono::DateTime<Utc>) -> Condition {
@@ -86,13 +74,14 @@ struct StatsResult {
 
 impl SeaOrmStorage {
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
-        let start = Instant::now();
         let db = &self.db;
         let code_owned = code.to_string();
 
-        let result = retry::with_retry(&format!("get({})", code), self.retry_config, || async {
-            short_link::Entity::find_by_id(&code_owned).one(db).await
-        })
+        let result = aster_forge_db::retry::with_sea_orm_retry(
+            &format!("get({code})"),
+            self.retry_config,
+            || async { short_link::Entity::find_by_id(&code_owned).one(db).await },
+        )
         .await
         .map_err(|e| {
             ShortlinkerError::database_operation(format!(
@@ -101,12 +90,10 @@ impl SeaOrmStorage {
             ))
         })?;
 
-        record_db_metrics(&self.metrics, "get", start);
         Ok(result.map(model_to_shortlink))
     }
 
     pub async fn load_all(&self) -> Result<HashMap<String, ShortLink>> {
-        let start = Instant::now();
         let models = short_link::Entity::find()
             .all(&self.db)
             .await
@@ -117,7 +104,6 @@ impl SeaOrmStorage {
                 ))
             })?;
 
-        record_db_metrics(&self.metrics, "load_all", start);
         let count = models.len();
         let links: HashMap<String, ShortLink> = models
             .into_iter()
@@ -132,7 +118,6 @@ impl SeaOrmStorage {
 
     /// 只加载所有短码（用于 Bloom Filter 初始化，内存占用小）
     pub async fn load_all_codes(&self) -> Result<Vec<String>> {
-        let start = Instant::now();
         let codes = short_link::Entity::find()
             .select_only()
             .column(short_link::Column::ShortCode)
@@ -146,7 +131,6 @@ impl SeaOrmStorage {
                 ))
             })?;
 
-        record_db_metrics(&self.metrics, "load_all_codes", start);
         info!("Loaded {} short codes for Bloom filter", codes.len());
         Ok(codes)
     }
@@ -164,8 +148,10 @@ impl SeaOrmStorage {
         // 分批查询，每批 500 个，避免 SQL IN 子句过长
         for chunk in codes.chunks(500) {
             let chunk_owned: Vec<String> = chunk.to_vec();
-            let result =
-                retry::with_retry("batch_check_codes_exist", self.retry_config, || async {
+            let result = aster_forge_db::retry::with_sea_orm_retry(
+                "batch_check_codes_exist",
+                self.retry_config,
+                || async {
                     short_link::Entity::find()
                         .select_only()
                         .column(short_link::Column::ShortCode)
@@ -173,14 +159,15 @@ impl SeaOrmStorage {
                         .into_tuple::<String>()
                         .all(db)
                         .await
-                })
-                .await
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!(
-                        "Failed to batch-check short code existence: {}",
-                        e
-                    ))
-                })?;
+                },
+            )
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "Failed to batch-check short code existence: {}",
+                    e
+                ))
+            })?;
 
             existing.extend(result);
         }
@@ -195,16 +182,12 @@ impl SeaOrmStorage {
 
     /// 获取链接总数（轻量查询，用于健康检查）
     pub async fn count(&self) -> Result<u64> {
-        let start = Instant::now();
         let db = &self.db;
-        let result = retry::with_retry("count", self.retry_config, || async {
+        aster_forge_db::retry::with_sea_orm_retry("count", self.retry_config, || async {
             short_link::Entity::find().count(db).await
         })
         .await
-        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)));
-
-        record_db_metrics(&self.metrics, "count", start);
-        result
+        .map_err(|e| ShortlinkerError::database_operation(format!("Failed to count links: {}", e)))
     }
 
     /// 带过滤条件的分页加载链接（带 COUNT 缓存）
@@ -214,7 +197,6 @@ impl SeaOrmStorage {
         page_size: u64,
         filter: LinkFilter,
     ) -> Result<(Vec<ShortLink>, u64)> {
-        let start = Instant::now();
         let now = Utc::now();
 
         // 生成缓存 key（基于过滤条件）
@@ -238,7 +220,7 @@ impl SeaOrmStorage {
             // 缓存未命中，执行 COUNT 查询（带重试）
             let db = &self.db;
             let cond = condition.clone();
-            let count = retry::with_retry(
+            let count = aster_forge_db::retry::with_sea_orm_retry(
                 "load_paginated_filtered(count)",
                 self.retry_config,
                 || async {
@@ -263,7 +245,7 @@ impl SeaOrmStorage {
         // 执行分页数据查询（带重试）
         let db = &self.db;
         let page_offset = page.saturating_sub(1);
-        let models = retry::with_retry(
+        let models = aster_forge_db::retry::with_sea_orm_retry(
             "load_paginated_filtered(data)",
             self.retry_config,
             || async {
@@ -281,7 +263,6 @@ impl SeaOrmStorage {
         })?;
 
         let links: Vec<ShortLink> = models.into_iter().map(model_to_shortlink).collect();
-        record_db_metrics(&self.metrics, "paginated_query", start);
         Ok((links, total))
     }
 
@@ -291,25 +272,24 @@ impl SeaOrmStorage {
             return Ok(HashMap::new());
         }
 
-        let start = Instant::now();
         let db = &self.db;
         let codes_owned: Vec<String> = codes.iter().map(|s| s.to_string()).collect();
 
-        let models = retry::with_retry("batch_get", self.retry_config, || async {
-            short_link::Entity::find()
-                .filter(short_link::Column::ShortCode.is_in(codes_owned.clone()))
-                .all(db)
-                .await
-        })
-        .await
-        .map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Batch query failed (still failed after retries): {}",
-                e
-            ))
-        })?;
+        let models =
+            aster_forge_db::retry::with_sea_orm_retry("batch_get", self.retry_config, || async {
+                short_link::Entity::find()
+                    .filter(short_link::Column::ShortCode.is_in(codes_owned.clone()))
+                    .all(db)
+                    .await
+            })
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "Batch query failed (still failed after retries): {}",
+                    e
+                ))
+            })?;
 
-        record_db_metrics(&self.metrics, "batch_get", start);
         Ok(models
             .into_iter()
             .map(|m| {
@@ -434,7 +414,6 @@ impl SeaOrmStorage {
 
     /// 获取链接统计信息（SeaORM DSL 聚合查询）
     pub async fn get_stats(&self) -> Result<LinkStats> {
-        let start = Instant::now();
         let now = Utc::now();
 
         let result = short_link::Entity::find()
@@ -462,7 +441,6 @@ impl SeaOrmStorage {
                 ShortlinkerError::database_operation(format!("Stats query failed: {}", e))
             })?;
 
-        record_db_metrics(&self.metrics, "get_stats", start);
         match result {
             Some(stats) => Ok(LinkStats {
                 total_links: stats.total_links.try_into().unwrap_or(usize::MAX),

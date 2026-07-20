@@ -11,7 +11,7 @@ use chrono::{Duration, Utc};
 use tempfile::TempDir;
 
 use shortlinker::config::init_config;
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
 use shortlinker::services::{AnalyticsService, GroupBy};
 use shortlinker::storage::backend::SeaOrmStorage;
 

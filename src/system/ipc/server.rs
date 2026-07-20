@@ -5,6 +5,8 @@
 use bytes::BytesMut;
 use futures_util::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use super::handler::handle_command;
@@ -12,42 +14,35 @@ use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
 use super::types::{IpcCommand, IpcResponse};
 
-/// Start the IPC server
-///
-/// This spawns a background task that listens for IPC connections
-/// and handles commands. Returns a JoinHandle that can be used to
-/// wait for or cancel the server.
-///
-/// # Panics
-///
-/// Does not panic, but logs errors if the server cannot start.
-pub async fn start_ipc_server() -> Option<tokio::task::JoinHandle<()>> {
-    let handle = tokio::spawn(async move {
-        let mut listener = match PlatformIpc::bind().await {
-            Ok(l) => {
-                info!("IPC server listening on {}", PlatformIpc::socket_path());
-                l
-            }
-            Err(e) => {
-                error!("Failed to start IPC server: {}", e);
-                return;
-            }
-        };
-
-        loop {
-            match PlatformIpc::accept(&mut listener).await {
-                Ok(stream) => {
-                    // Handle each connection in a separate task
-                    tokio::spawn(handle_connection(stream));
-                }
-                Err(e) => {
-                    warn!("Failed to accept IPC connection: {}", e);
-                }
-            }
+pub async fn run_ipc_server(shutdown_token: CancellationToken) {
+    let mut listener = match PlatformIpc::bind().await {
+        Ok(listener) => {
+            info!("IPC server listening on {}", PlatformIpc::socket_path());
+            listener
         }
-    });
+        Err(error) => {
+            error!(%error, "Failed to start IPC server");
+            return;
+        }
+    };
+    let mut connections = JoinSet::new();
 
-    Some(handle)
+    loop {
+        tokio::select! {
+            _ = shutdown_token.cancelled() => break,
+            result = PlatformIpc::accept(&mut listener) => match result {
+                Ok(stream) => {
+                    connections.spawn(handle_connection(stream));
+                }
+                Err(error) => warn!(%error, "Failed to accept IPC connection"),
+            },
+        }
+    }
+
+    connections.abort_all();
+    while connections.join_next().await.is_some() {}
+    PlatformIpc::cleanup();
+    info!("IPC server stopped, socket cleaned up");
 }
 
 /// Send a single IpcResponse over the stream
@@ -245,12 +240,4 @@ where
             }
         }
     }
-}
-
-/// Stop the IPC server and clean up
-///
-/// This removes the socket file (on Unix) to allow a clean restart.
-pub fn stop_ipc_server() {
-    PlatformIpc::cleanup();
-    info!("IPC server stopped, socket cleaned up");
 }

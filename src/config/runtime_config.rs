@@ -1,4 +1,3 @@
-use parking_lot::RwLock;
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -20,7 +19,7 @@ static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 /// 提供从数据库加载配置并缓存到内存的功能，
 /// 支持热更新和实时重载。
 pub struct RuntimeConfig {
-    cache: RwLock<HashMap<String, ConfigItem>>,
+    cache: aster_forge_config::SyncRuntimeConfig<ConfigItem>,
     store: Arc<ConfigStore>,
 }
 
@@ -28,7 +27,7 @@ impl RuntimeConfig {
     /// 创建新的运行时配置实例
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
+            cache: aster_forge_config::SyncRuntimeConfig::new(),
             store: Arc::new(ConfigStore::new(db)),
         }
     }
@@ -39,10 +38,7 @@ impl RuntimeConfig {
         let count = configs.len();
 
         // 更新内部缓存
-        {
-            let mut cache = self.cache.write();
-            *cache = configs;
-        }
+        self.cache.replace(configs.into_values().collect());
 
         info!("Loaded {} runtime configuration items", count);
         Ok(())
@@ -54,10 +50,7 @@ impl RuntimeConfig {
         let count = configs.len();
 
         // 更新内部缓存
-        {
-            let mut cache = self.cache.write();
-            *cache = configs;
-        }
+        self.cache.replace(configs.into_values().collect());
 
         info!("Reloaded {} runtime configuration items", count);
         Ok(())
@@ -65,19 +58,22 @@ impl RuntimeConfig {
 
     /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
-        let cache = self.cache.read();
-        cache.get(key).map(|item| (*item.value).clone())
+        self.cache.get(key)
     }
 
     /// 获取配置的完整信息
     pub fn get_full(&self, key: &str) -> Option<ConfigItem> {
-        let cache = self.cache.read();
-        cache.get(key).cloned()
+        self.cache.get_model(key)
     }
 
     /// 获取所有配置
     pub fn get_all(&self) -> HashMap<String, ConfigItem> {
-        self.cache.read().clone()
+        self.cache
+            .snapshot()
+            .values()
+            .iter()
+            .map(|(key, item)| (key.clone(), item.clone()))
+            .collect()
     }
 
     /// 获取 bool 类型配置
@@ -184,11 +180,10 @@ impl RuntimeConfig {
         }
 
         // 更新内部缓存（必须成功，保证一致性）
-        let mut cache = self.cache.write();
-
-        if let Some(item) = cache.get_mut(key) {
+        if let Some(mut item) = self.cache.get_model(key) {
             item.value = std::sync::Arc::new(value.to_string());
             item.updated_at = chrono::Utc::now();
+            self.cache.apply(item);
         } else {
             // 不应该发生：如果 load() 正确初始化了缓存
             tracing::warn!(

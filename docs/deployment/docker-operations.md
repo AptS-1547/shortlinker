@@ -42,7 +42,7 @@ docker build --build-arg CARGO_FEATURES="cli,metrics" -t shortlinker:metrics .
 ### 多阶段构建
 ```dockerfile
 # 构建阶段
-FROM rust:1.92-slim as builder
+FROM rust:1.94-slim as builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release

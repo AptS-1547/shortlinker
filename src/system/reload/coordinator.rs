@@ -9,10 +9,9 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast};
 use tracing::{error, info, warn};
 
-use crate::cache::CompositeCacheTrait;
 use crate::config::try_get_runtime_config;
 use crate::errors::Result;
-use crate::storage::SeaOrmStorage;
+use crate::services::LinkCache;
 
 use super::types::{ReloadEvent, ReloadResult, ReloadStatus, ReloadTarget};
 
@@ -33,19 +32,17 @@ pub trait ReloadCoordinator: Send + Sync {
 
 /// Default implementation of ReloadCoordinator
 pub struct DefaultReloadCoordinator {
-    cache: Arc<dyn CompositeCacheTrait + 'static>,
-    storage: Arc<SeaOrmStorage>,
+    cache: Arc<dyn LinkCache + 'static>,
     status: RwLock<ReloadStatus>,
     event_sender: broadcast::Sender<ReloadEvent>,
 }
 
 impl DefaultReloadCoordinator {
     /// Create a new DefaultReloadCoordinator
-    pub fn new(cache: Arc<dyn CompositeCacheTrait + 'static>, storage: Arc<SeaOrmStorage>) -> Self {
+    pub fn new(cache: Arc<dyn LinkCache + 'static>) -> Self {
         let (sender, _) = broadcast::channel(32);
         Self {
             cache,
-            storage,
             status: RwLock::new(ReloadStatus::default()),
             event_sender: sender,
         }
@@ -54,9 +51,6 @@ impl DefaultReloadCoordinator {
     /// Core data reload logic (eliminates code duplication)
     async fn reload_data(&self) -> Result<()> {
         info!("Starting data reload process...");
-
-        // Reload storage backend
-        self.storage.reload().await?;
 
         // 原子重建所有缓存层（含 Bloom Filter，内部自行从 DB 加载短码）
         self.cache.rebuild_all().await?;

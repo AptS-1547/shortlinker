@@ -2,7 +2,7 @@
 //!
 //! # 架构决策：直连 Storage + Cache
 //!
-//! health handler 直接访问 `SeaOrmStorage` 和 `CompositeCacheTrait`，
+//! health handler 直接访问 `SeaOrmStorage` 和产品侧 `LinkCache` policy，
 //! 不经过任何 service 层。这是有意为之的设计决策：
 //!
 //! ## 原因
@@ -21,12 +21,9 @@ use crate::api::services::admin::{
     ApiResponse, ErrorCode, HealthCacheCheck, HealthChecks, HealthResponse, HealthStorageBackend,
     HealthStorageCheck,
 };
-use crate::cache::CompositeCacheTrait;
+use crate::services::LinkCache;
 use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
-
-#[cfg(feature = "metrics")]
-use super::metrics::MetricsService;
 
 // 应用启动时间结构体
 #[derive(Clone, Debug)]
@@ -39,7 +36,7 @@ pub struct HealthService;
 impl HealthService {
     pub async fn health_check(
         storage: web::Data<Arc<SeaOrmStorage>>,
-        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        cache: web::Data<Arc<dyn LinkCache>>,
         app_start_time: web::Data<AppStartTime>,
     ) -> impl Responder {
         let start_time = Instant::now();
@@ -178,8 +175,5 @@ pub fn health_routes() -> actix_web::Scope {
         .route("/live", web::get().to(HealthService::liveness_check))
         .route("/live", web::head().to(HealthService::liveness_check));
 
-    #[cfg(feature = "metrics")]
-    let scope = scope.route("/metrics", web::get().to(MetricsService::metrics));
-
-    scope
+    aster_forge_actix_observability::configure_prometheus_route(scope)
 }

@@ -12,14 +12,13 @@ use futures_util::Stream;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 
-use crate::cache::traits::CompositeCacheTrait;
 use crate::config::{get_config, keys, try_get_runtime_config};
 use crate::errors::ShortlinkerError;
+use crate::services::LinkCache;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
 use crate::utils::password::{process_imported_password, process_new_password};
-use crate::utils::url_validator::validate_url;
 
 // ============ Request/Response DTOs ============
 
@@ -201,12 +200,12 @@ pub struct BatchDeleteResult {
 /// ensuring consistent behavior across IPC and HTTP interfaces.
 pub struct LinkService {
     storage: Arc<SeaOrmStorage>,
-    cache: Arc<dyn CompositeCacheTrait>,
+    cache: Arc<dyn LinkCache>,
 }
 
 impl LinkService {
     /// Create a new LinkService instance
-    pub fn new(storage: Arc<SeaOrmStorage>, cache: Arc<dyn CompositeCacheTrait>) -> Self {
+    pub fn new(storage: Arc<SeaOrmStorage>, cache: Arc<dyn LinkCache>) -> Self {
         Self { storage, cache }
     }
 
@@ -257,7 +256,8 @@ impl LinkService {
         req: CreateLinkRequest,
     ) -> Result<LinkCreateResult, ShortlinkerError> {
         // Validate URL
-        validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
+        aster_forge_utils::url::parse_http_url(&req.target, "target URL")
+            .map_err(|error| ShortlinkerError::link_invalid_url(error.to_string()))?;
 
         // Generate code if not provided, or validate user-provided code
         let (code, generated) = match req.code.filter(|c| !c.is_empty()) {
@@ -346,7 +346,8 @@ impl LinkService {
         req: UpdateLinkRequest,
     ) -> Result<ShortLink, ShortlinkerError> {
         // Validate URL
-        validate_url(&req.target).map_err(|e| ShortlinkerError::link_invalid_url(e.to_string()))?;
+        aster_forge_utils::url::parse_http_url(&req.target, "target URL")
+            .map_err(|error| ShortlinkerError::link_invalid_url(error.to_string()))?;
 
         // Get existing link
         let existing = self
@@ -466,7 +467,7 @@ impl LinkService {
 
         for item in links {
             // Validate URL first
-            if let Err(e) = validate_url(&item.target) {
+            if let Err(e) = aster_forge_utils::url::parse_http_url(&item.target, "target URL") {
                 result.failed += 1;
                 result.errors.push(ImportError {
                     code: item.code,
@@ -796,7 +797,7 @@ impl LinkService {
 
         for req in requests {
             // Validate URL first
-            if let Err(e) = validate_url(&req.target) {
+            if let Err(e) = aster_forge_utils::url::parse_http_url(&req.target, "target URL") {
                 let code = req
                     .code
                     .clone()
@@ -939,7 +940,7 @@ impl LinkService {
 
         for (code, req) in updates {
             // Validate URL first
-            if let Err(e) = validate_url(&req.target) {
+            if let Err(e) = aster_forge_utils::url::parse_http_url(&req.target, "target URL") {
                 result.failed.push(BatchFailedItem {
                     code,
                     reason: format!("Invalid URL: {}", e),

@@ -6,13 +6,12 @@ use chrono::{Duration, Utc};
 use shortlinker::config::init_config;
 use shortlinker::storage::ShortLink;
 use shortlinker::storage::backend::{
-    LinkFilter, SeaOrmStorage, connect_sqlite, infer_backend_from_url, normalize_backend_name,
-    run_migrations,
+    LinkFilter, SeaOrmStorage, infer_backend_from_url, normalize_backend_name, run_migrations,
 };
 use std::sync::Once;
 use tempfile::TempDir;
 
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
 
 // 确保 config 只初始化一次
 static INIT: Once = Once::new();
@@ -146,6 +145,39 @@ mod url_inference_tests {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    use aster_forge_metrics::{DbMetricsRecorder, DbQueryMetric};
+    use shortlinker::metrics::MetricsRecorder;
+
+    struct RecordingForgeMetrics {
+        queries: AtomicUsize,
+    }
+
+    impl DbMetricsRecorder for RecordingForgeMetrics {
+        fn enabled(&self) -> bool {
+            true
+        }
+
+        fn record_db_query(&self, _metric: &DbQueryMetric) {
+            self.queries.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl aster_forge_metrics::MetricsRecorder for RecordingForgeMetrics {}
+
+    struct RecordingMetrics {
+        forge: Arc<RecordingForgeMetrics>,
+    }
+
+    impl MetricsRecorder for RecordingMetrics {
+        fn forge_recorder(&self) -> aster_forge_metrics::SharedMetricsRecorder {
+            self.forge.clone()
+        }
+    }
 
     #[tokio::test]
     async fn test_connect_sqlite_creates_file() {
@@ -153,13 +185,14 @@ mod connection_tests {
         let db_path = temp_dir.path().join("new_db.db");
         let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-        let conn = connect_sqlite(&db_url).await;
+        let conn = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&db_url)).await;
         assert!(conn.is_ok(), "Should connect to SQLite: {:?}", conn);
     }
 
     #[tokio::test]
     async fn test_connect_sqlite_memory() {
-        let conn = connect_sqlite("sqlite::memory:").await;
+        let conn =
+            aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new("sqlite::memory:")).await;
         assert!(conn.is_ok(), "Should connect to in-memory SQLite");
     }
 
@@ -169,7 +202,9 @@ mod connection_tests {
         let db_path = temp_dir.path().join("migration_test.db");
         let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
-        let conn = connect_sqlite(&db_url).await.unwrap();
+        let conn = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&db_url))
+            .await
+            .unwrap();
         let result = run_migrations(&conn).await;
         assert!(result.is_ok(), "Migrations should run: {:?}", result);
     }
@@ -179,6 +214,27 @@ mod connection_tests {
         init_test_config();
         let result = SeaOrmStorage::new("", "sqlite", NoopMetrics::arc()).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_storage_installs_forge_query_metrics() {
+        init_test_config();
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("metrics.db");
+        let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
+        let forge = Arc::new(RecordingForgeMetrics {
+            queries: AtomicUsize::new(0),
+        });
+        let metrics: Arc<dyn MetricsRecorder> = Arc::new(RecordingMetrics {
+            forge: forge.clone(),
+        });
+
+        let storage = SeaOrmStorage::new(&db_url, "sqlite", metrics)
+            .await
+            .expect("storage should connect through Forge");
+        storage.count().await.expect("count query should succeed");
+
+        assert!(forge.queries.load(Ordering::Relaxed) > 0);
     }
 }
 

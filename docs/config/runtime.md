@@ -85,7 +85,7 @@ curl -sS -b cookies.txt \
 | `api.cookie_secure` | Boolean | `true` | 否 | 是否仅 HTTPS 传输（对浏览器生效；修改后建议重新登录获取新 Cookie） |
 | `api.cookie_same_site` | Enum | `Lax` | 否 | Cookie SameSite 策略：`Strict` / `Lax` / `None`（修改后建议重新登录获取新 Cookie） |
 | `api.cookie_domain` | String | *(空)* | 否 | Cookie 域名（修改后建议重新登录获取新 Cookie） |
-| `api.trusted_proxies` | StringArray | `[]` | 否 | 可信代理 IP 或 CIDR 列表。<br>**智能检测**（默认）：留空时，连接来自私有/本地地址会自动信任 X-Forwarded-For（IPv4: RFC1918 + `127.0.0.1`；IPv6: `::1`、`fc00::/7`、`fe80::/10`），适合 Docker/nginx 反向代理。<br>**显式配置**：设置后仅信任列表中的 IP，如 `["10.0.0.1", "172.17.0.0/16"]`。<br>**安全提示**：公网 IP 默认不信任 X-Forwarded-For，防止伪造。 |
+| `api.trusted_proxies` | StringArray | `[]` | 是 | TCP 反向代理的可信 peer IP 或 CIDR 列表。留空时所有 TCP 请求只使用连接 peer IP，并忽略 X-Forwarded-For。设置后仅在直接 peer 命中列表时采信 X-Forwarded-For，例如 `["10.0.0.1", "172.17.0.0/16"]`。Unix socket 模式自动信任本机反代传输。 |
 
 > 提示：
 > - Cookie 名称当前为固定值：`shortlinker_access` / `shortlinker_refresh` / `csrf_token`（不可配置）。

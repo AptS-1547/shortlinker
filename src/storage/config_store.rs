@@ -1,6 +1,6 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TransactionTrait, sea_query::OnConflict,
+    QueryOrder, Set, sea_query::OnConflict,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
 
 /// 配置项的完整信息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigItem {
     pub key: String,
     pub value: Arc<String>,
@@ -19,6 +19,20 @@ pub struct ConfigItem {
     pub requires_restart: bool,
     pub is_sensitive: bool,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl aster_forge_config::RuntimeConfigRecord for ConfigItem {
+    fn config_key(&self) -> &str {
+        &self.key
+    }
+
+    fn config_value(&self) -> &str {
+        self.value.as_str()
+    }
+
+    fn config_requires_restart(&self) -> bool {
+        self.requires_restart
+    }
 }
 
 /// 配置更新结果
@@ -172,42 +186,39 @@ impl ConfigStore {
             (old_value.clone(), value.to_string())
         };
 
-        // 使用事务确保更新和历史记录的原子性
-        let txn = self.db.begin().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to begin transaction: {}", e))
-        })?;
+        let old_record = old_record.expect("existing config record was checked above");
+        aster_forge_db::transaction::with_transaction(&self.db, async |txn| {
+            let mut active_model: system_config::ActiveModel = old_record.clone().into();
+            active_model.value = Set(value.to_string());
+            active_model.updated_at = Set(chrono::Utc::now());
 
-        // 更新配置
-        let mut active_model: system_config::ActiveModel = old_record.unwrap().into();
-        active_model.value = Set(value.to_string());
-        active_model.updated_at = Set(chrono::Utc::now());
+            active_model.update(txn).await.map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "Failed to update config '{}': {}",
+                    key, e
+                ))
+            })?;
 
-        active_model.update(&txn).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to update config '{}': {}",
-                key, e
-            ))
-        })?;
+            config_history::ActiveModel {
+                id: Default::default(),
+                config_key: Set(key.to_string()),
+                old_value: Set(history_old_value.clone()),
+                new_value: Set(history_new_value.clone()),
+                changed_at: Set(chrono::Utc::now()),
+                changed_by: Set(None),
+            }
+            .insert(txn)
+            .await
+            .map_err(|e| {
+                ShortlinkerError::database_operation(format!(
+                    "Failed to record config change history: {}",
+                    e
+                ))
+            })?;
 
-        let history = config_history::ActiveModel {
-            id: Default::default(),
-            config_key: Set(key.to_string()),
-            old_value: Set(history_old_value),
-            new_value: Set(history_new_value),
-            changed_at: Set(chrono::Utc::now()),
-            changed_by: Set(None),
-        };
-
-        history.insert(&txn).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to record config change history: {}",
-                e
-            ))
-        })?;
-
-        txn.commit().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to commit transaction: {}", e))
-        })?;
+            Ok::<(), ShortlinkerError>(())
+        })
+        .await?;
 
         Ok(ConfigUpdateResult {
             key: key.to_string(),

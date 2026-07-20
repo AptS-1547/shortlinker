@@ -60,9 +60,11 @@ impl PlatformOps for WindowsPlatform {
 
     fn cleanup_lockfile() {
         let lock_file = ".shortlinker.lock";
-        if let Err(e) = fs::remove_file(lock_file) {
+        if let Err(e) = fs::remove_file(lock_file)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
             error!("Failed to delete lock file: {}", e);
-        } else {
+        } else if std::path::Path::new(lock_file).exists() {
             info!("Lock file cleaned: {}", lock_file);
         }
 
@@ -71,15 +73,4 @@ impl PlatformOps for WindowsPlatform {
     }
 }
 
-// Export convenience functions for backwards compatibility
 pub use WindowsPlatform as Platform;
-
-/// Initialize the lock file
-pub fn init_lockfile() -> std::io::Result<()> {
-    WindowsPlatform::init_lockfile()
-}
-
-/// Clean up the lock file
-pub fn cleanup_lockfile() {
-    WindowsPlatform::cleanup_lockfile()
-}

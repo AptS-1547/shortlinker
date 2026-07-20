@@ -9,8 +9,8 @@
 ::: warning 重要：反向代理配置要求
 通过反向代理部署时，建议设置 `X-Real-IP` 和 `X-Forwarded-For` 请求头，用于获取客户端真实 IP（登录限流/统计等功能会用到）。
 
-- **TCP 反代**：如果未设置这些头，登录通常仍可用，但登录限流会退化为按“代理 IP”限流（所有用户共享同一个限流 key）。
-- **Unix Socket 模式**（配置了 `server.unix_socket`）：**必须**设置 `X-Forwarded-For`，否则登录限流无法提取 key，登录会返回 500。
+- **TCP 反代**：还需把直接代理地址加入 `api.trusted_proxies`；否则 Shortlinker 会忽略这些头，并按代理 peer IP 限流和记录统计。
+- **Unix Socket 模式**（配置了 `server.unix_socket`）：本机反代传输自动受信任。缺少 `X-Forwarded-For` 时登录仍可用，但会退化为 loopback IP，所有用户共享同一个限流 key。
 :::
 
 ## Caddy 配置

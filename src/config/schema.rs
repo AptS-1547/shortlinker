@@ -187,6 +187,13 @@ mod tests {
     }
 
     #[test]
+    fn trusted_proxies_require_restart() {
+        let schema = get_schema(keys::API_TRUSTED_PROXIES).expect("trusted proxy schema");
+
+        assert!(schema.requires_restart);
+    }
+
+    #[test]
     fn test_get_all_schemas() {
         let schemas = get_all_schemas();
         assert!(!schemas.is_empty());

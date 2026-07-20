@@ -2,14 +2,14 @@
 //!
 //! # 架构决策：直连 Storage + Cache
 //!
-//! redirect handler 直接访问 `SeaOrmStorage` 和 `CompositeCacheTrait`，
+//! redirect handler 直接访问 `SeaOrmStorage` 和产品侧 `LinkCache` policy，
 //! 不经过 `LinkService`。这是有意为之的设计决策：
 //!
 //! ## 原因
 //! 1. **性能**：redirect 是系统最热的路径，每次请求都会触发。
 //!    额外的 service 层间接调用会增加不必要的开销。
-//! 2. **缓存策略**：redirect 使用 CompositeCache 的完整查询链
-//!    (Bloom → NegativeCache → ObjectCache → DB)，这是 cache 层的核心价值。
+//! 2. **缓存策略**：redirect 使用 `LinkCache` 组合 Forge primitives 的完整查询链
+//!    (Bloom → negative backend → object backend → DB)，这是 cache policy 的核心价值。
 //!    LinkService 的 CRUD 操作不需要这个查询链。
 //! 3. **关注点不同**：redirect 的逻辑（缓存查询、点击计数、UTM 透传）
 //!    与 admin CRUD 操作完全不同，强行统一反而增加复杂度。
@@ -26,13 +26,10 @@ use std::sync::Arc;
 use tracing::{debug, error, trace};
 
 use crate::analytics::global::{get_click_manager, is_detailed_logging_stopped};
-use crate::cache::CacheResult;
-use crate::cache::CompositeCacheTrait;
 use crate::config::{get_config, get_runtime_config, keys};
-use crate::metrics_core::MetricsRecorder;
-use crate::services::GeoIpProvider;
+use crate::metrics::MetricsRecorder;
+use crate::services::{GeoIpProvider, LinkCache, LinkCacheLookup};
 use crate::storage::{SeaOrmStorage, ShortLink};
-use crate::utils::ip::extract_client_ip;
 use crate::utils::is_valid_short_code;
 
 pub struct RedirectService {}
@@ -41,7 +38,7 @@ impl RedirectService {
     pub async fn handle_redirect(
         req: HttpRequest,
         path: web::Path<String>,
-        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        cache: web::Data<Arc<dyn LinkCache>>,
         storage: web::Data<Arc<SeaOrmStorage>>,
         geoip: Option<web::Data<Arc<GeoIpProvider>>>,
         metrics: web::Data<Arc<dyn MetricsRecorder>>,
@@ -66,17 +63,17 @@ impl RedirectService {
     async fn process_redirect(
         capture_path: String,
         req: HttpRequest,
-        cache: web::Data<Arc<dyn CompositeCacheTrait>>,
+        cache: web::Data<Arc<dyn LinkCache>>,
         storage: web::Data<Arc<SeaOrmStorage>>,
         geoip: Option<web::Data<Arc<GeoIpProvider>>>,
         metrics: web::Data<Arc<dyn MetricsRecorder>>,
     ) -> HttpResponse {
         match cache.get(&capture_path).await {
-            CacheResult::Found(link) => {
+            LinkCacheLookup::Found(link) => {
                 Self::update_click(&capture_path, &req, geoip);
                 Self::finish_redirect(&req, link, &metrics)
             }
-            CacheResult::Miss => {
+            LinkCacheLookup::Miss => {
                 trace!("Cache miss for path: {}", &capture_path);
                 match storage.get(&capture_path).await {
                     Ok(Some(link)) => match link.cache_ttl(get_config().cache.default_ttl) {
@@ -104,7 +101,7 @@ impl RedirectService {
                     }
                 }
             }
-            CacheResult::NotFound => {
+            LinkCacheLookup::NotFound => {
                 debug!("Cache not found for path: {}", &capture_path);
                 Self::not_found_response(&metrics)
             }
@@ -173,7 +170,38 @@ impl RedirectService {
                 .get("user-agent")
                 .and_then(|h| h.to_str().ok())
                 .map(String::from),
-            ip: extract_client_ip(req),
+            ip: {
+                let trusted =
+                    get_runtime_config().get_json_or(keys::API_TRUSTED_PROXIES, Vec::new());
+                #[cfg(unix)]
+                let trusted = if get_config().server.unix_socket.is_some() {
+                    trusted
+                        .into_iter()
+                        .chain(["127.0.0.0/8".to_string(), "::1/128".to_string()])
+                        .collect::<Vec<_>>()
+                } else {
+                    trusted
+                };
+
+                let peer = req.peer_addr().map(|address| address.ip());
+                #[cfg(unix)]
+                let peer = peer.or_else(|| {
+                    get_config()
+                        .server
+                        .unix_socket
+                        .as_ref()
+                        .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
+                });
+
+                peer.map(|peer| {
+                    aster_forge_actix_middleware::client_ip::real_ip_from_headers(
+                        req.headers(),
+                        peer,
+                        &trusted,
+                    )
+                    .to_string()
+                })
+            },
         };
 
         // send_raw_event 内部会调用 increment

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::errors::Result;
-use crate::metrics_core::MetricsRecorder;
+use crate::metrics::MetricsRecorder;
 
 pub mod backend;
 pub mod config_store;

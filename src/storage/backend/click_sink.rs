@@ -15,7 +15,6 @@ use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, ExprTrait, Iden};
 use tracing::{debug, warn};
 
 use super::SeaOrmStorage;
-use super::retry;
 use crate::analytics::{
     ClickDetail, ClickSink, DetailedClickSink, HourlyRollupWriter, truncate_to_hour,
 };
@@ -52,13 +51,15 @@ impl ClickSink for SeaOrmStorage {
             _ => "MIN",
         };
 
+        let mut statements = Vec::with_capacity(updates.len().div_ceil(BATCH_SIZE));
         for batch in updates.chunks(BATCH_SIZE) {
             // 构建 CASE WHEN 表达式（跨平台兼容，带溢出保护）
             let mut case_stmt = CaseStatement::new();
             let mut codes: Vec<String> = Vec::with_capacity(batch.len());
 
             for (code, count) in batch {
-                let delta = i64::try_from(*count).unwrap_or(i64::MAX);
+                let delta = aster_forge_utils::numbers::usize_to_i64(*count, "click delta")
+                    .unwrap_or(i64::MAX);
                 case_stmt = case_stmt.case(
                     Expr::col(short_link::Column::ShortCode).eq(Expr::val(code.as_str())),
                     Expr::cust(format!(
@@ -75,26 +76,33 @@ impl ClickSink for SeaOrmStorage {
             case_stmt = case_stmt.finally(Expr::col(short_link::Column::ClickCount));
 
             // 构建 UPDATE 语句
-            let stmt = Query::update()
-                .table(short_link::Entity)
-                .value(short_link::Column::ClickCount, case_stmt)
-                .and_where(Expr::col(short_link::Column::ShortCode).is_in(codes))
-                .to_owned();
-
-            // 使用参数化查询执行，带 30 秒超时
-            let db = &self.db;
-            let stmt_ref = &stmt;
-            retry::with_retry_timeout("flush_clicks", self.retry_config, 30_000, || async {
-                db.execute(stmt_ref).await
-            })
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to batch update click counts (still failed after retries): {}",
-                    e
-                )
-            })?;
+            statements.push(
+                Query::update()
+                    .table(short_link::Entity)
+                    .value(short_link::Column::ClickCount, case_stmt)
+                    .and_where(Expr::col(short_link::Column::ShortCode).is_in(codes))
+                    .to_owned(),
+            );
         }
+
+        aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &self.retry_config,
+            |txn| {
+                let statements = statements.clone();
+                Box::pin(async move {
+                    for statement in statements {
+                        txn.execute(&statement)
+                            .await
+                            .map_err(aster_forge_db::DbError::from)?;
+                    }
+                    Ok(())
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
+        .await
+        .map_err(anyhow::Error::new)?;
 
         debug!(
             "Click counts flushed to {} database ({} records)",
@@ -140,15 +148,22 @@ impl DetailedClickSink for SeaOrmStorage {
             })
             .collect();
 
-        // 使用 insert_many 进行批量插入，带 30 秒超时
-        let db = &self.db;
-        retry::with_retry_timeout("log_clicks_batch", self.retry_config, 30_000, || async {
-            click_log::Entity::insert_many(models.clone())
-                .exec(db)
-                .await
-        })
+        aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &self.retry_config,
+            |txn| {
+                let models = models.clone();
+                Box::pin(async move {
+                    click_log::Entity::insert_many(models)
+                        .exec(txn)
+                        .await
+                        .map_err(aster_forge_db::DbError::from)
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to batch insert click logs: {}", e))?;
+        .map_err(anyhow::Error::new)?;
 
         debug!(
             "Detailed click logs written to {} database ({} records)",
@@ -170,7 +185,7 @@ impl DetailedClickSink for SeaOrmStorage {
 
 impl SeaOrmStorage {
     /// 创建 HourlyRollupWriter 实例
-    fn hourly_writer(&self) -> HourlyRollupWriter<'_, impl ConnectionTrait> {
+    fn hourly_writer(&self) -> HourlyRollupWriter<'_, sea_orm::DatabaseConnection> {
         HourlyRollupWriter::new(&self.db, self.retry_config)
     }
 
@@ -183,19 +198,8 @@ impl SeaOrmStorage {
         let hour_bucket = truncate_to_hour(timestamp);
         let writer = self.hourly_writer();
 
-        // 更新各链接的小时汇总
         writer
-            .upsert_hourly_counts(updates, timestamp, "sink")
-            .await?;
-
-        // 更新全局小时汇总（用 saturating_add 防止溢出）
-        let total_clicks: usize = updates.iter().map(|(_, c)| c).fold(0usize, |acc, &c| {
-            let capped = c.min(i64::MAX as usize);
-            acc.saturating_add(capped)
-        });
-        let unique_links = i32::try_from(updates.len()).unwrap_or(i32::MAX);
-        writer
-            .upsert_global_hourly(hour_bucket, total_clicks, unique_links, "sink")
+            .increment_hourly_counts(updates, timestamp, "sink")
             .await?;
 
         debug!(

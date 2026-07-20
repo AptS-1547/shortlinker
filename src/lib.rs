@@ -10,7 +10,7 @@
 //! - **full**: All features enabled
 //!
 //! # Architecture
-//! - `cache`: Multi-level caching (L1 + L2 + Bloom filter)
+//! - `services`: Link cache policy and product business logic
 //! - `storage`: Storage backends and data access
 //! - `analytics`: Click tracking and statistics
 //! - `api`: HTTP services and middleware
@@ -21,16 +21,12 @@
 
 pub mod analytics;
 pub mod api;
-pub mod cache;
 pub mod cli;
 pub mod client;
 pub mod config;
 pub mod errors;
 mod event;
-pub mod interfaces;
-#[cfg(feature = "metrics")]
 pub mod metrics;
-pub mod metrics_core;
 pub mod runtime;
 pub mod services;
 pub mod storage;

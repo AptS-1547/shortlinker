@@ -16,7 +16,6 @@ use actix_web::{
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
 use std::rc::Rc;
-use subtle::ConstantTimeEq;
 use tracing::{info, trace};
 
 use crate::api::constants;
@@ -50,10 +49,16 @@ where
             format!("{}/v1/auth/refresh", admin_prefix),
             format!("{}/v1/auth/logout", admin_prefix),
         ];
+        let csrf_names = aster_forge_actix_middleware::csrf::CsrfTokenNames::new(
+            constants::CSRF_COOKIE_NAME,
+            "X-CSRF-Token",
+        )
+        .expect("shortlinker CSRF names are static valid header/cookie names");
 
         ready(Ok(CsrfMiddleware {
             service: Rc::new(service),
             auth_endpoints,
+            csrf_names,
         }))
     }
 }
@@ -61,6 +66,7 @@ where
 pub struct CsrfMiddleware<S> {
     service: Rc<S>,
     auth_endpoints: Vec<String>,
+    csrf_names: aster_forge_actix_middleware::csrf::CsrfTokenNames,
 }
 
 impl<S, B> CsrfMiddleware<S>
@@ -94,45 +100,6 @@ where
         let path = req.path();
         auth_endpoints.iter().any(|endpoint| endpoint == path)
     }
-
-    /// 常量时间比较两个字符串
-    fn constant_time_compare(a: &str, b: &str) -> bool {
-        a.as_bytes().ct_eq(b.as_bytes()).into()
-    }
-
-    /// 验证 CSRF Token
-    fn validate_csrf_token(req: &ServiceRequest) -> bool {
-        // 从 Cookie 获取 CSRF token
-        let cookie_token = req
-            .cookie(constants::CSRF_COOKIE_NAME)
-            .map(|c| c.value().to_string());
-
-        // 从 Header 获取 CSRF token
-        let header_token = req
-            .headers()
-            .get("X-CSRF-Token")
-            .and_then(|h| h.to_str().ok())
-            .map(|s| s.to_string());
-
-        match (cookie_token, header_token) {
-            (Some(cookie), Some(header)) => {
-                // 常量时间比较，防止时序攻击
-                let valid = Self::constant_time_compare(&cookie, &header);
-                if !valid {
-                    info!("CSRF token mismatch");
-                }
-                valid
-            }
-            (None, _) => {
-                info!("CSRF cookie not found");
-                false
-            }
-            (_, None) => {
-                info!("X-CSRF-Token header not found");
-                false
-            }
-        }
-    }
 }
 
 impl<S, B> Service<ServiceRequest> for CsrfMiddleware<S>
@@ -154,6 +121,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         let auth_endpoints = self.auth_endpoints.clone();
+        let csrf_names = self.csrf_names.clone();
 
         Box::pin(async move {
             // 1. 跳过安全方法（GET, HEAD, OPTIONS）
@@ -185,7 +153,13 @@ where
             }
 
             // 4. Cookie 认证需要验证 CSRF Token
-            if !Self::validate_csrf_token(&req) {
+            if let Err(error) =
+                aster_forge_actix_middleware::csrf::ensure_service_double_submit_token_with_names(
+                    &req,
+                    &csrf_names,
+                )
+            {
+                info!(kind = ?error.kind(), "CSRF validation failed");
                 return Ok(Self::handle_csrf_error(req));
             }
 

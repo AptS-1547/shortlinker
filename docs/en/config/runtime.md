@@ -72,7 +72,7 @@ These settings are stored in the database and can be changed at runtime via the 
 | `api.cookie_secure` | Boolean | `true` | No | HTTPS-only cookies (browser-facing; re-login recommended after changes) |
 | `api.cookie_same_site` | Enum | `Lax` | No | SameSite policy: `Strict` / `Lax` / `None` (re-login recommended after changes) |
 | `api.cookie_domain` | String | *(empty)* | No | Cookie domain (re-login recommended after changes) |
-| `api.trusted_proxies` | StringArray | `[]` | No | Trusted proxy IPs or CIDRs for login rate-limit IP extraction.<br>**Auto-detect** (default): When empty, connections from private/local addresses automatically trust X-Forwarded-For (IPv4: RFC1918 + `127.0.0.1`; IPv6: `::1`, `fc00::/7`, `fe80::/10`), suitable for Docker/nginx reverse proxy.<br>**Explicit config**: When set, only trust IPs in the list, e.g., `["10.0.0.1", "172.17.0.0/16"]`.<br>**Security**: Public IPs never trust X-Forwarded-For by default to prevent spoofing. |
+| `api.trusted_proxies` | StringArray | `[]` | Yes | Trusted direct peer IPs or CIDRs for TCP reverse proxies. When empty, every TCP request uses the connection peer IP and ignores X-Forwarded-For. When configured, X-Forwarded-For is accepted only if the direct peer matches the list, e.g. `["10.0.0.1", "172.17.0.0/16"]`. Unix socket mode trusts the local proxy transport automatically. |
 
 > Notes:
 > - Cookie names are fixed: `shortlinker_access` / `shortlinker_refresh` / `csrf_token` (not configurable).

@@ -7,6 +7,7 @@ use std::sync::{Arc, Once};
 
 use async_trait::async_trait;
 use chrono::Utc;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tempfile::TempDir;
 use tokio::time::Duration as TokioDuration;
 
@@ -16,8 +17,8 @@ use shortlinker::analytics::{
 };
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
-use shortlinker::metrics_core::NoopMetrics;
-use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
+use shortlinker::metrics::NoopMetrics;
+use shortlinker::storage::backend::{SeaOrmStorage, run_migrations};
 
 // =============================================================================
 // 全局初始化
@@ -40,7 +41,9 @@ async fn init_test_runtime_config() {
             let td = TempDir::new().unwrap();
             let p = td.path().join("analytics_rt.db");
             let u = format!("sqlite://{}?mode=rwc", p.display());
-            let db = connect_sqlite(&u).await.unwrap();
+            let db = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&u))
+                .await
+                .unwrap();
             run_migrations(&db).await.unwrap();
             init_runtime_config(db).await.unwrap();
             let _ = TEST_DIR.set(td);
@@ -403,20 +406,39 @@ mod rollup_integration_tests {
     #[tokio::test]
     async fn test_rollup_hourly_to_daily() {
         let (storage, _td) = create_temp_storage().await;
-        let manager = RollupManager::new(storage);
-        let now = Utc::now();
+        let manager = RollupManager::new(storage.clone());
+        let timestamp = Utc::now() - chrono::Duration::days(1);
+        let target_date = timestamp.date_naive();
 
         // 先写入一些小时数据
         let updates = vec![("rollup-test".to_string(), 10usize)];
         manager
-            .increment_hourly_counts(&updates, now)
+            .increment_hourly_counts(&updates, timestamp)
             .await
             .unwrap();
 
-        // 执行汇总
-        let yesterday = (Utc::now() - chrono::Duration::days(1)).date_naive();
-        let result = manager.rollup_hourly_to_daily(yesterday).await;
+        let result = manager.rollup_hourly_to_daily(target_date).await;
         assert!(result.is_ok(), "rollup_hourly_to_daily 失败: {:?}", result);
+        manager.rollup_hourly_to_daily(target_date).await.unwrap();
+
+        let daily = migration::entities::click_stats_daily::Entity::find()
+            .filter(migration::entities::click_stats_daily::Column::ShortCode.eq("rollup-test"))
+            .filter(migration::entities::click_stats_daily::Column::DayBucket.eq(target_date))
+            .one(storage.get_db())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(daily.click_count, 10, "重复 rollup 不应重复累加");
+
+        let global = migration::entities::click_stats_global_daily::Entity::find()
+            .filter(
+                migration::entities::click_stats_global_daily::Column::DayBucket.eq(target_date),
+            )
+            .one(storage.get_db())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(global.total_clicks, 10, "全局 daily 快照也必须幂等");
     }
 
     #[tokio::test]

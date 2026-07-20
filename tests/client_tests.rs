@@ -7,9 +7,9 @@
 use shortlinker::client::{ConfigClient, LinkClient, ServiceContext};
 use shortlinker::config::init_config;
 use shortlinker::config::runtime_config::init_runtime_config;
-use shortlinker::metrics_core::NoopMetrics;
+use shortlinker::metrics::NoopMetrics;
 use shortlinker::services::ImportLinkItemRich;
-use shortlinker::storage::backend::{SeaOrmStorage, connect_sqlite, run_migrations};
+use shortlinker::storage::backend::{SeaOrmStorage, run_migrations};
 use std::sync::{Arc, Once};
 use tempfile::TempDir;
 
@@ -34,7 +34,9 @@ async fn init_test_runtime_config() {
             let td = TempDir::new().unwrap();
             let p = td.path().join("client_rt.db");
             let u = format!("sqlite://{}?mode=rwc", p.display());
-            let db = connect_sqlite(&u).await.unwrap();
+            let db = aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new(&u))
+                .await
+                .unwrap();
             run_migrations(&db).await.unwrap();
             init_runtime_config(db).await.unwrap();
             let _ = TEST_DIR.set(td);

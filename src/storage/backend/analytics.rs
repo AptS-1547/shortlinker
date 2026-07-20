@@ -685,7 +685,7 @@ impl super::SeaOrmStorage {
 
         // 排序并取 top N
         let mut items: Vec<_> = aggregated.into_iter().collect();
-        items.sort_by(|a, b| b.1.cmp(&a.1));
+        items.sort_by_key(|item| std::cmp::Reverse(item.1));
         items.truncate(limit);
 
         Ok(items
@@ -768,7 +768,7 @@ impl super::SeaOrmStorage {
 
         // 排序并取 top N
         let mut items: Vec<_> = aggregated.into_iter().collect();
-        items.sort_by(|a, b| b.1.cmp(&a.1));
+        items.sort_by_key(|item| std::cmp::Reverse(item.1));
         items.truncate(limit);
 
         Ok(items
