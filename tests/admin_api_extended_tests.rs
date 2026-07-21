@@ -82,12 +82,22 @@ fn get_config_service() -> Arc<ConfigService> {
 struct MockCache {
     data: RwLock<HashMap<String, ShortLink>>,
     not_found: RwLock<std::collections::HashSet<String>>,
+    healthy: bool,
 }
 impl MockCache {
     fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
             not_found: RwLock::new(std::collections::HashSet::new()),
+            healthy: true,
+        }
+    }
+
+    fn unhealthy() -> Self {
+        Self {
+            data: RwLock::new(HashMap::new()),
+            not_found: RwLock::new(std::collections::HashSet::new()),
+            healthy: false,
         }
     }
 }
@@ -125,11 +135,11 @@ impl LinkCache for MockCache {
     }
     async fn health_check(&self) -> LinkCacheHealth {
         LinkCacheHealth {
-            status: "healthy".to_string(),
+            status: if self.healthy { "healthy" } else { "unhealthy" }.to_string(),
             cache_type: "mock".to_string(),
             bloom_filter_enabled: false,
             negative_cache_enabled: true,
-            error: None,
+            error: (!self.healthy).then(|| "cache offline".to_string()),
         }
     }
 }
@@ -144,10 +154,17 @@ mod health_tests {
 
     #[tokio::test]
     async fn test_readiness_check() {
-        let app = test::init_service(App::new().route(
-            "/health/ready",
-            web::get().to(HealthService::readiness_check),
-        ))
+        init_test_env().await;
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::new());
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_storage()))
+                .app_data(web::Data::new(cache))
+                .route(
+                    "/health/ready",
+                    web::get().to(HealthService::readiness_check),
+                ),
+        )
         .await;
 
         let req = TestRequest::get().uri("/health/ready").to_request();
@@ -191,6 +208,39 @@ mod health_tests {
 
         let body: Value = test::read_body_json(resp).await;
         assert_eq!(body["data"]["status"], "healthy");
+    }
+
+    #[tokio::test]
+    async fn test_cache_failure_degrades_health_without_failing_readiness() {
+        init_test_env().await;
+        let cache: Arc<dyn LinkCache> = Arc::new(MockCache::unhealthy());
+        let start_time = AppStartTime {
+            start_datetime: chrono::Utc::now(),
+        };
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_storage()))
+                .app_data(web::Data::new(cache))
+                .app_data(web::Data::new(start_time))
+                .route("/health", web::get().to(HealthService::health_check))
+                .route(
+                    "/health/ready",
+                    web::get().to(HealthService::readiness_check),
+                ),
+        )
+        .await;
+
+        let full = test::call_service(&app, TestRequest::get().uri("/health").to_request()).await;
+        assert_eq!(full.status(), StatusCode::OK);
+        let body: Value = test::read_body_json(full).await;
+        assert_eq!(body["data"]["status"], "degraded");
+        assert_eq!(body["data"]["checks"]["cache"]["status"], "unhealthy");
+        assert_eq!(body["data"]["checks"]["cache"]["error"], "cache offline");
+
+        let ready =
+            test::call_service(&app, TestRequest::get().uri("/health/ready").to_request()).await;
+        assert_eq!(ready.status(), StatusCode::OK);
     }
 }
 
@@ -274,6 +324,66 @@ mod config_api_tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         // 不存在的 key 应返回 404
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_update_config_uses_registry_normalization() {
+        init_test_env().await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
+
+        let req = TestRequest::put()
+            .uri("/v1/config/api.cookie_same_site")
+            .set_json(serde_json::json!({ "value": "strict" }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: Value = test::read_body_json(resp).await;
+        assert_eq!(body["data"]["value"], "Strict");
+    }
+
+    #[tokio::test]
+    async fn test_update_config_rejects_invalid_registry_value() {
+        init_test_env().await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
+
+        let req = TestRequest::put()
+            .uri("/v1/config/features.random_code_length")
+            .set_json(serde_json::json!({ "value": "6.5" }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_update_unknown_config_uses_product_not_found_error() {
+        init_test_env().await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(get_config_service()))
+                .service(web::scope("/v1").service(config_routes())),
+        )
+        .await;
+
+        let req = TestRequest::put()
+            .uri("/v1/config/nonexistent.key")
+            .set_json(serde_json::json!({ "value": "anything" }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }

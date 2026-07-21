@@ -94,7 +94,7 @@ value_type: ValueType, requires_restart: boolean, is_sensitive: boolean, updated
  */
 export type ConfigSchema = { key: string, value_type: ValueType, default_value: string, description: string, category?: string, enum_options?: Array<EnumOption>, requires_restart: boolean, editable: boolean, 
 /**
- * 排序顺序（基于 definitions.rs 中 ALL_CONFIGS 的索引）
+ * 排序顺序（基于 Forge registry 中定义的顺序）
  */
 order: number, 
 /**

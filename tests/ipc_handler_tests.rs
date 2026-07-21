@@ -661,6 +661,57 @@ async fn test_config_set_invalid_value() {
 }
 
 #[tokio::test]
+async fn test_config_set_canonicalizes_product_enum() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "api.cookie_same_site".to_string(),
+        value: "strict".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::ConfigSetResult { value, .. } => assert_eq!(value, "Strict"),
+        other => panic!("Expected ConfigSetResult, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_config_set_rejects_non_integer_number() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "features.random_code_length".to_string(),
+        value: "6.5".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::Error { code, .. } => assert_eq!(code, "CONFIG_INVALID_VALUE"),
+        other => panic!(
+            "Expected Error for fractional integer config, got {:?}",
+            other
+        ),
+    }
+}
+
+#[tokio::test]
+async fn test_config_set_rejects_non_canonical_boolean() {
+    setup_ipc_handler().await;
+
+    let resp = handle_command(IpcCommand::ConfigSet {
+        key: "features.enable_admin_panel".to_string(),
+        value: "yes".to_string(),
+    })
+    .await;
+
+    match resp {
+        IpcResponse::Error { code, .. } => assert_eq!(code, "CONFIG_INVALID_VALUE"),
+        other => panic!("Expected Error for invalid boolean config, got {:?}", other),
+    }
+}
+
+#[tokio::test]
 async fn test_config_set_trusted_proxies_requires_restart() {
     setup_ipc_handler().await;
 

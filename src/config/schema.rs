@@ -12,8 +12,10 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 use ts_rs::TS;
 
-use super::definitions::{ALL_CONFIGS, ConfigDef};
-use super::types::{ActionType, RustType, TS_EXPORT_PATH};
+use aster_forge_config::{ConfigDefinition, ConfigValueType};
+
+use super::definitions::{CONFIG_REGISTRY, action_for_key, keys};
+use super::types::{ActionType, TS_EXPORT_PATH};
 use super::{HttpMethod, SameSitePolicy, ValueType};
 
 /// Schema 缓存
@@ -47,7 +49,7 @@ pub struct ConfigSchema {
     pub enum_options: Option<Vec<EnumOption>>,
     pub requires_restart: bool,
     pub editable: bool,
-    /// 排序顺序（基于 definitions.rs 中 ALL_CONFIGS 的索引）
+    /// 排序顺序（基于 Forge registry 中定义的顺序）
     pub order: usize,
     /// 可执行的 action（如生成 token）
     #[ts(optional)]
@@ -56,24 +58,25 @@ pub struct ConfigSchema {
 
 /// 获取所有配置的 schema
 ///
-/// 从 ALL_CONFIGS 生成，保证与配置定义同步。
+/// 从 Forge registry 生成，保证存储、校验和展示元数据使用同一份定义。
 /// 首次调用会计算并缓存，后续调用直接返回缓存。
 pub fn get_all_schemas() -> &'static Vec<ConfigSchema> {
     SCHEMA_CACHE.get_or_init(|| {
-        ALL_CONFIGS
+        CONFIG_REGISTRY
+            .definitions()
             .iter()
             .enumerate()
             .map(|(idx, def)| ConfigSchema {
                 key: def.key.to_string(),
-                value_type: def.value_type,
+                value_type: ValueType::from_forge(def.key, def.value_type),
                 default_value: (def.default_fn)(),
                 description: def.description.to_string(),
                 category: Some(def.category.to_string()),
                 enum_options: get_enum_options(def),
                 requires_restart: def.requires_restart,
-                editable: def.editable,
+                editable: true,
                 order: idx,
-                action: def.action,
+                action: action_for_key(def.key),
             })
             .collect()
     })
@@ -84,16 +87,13 @@ pub fn get_schema(key: &str) -> Option<ConfigSchema> {
     get_all_schemas().iter().find(|s| s.key == key).cloned()
 }
 
-/// 根据 RustType 自动推断 enum 选项
-///
-/// 这样就不需要手动维护 key -> options 的映射，
-/// 编译器会确保所有枚举类型都有对应的选项。
-fn get_enum_options(def: &ConfigDef) -> Option<Vec<EnumOption>> {
-    match def.rust_type {
-        RustType::SameSitePolicy => Some(same_site_options()),
-        RustType::VecHttpMethod => Some(http_method_options()),
-        RustType::MaxRowsAction => Some(max_rows_action_options()),
-        RustType::Bool => Some(bool_options()),
+/// 将产品枚举的候选值附加到 Shortlinker schema。
+fn get_enum_options(def: &ConfigDefinition) -> Option<Vec<EnumOption>> {
+    match def.key {
+        keys::API_COOKIE_SAME_SITE => Some(same_site_options()),
+        keys::CORS_ALLOWED_METHODS => Some(http_method_options()),
+        keys::ANALYTICS_MAX_ROWS_ACTION => Some(max_rows_action_options()),
+        _ if def.value_type == ConfigValueType::Boolean => Some(bool_options()),
         _ => None,
     }
 }
@@ -175,8 +175,6 @@ fn max_rows_action_options() -> Vec<EnumOption> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::definitions::keys;
-
     #[test]
     fn test_get_schema() {
         let schema = get_schema(keys::API_COOKIE_SAME_SITE);
@@ -197,8 +195,7 @@ mod tests {
     fn test_get_all_schemas() {
         let schemas = get_all_schemas();
         assert!(!schemas.is_empty());
-        // 应该与 ALL_CONFIGS 数量一致
-        assert_eq!(schemas.len(), ALL_CONFIGS.len());
+        assert_eq!(schemas.len(), CONFIG_REGISTRY.definitions().len());
     }
 
     #[test]
@@ -227,7 +224,7 @@ mod tests {
         println!("Schema TypeScript types exported to {}", TS_EXPORT_PATH);
     }
 
-    /// 编译期安全检查：所有 EnumArray 和 Enum 类型必须有 enum_options
+    /// 注册表一致性检查：所有 EnumArray 和 Enum 类型必须有 enum_options
     ///
     /// 这个测试确保配置定义的一致性：
     /// - ValueType::Enum 或 EnumArray 必须有对应的 enum_options
@@ -240,7 +237,7 @@ mod tests {
                 assert!(
                     schema.enum_options.is_some(),
                     "Config '{}' is defined as {:?} but has no enum_options. \
-                     Check get_enum_options() in schema.rs to ensure RustType is handled.",
+                     Check get_enum_options() in schema.rs to ensure the product enum is handled.",
                     schema.key,
                     schema.value_type
                 );

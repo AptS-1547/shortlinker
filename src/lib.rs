@@ -25,7 +25,6 @@ pub mod cli;
 pub mod client;
 pub mod config;
 pub mod errors;
-mod event;
 pub mod metrics;
 pub mod runtime;
 pub mod services;

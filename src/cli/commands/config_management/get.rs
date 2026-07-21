@@ -2,7 +2,7 @@
 
 use crate::cli::CliError;
 use crate::client::ConfigClient;
-use crate::config::definitions::get_def;
+use crate::config::definitions::CONFIG_REGISTRY;
 use crate::config::schema::get_schema;
 use colored::Colorize;
 use serde::Serialize;
@@ -27,12 +27,11 @@ pub async fn config_get(client: &ConfigClient, key: String, json: bool) -> Resul
     let item = client.get(key).await?;
 
     // Enrich with definition and schema metadata
-    let def = get_def(&item.key);
+    let def = CONFIG_REGISTRY.get(&item.key);
     let schema = get_schema(&item.key);
 
     let category = def.map(|d| d.category.to_string()).unwrap_or_default();
     let description = def.map(|d| d.description.to_string()).unwrap_or_default();
-    let editable = def.map(|d| d.editable).unwrap_or(true);
     let default_value = if item.is_sensitive {
         "(masked)".to_string()
     } else {
@@ -57,7 +56,7 @@ pub async fn config_get(client: &ConfigClient, key: String, json: bool) -> Resul
         value_type: item.value_type.to_string(),
         default_value,
         requires_restart: item.requires_restart,
-        editable,
+        editable: true,
         sensitive: item.is_sensitive,
         description,
         enum_options,

@@ -5,7 +5,7 @@
 
 use tracing::info;
 
-use crate::config::definitions::get_def;
+use crate::config::definitions::{CONFIG_REGISTRY, action_for_key};
 use crate::config::types::ActionType;
 use crate::config::{RuntimeConfig, ValueType, get_all_schemas, try_get_runtime_config};
 use crate::errors::ShortlinkerError;
@@ -143,7 +143,7 @@ impl ConfigService {
         if result.is_sensitive {
             info!("Config updated: {} = {}", key, REDACTED);
         } else {
-            info!("Config updated: {} = {}", key, value);
+            info!("Config updated: {} = {}", key, result.value);
         }
 
         Ok(Self::to_update_view(result))
@@ -197,11 +197,11 @@ impl ConfigService {
         key: &str,
         action: ActionType,
     ) -> Result<String, ShortlinkerError> {
-        let def = get_def(key).ok_or_else(|| {
+        CONFIG_REGISTRY.get(key).ok_or_else(|| {
             ShortlinkerError::config_not_found(format!("Config key '{}' not found", key))
         })?;
 
-        match def.action {
+        match action_for_key(key) {
             Some(expected) if expected == action => {
                 let value = Self::run_action(action);
                 info!("Config action {:?} executed for key: {}", action, key);
@@ -209,7 +209,9 @@ impl ConfigService {
             }
             Some(_) => Err(ShortlinkerError::validation(format!(
                 "Action {:?} not supported for config '{}', expected {:?}",
-                action, key, def.action
+                action,
+                key,
+                action_for_key(key)
             ))),
             None => Err(ShortlinkerError::validation(format!(
                 "Config '{}' does not support any action",
@@ -224,11 +226,11 @@ impl ConfigService {
         key: &str,
         action: ActionType,
     ) -> Result<ConfigUpdateView, ShortlinkerError> {
-        let def = get_def(key).ok_or_else(|| {
+        CONFIG_REGISTRY.get(key).ok_or_else(|| {
             ShortlinkerError::config_not_found(format!("Config key '{}' not found", key))
         })?;
 
-        match def.action {
+        match action_for_key(key) {
             Some(expected) if expected == action => {
                 let value = Self::run_action(action);
                 let result = self.runtime_config.set(key, &value).await.map_err(|e| {
@@ -244,7 +246,9 @@ impl ConfigService {
             }
             Some(_) => Err(ShortlinkerError::validation(format!(
                 "Action {:?} not supported for config '{}', expected {:?}",
-                action, key, def.action
+                action,
+                key,
+                action_for_key(key)
             ))),
             None => Err(ShortlinkerError::validation(format!(
                 "Config '{}' does not support any action",

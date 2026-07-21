@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::config::ValueType;
-use crate::config::definitions::get_def;
+use crate::config::definitions::CONFIG_REGISTRY;
 use crate::errors::{Result, ShortlinkerError};
 use migration::entities::{config_history, system_config};
 
@@ -19,6 +19,24 @@ pub struct ConfigItem {
     pub requires_restart: bool,
     pub is_sensitive: bool,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl ConfigItem {
+    fn from_model(model: system_config::Model) -> Self {
+        let value_type = CONFIG_REGISTRY
+            .get(&model.key)
+            .map(|definition| ValueType::from_forge(definition.key, definition.value_type))
+            .unwrap_or_else(|| model.value_type.parse().unwrap_or(ValueType::String));
+
+        Self {
+            key: model.key,
+            value: Arc::new(model.value),
+            value_type,
+            requires_restart: model.requires_restart,
+            is_sensitive: model.is_sensitive,
+            updated_at: model.updated_at,
+        }
+    }
 }
 
 impl aster_forge_config::RuntimeConfigRecord for ConfigItem {
@@ -93,14 +111,7 @@ impl ConfigStore {
                 ))
             })?;
 
-        Ok(result.map(|m| ConfigItem {
-            key: m.key,
-            value: Arc::new(m.value),
-            value_type: m.value_type.parse().unwrap_or(ValueType::String),
-            requires_restart: m.requires_restart,
-            is_sensitive: m.is_sensitive,
-            updated_at: m.updated_at,
-        }))
+        Ok(result.map(ConfigItem::from_model))
     }
 
     /// 获取配置并解析为指定类型
@@ -172,8 +183,9 @@ impl ConfigStore {
         }
 
         // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
-        let is_sensitive_config = get_def(key)
-            .map(|def| def.is_sensitive)
+        let is_sensitive_config = CONFIG_REGISTRY
+            .get(key)
+            .map(|definition| definition.is_sensitive)
             .unwrap_or(is_sensitive);
 
         // 记录变更历史（敏感配置的值脱敏为 [REDACTED]）
@@ -240,17 +252,7 @@ impl ConfigStore {
 
         let mut map = HashMap::new();
         for r in records {
-            map.insert(
-                r.key.clone(),
-                ConfigItem {
-                    key: r.key,
-                    value: Arc::new(r.value),
-                    value_type: r.value_type.parse().unwrap_or(ValueType::String),
-                    requires_restart: r.requires_restart,
-                    is_sensitive: r.is_sensitive,
-                    updated_at: r.updated_at,
-                },
-            );
+            map.insert(r.key.clone(), ConfigItem::from_model(r));
         }
 
         Ok(map)
@@ -310,14 +312,14 @@ impl ConfigStore {
         &self,
         key: &str,
         value: &str,
-        value_type: ValueType,
+        value_type: aster_forge_config::ConfigValueType,
         requires_restart: bool,
         is_sensitive: bool,
     ) -> Result<bool> {
         let model = system_config::ActiveModel {
             key: Set(key.to_string()),
             value: Set(value.to_string()),
-            value_type: Set(value_type.to_string()),
+            value_type: Set(value_type.as_str().to_string()),
             requires_restart: Set(requires_restart),
             is_sensitive: Set(is_sensitive),
             updated_at: Set(chrono::Utc::now()),
@@ -364,7 +366,7 @@ impl ConfigStore {
     pub async fn sync_metadata(
         &self,
         key: &str,
-        value_type: ValueType,
+        value_type: aster_forge_config::ConfigValueType,
         requires_restart: bool,
         is_sensitive: bool,
     ) -> Result<bool> {
@@ -382,7 +384,7 @@ impl ConfigStore {
             return Ok(false);
         };
 
-        let desired_value_type = value_type.to_string();
+        let desired_value_type = value_type.as_str().to_string();
         let current_value_type = r.value_type.clone();
         let current_requires_restart = r.requires_restart;
         let current_is_sensitive = r.is_sensitive;
@@ -433,47 +435,45 @@ impl ConfigStore {
 
     /// 确保所有配置项存在,不存在则使用默认值初始化
     ///
-    /// 遍历 `definitions::ALL_CONFIGS` 中定义的所有配置项，
-    /// 对于数据库中不存在的配置，调用其 `default_fn` 生成默认值并插入。
+    /// 遍历 Forge registry 的默认 seed，插入数据库中不存在的配置。
     /// 同时同步配置的元数据（value_type, requires_restart, is_sensitive）。
     ///
     /// 应在服务启动时调用，确保首次启动时配置表不为空。
     pub async fn ensure_defaults(&self) -> Result<usize> {
-        use crate::config::definitions::ALL_CONFIGS;
         use tracing::{debug, info};
 
         let mut inserted_count = 0;
+        let seeds = CONFIG_REGISTRY.default_seed_records().map_err(|error| {
+            ShortlinkerError::validation(format!("Invalid config registry defaults: {}", error))
+        })?;
 
-        for def in ALL_CONFIGS {
-            // 调用默认值函数生成值
-            let default_value = (def.default_fn)();
-
+        for seed in seeds {
             // 尝试插入（如果不存在）
             let inserted = self
                 .insert_if_not_exists(
-                    def.key,
-                    &default_value,
-                    def.value_type,
-                    def.requires_restart,
-                    def.is_sensitive,
+                    &seed.key,
+                    &seed.value,
+                    seed.value_type,
+                    seed.requires_restart,
+                    seed.is_sensitive,
                 )
                 .await?;
 
             if inserted {
-                debug!("Initialized config '{}' with default value", def.key);
+                debug!("Initialized config '{}' with default value", seed.key);
                 inserted_count += 1;
             } else {
                 // 配置已存在，同步元数据
                 if self
                     .sync_metadata(
-                        def.key,
-                        def.value_type,
-                        def.requires_restart,
-                        def.is_sensitive,
+                        &seed.key,
+                        seed.value_type,
+                        seed.requires_restart,
+                        seed.is_sensitive,
                     )
                     .await?
                 {
-                    debug!("Synced metadata for config '{}'", def.key);
+                    debug!("Synced metadata for config '{}'", seed.key);
                 }
             }
         }

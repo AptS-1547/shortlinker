@@ -549,33 +549,13 @@ pub fn import_links_with_progress(
 
 // ============ Config Management Handlers ============
 
-use crate::config::definitions::get_def;
+use crate::config::definitions::CONFIG_REGISTRY;
 use crate::config::schema::get_schema;
-use crate::config::validators;
 use crate::services::ConfigItemView;
-
-/// Validate that a config key exists and is editable.
-/// Returns the definition on success, or an IpcResponse::Error on failure.
-#[allow(clippy::result_large_err)]
-fn validate_editable_key(
-    key: &str,
-) -> Result<&'static crate::config::definitions::ConfigDef, IpcResponse> {
-    let def = get_def(key).ok_or_else(|| IpcResponse::Error {
-        code: "CONFIG_NOT_FOUND".to_string(),
-        message: format!("Unknown configuration key: '{}'", key),
-    })?;
-    if !def.editable {
-        return Err(IpcResponse::Error {
-            code: "CONFIG_READONLY".to_string(),
-            message: format!("Configuration '{}' is read-only", key),
-        });
-    }
-    Ok(def)
-}
 
 /// Build ConfigItemData from a ConfigItemView by enriching with definition metadata
 fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
-    let def = get_def(&view.key);
+    let definition = CONFIG_REGISTRY.get(&view.key);
     let schema = get_schema(&view.key);
 
     let enum_options = schema.and_then(|s| {
@@ -586,13 +566,19 @@ fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
     ConfigItemData {
         key: view.key.clone(),
         value: view.value,
-        category: def.map(|d| d.category.to_string()).unwrap_or_default(),
+        category: definition
+            .map(|definition| definition.category.to_string())
+            .unwrap_or_default(),
         value_type: format!("{}", view.value_type),
-        default_value: def.map(|d| (d.default_fn)()).unwrap_or_default(),
+        default_value: definition
+            .map(|definition| (definition.default_fn)())
+            .unwrap_or_default(),
         requires_restart: view.requires_restart,
-        editable: def.map(|d| d.editable).unwrap_or(false),
+        editable: definition.is_some(),
         sensitive: view.is_sensitive,
-        description: def.map(|d| d.description.to_string()).unwrap_or_default(),
+        description: definition
+            .map(|definition| definition.description.to_string())
+            .unwrap_or_default(),
         enum_options,
         updated_at: view.updated_at.to_rfc3339(),
     }
@@ -609,8 +595,9 @@ async fn handle_config_list(category: Option<String>) -> IpcResponse {
         .into_iter()
         .filter(|item| {
             if let Some(ref cat) = category {
-                get_def(&item.key)
-                    .map(|d| d.category == cat.as_str())
+                CONFIG_REGISTRY
+                    .get(&item.key)
+                    .map(|definition| definition.category == cat.as_str())
                     .unwrap_or(false)
             } else {
                 true
@@ -642,16 +629,10 @@ async fn handle_config_set(key: String, value: String) -> IpcResponse {
         Err(e) => return e,
     };
 
-    let _def = match validate_editable_key(&key) {
-        Ok(d) => d,
-        Err(e) => return e,
-    };
-
-    // Validate value
-    if let Err(e) = validators::validate_config_value(&key, &value) {
+    if !CONFIG_REGISTRY.contains_key(&key) {
         return IpcResponse::Error {
-            code: "CONFIG_INVALID_VALUE".to_string(),
-            message: format!("Invalid value for '{}': {}", key, e),
+            code: "CONFIG_NOT_FOUND".to_string(),
+            message: format!("Unknown configuration key: '{}'", key),
         };
     }
 
@@ -667,6 +648,10 @@ async fn handle_config_set(key: String, value: String) -> IpcResponse {
                 message: view.message,
             }
         }
+        Err(crate::errors::ShortlinkerError::Validation(message)) => IpcResponse::Error {
+            code: "CONFIG_INVALID_VALUE".to_string(),
+            message,
+        },
         Err(e) => error_response(e),
     }
 }
@@ -677,12 +662,17 @@ async fn handle_config_reset(key: String) -> IpcResponse {
         Err(e) => return e,
     };
 
-    let def = match validate_editable_key(&key) {
-        Ok(d) => d,
-        Err(e) => return e,
+    let definition = match CONFIG_REGISTRY.get(&key) {
+        Some(definition) => definition,
+        None => {
+            return IpcResponse::Error {
+                code: "CONFIG_NOT_FOUND".to_string(),
+                message: format!("Unknown configuration key: '{}'", key),
+            };
+        }
     };
 
-    let default_value = (def.default_fn)();
+    let default_value = (definition.default_fn)();
 
     match service.update(&key, &default_value).await {
         Ok(view) => {
@@ -712,35 +702,11 @@ async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> I
 
     for item in &configs {
         // Validate key
-        let def = match get_def(&item.key) {
-            Some(d) => d,
-            None => {
-                skipped += 1;
-                errors.push(ImportErrorData {
-                    code: item.key.clone(),
-                    message: "unknown key".into(),
-                    error_code: None,
-                });
-                continue;
-            }
-        };
-
-        if !def.editable {
+        if !CONFIG_REGISTRY.contains_key(&item.key) {
             skipped += 1;
             errors.push(ImportErrorData {
                 code: item.key.clone(),
-                message: "read-only".into(),
-                error_code: None,
-            });
-            continue;
-        }
-
-        // Validate value
-        if let Err(e) = validators::validate_config_value(&item.key, &item.value) {
-            failed += 1;
-            errors.push(ImportErrorData {
-                code: item.key.clone(),
-                message: e.to_string(),
+                message: "unknown key".into(),
                 error_code: None,
             });
             continue;

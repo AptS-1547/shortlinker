@@ -6,7 +6,7 @@ use tracing::info;
 use crate::errors::{Result, ShortlinkerError};
 use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 
-use super::validators;
+use super::definitions::CONFIG_REGISTRY;
 
 // Re-export keys from definitions module
 pub use super::definitions::keys;
@@ -162,16 +162,25 @@ impl RuntimeConfig {
     /// 对于 `requires_restart=true` 的配置，只更新数据库，不更新内存缓存。
     /// 这确保在重启前，所有读取该配置的代码都获得一致的旧值。
     pub async fn set(&self, key: &str, value: &str) -> Result<ConfigUpdateResult> {
-        // 验证 enum 类型配置值
-        if let Err(e) = validators::validate_config_value(key, value) {
-            return Err(ShortlinkerError::validation(format!(
-                "Invalid value for '{}': {}",
-                key, e
-            )));
-        }
+        let snapshot = self.cache.snapshot();
+        let current_values: HashMap<String, String> = snapshot
+            .values()
+            .iter()
+            .map(|(config_key, item)| (config_key.clone(), item.value.as_ref().clone()))
+            .collect();
+        let normalized = CONFIG_REGISTRY
+            .normalize_value(&current_values, key, value)
+            .map_err(|error| match error {
+                aster_forge_config::ConfigCoreError::UnknownKey(_) => {
+                    ShortlinkerError::config_not_found(format!("Config key '{}' not found", key))
+                }
+                other => {
+                    ShortlinkerError::validation(format!("Invalid value for '{}': {}", key, other))
+                }
+            })?;
 
         // 先更新数据库
-        let result = self.store.set(key, value).await?;
+        let result = self.store.set(key, &normalized).await?;
 
         // 对于 requires_restart=true 的配置，不更新内存缓存
         // 这确保在重启前，所有读取该配置的代码都获得一致的旧值
@@ -181,7 +190,7 @@ impl RuntimeConfig {
 
         // 更新内部缓存（必须成功，保证一致性）
         if let Some(mut item) = self.cache.get_model(key) {
-            item.value = std::sync::Arc::new(value.to_string());
+            item.value = std::sync::Arc::new(normalized);
             item.updated_at = chrono::Utc::now();
             self.cache.apply(item);
         } else {

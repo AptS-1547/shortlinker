@@ -13,8 +13,12 @@
 //! 3. **k8s 探针**：readiness/liveness 探针需要最小依赖链
 
 use actix_web::{HttpResponse, Responder, web};
+use aster_forge_runtime::{
+    HealthCheckOptions, HealthCheckRegistry, HealthCheckScope, HealthCheckScopes,
+    HealthComponentReport, HealthStatus,
+};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tracing::{error, info, trace};
 
 use crate::api::services::admin::{
@@ -33,63 +37,142 @@ pub struct AppStartTime {
 
 pub struct HealthService;
 
+fn health_registry(storage: Arc<SeaOrmStorage>, cache: Arc<dyn LinkCache>) -> HealthCheckRegistry {
+    HealthCheckRegistry::configured(|registry| {
+        let storage = storage.clone();
+        registry.register_with_options(
+            "storage",
+            HealthCheckOptions::required(Some(Duration::from_secs(5)))
+                .with_scopes(HealthCheckScopes::readiness_and_diagnostics()),
+            move || {
+                let storage = storage.clone();
+                async move {
+                    match storage.count().await {
+                        Ok(count) => HealthComponentReport::healthy(
+                            "storage",
+                            format!("database available with {count} links"),
+                        )
+                        .with_detail("links_count", count),
+                        Err(error) => {
+                            error!(%error, "storage health check failed");
+                            HealthComponentReport::unhealthy(
+                                "storage",
+                                format!("database error: {error}"),
+                            )
+                        }
+                    }
+                }
+            },
+        );
+
+        registry.register_with_options(
+            "cache",
+            HealthCheckOptions::optional(Some(Duration::from_secs(5)))
+                .with_scopes(HealthCheckScopes::readiness_and_diagnostics()),
+            move || {
+                let cache = cache.clone();
+                async move {
+                    let health = cache.health_check().await;
+                    let mut report = if health.status == "healthy" {
+                        HealthComponentReport::healthy("cache", "cache available")
+                    } else {
+                        HealthComponentReport::degraded(
+                            "cache",
+                            health
+                                .error
+                                .clone()
+                                .unwrap_or_else(|| "cache unavailable".to_string()),
+                        )
+                    }
+                    .with_detail("reported_status", health.status)
+                    .with_detail("cache_type", health.cache_type)
+                    .with_detail("bloom_filter_enabled", health.bloom_filter_enabled)
+                    .with_detail("negative_cache_enabled", health.negative_cache_enabled);
+
+                    if let Some(error) = health.error {
+                        report = report.with_detail("error", error);
+                    }
+                    report
+                }
+            },
+        );
+    })
+}
+
 impl HealthService {
     pub async fn health_check(
         storage: web::Data<Arc<SeaOrmStorage>>,
         cache: web::Data<Arc<dyn LinkCache>>,
         app_start_time: web::Data<AppStartTime>,
     ) -> impl Responder {
-        let start_time = Instant::now();
         trace!("Received health check request");
 
-        // 获取后端配置
+        let registry = health_registry(storage.get_ref().clone(), cache.get_ref().clone());
+        let report = registry.run_scope(HealthCheckScope::Diagnostics).await;
+
         let backend_config = storage.get_backend_config().await;
         let backend = HealthStorageBackend {
             storage_type: backend_config.storage_type,
             support_click: backend_config.support_click,
         };
 
-        // 检查存储健康状况（只查 count，不加载全表）
-        let storage_status =
-            match tokio::time::timeout(Duration::from_secs(5), storage.count()).await {
-                Ok(Ok(count)) => {
-                    trace!("Storage health check passed, {} links found", count);
-                    HealthStorageCheck {
-                        status: "healthy".to_string(),
-                        links_count: Some(count as usize),
-                        backend,
-                        error: None,
-                    }
-                }
-                Ok(Err(e)) => {
-                    error!("Storage health check failed: {}", e);
-                    HealthStorageCheck {
-                        status: "unhealthy".to_string(),
-                        links_count: None,
-                        backend,
-                        error: Some(format!("database error: {}", e)),
-                    }
-                }
-                Err(_) => {
-                    error!("Storage health check timeout");
-                    HealthStorageCheck {
-                        status: "unhealthy".to_string(),
-                        links_count: None,
-                        backend,
-                        error: Some("timeout".to_string()),
-                    }
-                }
-            };
+        let storage_status = report
+            .components
+            .iter()
+            .find(|component| component.name == "storage")
+            .map(|component| HealthStorageCheck {
+                status: component.status.as_str().to_string(),
+                links_count: component
+                    .detail("links_count")
+                    .and_then(|value| value.as_unsigned())
+                    .and_then(|count| usize::try_from(count).ok()),
+                backend: backend.clone(),
+                error: component
+                    .status
+                    .is_issue()
+                    .then(|| component.message.clone()),
+            })
+            .unwrap_or_else(|| HealthStorageCheck {
+                status: "unhealthy".to_string(),
+                links_count: None,
+                backend,
+                error: Some("storage health check missing".to_string()),
+            });
 
-        // 检查缓存健康状况
-        let cache_health = cache.health_check().await;
-        let cache_status = Some(HealthCacheCheck {
-            status: cache_health.status,
-            cache_type: cache_health.cache_type,
-            bloom_filter_enabled: cache_health.bloom_filter_enabled,
-            negative_cache_enabled: cache_health.negative_cache_enabled,
-            error: cache_health.error,
-        });
+        let cache_status = report
+            .components
+            .iter()
+            .find(|component| component.name == "cache")
+            .map(|component| HealthCacheCheck {
+                status: component
+                    .detail("reported_status")
+                    .and_then(|value| value.as_text())
+                    .unwrap_or_else(|| component.status.as_str())
+                    .to_string(),
+                cache_type: component
+                    .detail("cache_type")
+                    .and_then(|value| value.as_text())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                bloom_filter_enabled: component
+                    .detail("bloom_filter_enabled")
+                    .and_then(|value| value.as_boolean())
+                    .unwrap_or(false),
+                negative_cache_enabled: component
+                    .detail("negative_cache_enabled")
+                    .and_then(|value| value.as_boolean())
+                    .unwrap_or(false),
+                error: component
+                    .detail("error")
+                    .and_then(|value| value.as_text())
+                    .map(str::to_string)
+                    .or_else(|| {
+                        component
+                            .status
+                            .is_issue()
+                            .then(|| component.message.clone())
+                    }),
+            });
 
         let now = chrono::Utc::now();
 
@@ -97,49 +180,49 @@ impl HealthService {
         let uptime_human = TimeParser::format_duration_human(app_start_time.start_datetime, now);
 
         // 计算运行秒数
-        let uptime_seconds = (now - app_start_time.start_datetime).num_seconds().max(0) as u32;
-
-        let is_healthy = storage_status.status == "healthy";
+        let uptime_seconds =
+            u32::try_from((now - app_start_time.start_datetime).num_seconds().max(0))
+                .unwrap_or(u32::MAX);
+        let status = report.status();
 
         let health_data = HealthResponse {
-            status: if is_healthy {
-                "healthy".to_string()
-            } else {
-                "unhealthy".to_string()
-            },
+            status: status.as_str().to_string(),
             timestamp: now.to_rfc3339(),
             uptime: uptime_seconds,
             checks: HealthChecks {
                 storage: storage_status,
                 cache: cache_status,
             },
-            response_time_ms: start_time.elapsed().as_millis() as u32,
+            response_time_ms: report
+                .duration
+                .and_then(|duration| u32::try_from(duration.as_millis()).ok())
+                .unwrap_or(u32::MAX),
         };
 
         let health_response = ApiResponse {
-            code: if is_healthy {
-                ErrorCode::Success as i32
-            } else {
+            code: if matches!(status, HealthStatus::Unhealthy) {
                 ErrorCode::ServiceUnavailable as i32
-            },
-            message: if is_healthy {
-                "OK".to_string()
             } else {
+                ErrorCode::Success as i32
+            },
+            message: if matches!(status, HealthStatus::Unhealthy) {
                 "Service Unavailable".to_string()
+            } else {
+                "OK".to_string()
             },
             data: Some(health_data),
         };
 
-        let response_status = if is_healthy {
-            actix_web::http::StatusCode::OK
-        } else {
+        let response_status = if matches!(status, HealthStatus::Unhealthy) {
             actix_web::http::StatusCode::SERVICE_UNAVAILABLE
+        } else {
+            actix_web::http::StatusCode::OK
         };
 
         info!(
             "Health check completed in {:?}, status: {}, uptime: {}",
-            start_time.elapsed(),
-            if is_healthy { "healthy" } else { "unhealthy" },
+            report.duration.unwrap_or_default(),
+            status.as_str(),
             uptime_human
         );
 
@@ -148,13 +231,23 @@ impl HealthService {
             .json(health_response)
     }
 
-    // 简单的就绪检查，只返回 200 状态码
-    pub async fn readiness_check() -> impl Responder {
+    pub async fn readiness_check(
+        storage: web::Data<Arc<SeaOrmStorage>>,
+        cache: web::Data<Arc<dyn LinkCache>>,
+    ) -> impl Responder {
         trace!("Received readiness check request");
 
-        HttpResponse::Ok()
-            .append_header(("Content-Type", "text/plain"))
-            .body("OK")
+        let registry = health_registry(storage.get_ref().clone(), cache.get_ref().clone());
+        let report = registry.run_scope(HealthCheckScope::Readiness).await;
+        if matches!(report.status(), HealthStatus::Unhealthy) {
+            HttpResponse::ServiceUnavailable()
+                .append_header(("Content-Type", "text/plain"))
+                .body("Service Unavailable")
+        } else {
+            HttpResponse::Ok()
+                .append_header(("Content-Type", "text/plain"))
+                .body("OK")
+        }
     }
 
     // 活跃性检查，检查基本服务可用性

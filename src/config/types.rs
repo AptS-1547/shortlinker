@@ -1,6 +1,6 @@
 //! 配置类型定义模块
 //!
-//! 定义配置系统的核心类型，包括值类型、Rust 类型标识等。
+//! 定义 Shortlinker 配置 API 的展示类型。
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -40,6 +40,26 @@ pub enum ValueType {
     EnumArray,
 }
 
+impl ValueType {
+    /// 将 Forge 的存储类型映射为 Shortlinker 已发布的 API/TypeScript 展示类型。
+    ///
+    /// Forge 统一把数字存储为 `number`；Shortlinker 的管理界面仍区分整数和
+    /// 点击采样率浮点数，这是产品协议边界而不是第二套配置定义。
+    pub fn from_forge(key: &str, value_type: aster_forge_config::ConfigValueType) -> Self {
+        use aster_forge_config::ConfigValueType;
+
+        match value_type {
+            ConfigValueType::String | ConfigValueType::Multiline => Self::String,
+            ConfigValueType::StringArray => Self::StringArray,
+            ConfigValueType::StringEnum => Self::Enum,
+            ConfigValueType::StringEnumSet => Self::EnumArray,
+            ConfigValueType::Number if key == super::keys::ANALYTICS_SAMPLE_RATE => Self::Float,
+            ConfigValueType::Number => Self::Int,
+            ConfigValueType::Boolean => Self::Bool,
+        }
+    }
+}
+
 impl std::fmt::Display for ValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -60,43 +80,17 @@ impl std::str::FromStr for ValueType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "string" => Ok(Self::String),
-            "int" => Ok(Self::Int),
+            "multiline" => Ok(Self::String),
+            "int" | "number" => Ok(Self::Int),
             "float" => Ok(Self::Float),
-            "bool" => Ok(Self::Bool),
+            "bool" | "boolean" => Ok(Self::Bool),
             "json" => Ok(Self::Json),
-            "enum" => Ok(Self::Enum),
-            "stringarray" => Ok(Self::StringArray),
-            "enumarray" => Ok(Self::EnumArray),
+            "enum" | "string_enum" => Ok(Self::Enum),
+            "stringarray" | "string_array" => Ok(Self::StringArray),
+            "enumarray" | "string_enum_set" => Ok(Self::EnumArray),
             _ => Err(format!("Unknown value type: {}", s)),
         }
     }
-}
-
-/// Rust 类型标识
-///
-/// 用于类型安全的配置更新，标识配置项在 Rust 代码中的实际类型。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RustType {
-    /// String 类型
-    String,
-    /// u64 类型
-    U64,
-    /// usize 类型
-    Usize,
-    /// f64 类型
-    F64,
-    /// bool 类型
-    Bool,
-    /// Option<String> 类型
-    OptionString,
-    /// Vec<String> 类型
-    VecString,
-    /// Vec<HttpMethod> 类型
-    VecHttpMethod,
-    /// SameSitePolicy 枚举类型
-    SameSitePolicy,
-    /// MaxRowsAction 枚举类型（cleanup 或 stop）
-    MaxRowsAction,
 }
 
 #[cfg(test)]
@@ -135,21 +129,24 @@ mod tests {
     }
 
     #[test]
-    fn test_rust_type_variants() {
-        // 确保所有 RustType 变体都可以创建
-        let variants = [
-            RustType::String,
-            RustType::U64,
-            RustType::Usize,
-            RustType::F64,
-            RustType::Bool,
-            RustType::OptionString,
-            RustType::VecString,
-            RustType::VecHttpMethod,
-            RustType::SameSitePolicy,
-            RustType::MaxRowsAction,
-        ];
-        assert_eq!(variants.len(), 10);
+    fn forge_storage_types_preserve_shortlinker_wire_types() {
+        use aster_forge_config::ConfigValueType;
+
+        assert_eq!(
+            ValueType::from_forge(
+                super::super::keys::ANALYTICS_SAMPLE_RATE,
+                ConfigValueType::Number
+            ),
+            ValueType::Float
+        );
+        assert_eq!(
+            ValueType::from_forge("cors.max_age", ConfigValueType::Number),
+            ValueType::Int
+        );
+        assert_eq!(
+            ValueType::from_forge("cors.allowed_methods", ConfigValueType::StringEnumSet),
+            ValueType::EnumArray
+        );
     }
 
     #[test]

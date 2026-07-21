@@ -40,8 +40,9 @@ impl ConfigClient {
                 let mut items = service.get_all();
                 if let Some(cat) = cat {
                     items.retain(|item| {
-                        crate::config::definitions::get_def(&item.key)
-                            .map(|d| d.category == cat.as_str())
+                        crate::config::definitions::CONFIG_REGISTRY
+                            .get(&item.key)
+                            .map(|definition| definition.category == cat.as_str())
                             .unwrap_or(false)
                     });
                 }
@@ -126,12 +127,14 @@ impl ConfigClient {
             || async move {
                 let service = ctx.get_config_service().await?;
                 // Reset = set to default value
-                let def = crate::config::definitions::get_def(&key2).ok_or_else(|| {
-                    ClientError::Service(crate::errors::ShortlinkerError::config_not_found(
-                        format!("Unknown config key: {}", key2),
-                    ))
-                })?;
-                let default_value = (def.default_fn)();
+                let definition = crate::config::definitions::CONFIG_REGISTRY
+                    .get(&key2)
+                    .ok_or_else(|| {
+                        ClientError::Service(crate::errors::ShortlinkerError::config_not_found(
+                            format!("Unknown config key: {}", key2),
+                        ))
+                    })?;
+                let default_value = (definition.default_fn)();
                 Ok(service.update(&key2, &default_value).await?)
             },
         )
@@ -168,7 +171,11 @@ fn parse_value_type(s: &str) -> crate::config::ValueType {
         "int" => crate::config::ValueType::Int,
         "float" => crate::config::ValueType::Float,
         "json" => crate::config::ValueType::Json,
-        "enum" => crate::config::ValueType::Enum,
+        "enum" | "string_enum" => crate::config::ValueType::Enum,
+        "stringarray" | "string_array" => crate::config::ValueType::StringArray,
+        "enumarray" | "string_enum_set" => crate::config::ValueType::EnumArray,
+        "number" => crate::config::ValueType::Int,
+        "boolean" => crate::config::ValueType::Bool,
         _ => crate::config::ValueType::String,
     }
 }
@@ -279,6 +286,26 @@ mod tests {
         assert!(matches!(parse_value_type("FLOAT"), ValueType::Float));
         assert!(matches!(parse_value_type("JSON"), ValueType::Json));
         assert!(matches!(parse_value_type("ENUM"), ValueType::Enum));
+    }
+
+    #[test]
+    fn test_parse_value_type_list_variants() {
+        assert!(matches!(
+            parse_value_type("stringarray"),
+            ValueType::StringArray
+        ));
+        assert!(matches!(
+            parse_value_type("string_array"),
+            ValueType::StringArray
+        ));
+        assert!(matches!(
+            parse_value_type("enumarray"),
+            ValueType::EnumArray
+        ));
+        assert!(matches!(
+            parse_value_type("string_enum_set"),
+            ValueType::EnumArray
+        ));
     }
 
     // ---- config_data_to_view tests ----

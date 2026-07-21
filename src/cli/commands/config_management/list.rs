@@ -2,7 +2,7 @@
 
 use crate::cli::CliError;
 use crate::client::ConfigClient;
-use crate::config::definitions::{categories, get_def};
+use crate::config::definitions::{CONFIG_REGISTRY, categories};
 use colored::Colorize;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -35,10 +35,10 @@ pub async fn config_list(
     let mut grouped: BTreeMap<String, Vec<ConfigOutput>> = BTreeMap::new();
 
     for item in &items {
-        let (cat, editable) = if let Some(def) = get_def(&item.key) {
-            (def.category.to_string(), def.editable)
+        let cat = if let Some(definition) = CONFIG_REGISTRY.get(&item.key) {
+            definition.category.to_string()
         } else {
-            ("unknown".to_string(), true)
+            "unknown".to_string()
         };
 
         let value = if item.is_sensitive {
@@ -53,7 +53,7 @@ pub async fn config_list(
             category: cat.clone(),
             value_type: item.value_type.to_string(),
             requires_restart: item.requires_restart,
-            editable,
+            editable: true,
             sensitive: item.is_sensitive,
         };
 

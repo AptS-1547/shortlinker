@@ -3,8 +3,7 @@
 use super::helpers::notify_config_change;
 use crate::cli::CliError;
 use crate::client::ConfigClient;
-use crate::config::definitions::get_def;
-use crate::config::validators;
+use crate::config::definitions::CONFIG_REGISTRY;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -35,7 +34,9 @@ pub async fn config_export(
     let export_configs: Vec<ExportConfig> = items
         .iter()
         .map(|item| {
-            let category = get_def(&item.key).map(|d| d.category.to_string());
+            let category = CONFIG_REGISTRY
+                .get(&item.key)
+                .map(|definition| definition.category.to_string());
             ExportConfig {
                 key: item.key.clone(),
                 value: item.value.clone(),
@@ -98,40 +99,38 @@ pub async fn config_import(
     let mut valid_configs = Vec::new();
     let mut skipped = Vec::new();
     let mut invalid = Vec::new();
+    let validation_lookup = std::collections::HashMap::new();
 
     for cfg in &import_data.configs {
         // Check if key exists
-        let def = match get_def(&cfg.key) {
-            Some(d) => d,
+        let definition = match CONFIG_REGISTRY.get(&cfg.key) {
+            Some(definition) => definition,
             None => {
                 skipped.push((cfg.key.clone(), "Unknown key".to_string()));
                 continue;
             }
         };
 
-        // Check if editable
-        if !def.editable {
-            skipped.push((cfg.key.clone(), "Read-only".to_string()));
-            continue;
-        }
+        let normalized =
+            match CONFIG_REGISTRY.normalize_value(&validation_lookup, &cfg.key, &cfg.value) {
+                Ok(normalized) => normalized,
+                Err(error) => {
+                    invalid.push((cfg.key.clone(), error.to_string()));
+                    continue;
+                }
+            };
 
-        // Validate value
-        if let Err(e) = validators::validate_config_value(&cfg.key, &cfg.value) {
-            invalid.push((cfg.key.clone(), e));
-            continue;
-        }
-
-        valid_configs.push((cfg, def.is_sensitive));
+        valid_configs.push((cfg, definition.is_sensitive, normalized));
     }
 
     // Show preview
     if !valid_configs.is_empty() {
         println!("\n{}", "Configs to import:".bold());
-        for (cfg, is_sensitive) in &valid_configs {
+        for (cfg, is_sensitive, normalized) in &valid_configs {
             let display_value = if *is_sensitive {
                 "*****".to_string()
             } else {
-                cfg.value.clone()
+                normalized.clone()
             };
             println!("  {} = {}", cfg.key.green(), display_value);
         }
@@ -178,8 +177,8 @@ pub async fn config_import(
     let mut success = 0;
     let mut failed = 0;
 
-    for (cfg, _) in valid_configs {
-        match client.set(cfg.key.clone(), cfg.value.clone()).await {
+    for (cfg, _, normalized) in valid_configs {
+        match client.set(cfg.key.clone(), normalized).await {
             Ok(_) => {
                 success += 1;
             }
