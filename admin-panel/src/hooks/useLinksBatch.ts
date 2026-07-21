@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { batchService } from '@/services/batchService'
+import type { GetLinksQuery } from '@/services/types'
+import { logger } from '@/utils/logger'
 
 interface UseLinksBatchOptions {
   onBatchDeleteSuccess?: () => void
@@ -17,6 +19,7 @@ export function useLinksBatch(
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchDeleting, setBatchDeleting] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const selectedCount = selectedCodes.size
 
@@ -77,15 +80,33 @@ export function useLinksBatch(
     }
   }, [selectedCodes, onBatchDeleteSuccess, t])
 
+  const handleExport = useCallback(
+    async (query: Partial<GetLinksQuery>) => {
+      setExporting(true)
+      try {
+        await batchService.exportLinks(query)
+        toast.success(t('links.export.success'))
+      } catch (error) {
+        toast.error(t('links.export.error'))
+        logger.error('Failed to export links:', error)
+      } finally {
+        setExporting(false)
+      }
+    },
+    [t],
+  )
+
   return {
     selectedCodes,
     selectedCount,
     batchDeleteOpen,
     batchDeleting,
+    exporting,
     setBatchDeleteOpen,
     handleSelectChange,
     handleSelectAll,
     handleClearSelection,
     handleBatchDelete,
+    handleExport,
   }
 }

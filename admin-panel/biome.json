@@ -11,7 +11,8 @@
       "!!**/public",
       "!!**/dist",
       "!!**/node_modules",
-      "!!**/src/services/types.generated.ts"
+      "!!**/generated/openapi.json",
+      "!!**/src/services/api.generated.ts"
     ]
   },
   "formatter": {

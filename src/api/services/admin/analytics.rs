@@ -12,7 +12,6 @@ use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::info;
-use ts_rs::TS;
 
 use crate::services::{
     AnalyticsService, CategoryStats as ServiceCategoryStats,
@@ -26,14 +25,14 @@ use super::export_import::create_csv_stream;
 use super::helpers::{error_from_shortlinker, success_response};
 use super::types::ClickLogCsvRow;
 
-/// 输出目录常量
-const TS_EXPORT_PATH: &str = "../admin-panel/src/services/types.generated.ts";
-
 // ============ 请求参数 ============
 
 /// Analytics 查询参数
-#[derive(Debug, Clone, Deserialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(
+    all(debug_assertions, feature = "openapi"),
+    derive(utoipa::IntoParams, utoipa::ToSchema)
+)]
 pub struct AnalyticsQuery {
     /// 开始日期 (ISO 8601)
     pub start_date: Option<String>,
@@ -46,8 +45,8 @@ pub struct AnalyticsQuery {
 }
 
 /// 分组方式
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, TS, Default)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum GroupBy {
     Hour,
@@ -71,8 +70,8 @@ impl From<GroupBy> for ServiceGroupBy {
 // ============ 响应结构 ============
 
 /// 点击趋势数据
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct TrendData {
     /// 时间标签
     pub labels: Vec<String>,
@@ -90,8 +89,8 @@ impl From<ServiceTrendData> for TrendData {
 }
 
 /// 热门链接
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct TopLink {
     pub code: String,
     pub clicks: u64,
@@ -107,8 +106,8 @@ impl From<ServiceTopLink> for TopLink {
 }
 
 /// 来源统计
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ReferrerStats {
     pub referrer: String,
     pub count: u64,
@@ -126,10 +125,11 @@ impl From<ServiceReferrerStats> for ReferrerStats {
 }
 
 /// 地理位置统计
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct GeoStats {
     pub country: String,
+    #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub city: Option<String>,
     pub count: u64,
 }
@@ -145,8 +145,8 @@ impl From<ServiceGeoStats> for GeoStats {
 }
 
 /// 单链接分析数据
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct LinkAnalytics {
     pub code: String,
     pub total_clicks: u64,
@@ -168,8 +168,8 @@ impl From<ServiceLinkAnalytics> for LinkAnalytics {
 }
 
 /// 设备分析响应
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct DeviceAnalyticsResponse {
     pub browsers: Vec<CategoryStatsResponse>,
     pub operating_systems: Vec<CategoryStatsResponse>,
@@ -179,8 +179,8 @@ pub struct DeviceAnalyticsResponse {
 }
 
 /// 分类统计响应
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct CategoryStatsResponse {
     pub name: String,
     pub count: u64,
@@ -212,6 +212,14 @@ impl From<ServiceCategoryStats> for CategoryStatsResponse {
 // ============ API 端点 ============
 
 /// GET /admin/v1/analytics/trends - 获取点击趋势
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/trends",
+        tag = "analytics",
+        operation_id = "get_analytics_trends",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Click trend", body = super::types::ApiResponse<TrendData>))
+)]
 pub async fn get_trends(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -230,6 +238,14 @@ pub async fn get_trends(
 }
 
 /// GET /admin/v1/analytics/top - 获取热门链接
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/top",
+        tag = "analytics",
+        operation_id = "get_top_links",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Top links", body = super::types::ApiResponse<Vec<TopLink>>))
+)]
 pub async fn get_top_links(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -251,6 +267,14 @@ pub async fn get_top_links(
 }
 
 /// GET /admin/v1/analytics/referrers - 获取来源统计
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/referrers",
+        tag = "analytics",
+        operation_id = "get_referrer_stats",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Referrer statistics", body = super::types::ApiResponse<Vec<ReferrerStats>>))
+)]
 pub async fn get_referrers(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -272,6 +296,14 @@ pub async fn get_referrers(
 }
 
 /// GET /admin/v1/analytics/geo - 获取地理位置分布
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/geo",
+        tag = "analytics",
+        operation_id = "get_geo_stats",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Geographic statistics", body = super::types::ApiResponse<Vec<GeoStats>>))
+)]
 pub async fn get_geo_stats(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -293,6 +325,20 @@ pub async fn get_geo_stats(
 }
 
 /// GET /admin/v1/links/{code}/analytics - 获取单链接详细统计
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/links/{code}/analytics",
+        tag = "analytics",
+        operation_id = "get_link_analytics",
+        params(
+            ("code" = String, Path, description = "Short code"),
+            AnalyticsQuery,
+        ),
+        responses(
+            (status = 200, description = "Link analytics", body = super::types::ApiResponse<LinkAnalytics>),
+            (status = 404, description = "Short link not found"),
+        )
+)]
 pub async fn get_link_analytics(
     _req: HttpRequest,
     code: web::Path<String>,
@@ -315,6 +361,20 @@ pub async fn get_link_analytics(
 }
 
 /// GET /admin/v1/links/{code}/analytics/devices - 获取单链接设备分析
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/links/{code}/analytics/devices",
+        tag = "analytics",
+        operation_id = "get_link_device_stats",
+        params(
+            ("code" = String, Path, description = "Short code"),
+            AnalyticsQuery,
+        ),
+        responses(
+            (status = 200, description = "Link device statistics", body = super::types::ApiResponse<DeviceAnalyticsResponse>),
+            (status = 404, description = "Short link not found"),
+        )
+)]
 pub async fn get_link_device_stats(
     _req: HttpRequest,
     code: web::Path<String>,
@@ -341,6 +401,14 @@ pub async fn get_link_device_stats(
 }
 
 /// GET /admin/v1/analytics/devices - 获取设备分析
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/devices",
+        tag = "analytics",
+        operation_id = "get_device_stats",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Device statistics", body = super::types::ApiResponse<DeviceAnalyticsResponse>))
+)]
 pub async fn get_device_stats(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -362,6 +430,14 @@ pub async fn get_device_stats(
 const EXPORT_BATCH_SIZE: u64 = 10000;
 
 /// GET /admin/v1/analytics/export - 导出报告（流式响应）
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/analytics/export",
+        tag = "analytics",
+        operation_id = "export_analytics_report",
+        params(AnalyticsQuery),
+        responses((status = 200, description = "Analytics CSV report", content_type = "text/csv"))
+)]
 pub async fn export_report(
     _req: HttpRequest,
     query: web::Query<AnalyticsQuery>,
@@ -422,26 +498,4 @@ pub fn analytics_routes() -> actix_web::Scope {
         .route("/devices", web::head().to(get_device_stats))
         .route("/export", web::get().to(export_report))
         .route("/export", web::head().to(export_report))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ts_rs::TS;
-
-    #[test]
-    fn export_typescript_types() {
-        let cfg = ts_rs::Config::default();
-        AnalyticsQuery::export_all(&cfg).expect("Failed to export AnalyticsQuery");
-        GroupBy::export_all(&cfg).expect("Failed to export GroupBy");
-        TrendData::export_all(&cfg).expect("Failed to export TrendData");
-        TopLink::export_all(&cfg).expect("Failed to export TopLink");
-        ReferrerStats::export_all(&cfg).expect("Failed to export ReferrerStats");
-        GeoStats::export_all(&cfg).expect("Failed to export GeoStats");
-        LinkAnalytics::export_all(&cfg).expect("Failed to export LinkAnalytics");
-        DeviceAnalyticsResponse::export_all(&cfg)
-            .expect("Failed to export DeviceAnalyticsResponse");
-        CategoryStatsResponse::export_all(&cfg).expect("Failed to export CategoryStatsResponse");
-        println!("Analytics TypeScript types exported to {}", TS_EXPORT_PATH);
-    }
 }

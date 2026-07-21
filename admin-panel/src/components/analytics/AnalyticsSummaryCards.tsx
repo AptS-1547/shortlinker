@@ -7,11 +7,7 @@ import {
 } from 'react-icons/fi'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type {
-  GeoStats,
-  ReferrerStats,
-  TopLink,
-} from '@/services/types.generated'
+import type { GeoStats, ReferrerStats, TopLink } from '@/services/types'
 
 interface AnalyticsSummaryCardsProps {
   totalClicks: number

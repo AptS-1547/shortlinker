@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { GroupBy } from '@/services/types.generated'
+import type { GroupBy } from '@/services/types'
 import type { DateRange } from './utils'
 
 interface DateRangeSelectorProps {

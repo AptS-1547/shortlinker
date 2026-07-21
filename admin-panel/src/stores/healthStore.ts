@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { HealthAPI, type HealthResponse } from '@/services/api'
+import { healthService } from '@/services/healthService'
+import type { HealthResponse } from '@/services/types'
 
 // 缓存有效期 30 秒
 const CACHE_TTL = 30 * 1000
@@ -32,7 +33,7 @@ export const useHealthStore = create<HealthState>((set, get) => ({
 
     set({ loading: true, error: null })
     try {
-      const status = await HealthAPI.check()
+      const status = await healthService.check()
       set({ status, lastFetchTime: now })
     } catch (err) {
       set({

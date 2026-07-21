@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FiArrowLeft as ArrowLeft,
@@ -14,7 +14,6 @@ import {
   DateRangeSelector,
   DeviceAnalytics,
   GeoDistribution,
-  getDateRange,
   ReferrerChart,
   TrendChart,
 } from '@/components/analytics'
@@ -24,15 +23,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { analyticsService } from '@/services/analyticsService'
-import { linkService } from '@/services/linkService'
-import type { LinkResponse } from '@/services/types'
-import type {
-  DeviceAnalyticsResponse,
-  GeoStats,
-  GroupBy,
-  LinkAnalytics,
-} from '@/services/types.generated'
+import { useLinkDetailData } from '@/hooks/useLinkDetailData'
+import type { GeoStats, GroupBy } from '@/services/types'
 
 export default function LinkDetailPage() {
   const { t } = useTranslation()
@@ -42,58 +34,13 @@ export default function LinkDetailPage() {
   // State
   const [dateRange, setDateRange] = useState<DateRange>('30d')
   const [groupBy, setGroupBy] = useState<GroupBy>('day')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-
-  // Data
-  const [linkInfo, setLinkInfo] = useState<LinkResponse | null>(null)
-  const [analytics, setAnalytics] = useState<LinkAnalytics | null>(null)
-  const [deviceData, setDeviceData] = useState<DeviceAnalyticsResponse | null>(
-    null,
-  )
   const [qrCodeDialogOpen, setQrCodeDialogOpen] = useState(false)
-
-  const fetchData = useCallback(async () => {
-    if (!code) return
-
-    setLoading(true)
-    setError(null)
-
-    const { start, end } = getDateRange(dateRange)
-    const params = {
-      start_date: start,
-      end_date: end,
-      group_by: groupBy,
-      limit: 10,
-    }
-
-    try {
-      const [info, analyticsData, devices] = await Promise.all([
-        linkService.fetchOne(code),
-        analyticsService.getLinkAnalytics(code, params),
-        analyticsService.getLinkDeviceStats(code, params),
-      ])
-
-      if (!info) {
-        setError(t('linkDetail.notFound'))
-        return
-      }
-
-      setLinkInfo(info)
-      setAnalytics(analyticsData)
-      setDeviceData(devices)
-    } catch (err) {
-      console.error('Failed to fetch link data:', err)
-      setError(t('linkDetail.fetchFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [code, dateRange, groupBy, t])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const { loading, error, linkInfo, analytics, deviceData } = useLinkDetailData(
+    code,
+    dateRange,
+    groupBy,
+  )
 
   const handleCopy = async () => {
     if (!linkInfo) return

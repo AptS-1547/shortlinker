@@ -3,7 +3,6 @@
 //! This module provides a unified reload system with:
 //! - `ReloadCoordinator`: Trait for managing reload operations
 //! - `ReloadTarget`: What to reload (Data, Config, or All)
-//! - `ReloadEvent`: Events emitted during reload
 //! - Global instance management
 //!
 //! # Architecture
@@ -33,4 +32,4 @@ mod types;
 
 pub use coordinator::{DefaultReloadCoordinator, ReloadCoordinator};
 pub use global::{get_reload_coordinator, init_reload_coordinator};
-pub use types::{ReloadEvent, ReloadResult, ReloadStatus, ReloadTarget};
+pub use types::{ReloadResult, ReloadStatus, ReloadTarget};

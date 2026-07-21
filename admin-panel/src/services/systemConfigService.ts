@@ -1,18 +1,16 @@
 import { ENDPOINTS } from './endpoints'
 import { adminClient } from './http'
 import type {
-  ConfigHistoryResponse,
-  ConfigItemResponse,
-  ConfigUpdateRequest,
-  ConfigUpdateResponse,
-} from './types'
-import type {
   ActionType,
   ConfigActionResponse,
+  ConfigHistoryResponse,
+  ConfigItemResponse,
   ConfigSchema,
+  ConfigUpdateRequest,
+  ConfigUpdateResponse,
   ExecuteAndSaveResponse,
   ReloadResponse,
-} from './types.generated'
+} from './types'
 
 export class SystemConfigService {
   /**
@@ -106,9 +104,7 @@ export class SystemConfigService {
     // 清除所有配置缓存
     adminClient.invalidateTags(['config-all'])
 
-    return (
-      response.data || { message: 'Config reloaded', duration_ms: BigInt(0) }
-    )
+    return response.data || { message: 'Config reloaded', duration_ms: 0 }
   }
 
   /**

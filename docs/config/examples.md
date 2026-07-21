@@ -38,9 +38,6 @@ pool_size = 20
 type = "memory"
 default_ttl = 7200
 
-[cache.memory]
-max_capacity = 50000
-
 [logging]
 level = "info"
 format = "json"

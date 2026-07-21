@@ -1,13 +1,10 @@
 //! 统一 API 错误码定义
 
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use ts_rs::TS;
-
-use super::types::TS_EXPORT_PATH;
 
 /// API 错误码枚举
 ///
-/// 使用 serde_repr 序列化为数字，ts-rs 自动生成 TypeScript 类型。
+/// 使用 serde_repr 序列化为数字，OpenAPI schema 保持相同 wire value。
 /// 按千位分域：
 /// - 0: 成功
 /// - 1000-1099: 通用错误
@@ -15,10 +12,8 @@ use super::types::TS_EXPORT_PATH;
 /// - 3000-3099: 链接错误
 /// - 4000-4099: 导入导出错误
 /// - 5000-5099: 配置错误
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
-#[ts(rename = "ErrorCode")]
-#[ts(repr(enum))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(strum::EnumIter))]
 #[repr(i32)]
 pub enum ErrorCode {
     // 成功
@@ -71,3 +66,33 @@ pub enum ErrorCode {
     AnalyticsLinkNotFound = 6001,
     AnalyticsInvalidDateRange = 6002,
 }
+
+#[cfg(all(debug_assertions, feature = "openapi"))]
+impl utoipa::PartialSchema for ErrorCode {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use strum::IntoEnumIterator;
+        use utoipa::openapi::extensions::Extensions;
+        use utoipa::openapi::schema::{KnownFormat, SchemaFormat, Type};
+
+        let variants = Self::iter().collect::<Vec<_>>();
+        let values = variants.iter().map(|variant| *variant as i32);
+        let names = variants
+            .iter()
+            .map(|variant| format!("{variant:?}"))
+            .collect::<Vec<_>>();
+
+        utoipa::openapi::ObjectBuilder::new()
+            .schema_type(Type::Integer)
+            .format(Some(SchemaFormat::KnownFormat(KnownFormat::Int32)))
+            .description(Some("Shortlinker API numeric error code"))
+            .enum_values(Some(values))
+            .extensions(Some(Extensions::from_iter([(
+                "x-enum-varnames",
+                serde_json::json!(names),
+            )])))
+            .into()
+    }
+}
+
+#[cfg(all(debug_assertions, feature = "openapi"))]
+impl utoipa::ToSchema for ErrorCode {}

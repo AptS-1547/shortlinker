@@ -1,8 +1,7 @@
 import { authLogger } from '@/utils/logger'
 import { ENDPOINTS } from './endpoints'
 import { adminClient } from './http'
-import type { LoginCredentials } from './types'
-import type { AuthSuccessResponse } from './types.generated'
+import type { AuthSuccessResponse, LoginCredentials } from './types'
 
 export interface AuthResult {
   expiresIn: number

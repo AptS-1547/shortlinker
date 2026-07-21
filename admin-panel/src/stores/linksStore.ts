@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import type { GetLinksQuery, LinkResponse, PostNewLink } from '@/services/api'
-import { LinkAPI } from '@/services/api'
+import { linkService } from '@/services/linkService'
+import type { GetLinksQuery, LinkResponse, PostNewLink } from '@/services/types'
 import { extractErrorMessage } from '@/utils/errorHandler'
 import { linksLogger } from '@/utils/logger'
 import { STORAGE_KEYS, Storage } from '@/utils/storage'
@@ -98,7 +98,7 @@ export const useLinksStore = create<LinksState>((set, get) => ({
         set({ currentQuery: { ...query } })
       }
 
-      const response = await LinkAPI.fetchPaginated(targetQuery, signal)
+      const response = await linkService.fetchPaginated(targetQuery, signal)
 
       // 检查是否被取消
       if (signal.aborted) {
@@ -181,7 +181,7 @@ export const useLinksStore = create<LinksState>((set, get) => ({
   createLink: async (data: PostNewLink) => {
     set({ creating: true, error: null })
     try {
-      await LinkAPI.create(data)
+      await linkService.create(data)
       await get().fetchLinks(get().currentQuery)
     } catch (err) {
       set({ error: extractErrorMessage(err, 'Failed to create link') })
@@ -194,7 +194,7 @@ export const useLinksStore = create<LinksState>((set, get) => ({
   updateLink: async (code: string, data: PostNewLink) => {
     set({ updating: true, error: null })
     try {
-      await LinkAPI.update(code, data)
+      await linkService.update(code, data)
       await get().fetchLinks(get().currentQuery)
     } catch (err) {
       set({ error: extractErrorMessage(err, 'Failed to update link') })
@@ -207,7 +207,7 @@ export const useLinksStore = create<LinksState>((set, get) => ({
   deleteLink: async (code: string) => {
     set({ deleting: true, error: null })
     try {
-      await LinkAPI.delete(code)
+      await linkService.delete(code)
 
       // ✅ 新实现：重新请求列表（和批量删除保持一致，修复分页 bug）
       const { currentQuery, pagination } = get()

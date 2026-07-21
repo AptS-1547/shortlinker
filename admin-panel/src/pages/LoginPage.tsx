@@ -9,7 +9,6 @@ import {
   FiMoon as Moon,
   FiSun as Sun,
 } from 'react-icons/fi'
-import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -21,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { appConfig } from '@/config/app'
+import { useLoginFlow } from '@/hooks/useLoginFlow'
 import { useTheme } from '@/hooks/useTheme'
 import { useVersion } from '@/hooks/useVersion'
 import {
@@ -30,20 +30,14 @@ import {
   type SupportedLanguage,
   supportedLanguages,
 } from '@/i18n'
-import { HealthAPI } from '@/services/api'
-import { useAuthStore } from '@/stores/authStore'
-import { authLogger } from '@/utils/logger'
 
 export default function LoginPage() {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
-  const login = useAuthStore((state) => state.login)
+  const { authenticate, error, isSubmitting } = useLoginFlow()
   const { isDark, setTheme } = useTheme()
   const { displayVersion, versionBadgeColor, versionLabel } = useVersion()
 
   const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState('')
 
   const apiBaseUrl =
     appConfig.apiBaseUrl ||
@@ -58,49 +52,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
-    if (!password.trim()) {
-      setError(t('auth.errors.passwordRequired'))
-      return
-    }
-
-    setIsSubmitting(true)
-    setError('')
-
-    try {
-      setError(t('auth.authenticating'))
-      await login(password.trim())
-
-      setError(t('auth.verifying'))
-      await HealthAPI.check()
-
-      navigate('/dashboard')
-    } catch (err) {
-      authLogger.error('Authentication failed:', err)
-
-      if (err instanceof Error) {
-        if (
-          err.message.includes('Network Error') ||
-          err.message.includes('ECONNREFUSED')
-        ) {
-          setError(t('auth.errors.networkError'))
-        } else if (
-          err.message.includes('401') ||
-          err.message.includes('INVALID_CREDENTIALS')
-        ) {
-          setError(t('auth.errors.unauthorized'))
-        } else if (err.message.includes('404')) {
-          setError(t('auth.errors.notFound'))
-        } else if (err.message.includes('500')) {
-          setError(t('auth.errors.serverError'))
-        } else {
-          setError(t('auth.errors.authFailed'))
-        }
-      } else {
-        setError(t('auth.errors.authFailed'))
-      }
-    } finally {
-      setIsSubmitting(false)
-    }
+    await authenticate(password.trim())
   }
 
   const handleChangeLanguage = (lang: SupportedLanguage) => {

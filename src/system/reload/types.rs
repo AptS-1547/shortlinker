@@ -3,7 +3,6 @@
 //! This module defines the types used for the reload system:
 //! - `ReloadTarget`: What to reload (data, config, or all)
 //! - `ReloadResult`: Result of a reload operation
-//! - `ReloadEvent`: Events emitted during reload
 //! - `ReloadStatus`: Current reload system status
 
 use chrono::{DateTime, Utc};
@@ -90,19 +89,6 @@ impl ReloadResult {
     }
 }
 
-/// Events emitted during reload operations
-///
-/// These events can be subscribed to for monitoring reload progress.
-#[derive(Debug, Clone)]
-pub enum ReloadEvent {
-    /// Reload operation started
-    Started { target: ReloadTarget },
-    /// Reload operation completed successfully
-    Completed { result: ReloadResult },
-    /// Reload operation failed
-    Failed { target: ReloadTarget, error: String },
-}
-
 /// Current status of the reload system
 #[derive(Debug, Clone, Default)]
 pub struct ReloadStatus {
@@ -184,33 +170,6 @@ mod tests {
         let result = ReloadResult::success(ReloadTarget::Data, started);
         // u64 类型保证非负，这里只验证结果存在
         let _ = result.duration_ms;
-    }
-
-    #[test]
-    fn test_reload_event_variants() {
-        let event = ReloadEvent::Started {
-            target: ReloadTarget::Data,
-        };
-        if let ReloadEvent::Started { target } = event {
-            assert_eq!(target, ReloadTarget::Data);
-        }
-
-        let result = ReloadResult::success(ReloadTarget::Config, Utc::now());
-        let event = ReloadEvent::Completed {
-            result: result.clone(),
-        };
-        if let ReloadEvent::Completed { result: r } = event {
-            assert!(r.success);
-        }
-
-        let event = ReloadEvent::Failed {
-            target: ReloadTarget::All,
-            error: "test error".to_string(),
-        };
-        if let ReloadEvent::Failed { target, error } = event {
-            assert_eq!(target, ReloadTarget::All);
-            assert_eq!(error, "test error");
-        }
     }
 
     #[test]

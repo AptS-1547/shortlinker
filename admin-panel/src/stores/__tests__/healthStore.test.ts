@@ -1,14 +1,14 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock HealthAPI
-vi.mock('@/services/api', () => ({
-  HealthAPI: {
+// Mock healthService
+vi.mock('@/services/healthService', () => ({
+  healthService: {
     check: vi.fn(),
   },
 }))
 
-import { HealthAPI } from '@/services/api'
+import { healthService } from '@/services/healthService'
 import { useHealthStore } from '../healthStore'
 
 describe('healthStore', () => {
@@ -73,7 +73,7 @@ describe('healthStore', () => {
 
   describe('checkHealth', () => {
     it('should fetch health status and update state', async () => {
-      vi.mocked(HealthAPI.check).mockResolvedValueOnce(mockHealthResponse)
+      vi.mocked(healthService.check).mockResolvedValueOnce(mockHealthResponse)
 
       await act(async () => {
         await useHealthStore.getState().checkHealth()
@@ -87,7 +87,7 @@ describe('healthStore', () => {
 
     it('should set loading to true during fetch', async () => {
       let loadingDuringCall = false
-      vi.mocked(HealthAPI.check).mockImplementation(async () => {
+      vi.mocked(healthService.check).mockImplementation(async () => {
         loadingDuringCall = useHealthStore.getState().loading
         return mockHealthResponse
       })
@@ -106,18 +106,18 @@ describe('healthStore', () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).not.toHaveBeenCalled()
+      expect(healthService.check).not.toHaveBeenCalled()
     })
 
     it('should use cached result within TTL', async () => {
-      vi.mocked(HealthAPI.check).mockResolvedValueOnce(mockHealthResponse)
+      vi.mocked(healthService.check).mockResolvedValueOnce(mockHealthResponse)
 
       // First call
       await act(async () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(1)
+      expect(healthService.check).toHaveBeenCalledTimes(1)
 
       // Advance time by 10 seconds (within 30s TTL)
       vi.advanceTimersByTime(10000)
@@ -127,18 +127,18 @@ describe('healthStore', () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(1) // Still 1, not 2
+      expect(healthService.check).toHaveBeenCalledTimes(1) // Still 1, not 2
     })
 
     it('should fetch fresh data after TTL expires', async () => {
-      vi.mocked(HealthAPI.check).mockResolvedValue(mockHealthResponse)
+      vi.mocked(healthService.check).mockResolvedValue(mockHealthResponse)
 
       // First call
       await act(async () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(1)
+      expect(healthService.check).toHaveBeenCalledTimes(1)
 
       // Advance time by 31 seconds (past 30s TTL)
       vi.advanceTimersByTime(31000)
@@ -148,29 +148,29 @@ describe('healthStore', () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(2)
+      expect(healthService.check).toHaveBeenCalledTimes(2)
     })
 
     it('should force fetch when force=true', async () => {
-      vi.mocked(HealthAPI.check).mockResolvedValue(mockHealthResponse)
+      vi.mocked(healthService.check).mockResolvedValue(mockHealthResponse)
 
       // First call
       await act(async () => {
         await useHealthStore.getState().checkHealth()
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(1)
+      expect(healthService.check).toHaveBeenCalledTimes(1)
 
       // Force fetch immediately
       await act(async () => {
         await useHealthStore.getState().checkHealth(true)
       })
 
-      expect(HealthAPI.check).toHaveBeenCalledTimes(2)
+      expect(healthService.check).toHaveBeenCalledTimes(2)
     })
 
     it('should handle error and set unhealthy status', async () => {
-      vi.mocked(HealthAPI.check).mockRejectedValueOnce(
+      vi.mocked(healthService.check).mockRejectedValueOnce(
         new Error('Network error'),
       )
 
@@ -185,7 +185,7 @@ describe('healthStore', () => {
     })
 
     it('should set default unhealthy response on error', async () => {
-      vi.mocked(HealthAPI.check).mockRejectedValueOnce(new Error('Failed'))
+      vi.mocked(healthService.check).mockRejectedValueOnce(new Error('Failed'))
 
       await act(async () => {
         await useHealthStore.getState().checkHealth()
@@ -213,7 +213,7 @@ describe('healthStore', () => {
     })
 
     it('should use default error message for non-Error objects', async () => {
-      vi.mocked(HealthAPI.check).mockRejectedValueOnce('Unknown error')
+      vi.mocked(healthService.check).mockRejectedValueOnce('Unknown error')
 
       await act(async () => {
         await useHealthStore.getState().checkHealth()

@@ -152,6 +152,17 @@ where
 }
 
 /// 导出链接为 CSV（流式响应）
+#[aster_forge_api_docs_macros::path(
+    get,
+    path = "/admin/v1/links/export",
+    tag = "links",
+    operation_id = "export_links",
+    params(ExportQuery),
+    responses(
+        (status = 200, description = "Short links CSV export", content_type = "text/csv"),
+        (status = 400, description = "Invalid export filter"),
+    ),
+)]
 pub async fn export_links(
     _req: HttpRequest,
     query: web::Query<ExportQuery>,
@@ -242,6 +253,17 @@ pub async fn export_links(
 }
 
 /// 导入链接从 CSV
+#[aster_forge_api_docs_macros::path(
+    post,
+    path = "/admin/v1/links/import",
+    tag = "links",
+    operation_id = "import_links",
+    request_body(content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Import result", body = super::types::ApiResponse<ImportResponse>),
+        (status = 400, description = "Invalid CSV or multipart request"),
+    ),
+)]
 pub async fn import_links(
     _req: HttpRequest,
     mut payload: Multipart,

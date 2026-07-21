@@ -11,4 +11,4 @@ pub use runtime_config::{
 };
 pub use schema::{ConfigSchema, EnumOption, get_all_schemas, get_schema};
 pub use structs::*;
-pub use types::{TS_EXPORT_PATH, ValueType};
+pub use types::ValueType;

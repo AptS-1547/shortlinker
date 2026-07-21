@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FiExternalLink as ExternalLink,
@@ -29,11 +28,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { analyticsService } from '@/services/analyticsService'
-import type {
-  DeviceAnalyticsResponse,
-  LinkAnalytics,
-} from '@/services/types.generated'
+import { useLinkAnalyticsData } from '@/hooks/useLinkAnalyticsData'
 
 interface LinkAnalyticsSheetProps {
   code: string | null
@@ -43,37 +38,7 @@ interface LinkAnalyticsSheetProps {
 export function LinkAnalyticsSheet({ code, onClose }: LinkAnalyticsSheetProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [data, setData] = useState<LinkAnalytics | null>(null)
-  const [deviceData, setDeviceData] = useState<DeviceAnalyticsResponse | null>(
-    null,
-  )
-  const [loading, setLoading] = useState(false)
-
-  const fetchData = useCallback(async () => {
-    if (!code) return
-    setLoading(true)
-    try {
-      const [result, devices] = await Promise.all([
-        analyticsService.getLinkAnalytics(code),
-        analyticsService.getLinkDeviceStats(code),
-      ])
-      setData(result)
-      setDeviceData(devices)
-    } catch (err) {
-      console.error('Failed to fetch link analytics:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [code])
-
-  useEffect(() => {
-    if (code) {
-      fetchData()
-    } else {
-      setData(null)
-      setDeviceData(null)
-    }
-  }, [code, fetchData])
+  const { data, deviceData, loading } = useLinkAnalyticsData(code)
 
   const handleViewDetail = () => {
     onClose()

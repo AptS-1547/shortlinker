@@ -68,8 +68,8 @@ pub struct ImportLinkItem {
 }
 
 /// Import conflict resolution mode
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ts_rs::TS)]
-#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum ImportMode {
     /// Skip existing links

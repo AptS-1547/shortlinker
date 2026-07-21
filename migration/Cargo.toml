@@ -10,6 +10,8 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
+aster_forge_config = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_config", features = ["sea-orm"] }
+aster_forge_db = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_db", features = ["system-config"] }
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
 
 [dependencies.sea-orm]

@@ -65,15 +65,6 @@ impl CorsSettings {
     }
 }
 
-/// Server configuration
-#[derive(Clone, Debug)]
-pub struct ServerConfig {
-    pub server_host: String,
-    pub server_port: u16,
-    #[cfg(unix)]
-    pub unix_socket_path: Option<String>,
-}
-
 /// Validate CORS configuration at startup (runs once)
 fn validate_cors_config(cors_config: &CorsSettings) {
     if !cors_config.enabled {
@@ -180,14 +171,6 @@ pub fn http_component(
     // Load configuration (after database sync in prepare_server_startup)
     let config = crate::config::get_config();
     let rt = get_runtime_config();
-
-    // Load server configuration
-    let server_config = ServerConfig {
-        server_host: config.server.host.clone(),
-        server_port: config.server.port,
-        #[cfg(unix)]
-        unix_socket_path: config.server.unix_socket.clone(),
-    };
 
     let cpu_count = config.server.cpu_count.min(32);
     info!("Using {} CPU cores for the server", cpu_count);
@@ -305,17 +288,14 @@ pub fn http_component(
     let server = {
         #[cfg(unix)]
         {
-            if let Some(ref socket_path) = server_config.unix_socket_path {
+            if let Some(ref socket_path) = config.server.unix_socket {
                 info!("Starting server on Unix socket: {}", socket_path);
                 if std::path::Path::new(socket_path).exists() {
                     std::fs::remove_file(socket_path)?;
                 }
                 Some(server.bind_uds(socket_path)?)
             } else {
-                let bind_address = format!(
-                    "{}:{}",
-                    server_config.server_host, server_config.server_port
-                );
+                let bind_address = format!("{}:{}", config.server.host, config.server.port);
                 info!("Starting server at http://{}", bind_address);
                 Some(server.bind(bind_address)?)
             }
@@ -323,10 +303,7 @@ pub fn http_component(
 
         #[cfg(not(unix))]
         {
-            let bind_address = format!(
-                "{}:{}",
-                server_config.server_host, server_config.server_port
-            );
+            let bind_address = format!("{}:{}", config.server.host, config.server.port);
             info!("Starting server at http://{}", bind_address);
             Some(server.bind(bind_address)?)
         }

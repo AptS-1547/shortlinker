@@ -60,9 +60,6 @@ database_url = "shortlinks.db"
 # Increase for high-traffic deployments
 pool_size = 10
 
-# Connection timeout in seconds
-timeout = 30
-
 # Retry configuration for transient database errors
 # Number of retry attempts before failing
 # retry_count = 3
@@ -96,12 +93,6 @@ url = "redis://127.0.0.1:6379/"
 # Useful when sharing Redis with other applications
 key_prefix = "shortlinker:"
 
-# Memory cache configuration (used when type = "memory")
-[cache.memory]
-# Maximum number of entries in cache
-# Older entries are evicted when limit is reached (LRU policy)
-max_capacity = 10000
-
 # ==============================================================================
 # Logging Configuration
 # ==============================================================================
@@ -120,16 +111,14 @@ level = "info"
 format = "text"
 
 # Log file path (optional)
-# If not set, logs are written to stdout/stderr
+# If empty or omitted, logs are written to stdout
 # file = "shortlinker.log"
-
-# Maximum log file size in MB before rotation
-max_size = 100
 
 # Number of rotated log files to keep
 max_backups = 5
 
 # Enable log file rotation
+# Rotation is daily when enabled and file is set
 # When disabled, logs append to a single file indefinitely
 enable_rotation = true
 

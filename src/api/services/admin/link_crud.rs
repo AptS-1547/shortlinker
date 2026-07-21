@@ -17,6 +17,17 @@ use super::types::{
 };
 
 /// 获取所有链接（支持分页和过滤）
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/links",
+        tag = "links",
+        operation_id = "list_links",
+        params(GetLinksQuery),
+        responses(
+            (status = 200, description = "Paginated short links", body = PaginatedResponse<Vec<LinkResponse>>),
+            (status = 400, description = "Invalid filter"),
+        )
+)]
 pub async fn get_all_links(
     _req: HttpRequest,
     query: web::Query<GetLinksQuery>,
@@ -120,6 +131,18 @@ pub async fn get_all_links(
 }
 
 /// 创建新链接
+#[aster_forge_api_docs_macros::path(
+        post,
+        path = "/admin/v1/links",
+        tag = "links",
+        operation_id = "create_link",
+        request_body = PostNewLink,
+        responses(
+            (status = 201, description = "Short link created", body = ApiResponse<PostNewLink>),
+            (status = 400, description = "Invalid short link"),
+            (status = 409, description = "Short code already exists"),
+        )
+)]
 pub async fn post_link(
     _req: HttpRequest,
     link: web::Json<PostNewLink>,
@@ -166,6 +189,17 @@ pub async fn post_link(
 }
 
 /// 获取单个链接
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/links/{code}",
+        tag = "links",
+        operation_id = "get_link",
+        params(("code" = String, Path, description = "Short code")),
+        responses(
+            (status = 200, description = "Short link", body = ApiResponse<LinkResponse>),
+            (status = 404, description = "Short link not found"),
+        )
+)]
 pub async fn get_link(
     _req: HttpRequest,
     code: web::Path<String>,
@@ -186,6 +220,17 @@ pub async fn get_link(
 }
 
 /// 删除链接
+#[aster_forge_api_docs_macros::path(
+        delete,
+        path = "/admin/v1/links/{code}",
+        tag = "links",
+        operation_id = "delete_link",
+        params(("code" = String, Path, description = "Short code")),
+        responses(
+            (status = 200, description = "Short link deleted", body = ApiResponse<MessageResponse>),
+            (status = 404, description = "Short link not found"),
+        )
+)]
 pub async fn delete_link(
     _req: HttpRequest,
     code: web::Path<String>,
@@ -205,6 +250,18 @@ pub async fn delete_link(
 }
 
 /// 更新链接
+#[aster_forge_api_docs_macros::path(
+        put,
+        path = "/admin/v1/links/{code}",
+        tag = "links",
+        operation_id = "update_link",
+        params(("code" = String, Path, description = "Short code")),
+        request_body = PostNewLink,
+        responses(
+            (status = 200, description = "Short link updated", body = ApiResponse<PostNewLink>),
+            (status = 404, description = "Short link not found"),
+        )
+)]
 pub async fn update_link(
     _req: HttpRequest,
     code: web::Path<String>,
@@ -238,6 +295,13 @@ pub async fn update_link(
 }
 
 /// 获取链接统计信息
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/stats",
+        tag = "links",
+        operation_id = "get_link_stats",
+        responses((status = 200, description = "Link statistics", body = ApiResponse<StatsResponse>))
+)]
 pub async fn get_stats(
     _req: HttpRequest,
     service: web::Data<Arc<LinkService>>,

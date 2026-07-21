@@ -19,7 +19,7 @@ export default defineConfig({
         'src/test/',
         '**/*.d.ts',
         '**/*.config.*',
-        '**/types.generated.ts',
+        '**/api.generated.ts',
         'src/main.tsx',
         'src/vite-env.d.ts',
       ],

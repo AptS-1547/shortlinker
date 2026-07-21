@@ -1,7 +1,5 @@
 import type { TFunction } from 'i18next'
-
-import type { ConfigItemResponse } from '@/services/api'
-import type { ConfigSchema } from '@/services/types.generated'
+import type { ConfigItemResponse, ConfigSchema } from '@/services/types'
 
 /**
  * 获取配置键的翻译标签

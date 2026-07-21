@@ -19,7 +19,6 @@ These settings live in `config.toml` and require restart to take effect.
 |--------|------|---------|-------------|
 | `database.database_url` | String | `shortlinks.db` | Database URL or file path (backend type inferred from this value) |
 | `database.pool_size` | Integer | `20` | Pool size (MySQL/PostgreSQL only; SQLite uses built-in pool settings) |
-| `database.timeout` | Integer | `30` | *(currently unused; connect/acquire timeout is fixed at 8s)* |
 | `database.retry_count` | Integer | `3` | Retry count for some DB operations |
 | `database.retry_base_delay_ms` | Integer | `100` | Retry base delay (ms) |
 | `database.retry_max_delay_ms` | Integer | `2000` | Retry max delay (ms) |
@@ -34,7 +33,6 @@ See [Storage Backends](/en/config/storage) for URL formats.
 | `cache.default_ttl` | Integer | `3600` | Default TTL (seconds) |
 | `cache.redis.url` | String | `redis://127.0.0.1:6379/` | Redis URL |
 | `cache.redis.key_prefix` | String | `shortlinker:` | Redis key prefix |
-| `cache.memory.max_capacity` | Integer | `10000` | In-memory cache max entries |
 
 ### Logging
 
@@ -45,7 +43,8 @@ See [Storage Backends](/en/config/storage) for URL formats.
 | `logging.file` | String | *(empty)* | Log file path (empty = stdout) |
 | `logging.max_backups` | Integer | `5` | How many rotated files to keep |
 | `logging.enable_rotation` | Boolean | `true` | Enable rotation (currently daily rotation) |
-| `logging.max_size` | Integer | `100` | *(currently unused; rotation is time-based)* |
+
+> Logging format and file output are configured under `[logging]` in `config.toml`. When set to a valid value, `RUST_LOG` takes precedence over `logging.level`.
 
 ### IPC
 

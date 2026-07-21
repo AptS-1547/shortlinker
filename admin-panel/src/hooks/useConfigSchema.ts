@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { systemConfigService } from '@/services/systemConfigService'
-import type { ConfigSchema } from '@/services/types.generated'
+import type { ConfigSchema } from '@/services/types'
 
 // 全局缓存，带过期时间
 let cachedSchemas: ConfigSchema[] | null = null

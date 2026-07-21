@@ -3,19 +3,15 @@
 use actix_web::{HttpRequest, Responder, Result as ActixResult, web};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use ts_rs::TS;
 
 use crate::services::ConfigService;
 
 use super::helpers::{error_from_shortlinker, success_response};
-use super::types::{ReloadResponse, TS_EXPORT_PATH, ValueType};
+use super::types::{ReloadResponse, ValueType};
 
 /// 配置项响应
-#[derive(Debug, Serialize, TS)]
-#[ts(
-    export,
-    export_to = TS_EXPORT_PATH
-)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigItemResponse {
     pub key: String,
     pub value: String,
@@ -27,70 +23,69 @@ pub struct ConfigItemResponse {
 }
 
 /// 配置更新请求
-#[derive(Debug, Deserialize, TS)]
-#[ts(
-    export,
-    export_to = TS_EXPORT_PATH
-)]
+#[derive(Debug, Deserialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigUpdateRequest {
     pub value: String,
 }
 
 /// 配置更新响应
-#[derive(Debug, Serialize, TS)]
-#[ts(
-    export,
-    export_to = TS_EXPORT_PATH
-)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigUpdateResponse {
     pub key: String,
     pub value: String,
     pub requires_restart: bool,
     pub is_sensitive: bool,
+    #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub message: Option<String>,
 }
 
 /// 配置历史记录响应
-#[derive(Debug, Serialize, TS)]
-#[ts(
-    export,
-    export_to = TS_EXPORT_PATH
-)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigHistoryResponse {
     pub id: i32,
     pub config_key: String,
+    #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub old_value: Option<String>,
     pub new_value: String,
     pub changed_at: String,
+    #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub changed_by: Option<String>,
 }
 
 // ========== Config Action API types ==========
 
 /// 配置 action 执行请求
-#[derive(Debug, Deserialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Deserialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigActionRequest {
     pub action: crate::config::types::ActionType,
 }
 
 /// 配置 action 执行响应
-#[derive(Debug, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigActionResponse {
     pub value: String,
 }
 
 /// 执行并保存响应（安全版本，不返回密钥值）
-#[derive(Debug, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ExecuteAndSaveResponse {
     pub success: bool,
     pub requires_restart: bool,
+    #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub message: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(
+    all(debug_assertions, feature = "openapi"),
+    derive(utoipa::IntoParams, utoipa::ToSchema)
+)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
 }
@@ -98,6 +93,13 @@ pub struct HistoryQuery {
 // ========== Handlers ==========
 
 /// 获取所有配置
+#[aster_forge_api_docs_macros::path(
+    get,
+    path = "/admin/v1/config",
+    tag = "config",
+    operation_id = "list_configs",
+    responses((status = 200, description = "Runtime configuration", body = super::types::ApiResponse<Vec<ConfigItemResponse>>)),
+)]
 pub async fn get_all_configs(
     _req: HttpRequest,
     service: web::Data<Arc<ConfigService>>,
@@ -119,6 +121,17 @@ pub async fn get_all_configs(
 }
 
 /// 获取单个配置
+#[aster_forge_api_docs_macros::path(
+    get,
+    path = "/admin/v1/config/{key}",
+    tag = "config",
+    operation_id = "get_config",
+    params(("key" = String, Path, description = "Configuration key")),
+    responses(
+        (status = 200, description = "Configuration item", body = super::types::ApiResponse<ConfigItemResponse>),
+        (status = 404, description = "Configuration key not found"),
+    ),
+)]
 pub async fn get_config(
     _req: HttpRequest,
     path: web::Path<String>,
@@ -140,6 +153,19 @@ pub async fn get_config(
 }
 
 /// 更新配置
+#[aster_forge_api_docs_macros::path(
+    put,
+    path = "/admin/v1/config/{key}",
+    tag = "config",
+    operation_id = "update_config",
+    params(("key" = String, Path, description = "Configuration key")),
+    request_body = ConfigUpdateRequest,
+    responses(
+        (status = 200, description = "Configuration updated", body = super::types::ApiResponse<ConfigUpdateResponse>),
+        (status = 400, description = "Invalid configuration value"),
+        (status = 404, description = "Configuration key not found"),
+    ),
+)]
 pub async fn update_config(
     _req: HttpRequest,
     path: web::Path<String>,
@@ -161,6 +187,17 @@ pub async fn update_config(
 }
 
 /// 获取配置变更历史
+#[aster_forge_api_docs_macros::path(
+    get,
+    path = "/admin/v1/config/{key}/history",
+    tag = "config",
+    operation_id = "get_config_history",
+    params(
+        ("key" = String, Path, description = "Configuration key"),
+        HistoryQuery,
+    ),
+    responses((status = 200, description = "Configuration history", body = super::types::ApiResponse<Vec<ConfigHistoryResponse>>)),
+)]
 pub async fn get_config_history(
     _req: HttpRequest,
     path: web::Path<String>,
@@ -190,6 +227,16 @@ pub async fn get_config_history(
 }
 
 /// 重新加载配置
+#[aster_forge_api_docs_macros::path(
+    post,
+    path = "/admin/v1/config/reload",
+    tag = "config",
+    operation_id = "reload_config",
+    responses(
+        (status = 200, description = "Configuration reloaded", body = super::types::ApiResponse<ReloadResponse>),
+        (status = 500, description = "Configuration reload failed"),
+    ),
+)]
 pub async fn reload_config(
     _req: HttpRequest,
     service: web::Data<Arc<ConfigService>>,
@@ -204,6 +251,13 @@ pub async fn reload_config(
 }
 
 /// 获取所有配置的 schema
+#[aster_forge_api_docs_macros::path(
+    get,
+    path = "/admin/v1/config/schema",
+    tag = "config",
+    operation_id = "get_config_schema",
+    responses((status = 200, description = "Configuration schema", body = super::types::ApiResponse<Vec<crate::config::ConfigSchema>>)),
+)]
 pub async fn get_config_schema(_req: HttpRequest) -> ActixResult<impl Responder> {
     let schemas = crate::config::get_all_schemas().clone();
     Ok(success_response(schemas))
@@ -212,6 +266,18 @@ pub async fn get_config_schema(_req: HttpRequest) -> ActixResult<impl Responder>
 /// 执行配置 action（如生成 token）
 ///
 /// POST /admin/v1/config/{key}/action
+#[aster_forge_api_docs_macros::path(
+    post,
+    path = "/admin/v1/config/{key}/action",
+    tag = "config",
+    operation_id = "execute_config_action",
+    params(("key" = String, Path, description = "Configuration key")),
+    request_body = ConfigActionRequest,
+    responses(
+        (status = 200, description = "Action result", body = super::types::ApiResponse<ConfigActionResponse>),
+        (status = 400, description = "Unsupported action"),
+    ),
+)]
 pub async fn execute_config_action(
     _req: HttpRequest,
     path: web::Path<String>,
@@ -229,6 +295,18 @@ pub async fn execute_config_action(
 /// 执行配置 action 并保存（安全版本）
 ///
 /// POST /admin/v1/config/{key}/execute-and-save
+#[aster_forge_api_docs_macros::path(
+    post,
+    path = "/admin/v1/config/{key}/execute-and-save",
+    tag = "config",
+    operation_id = "execute_and_save_config_action",
+    params(("key" = String, Path, description = "Configuration key")),
+    request_body = ConfigActionRequest,
+    responses(
+        (status = 200, description = "Action executed and value saved", body = super::types::ApiResponse<ExecuteAndSaveResponse>),
+        (status = 400, description = "Unsupported action"),
+    ),
+)]
 pub async fn execute_and_save_config_action(
     _req: HttpRequest,
     path: web::Path<String>,
@@ -242,25 +320,5 @@ pub async fn execute_and_save_config_action(
             message: view.message,
         })),
         Err(e) => Ok(error_from_shortlinker(&e)),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ts_rs::TS;
-
-    #[test]
-    fn export_config_types() {
-        let cfg = ts_rs::Config::default();
-        ValueType::export_all(&cfg).expect("Failed to export ValueType");
-        ConfigItemResponse::export_all(&cfg).expect("Failed to export ConfigItemResponse");
-        ConfigUpdateRequest::export_all(&cfg).expect("Failed to export ConfigUpdateRequest");
-        ConfigUpdateResponse::export_all(&cfg).expect("Failed to export ConfigUpdateResponse");
-        ConfigHistoryResponse::export_all(&cfg).expect("Failed to export ConfigHistoryResponse");
-        ConfigActionRequest::export_all(&cfg).expect("Failed to export ConfigActionRequest");
-        ConfigActionResponse::export_all(&cfg).expect("Failed to export ConfigActionResponse");
-        ExecuteAndSaveResponse::export_all(&cfg).expect("Failed to export ExecuteAndSaveResponse");
-        println!("Config TypeScript types exported");
     }
 }

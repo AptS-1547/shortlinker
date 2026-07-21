@@ -52,10 +52,8 @@ import { useDialog } from '@/hooks/useDialog'
 import { useLinksBatch } from '@/hooks/useLinksBatch'
 import { useLinksFilters } from '@/hooks/useLinksFilters'
 import { useLinksSort } from '@/hooks/useLinksSort'
-import { batchService } from '@/services/batchService'
 import type { LinkResponse, PostNewLink } from '@/services/types'
 import { useLinksStore } from '@/stores/linksStore'
-import { logger } from '@/utils/logger'
 import { buildShortUrl } from '@/utils/urlBuilder'
 
 export default function LinksPage() {
@@ -83,7 +81,19 @@ export default function LinksPage() {
   const { sortField, sortDirection, sortedLinks, handleSort } =
     useLinksSort(links)
   const { visibleColumns, handleColumnToggle } = useColumnVisibility()
-  const batch = useLinksBatch(
+  const {
+    selectedCodes,
+    selectedCount,
+    batchDeleteOpen,
+    batchDeleting,
+    exporting,
+    setBatchDeleteOpen,
+    handleSelectChange,
+    handleSelectAll,
+    handleClearSelection,
+    handleBatchDelete,
+    handleExport: exportLinks,
+  } = useLinksBatch(
     links.map((l) => l.code),
     { onBatchDeleteSuccess: fetchLinks },
   )
@@ -104,7 +114,7 @@ export default function LinksPage() {
       prevFilters.current.createdBefore !== filters.createdBefore
 
     if (filtersChanged) {
-      batch.handleClearSelection()
+      handleClearSelection()
       prevFilters.current = {
         searchQuery: filters.searchQuery,
         statusFilter: filters.statusFilter,
@@ -117,38 +127,37 @@ export default function LinksPage() {
     filters.statusFilter,
     filters.createdAfter,
     filters.createdBefore,
-    batch,
+    handleClearSelection,
   ])
 
   // 分页/页面大小变更时清除批量选择的包装函数
   const handlePageChange = useCallback(
     (page: number) => {
-      batch.handleClearSelection()
+      handleClearSelection()
       goToPage(page)
     },
-    [batch, goToPage],
+    [goToPage, handleClearSelection],
   )
 
   const handlePageSizeChange = useCallback(
     (size: number) => {
-      batch.handleClearSelection()
+      handleClearSelection()
       setPageSize(size)
     },
-    [batch, setPageSize],
+    [handleClearSelection, setPageSize],
   )
 
   // 导入成功时清除批量选择并刷新
   const handleImportSuccess = useCallback(() => {
-    batch.handleClearSelection()
+    handleClearSelection()
     fetchLinks()
-  }, [batch, fetchLinks])
+  }, [fetchLinks, handleClearSelection])
 
   // Dialog state
   const formDialog = useDialog<LinkResponse>()
   const deleteDialog = useDialog<LinkResponse>()
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const [analyticsCode, setAnalyticsCode] = useState<string | null>(null)
   const [qrCodeDialogCode, setQrCodeDialogCode] = useState<string | null>(null)
 
@@ -191,13 +200,13 @@ export default function LinksPage() {
       try {
         await deleteLink(deleteDialog.data.code)
         toast.success(t('links.deleteSuccess', 'Link deleted successfully'))
-        batch.handleClearSelection()
+        handleClearSelection()
         deleteDialog.close()
       } catch {
         toast.error(t('links.deleteError', 'Failed to delete link'))
       }
     }
-  }, [deleteDialog, deleteLink, t, batch])
+  }, [deleteDialog, deleteLink, handleClearSelection, t])
 
   const handleCopy = useCallback(
     async (code: string) => {
@@ -219,30 +228,14 @@ export default function LinksPage() {
   }, [])
 
   const handleExport = useCallback(async () => {
-    setExporting(true)
-    try {
-      // 构建当前过滤条件
-      const query = {
-        search: filters.searchQuery || undefined,
-        created_after: filters.createdAfter?.toISOString(),
-        created_before: filters.createdBefore?.toISOString(),
-        only_active: filters.statusFilter === 'active' || undefined,
-        only_expired: filters.statusFilter === 'expired' || undefined,
-      }
-
-      // 触发下载（预检 + 浏览器原生下载）
-      await batchService.exportLinks(query)
-
-      // 立即成功提示（浏览器已开始下载）
-      toast.success(t('links.export.success'))
-    } catch (error) {
-      // 预检失败时的错误处理（401/500等）
-      toast.error(t('links.export.error'))
-      logger.error('Failed to export links:', error)
-    } finally {
-      setExporting(false)
-    }
-  }, [filters, t])
+    await exportLinks({
+      search: filters.searchQuery || undefined,
+      created_after: filters.createdAfter?.toISOString(),
+      created_before: filters.createdBefore?.toISOString(),
+      only_active: filters.statusFilter === 'active' || undefined,
+      only_expired: filters.statusFilter === 'expired' || undefined,
+    })
+  }, [exportLinks, filters])
 
   return (
     <div className="space-y-6">
@@ -298,11 +291,11 @@ export default function LinksPage() {
               {t('links.tableTitle')} ({pagination.total})
             </CardTitle>
             <div className="flex items-center gap-2">
-              {batch.selectedCount > 0 ? (
+              {selectedCount > 0 ? (
                 <LinksBatchActions
-                  selectedCount={batch.selectedCount}
-                  onDelete={() => batch.setBatchDeleteOpen(true)}
-                  onClear={batch.handleClearSelection}
+                  selectedCount={selectedCount}
+                  onDelete={() => setBatchDeleteOpen(true)}
+                  onClear={handleClearSelection}
                 />
               ) : (
                 <ColumnConfigDropdown
@@ -321,15 +314,15 @@ export default function LinksPage() {
               <LinksTable
                 links={sortedLinks}
                 copiedCode={copiedCode}
-                selectedCodes={batch.selectedCodes}
+                selectedCodes={selectedCodes}
                 sortField={sortField}
                 sortDirection={sortDirection}
                 visibleColumns={visibleColumns}
                 onCopy={handleCopy}
                 onEdit={handleOpenEdit}
                 onDelete={deleteDialog.open}
-                onSelectChange={batch.handleSelectChange}
-                onSelectAll={batch.handleSelectAll}
+                onSelectChange={handleSelectChange}
+                onSelectAll={handleSelectAll}
                 onSort={handleSort}
                 onViewAnalytics={setAnalyticsCode}
                 onDownloadQr={handleOpenQrCode}
@@ -360,29 +353,26 @@ export default function LinksPage() {
       />
 
       {/* 批量删除确认对话框 */}
-      <AlertDialog
-        open={batch.batchDeleteOpen}
-        onOpenChange={batch.setBatchDeleteOpen}
-      >
+      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('links.batch.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
               {t('links.batch.deleteDescription', {
-                count: batch.selectedCount,
+                count: selectedCount,
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={batch.batchDeleting}>
+            <AlertDialogCancel disabled={batchDeleting}>
               {t('common.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={batch.handleBatchDelete}
-              disabled={batch.batchDeleting}
+              onClick={handleBatchDelete}
+              disabled={batchDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {batch.batchDeleting ? t('common.deleting') : t('common.delete')}
+              {batchDeleting ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,6 +8,10 @@ on:
       - '**/Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
+      - 'admin-panel/generated/openapi.json'
+      - 'admin-panel/src/services/api.generated.ts'
+      - 'admin-panel/package.json'
+      - 'admin-panel/bun.lock'
       - '.github/workflows/rust.yml'
   pull_request:
     branches: [master, develop]
@@ -16,6 +20,10 @@ on:
       - '**/Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
+      - 'admin-panel/generated/openapi.json'
+      - 'admin-panel/src/services/api.generated.ts'
+      - 'admin-panel/package.json'
+      - 'admin-panel/bun.lock'
       - '.github/workflows/rust.yml'
 
 concurrency:
@@ -55,6 +63,44 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  openapi-contract:
+    name: OpenAPI contract drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: openapi-v1
+
+      - name: Generate OpenAPI specification
+        run: cargo test --features openapi --test generate_openapi
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Install admin panel dependencies
+        working-directory: admin-panel
+        run: bun install --frozen-lockfile --registry https://registry.npmjs.org
+
+      - name: Generate TypeScript API types
+        working-directory: admin-panel
+        run: bun run generate-api
+
+      - name: Verify generated contract files
+        run: |
+          git diff --exit-code -- \
+            admin-panel/generated/openapi.json \
+            admin-panel/src/services/api.generated.ts
 
   tests-and-coverage:
     name: Tests and coverage

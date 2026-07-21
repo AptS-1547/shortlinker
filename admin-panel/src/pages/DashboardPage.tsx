@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FiBarChart2 as BarChart3,
@@ -16,111 +16,18 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useDashboardData } from '@/hooks/useDashboardData'
 import { useDateFormat } from '@/hooks/useDateFormat'
-import { analyticsService } from '@/services/analyticsService'
-import type { LinkResponse, StatsResponse } from '@/services/api'
-import { LinkAPI } from '@/services/api'
 import { useHealthStore } from '@/stores/healthStore'
-import { dashboardLogger } from '@/utils/logger'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
   const { formatRelative } = useDateFormat()
 
-  // 仪表盘独立管理最近链接数据，避免与 LinksPage 的 store 冲突
-  const [recentLinks, setRecentLinks] = useState<LinkResponse[]>([])
-  const [stats, setStats] = useState<StatsResponse>({
-    total_links: 0,
-    total_clicks: 0,
-    active_links: 0,
-  })
+  const { recentLinks, stats, trendData, trendLoading, clickChange } =
+    useDashboardData()
   // 健康状态由 AdminLayout 负责轮询，这里只读取
   const healthData = useHealthStore((state) => state.status)
-  const [trendData, setTrendData] = useState<
-    { date: string; clicks: number }[]
-  >([])
-  const [trendLoading, setTrendLoading] = useState(true)
-  const [clickChange, setClickChange] = useState<number | null>(null)
-
-  // 防止 StrictMode 双重执行
-  const hasFetched = useRef(false)
-
-  useEffect(() => {
-    if (hasFetched.current) return
-    hasFetched.current = true
-
-    const fetchData = async () => {
-      try {
-        // 并行获取统计数据和最近链接
-        const [statsRes, recentRes] = await Promise.all([
-          LinkAPI.fetchStats(),
-          LinkAPI.fetchPaginated({
-            page: 1,
-            page_size: 5,
-            created_after: null,
-            created_before: null,
-            only_expired: null,
-            only_active: null,
-            search: null,
-          }),
-        ])
-        setStats(statsRes)
-        setRecentLinks(recentRes.data)
-      } catch (err) {
-        dashboardLogger.error('Failed to fetch dashboard data:', err)
-      }
-    }
-    fetchData()
-  }, [])
-
-  const hasFetchedTrend = useRef(false)
-
-  useEffect(() => {
-    if (hasFetchedTrend.current) return
-    hasFetchedTrend.current = true
-
-    const fetchTrend = async () => {
-      try {
-        const end = new Date()
-        const start = new Date()
-        start.setDate(end.getDate() - 7)
-
-        const trends = await analyticsService.getTrends({
-          start_date: start.toISOString(),
-          end_date: end.toISOString(),
-          group_by: 'day',
-          limit: null,
-        })
-
-        const chartData = trends.labels.map((label, i) => ({
-          date: label,
-          clicks: Number(trends.values[i]),
-        }))
-
-        setTrendData(chartData)
-
-        // Calculate today vs yesterday change
-        if (chartData.length >= 2) {
-          const today = chartData[chartData.length - 1].clicks
-          const yesterday = chartData[chartData.length - 2].clicks
-          if (yesterday > 0) {
-            setClickChange(((today - yesterday) / yesterday) * 100)
-          } else if (today > 0) {
-            setClickChange(100)
-          } else {
-            setClickChange(0)
-          }
-        } else if (chartData.length === 1) {
-          setClickChange(null)
-        }
-      } catch (err) {
-        dashboardLogger.error('Failed to fetch trend data:', err)
-      } finally {
-        setTrendLoading(false)
-      }
-    }
-    fetchTrend()
-  }, [])
 
   const formattedUptime = useMemo(() => {
     const uptime = healthData?.uptime ?? 0

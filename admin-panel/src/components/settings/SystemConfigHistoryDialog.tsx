@@ -1,5 +1,4 @@
 import { format } from 'date-fns'
-import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FiArrowRight } from 'react-icons/fi'
 
@@ -13,8 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { ConfigHistoryResponse, ConfigItemResponse } from '@/services/api'
-import { SystemConfigAPI } from '@/services/api'
+import { useConfigHistory } from '@/hooks/useConfigHistory'
+import type { ConfigItemResponse } from '@/services/types'
 
 interface SystemConfigHistoryDialogProps {
   config: ConfigItemResponse | null
@@ -28,28 +27,7 @@ export function SystemConfigHistoryDialog({
   onOpenChange,
 }: SystemConfigHistoryDialogProps) {
   const { t } = useTranslation()
-  const [history, setHistory] = useState<ConfigHistoryResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadHistory = useCallback(async (key: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await SystemConfigAPI.fetchHistory(key, 50)
-      setHistory(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load history')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (open && config) {
-      loadHistory(config.key)
-    }
-  }, [open, config, loadHistory])
+  const { history, loading, error } = useConfigHistory(config?.key, open)
 
   const formatDate = (dateStr: string) => {
     try {

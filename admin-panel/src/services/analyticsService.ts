@@ -12,7 +12,7 @@ import type {
   ReferrerStats,
   TopLink,
   TrendData,
-} from './types.generated'
+} from './types'
 
 /**
  * API 响应包装类型

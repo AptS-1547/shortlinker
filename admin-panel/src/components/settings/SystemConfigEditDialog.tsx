@@ -35,14 +35,13 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { TagInput } from '@/components/ui/tag-input'
 import { Textarea } from '@/components/ui/textarea'
+import { useConfigAction } from '@/hooks/useConfigAction'
 import { useConfigSchemaByKey } from '@/hooks/useConfigSchema'
 import {
   type ConfigValueType,
   createConfigFormSchema,
 } from '@/schemas/systemConfigSchema'
-import type { ConfigItemResponse } from '@/services/api'
-import { systemConfigService } from '@/services/systemConfigService'
-import type { EnumOption } from '@/services/types.generated'
+import type { ConfigItemResponse, EnumOption } from '@/services/types'
 import { formatJSON, getConfigKeyLabel } from '@/utils/configUtils'
 
 interface SystemConfigEditDialogProps {
@@ -65,7 +64,7 @@ export function SystemConfigEditDialog({
 }: SystemConfigEditDialogProps) {
   const { t } = useTranslation()
   const [showRestartWarning, setShowRestartWarning] = useState(false)
-  const [generating, setGenerating] = useState(false)
+  const { executing: generating, executeAndSave } = useConfigAction()
 
   // 从 API 获取 schema
   const { schema: configSchema } = useConfigSchemaByKey(config?.key || '')
@@ -121,12 +120,8 @@ export function SystemConfigEditDialog({
   const handleSecureGenerate = async () => {
     if (!config || !configSchema?.action) return
 
-    setGenerating(true)
     try {
-      const result = await systemConfigService.executeAndSave(
-        config.key,
-        configSchema.action,
-      )
+      const result = await executeAndSave(config.key, configSchema.action)
       if (result.success) {
         if (result.requires_restart) {
           setShowRestartWarning(true)
@@ -135,9 +130,7 @@ export function SystemConfigEditDialog({
         }
       }
     } catch {
-      // Error is handled by the store
-    } finally {
-      setGenerating(false)
+      // Error is handled by the request boundary.
     }
   }
 

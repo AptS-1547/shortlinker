@@ -1,0 +1,3777 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shortlinker API",
+    "description": "Shortlinker management API",
+    "contact": {
+      "name": "AptS-1547",
+      "email": "apts-1547@esaps.net"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "version": "0.5.2"
+  },
+  "paths": {
+    "/admin/v1/analytics/devices": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/devices - 获取设备分析",
+        "operationId": "get_device_stats",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DeviceAnalyticsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/analytics/export": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/export - 导出报告（流式响应）",
+        "operationId": "export_analytics_report",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics CSV report",
+            "content": {
+              "text/csv": {}
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/analytics/geo": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/geo - 获取地理位置分布",
+        "operationId": "get_geo_stats",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geographic statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_GeoStats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/analytics/referrers": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/referrers - 获取来源统计",
+        "operationId": "get_referrer_stats",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Referrer statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_ReferrerStats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/analytics/top": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/top - 获取热门链接",
+        "operationId": "get_top_links",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_TopLink"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/analytics/trends": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/analytics/trends - 获取点击趋势",
+        "operationId": "get_analytics_trends",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Click trend",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TrendData"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "登录验证 - 检查管理员 token",
+        "operationId": "admin_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid administrator token"
+          },
+          "429": {
+            "description": "Login rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/admin/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "登出 - 清除 cookies",
+        "operationId": "admin_logout",
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "刷新 token",
+        "operationId": "refresh_admin_token",
+        "responses": {
+          "200": {
+            "description": "Token refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token is missing or invalid"
+          },
+          "429": {
+            "description": "Refresh rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/admin/v1/auth/verify": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "验证 token - 如果中间件通过，则 token 有效",
+        "operationId": "verify_admin_token",
+        "responses": {
+          "200": {
+            "description": "Token is valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token is missing or invalid"
+          }
+        }
+      }
+    },
+    "/admin/v1/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "获取所有配置",
+        "operationId": "list_configs",
+        "responses": {
+          "200": {
+            "description": "Runtime configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_ConfigItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/config/reload": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "重新加载配置",
+        "operationId": "reload_config",
+        "responses": {
+          "200": {
+            "description": "Configuration reloaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ReloadResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Configuration reload failed"
+          }
+        }
+      }
+    },
+    "/admin/v1/config/schema": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "获取所有配置的 schema",
+        "operationId": "get_config_schema",
+        "responses": {
+          "200": {
+            "description": "Configuration schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_ConfigSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/config/{key}": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "获取单个配置",
+        "operationId": "get_config",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Configuration key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConfigItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Configuration key not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "config"
+        ],
+        "summary": "更新配置",
+        "operationId": "update_config",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Configuration key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConfigUpdateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid configuration value"
+          },
+          "404": {
+            "description": "Configuration key not found"
+          }
+        }
+      }
+    },
+    "/admin/v1/config/{key}/action": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "执行配置 action（如生成 token）",
+        "description": "POST /admin/v1/config/{key}/action",
+        "operationId": "execute_config_action",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Configuration key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Action result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConfigActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported action"
+          }
+        }
+      }
+    },
+    "/admin/v1/config/{key}/execute-and-save": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "执行配置 action 并保存（安全版本）",
+        "description": "POST /admin/v1/config/{key}/execute-and-save",
+        "operationId": "execute_and_save_config_action",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Configuration key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Action executed and value saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ExecuteAndSaveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported action"
+          }
+        }
+      }
+    },
+    "/admin/v1/config/{key}/history": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "获取配置变更历史",
+        "operationId": "get_config_history",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Configuration key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Configuration history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Vec_ConfigHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/links": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "获取所有链接（支持分页和过滤）",
+        "operationId": "list_links",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "only_expired",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "only_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated short links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_Vec_LinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "创建新链接",
+        "operationId": "create_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostNewLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Short link created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_PostNewLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid short link"
+          },
+          "409": {
+            "description": "Short code already exists"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/batch": {
+      "put": {
+        "tags": [
+          "links"
+        ],
+        "summary": "批量更新链接",
+        "operationId": "batch_update_links",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Batch update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_BatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Batch too large or invalid"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "批量创建链接",
+        "operationId": "batch_create_links",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Batch create result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_BatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Batch too large or invalid"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "links"
+        ],
+        "summary": "批量删除链接",
+        "operationId": "batch_delete_links",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Batch delete result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_BatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Batch too large or invalid"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/export": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "导出链接为 CSV（流式响应）",
+        "operationId": "export_links",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "only_expired",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "only_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Short links CSV export",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "400": {
+            "description": "Invalid export filter"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/import": {
+      "post": {
+        "tags": [
+          "links"
+        ],
+        "summary": "导入链接从 CSV",
+        "operationId": "import_links",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid CSV or multipart request"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/{code}": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "获取单个链接",
+        "operationId": "get_link",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Short code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Short link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_LinkResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short link not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "links"
+        ],
+        "summary": "更新链接",
+        "operationId": "update_link",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Short code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostNewLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Short link updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_PostNewLink"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short link not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "links"
+        ],
+        "summary": "删除链接",
+        "operationId": "delete_link",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Short code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Short link deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_MessageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short link not found"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/{code}/analytics": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/links/{code}/analytics - 获取单链接详细统计",
+        "operationId": "get_link_analytics",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Short code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_LinkAnalytics"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short link not found"
+          }
+        }
+      }
+    },
+    "/admin/v1/links/{code}/analytics/devices": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "GET /admin/v1/links/{code}/analytics/devices - 获取单链接设备分析",
+        "operationId": "get_link_device_stats",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Short code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "description": "开始日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "description": "结束日期 (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "description": "分组方式",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/GroupBy"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回数量限制",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link device statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DeviceAnalyticsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short link not found"
+          }
+        }
+      }
+    },
+    "/admin/v1/stats": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "获取链接统计信息",
+        "operationId": "get_link_stats",
+        "responses": {
+          "200": {
+            "description": "Link statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_StatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActionType": {
+        "type": "string",
+        "description": "配置 Action 类型枚举\n\n用于标识配置项可执行的操作（如生成 token）。\n这是一个与 ValueType 正交的概念 - 任何类型的配置都可以有可选的 action。",
+        "enum": [
+          "generate_token"
+        ]
+      },
+      "AnalyticsQuery": {
+        "type": "object",
+        "description": "Analytics 查询参数",
+        "properties": {
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "结束日期 (ISO 8601)"
+          },
+          "group_by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GroupBy",
+                "description": "分组方式"
+              }
+            ]
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "返回数量限制",
+            "minimum": 0
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "开始日期 (ISO 8601)"
+          }
+        }
+      },
+      "ApiResponse_AuthSuccessResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "认证成功响应",
+            "required": [
+              "message",
+              "expires_in"
+            ],
+            "properties": {
+              "expires_in": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_BatchResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "success",
+              "failed"
+            ],
+            "properties": {
+              "failed": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BatchFailedItem"
+                }
+              },
+              "success": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ConfigActionResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "配置 action 执行响应",
+            "required": [
+              "value"
+            ],
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ConfigItemResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "配置项响应",
+            "required": [
+              "key",
+              "value",
+              "value_type",
+              "requires_restart",
+              "is_sensitive",
+              "updated_at"
+            ],
+            "properties": {
+              "is_sensitive": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "requires_restart": {
+                "type": "boolean"
+              },
+              "updated_at": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "value_type": {
+                "$ref": "#/components/schemas/ValueType",
+                "description": "值类型"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ConfigUpdateResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "配置更新响应",
+            "required": [
+              "key",
+              "value",
+              "requires_restart",
+              "is_sensitive",
+              "message"
+            ],
+            "properties": {
+              "is_sensitive": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requires_restart": {
+                "type": "boolean"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_DeviceAnalyticsResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "设备分析响应",
+            "required": [
+              "browsers",
+              "operating_systems",
+              "devices",
+              "bot_percentage",
+              "total_with_ua"
+            ],
+            "properties": {
+              "bot_percentage": {
+                "type": "number",
+                "format": "double"
+              },
+              "browsers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryStatsResponse"
+                }
+              },
+              "devices": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryStatsResponse"
+                }
+              },
+              "operating_systems": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryStatsResponse"
+                }
+              },
+              "total_with_ua": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ExecuteAndSaveResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "执行并保存响应（安全版本，不返回密钥值）",
+            "required": [
+              "success",
+              "requires_restart",
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requires_restart": {
+                "type": "boolean"
+              },
+              "success": {
+                "type": "boolean"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ImportResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "导入响应",
+            "required": [
+              "total_rows",
+              "success_count",
+              "skipped_count",
+              "failed_count",
+              "failed_items"
+            ],
+            "properties": {
+              "failed_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed_items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ImportFailedItem"
+                }
+              },
+              "skipped_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "success_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_rows": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_LinkAnalytics": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "单链接分析数据",
+            "required": [
+              "code",
+              "total_clicks",
+              "trend",
+              "top_referrers",
+              "geo_distribution"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "geo_distribution": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GeoStats"
+                }
+              },
+              "top_referrers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReferrerStats"
+                }
+              },
+              "total_clicks": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "trend": {
+                "$ref": "#/components/schemas/TrendData"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_LinkResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "code",
+              "target",
+              "created_at",
+              "expires_at",
+              "password",
+              "click_count"
+            ],
+            "properties": {
+              "click_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "code": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "password": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_MessageResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "简单消息响应",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_PostNewLink": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "target"
+            ],
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "force": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "password": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_ReloadResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "Reload 成功响应",
+            "required": [
+              "message",
+              "duration_ms"
+            ],
+            "properties": {
+              "duration_ms": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_StatsResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "统计信息响应",
+            "required": [
+              "total_links",
+              "total_clicks",
+              "active_links"
+            ],
+            "properties": {
+              "active_links": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_clicks": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_links": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_TrendData": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "object",
+            "description": "点击趋势数据",
+            "required": [
+              "labels",
+              "values"
+            ],
+            "properties": {
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "时间标签"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "description": "点击数"
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_ConfigHistoryResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "配置历史记录响应",
+              "required": [
+                "id",
+                "config_key",
+                "old_value",
+                "new_value",
+                "changed_at",
+                "changed_by"
+              ],
+              "properties": {
+                "changed_at": {
+                  "type": "string"
+                },
+                "changed_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "config_key": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "new_value": {
+                  "type": "string"
+                },
+                "old_value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_ConfigItemResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "配置项响应",
+              "required": [
+                "key",
+                "value",
+                "value_type",
+                "requires_restart",
+                "is_sensitive",
+                "updated_at"
+              ],
+              "properties": {
+                "is_sensitive": {
+                  "type": "boolean"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "requires_restart": {
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "value_type": {
+                  "$ref": "#/components/schemas/ValueType",
+                  "description": "值类型"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_ConfigSchema": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "配置项的 schema 元信息",
+              "required": [
+                "key",
+                "value_type",
+                "default_value",
+                "description",
+                "requires_restart",
+                "editable",
+                "order"
+              ],
+              "properties": {
+                "action": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ActionType",
+                      "description": "可执行的 action（如生成 token）"
+                    }
+                  ]
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "default_value": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "editable": {
+                  "type": "boolean"
+                },
+                "enum_options": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "$ref": "#/components/schemas/EnumOption"
+                  }
+                },
+                "key": {
+                  "type": "string"
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "排序顺序（基于 Forge registry 中定义的顺序）",
+                  "minimum": 0
+                },
+                "requires_restart": {
+                  "type": "boolean"
+                },
+                "value_type": {
+                  "$ref": "#/components/schemas/ValueType"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_GeoStats": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "地理位置统计",
+              "required": [
+                "country",
+                "city",
+                "count"
+              ],
+              "properties": {
+                "city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "country": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_ReferrerStats": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "来源统计",
+              "required": [
+                "referrer",
+                "count",
+                "percentage"
+              ],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "percentage": {
+                  "type": "number",
+                  "format": "double"
+                },
+                "referrer": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponse_Vec_TopLink": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "热门链接",
+              "required": [
+                "code",
+                "clicks"
+              ],
+              "properties": {
+                "clicks": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthSuccessResponse": {
+        "type": "object",
+        "description": "认证成功响应",
+        "required": [
+          "message",
+          "expires_in"
+        ],
+        "properties": {
+          "expires_in": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "BatchCreateRequest": {
+        "type": "object",
+        "required": [
+          "links"
+        ],
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostNewLink"
+            }
+          }
+        }
+      },
+      "BatchDeleteRequest": {
+        "type": "object",
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BatchFailedItem": {
+        "type": "object",
+        "required": [
+          "code",
+          "error"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "BatchResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "failed"
+        ],
+        "properties": {
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchFailedItem"
+            }
+          },
+          "success": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BatchUpdateItem": {
+        "type": "object",
+        "required": [
+          "code",
+          "payload"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PostNewLink"
+          }
+        }
+      },
+      "BatchUpdateRequest": {
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "properties": {
+          "updates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchUpdateItem"
+            }
+          }
+        }
+      },
+      "CategoryStatsResponse": {
+        "type": "object",
+        "description": "分类统计响应",
+        "required": [
+          "name",
+          "count",
+          "percentage"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "percentage": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ConfigActionRequest": {
+        "type": "object",
+        "description": "配置 action 执行请求",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ActionType"
+          }
+        }
+      },
+      "ConfigActionResponse": {
+        "type": "object",
+        "description": "配置 action 执行响应",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigHistoryResponse": {
+        "type": "object",
+        "description": "配置历史记录响应",
+        "required": [
+          "id",
+          "config_key",
+          "old_value",
+          "new_value",
+          "changed_at",
+          "changed_by"
+        ],
+        "properties": {
+          "changed_at": {
+            "type": "string"
+          },
+          "changed_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "config_key": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "new_value": {
+            "type": "string"
+          },
+          "old_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ConfigItemResponse": {
+        "type": "object",
+        "description": "配置项响应",
+        "required": [
+          "key",
+          "value",
+          "value_type",
+          "requires_restart",
+          "is_sensitive",
+          "updated_at"
+        ],
+        "properties": {
+          "is_sensitive": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/ValueType",
+            "description": "值类型"
+          }
+        }
+      },
+      "ConfigSchema": {
+        "type": "object",
+        "description": "配置项的 schema 元信息",
+        "required": [
+          "key",
+          "value_type",
+          "default_value",
+          "description",
+          "requires_restart",
+          "editable",
+          "order"
+        ],
+        "properties": {
+          "action": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ActionType",
+                "description": "可执行的 action（如生成 token）"
+              }
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_value": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "enum_options": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/EnumOption"
+            }
+          },
+          "key": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "description": "排序顺序（基于 Forge registry 中定义的顺序）",
+            "minimum": 0
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/ValueType"
+          }
+        }
+      },
+      "ConfigUpdateRequest": {
+        "type": "object",
+        "description": "配置更新请求",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigUpdateResponse": {
+        "type": "object",
+        "description": "配置更新响应",
+        "required": [
+          "key",
+          "value",
+          "requires_restart",
+          "is_sensitive",
+          "message"
+        ],
+        "properties": {
+          "is_sensitive": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "DeviceAnalyticsResponse": {
+        "type": "object",
+        "description": "设备分析响应",
+        "required": [
+          "browsers",
+          "operating_systems",
+          "devices",
+          "bot_percentage",
+          "total_with_ua"
+        ],
+        "properties": {
+          "bot_percentage": {
+            "type": "number",
+            "format": "double"
+          },
+          "browsers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryStatsResponse"
+            }
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryStatsResponse"
+            }
+          },
+          "operating_systems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryStatsResponse"
+            }
+          },
+          "total_with_ua": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "EnumOption": {
+        "type": "object",
+        "description": "单个 enum 选项",
+        "required": [
+          "value",
+          "label"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description_i18n_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "label_i18n_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorCode": {
+        "type": "integer",
+        "format": "int32",
+        "description": "Shortlinker API numeric error code",
+        "enum": [
+          0,
+          1000,
+          1001,
+          1004,
+          1005,
+          1010,
+          1011,
+          1012,
+          1030,
+          2000,
+          2001,
+          2002,
+          2003,
+          2004,
+          3000,
+          3001,
+          3002,
+          3003,
+          3004,
+          3005,
+          3006,
+          3007,
+          3008,
+          4000,
+          4001,
+          4002,
+          4003,
+          4004,
+          4005,
+          4006,
+          5000,
+          5001,
+          5002,
+          6000,
+          6001,
+          6002
+        ],
+        "x-enum-varnames": [
+          "Success",
+          "BadRequest",
+          "Unauthorized",
+          "NotFound",
+          "InternalServerError",
+          "BatchSizeTooLarge",
+          "FileTooLarge",
+          "InvalidDateFormat",
+          "ServiceUnavailable",
+          "AuthFailed",
+          "TokenExpired",
+          "TokenInvalid",
+          "CsrfInvalid",
+          "RateLimitExceeded",
+          "LinkNotFound",
+          "LinkAlreadyExists",
+          "LinkInvalidUrl",
+          "LinkInvalidExpireTime",
+          "LinkPasswordHashError",
+          "LinkDatabaseError",
+          "LinkEmptyCode",
+          "LinkInvalidCode",
+          "LinkReservedCode",
+          "ImportFailed",
+          "ExportFailed",
+          "InvalidMultipartData",
+          "FileReadError",
+          "CsvFileMissing",
+          "CsvParseError",
+          "CsvGenerationError",
+          "ConfigNotFound",
+          "ConfigUpdateFailed",
+          "ConfigReloadFailed",
+          "AnalyticsQueryFailed",
+          "AnalyticsLinkNotFound",
+          "AnalyticsInvalidDateRange"
+        ]
+      },
+      "ExecuteAndSaveResponse": {
+        "type": "object",
+        "description": "执行并保存响应（安全版本，不返回密钥值）",
+        "required": [
+          "success",
+          "requires_restart",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requires_restart": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ExportQuery": {
+        "type": "object",
+        "description": "导出查询参数",
+        "properties": {
+          "created_after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "only_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "only_expired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "search": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GeoStats": {
+        "type": "object",
+        "description": "地理位置统计",
+        "required": [
+          "country",
+          "city",
+          "count"
+        ],
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "country": {
+            "type": "string"
+          }
+        }
+      },
+      "GetLinksQuery": {
+        "type": "object",
+        "properties": {
+          "created_after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "only_active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "only_expired": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "page": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "page_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "search": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GroupBy": {
+        "type": "string",
+        "description": "分组方式",
+        "enum": [
+          "hour",
+          "day",
+          "week",
+          "month"
+        ]
+      },
+      "HealthCacheCheck": {
+        "type": "object",
+        "description": "缓存健康检查状态",
+        "required": [
+          "status",
+          "cache_type",
+          "bloom_filter_enabled",
+          "negative_cache_enabled"
+        ],
+        "properties": {
+          "bloom_filter_enabled": {
+            "type": "boolean"
+          },
+          "cache_type": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "negative_cache_enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthChecks": {
+        "type": "object",
+        "description": "健康检查项容器",
+        "required": [
+          "storage"
+        ],
+        "properties": {
+          "cache": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HealthCacheCheck"
+              }
+            ]
+          },
+          "storage": {
+            "$ref": "#/components/schemas/HealthStorageCheck"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "description": "健康检查响应",
+        "required": [
+          "status",
+          "timestamp",
+          "uptime",
+          "checks",
+          "response_time_ms"
+        ],
+        "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/HealthChecks"
+          },
+          "response_time_ms": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "HealthStorageBackend": {
+        "type": "object",
+        "description": "存储后端信息",
+        "required": [
+          "storage_type",
+          "support_click"
+        ],
+        "properties": {
+          "storage_type": {
+            "type": "string"
+          },
+          "support_click": {
+            "type": "boolean"
+          }
+        }
+      },
+      "HealthStorageCheck": {
+        "type": "object",
+        "description": "存储健康检查状态",
+        "required": [
+          "status",
+          "links_count",
+          "backend"
+        ],
+        "properties": {
+          "backend": {
+            "$ref": "#/components/schemas/HealthStorageBackend"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "links_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "HistoryQuery": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "HttpMethod": {
+        "type": "string",
+        "description": "HTTP 方法枚举",
+        "enum": [
+          "GET",
+          "POST",
+          "PUT",
+          "DELETE",
+          "PATCH",
+          "HEAD",
+          "OPTIONS"
+        ]
+      },
+      "ImportFailedItem": {
+        "type": "object",
+        "description": "导入失败项",
+        "required": [
+          "row",
+          "code",
+          "error"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "row": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "CSV 行号（1-based），None 表示行号未知（如 service 层返回的冲突项无法反查行号）",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportMode": {
+        "type": "string",
+        "description": "Import conflict resolution mode",
+        "enum": [
+          "skip",
+          "overwrite",
+          "error"
+        ]
+      },
+      "ImportResponse": {
+        "type": "object",
+        "description": "导入响应",
+        "required": [
+          "total_rows",
+          "success_count",
+          "skipped_count",
+          "failed_count",
+          "failed_items"
+        ],
+        "properties": {
+          "failed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportFailedItem"
+            }
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "success_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "LinkAnalytics": {
+        "type": "object",
+        "description": "单链接分析数据",
+        "required": [
+          "code",
+          "total_clicks",
+          "trend",
+          "top_referrers",
+          "geo_distribution"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "geo_distribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeoStats"
+            }
+          },
+          "top_referrers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferrerStats"
+            }
+          },
+          "total_clicks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "trend": {
+            "$ref": "#/components/schemas/TrendData"
+          }
+        }
+      },
+      "LinkResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "target",
+          "created_at",
+          "expires_at",
+          "password",
+          "click_count"
+        ],
+        "properties": {
+          "click_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "code": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginCredentials": {
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "description": "简单消息响应",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PaginatedResponse_Vec_LinkResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "pagination"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "target",
+                "created_at",
+                "expires_at",
+                "password",
+                "click_count"
+              ],
+              "properties": {
+                "click_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "code": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "expires_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "password": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "target": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo"
+          }
+        }
+      },
+      "PaginationInfo": {
+        "type": "object",
+        "required": [
+          "page",
+          "page_size",
+          "total",
+          "total_pages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PostNewLink": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "force": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "type": "string"
+          }
+        }
+      },
+      "ReferrerStats": {
+        "type": "object",
+        "description": "来源统计",
+        "required": [
+          "referrer",
+          "count",
+          "percentage"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "percentage": {
+            "type": "number",
+            "format": "double"
+          },
+          "referrer": {
+            "type": "string"
+          }
+        }
+      },
+      "ReloadResponse": {
+        "type": "object",
+        "description": "Reload 成功响应",
+        "required": [
+          "message",
+          "duration_ms"
+        ],
+        "properties": {
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SameSitePolicy": {
+        "type": "string",
+        "description": "Cookie SameSite 策略",
+        "enum": [
+          "Strict",
+          "Lax",
+          "None"
+        ]
+      },
+      "StatsResponse": {
+        "type": "object",
+        "description": "统计信息响应",
+        "required": [
+          "total_links",
+          "total_clicks",
+          "active_links"
+        ],
+        "properties": {
+          "active_links": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_clicks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_links": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "TopLink": {
+        "type": "object",
+        "description": "热门链接",
+        "required": [
+          "code",
+          "clicks"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "TrendData": {
+        "type": "object",
+        "description": "点击趋势数据",
+        "required": [
+          "labels",
+          "values"
+        ],
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "时间标签"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "description": "点击数"
+          }
+        }
+      },
+      "ValueType": {
+        "type": "string",
+        "description": "配置值类型枚举\n\n用于标识配置项在数据库和前端的类型。",
+        "enum": [
+          "string",
+          "int",
+          "float",
+          "bool",
+          "json",
+          "enum",
+          "stringarray",
+          "enumarray"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "links",
+      "description": "Short link management"
+    },
+    {
+      "name": "analytics",
+      "description": "Click analytics"
+    },
+    {
+      "name": "auth",
+      "description": "Administrator authentication"
+    },
+    {
+      "name": "config",
+      "description": "Runtime configuration"
+    },
+    {
+      "name": "health",
+      "description": "Service health"
+    }
+  ]
+}

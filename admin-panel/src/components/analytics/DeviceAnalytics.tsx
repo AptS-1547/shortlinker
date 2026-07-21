@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { DeviceAnalyticsResponse } from '@/services/types.generated'
+import type { DeviceAnalyticsResponse } from '@/services/types'
 import { COLORS } from './utils'
 
 interface DeviceAnalyticsProps {

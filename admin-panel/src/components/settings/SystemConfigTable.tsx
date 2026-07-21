@@ -17,7 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { ConfigItemResponse } from '@/services/api'
+import type { ConfigItemResponse } from '@/services/types'
 import { getConfigKeyLabel } from '@/utils/configUtils'
 
 interface SystemConfigTableProps {

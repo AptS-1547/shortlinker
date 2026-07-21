@@ -1,9 +1,9 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock AuthAPI
-vi.mock('@/services/api', () => ({
-  AuthAPI: {
+// Mock authService
+vi.mock('@/services/authService', () => ({
+  authService: {
     login: vi.fn(),
     logout: vi.fn(),
     verifyToken: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('@/utils/logger', () => ({
   },
 }))
 
-import { AuthAPI } from '@/services/api'
+import { authService } from '@/services/authService'
 import { forceLogout, refreshTokenFromHttp, useAuthStore } from '../authStore'
 
 describe('authStore', () => {
@@ -64,7 +64,7 @@ describe('authStore', () => {
 
   describe('login', () => {
     it('should set isAuthenticated to true on successful login', async () => {
-      vi.mocked(AuthAPI.login).mockResolvedValueOnce({
+      vi.mocked(authService.login).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -78,8 +78,8 @@ describe('authStore', () => {
       expect(state.expiresAt).not.toBe(null)
     })
 
-    it('should call AuthAPI.login with password', async () => {
-      vi.mocked(AuthAPI.login).mockResolvedValueOnce({
+    it('should call authService.login with password', async () => {
+      vi.mocked(authService.login).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -87,11 +87,11 @@ describe('authStore', () => {
         await useAuthStore.getState().login('mypassword')
       })
 
-      expect(AuthAPI.login).toHaveBeenCalledWith({ password: 'mypassword' })
+      expect(authService.login).toHaveBeenCalledWith({ password: 'mypassword' })
     })
 
     it('should save expiresAt to sessionStorage', async () => {
-      vi.mocked(AuthAPI.login).mockResolvedValueOnce({
+      vi.mocked(authService.login).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -105,7 +105,7 @@ describe('authStore', () => {
 
     it('should throw error on failed login', async () => {
       const error = new Error('Invalid password')
-      vi.mocked(AuthAPI.login).mockRejectedValueOnce(error)
+      vi.mocked(authService.login).mockRejectedValueOnce(error)
 
       await expect(
         act(async () => {
@@ -130,7 +130,7 @@ describe('authStore', () => {
         expiresAt: Date.now() + 3600000,
       })
 
-      vi.mocked(AuthAPI.logout).mockResolvedValueOnce(undefined)
+      vi.mocked(authService.logout).mockResolvedValueOnce(undefined)
 
       await act(async () => {
         await useAuthStore.getState().logout()
@@ -141,19 +141,19 @@ describe('authStore', () => {
       expect(state.expiresAt).toBe(null)
     })
 
-    it('should call AuthAPI.logout', async () => {
-      vi.mocked(AuthAPI.logout).mockResolvedValueOnce(undefined)
+    it('should call authService.logout', async () => {
+      vi.mocked(authService.logout).mockResolvedValueOnce(undefined)
 
       await act(async () => {
         await useAuthStore.getState().logout()
       })
 
-      expect(AuthAPI.logout).toHaveBeenCalled()
+      expect(authService.logout).toHaveBeenCalled()
     })
 
     it('should set isAuthenticated to false even if API fails', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      vi.mocked(AuthAPI.logout).mockRejectedValueOnce(
+      vi.mocked(authService.logout).mockRejectedValueOnce(
         new Error('Network error'),
       )
 
@@ -167,7 +167,7 @@ describe('authStore', () => {
 
     it('should clear sessionStorage', async () => {
       sessionStorage.setItem('auth_expires_at', '123456')
-      vi.mocked(AuthAPI.logout).mockResolvedValueOnce(undefined)
+      vi.mocked(authService.logout).mockResolvedValueOnce(undefined)
 
       await act(async () => {
         await useAuthStore.getState().logout()
@@ -184,8 +184,8 @@ describe('authStore', () => {
 
   describe('checkAuthStatus', () => {
     it('should set isAuthenticated based on verifyToken result', async () => {
-      vi.mocked(AuthAPI.verifyToken).mockResolvedValueOnce(true)
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValueOnce({
+      vi.mocked(authService.verifyToken).mockResolvedValueOnce(true)
+      vi.mocked(authService.refreshToken).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -199,7 +199,7 @@ describe('authStore', () => {
     })
 
     it('should set isAuthenticated to false when token is invalid', async () => {
-      vi.mocked(AuthAPI.verifyToken).mockResolvedValueOnce(false)
+      vi.mocked(authService.verifyToken).mockResolvedValueOnce(false)
 
       await act(async () => {
         await useAuthStore.getState().checkAuthStatus()
@@ -217,11 +217,11 @@ describe('authStore', () => {
         await useAuthStore.getState().checkAuthStatus()
       })
 
-      expect(AuthAPI.verifyToken).not.toHaveBeenCalled()
+      expect(authService.verifyToken).not.toHaveBeenCalled()
     })
 
     it('should handle verification error', async () => {
-      vi.mocked(AuthAPI.verifyToken).mockRejectedValueOnce(
+      vi.mocked(authService.verifyToken).mockRejectedValueOnce(
         new Error('Network error'),
       )
 
@@ -239,9 +239,9 @@ describe('authStore', () => {
       vi.setSystemTime(new Date('2024-01-01T00:00:00Z'))
       const futureTime = new Date('2024-01-01T01:00:00Z').getTime() // 1 hour in the future
       sessionStorage.setItem('auth_expires_at', futureTime.toString())
-      vi.mocked(AuthAPI.verifyToken).mockResolvedValueOnce(true)
+      vi.mocked(authService.verifyToken).mockResolvedValueOnce(true)
       // Token has valid expiresAt so no immediate refresh needed
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValue({ expiresIn: 3600 })
+      vi.mocked(authService.refreshToken).mockResolvedValue({ expiresIn: 3600 })
 
       await act(async () => {
         await useAuthStore.getState().checkAuthStatus()
@@ -258,7 +258,7 @@ describe('authStore', () => {
 
   describe('refreshToken', () => {
     it('should update expiresAt on successful refresh', async () => {
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValueOnce({
+      vi.mocked(authService.refreshToken).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -272,7 +272,7 @@ describe('authStore', () => {
 
     it('should set isAuthenticated to false on refresh failure', async () => {
       useAuthStore.setState({ isAuthenticated: true })
-      vi.mocked(AuthAPI.refreshToken).mockRejectedValueOnce(
+      vi.mocked(authService.refreshToken).mockRejectedValueOnce(
         new Error('Refresh failed'),
       )
 
@@ -307,7 +307,7 @@ describe('authStore', () => {
     it('should schedule refresh when expiresAt is set', async () => {
       const expiresAt = Date.now() + 600000 // 10 minutes
       useAuthStore.setState({ expiresAt })
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValue({
+      vi.mocked(authService.refreshToken).mockResolvedValue({
         expiresIn: 3600,
       })
 
@@ -320,13 +320,13 @@ describe('authStore', () => {
         vi.advanceTimersByTime(480000 + 1000) // 8min + 1s
       })
 
-      expect(AuthAPI.refreshToken).toHaveBeenCalled()
+      expect(authService.refreshToken).toHaveBeenCalled()
     })
 
     it('should immediately refresh if token is about to expire', async () => {
       const expiresAt = Date.now() + 60000 // 1 minute (within buffer)
       useAuthStore.setState({ expiresAt })
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValue({
+      vi.mocked(authService.refreshToken).mockResolvedValue({
         expiresIn: 3600,
       })
 
@@ -334,7 +334,7 @@ describe('authStore', () => {
         useAuthStore.getState().startAutoRefresh()
       })
 
-      expect(AuthAPI.refreshToken).toHaveBeenCalled()
+      expect(authService.refreshToken).toHaveBeenCalled()
     })
 
     it('should stop auto refresh timer', () => {
@@ -372,7 +372,7 @@ describe('authStore', () => {
     })
 
     it('refreshTokenFromHttp should call refreshToken', async () => {
-      vi.mocked(AuthAPI.refreshToken).mockResolvedValueOnce({
+      vi.mocked(authService.refreshToken).mockResolvedValueOnce({
         expiresIn: 3600,
       })
 
@@ -380,7 +380,7 @@ describe('authStore', () => {
         await refreshTokenFromHttp()
       })
 
-      expect(AuthAPI.refreshToken).toHaveBeenCalled()
+      expect(authService.refreshToken).toHaveBeenCalled()
     })
   })
 })

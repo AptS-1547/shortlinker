@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useConfigSchema } from '@/hooks/useConfigSchema'
 import { cn } from '@/lib/utils'
-import type { ConfigItemResponse } from '@/services/api'
+import type { ConfigItemResponse } from '@/services/types'
 import { useSystemConfigStore } from '@/stores/systemConfigStore'
 import {
   CONFIG_CATEGORY_INFO,

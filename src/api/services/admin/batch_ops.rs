@@ -18,6 +18,17 @@ use super::types::{
 const MAX_BATCH_SIZE: usize = 5000;
 
 /// 批量创建链接
+#[aster_forge_api_docs_macros::path(
+        post,
+        path = "/admin/v1/links/batch",
+        tag = "links",
+        operation_id = "batch_create_links",
+        request_body = BatchCreateRequest,
+        responses(
+            (status = 200, description = "Batch create result", body = super::types::ApiResponse<BatchResponse>),
+            (status = 400, description = "Batch too large or invalid"),
+        )
+)]
 pub async fn batch_create_links(
     _req: HttpRequest,
     batch: web::Json<BatchCreateRequest>,
@@ -82,6 +93,17 @@ pub async fn batch_create_links(
 }
 
 /// 批量更新链接
+#[aster_forge_api_docs_macros::path(
+        put,
+        path = "/admin/v1/links/batch",
+        tag = "links",
+        operation_id = "batch_update_links",
+        request_body = BatchUpdateRequest,
+        responses(
+            (status = 200, description = "Batch update result", body = super::types::ApiResponse<BatchResponse>),
+            (status = 400, description = "Batch too large or invalid"),
+        )
+)]
 pub async fn batch_update_links(
     _req: HttpRequest,
     batch: web::Json<BatchUpdateRequest>,
@@ -149,6 +171,17 @@ pub async fn batch_update_links(
 }
 
 /// 批量删除链接
+#[aster_forge_api_docs_macros::path(
+        delete,
+        path = "/admin/v1/links/batch",
+        tag = "links",
+        operation_id = "batch_delete_links",
+        request_body = BatchDeleteRequest,
+        responses(
+            (status = 200, description = "Batch delete result", body = super::types::ApiResponse<BatchResponse>),
+            (status = 400, description = "Batch too large or invalid"),
+        )
+)]
 pub async fn batch_delete_links(
     _req: HttpRequest,
     batch: web::Json<BatchDeleteRequest>,

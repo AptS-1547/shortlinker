@@ -16,7 +16,12 @@ metrics = [
     "aster_forge_actix_observability/prometheus",
     "aster_forge_metrics/backend-prometheus",
 ]  # Prometheus 指标导出
-full = ["server", "cli", "metrics"]  # 全功能版本
+openapi = [
+    "server",
+    "dep:utoipa",
+    "aster_forge_api_docs_macros/openapi",
+]  # OpenAPI 文档和前端类型生成
+full = ["server", "cli", "metrics", "openapi"]  # 全功能版本
 
 # 开发构建优先缩短「改代码 -> 编译/测试」的反馈时间。
 # 工作区代码保持 O0 以避免每次修改后重做优化；第三方依赖单独使用 O1，
@@ -78,10 +83,11 @@ members = [".", "migration"]
 [dependencies]
 aster_forge_actix_middleware = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_middleware", features = ["metrics"] }
 aster_forge_actix_observability = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_observability" }
+aster_forge_api_docs_macros = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_api_docs_macros" }
 aster_forge_cache = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_cache", features = ["bloom", "memory", "redis"] }
 aster_forge_config = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_config" }
 aster_forge_crypto = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_crypto" }
-aster_forge_db = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_db" }
+aster_forge_db = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_db", features = ["system-config"] }
 aster_forge_logging = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_logging" }
 aster_forge_metrics = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_metrics" }
 aster_forge_panic = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_panic" }
@@ -118,7 +124,7 @@ sea-orm = { version = "2.0.0-rc.38", default-features = false, features = ["sqlx
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 arc-swap = "1"
 actix-cors = "0.7"
-ts-rs = { version = "12.0", features = ["chrono-impl"] }
+utoipa = { version = "5.5.0", features = ["actix_extras", "chrono", "repr"], optional = true }
 csv = "1.4"
 actix-multipart = "0.8"
 strum = { version = "0.28", features = ["derive"] }

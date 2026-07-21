@@ -1,9 +1,10 @@
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use tracing::info;
 
 use crate::errors::{Result, ShortlinkerError};
+use crate::storage::config_store::SYSTEM_CONFIG_BINDING;
 use crate::storage::{ConfigHistoryEntry, ConfigItem, ConfigStore, ConfigUpdateResult};
 
 use super::definitions::CONFIG_REGISTRY;
@@ -20,7 +21,7 @@ static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
 /// 支持热更新和实时重载。
 pub struct RuntimeConfig {
     cache: aster_forge_config::SyncRuntimeConfig<ConfigItem>,
-    store: Arc<ConfigStore>,
+    store: ConfigStore,
 }
 
 impl RuntimeConfig {
@@ -28,7 +29,7 @@ impl RuntimeConfig {
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             cache: aster_forge_config::SyncRuntimeConfig::new(),
-            store: Arc::new(ConfigStore::new(db)),
+            store: ConfigStore::new(db),
         }
     }
 
@@ -208,11 +209,6 @@ impl RuntimeConfig {
     pub async fn get_history(&self, key: &str, limit: u64) -> Result<Vec<ConfigHistoryEntry>> {
         self.store.get_history(key, limit).await
     }
-
-    /// 获取底层存储（用于迁移等高级操作）
-    pub fn store(&self) -> Arc<ConfigStore> {
-        self.store.clone()
-    }
 }
 
 /// 初始化全局运行时配置
@@ -223,10 +219,10 @@ impl RuntimeConfig {
 /// 1. 确保所有配置项存在（首次启动时使用默认值初始化）
 /// 2. 从数据库加载配置到内存缓存
 pub async fn init_runtime_config(db: DatabaseConnection) -> Result<()> {
-    let config = RuntimeConfig::new(db);
-
     // 确保所有配置项存在（首次启动时使用默认值初始化）
-    config.store().ensure_defaults().await?;
+    SYSTEM_CONFIG_BINDING.ensure_defaults(&db).await?;
+
+    let config = RuntimeConfig::new(db);
 
     // 加载配置到内存缓存
     config.load().await?;

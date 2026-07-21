@@ -48,7 +48,7 @@ assets/                 README 和管理面板使用的静态资源
 - 分析：点击计数通过异步 manager/channel 写入，详细日志、GeoIP、小时/每日 rollup 受运行时配置控制。
 - 前端：React 19、Vite、TypeScript、Tailwind CSS、Radix UI、Zustand、i18next、Vitest、Biome；包管理器使用 Bun。
 - 文档：VitePress，包管理器使用 Bun。
-- 可选 feature：`server`、`cli`、`metrics`、`full`；默认启用 `server` 和 `cli`。
+- 可选 feature：`server`、`cli`、`metrics`、`openapi`、`full`；默认启用 `server` 和 `cli`。
 
 ## 开发命令
 
@@ -64,6 +64,10 @@ cargo test --test <test_file> <test_filter>
 cargo test --test redirect_tests
 cargo test --test admin_api_tests
 cargo test
+
+# OpenAPI 和管理面板类型生成
+cargo test --features openapi --test generate_openapi
+cd admin-panel && bun run generate-api && cd ..
 
 # 运行服务或 CLI
 cargo run
@@ -105,6 +109,7 @@ Rust CI 的完整约束是 `cargo fmt --all -- --check`、`cargo clippy --worksp
 - 重定向、健康检查、metrics、静态资源和 CLI 不强行套管理 API envelope：307、404/500、Prometheus text 和文件响应必须保持客户端兼容。
 - 领域错误统一使用 `ShortlinkerError`/`src/errors.rs` 的现有转换路径，不要在 handler 中散落字符串错误和不一致的状态码。
 - 新增或修改 endpoint 时同步检查认证、CSRF/CORS、限流、缓存头和日志字段。
+- 管理 API handler 使用 `aster_forge_api_docs_macros::path` 声明 OpenAPI 元数据；schema 聚合在 `src/api/openapi.rs`。修改 DTO 或 endpoint 后依次运行 OpenAPI 生成测试和管理面板 `generate-api`，业务代码从 `admin-panel/src/services/types.ts` 导入类型，不直接依赖生成文件。
 
 ### 配置
 

@@ -83,6 +83,18 @@ pub fn refresh_rate_limiter()
 }
 
 /// 登录验证 - 检查管理员 token
+#[aster_forge_api_docs_macros::path(
+        post,
+        path = "/admin/v1/auth/login",
+        tag = "auth",
+        operation_id = "admin_login",
+        request_body = LoginCredentials,
+        responses(
+            (status = 200, description = "Login successful", body = ApiResponse<AuthSuccessResponse>),
+            (status = 401, description = "Invalid administrator token"),
+            (status = 429, description = "Login rate limit exceeded"),
+        )
+)]
 pub async fn check_admin_token(
     req: HttpRequest,
     login_body: web::Json<LoginCredentials>,
@@ -180,6 +192,17 @@ pub async fn check_admin_token(
 }
 
 /// 刷新 token
+#[aster_forge_api_docs_macros::path(
+        post,
+        path = "/admin/v1/auth/refresh",
+        tag = "auth",
+        operation_id = "refresh_admin_token",
+        responses(
+            (status = 200, description = "Token refreshed", body = ApiResponse<AuthSuccessResponse>),
+            (status = 401, description = "Refresh token is missing or invalid"),
+            (status = 429, description = "Refresh rate limit exceeded"),
+        )
+)]
 pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let cookie_builder = CookieBuilder::from_config();
 
@@ -250,6 +273,13 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
 }
 
 /// 登出 - 清除 cookies
+#[aster_forge_api_docs_macros::path(
+        post,
+        path = "/admin/v1/auth/logout",
+        tag = "auth",
+        operation_id = "admin_logout",
+        responses((status = 200, description = "Logout successful", body = ApiResponse<MessageResponse>))
+)]
 pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
     info!("Admin API: logout");
 
@@ -273,6 +303,16 @@ pub async fn logout(_req: HttpRequest) -> ActixResult<impl Responder> {
 }
 
 /// 验证 token - 如果中间件通过，则 token 有效
+#[aster_forge_api_docs_macros::path(
+        get,
+        path = "/admin/v1/auth/verify",
+        tag = "auth",
+        operation_id = "verify_admin_token",
+        responses(
+            (status = 200, description = "Token is valid", body = ApiResponse<MessageResponse>),
+            (status = 401, description = "Token is missing or invalid"),
+        )
+)]
 pub async fn verify_token(_req: HttpRequest) -> ActixResult<impl Responder> {
     Ok(success_response(MessageResponse {
         message: "Token is valid".to_string(),

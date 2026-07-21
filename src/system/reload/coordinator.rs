@@ -6,14 +6,14 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use std::sync::Arc;
-use tokio::sync::{RwLock, broadcast};
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 use crate::config::try_get_runtime_config;
 use crate::errors::Result;
 use crate::services::LinkCache;
 
-use super::types::{ReloadEvent, ReloadResult, ReloadStatus, ReloadTarget};
+use super::types::{ReloadResult, ReloadStatus, ReloadTarget};
 
 /// ReloadCoordinator trait
 ///
@@ -25,26 +25,20 @@ pub trait ReloadCoordinator: Send + Sync {
 
     /// Get the current reload status
     fn status(&self) -> ReloadStatus;
-
-    /// Subscribe to reload events
-    fn subscribe(&self) -> broadcast::Receiver<ReloadEvent>;
 }
 
 /// Default implementation of ReloadCoordinator
 pub struct DefaultReloadCoordinator {
     cache: Arc<dyn LinkCache + 'static>,
     status: RwLock<ReloadStatus>,
-    event_sender: broadcast::Sender<ReloadEvent>,
 }
 
 impl DefaultReloadCoordinator {
     /// Create a new DefaultReloadCoordinator
     pub fn new(cache: Arc<dyn LinkCache + 'static>) -> Self {
-        let (sender, _) = broadcast::channel(32);
         Self {
             cache,
             status: RwLock::new(ReloadStatus::default()),
-            event_sender: sender,
         }
     }
 
@@ -86,9 +80,6 @@ impl ReloadCoordinator for DefaultReloadCoordinator {
             status.current_target = Some(target);
         }
 
-        // Send started event
-        let _ = self.event_sender.send(ReloadEvent::Started { target });
-
         // Execute reload based on target
         let result = match target {
             ReloadTarget::Data => self.reload_data().await,
@@ -127,16 +118,7 @@ impl ReloadCoordinator for DefaultReloadCoordinator {
             }
         }
 
-        // Send completed/failed event
-        if reload_result.success {
-            let _ = self.event_sender.send(ReloadEvent::Completed {
-                result: reload_result.clone(),
-            });
-        } else {
-            let _ = self.event_sender.send(ReloadEvent::Failed {
-                target,
-                error: reload_result.message.clone().unwrap_or_default(),
-            });
+        if !reload_result.success {
             error!(
                 "Reload {} failed: {}",
                 target,
@@ -153,9 +135,5 @@ impl ReloadCoordinator for DefaultReloadCoordinator {
             .try_read()
             .map(|s| s.clone())
             .unwrap_or_default()
-    }
-
-    fn subscribe(&self) -> broadcast::Receiver<ReloadEvent> {
-        self.event_sender.subscribe()
     }
 }

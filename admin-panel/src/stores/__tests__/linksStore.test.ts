@@ -1,9 +1,9 @@
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock LinkAPI
-vi.mock('@/services/api', () => ({
-  LinkAPI: {
+// Mock linkService
+vi.mock('@/services/linkService', () => ({
+  linkService: {
     fetchPaginated: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('@/utils/storage', () => ({
   },
 }))
 
-import { LinkAPI } from '@/services/api'
+import { linkService } from '@/services/linkService'
 import { useLinksStore } from '../linksStore'
 
 describe('linksStore', () => {
@@ -117,7 +117,7 @@ describe('linksStore', () => {
 
   describe('fetchLinks', () => {
     it('should fetch links and update state', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -133,7 +133,7 @@ describe('linksStore', () => {
 
     it('should set fetching to true during fetch', async () => {
       let fetchingDuringCall = false
-      vi.mocked(LinkAPI.fetchPaginated).mockImplementation(async () => {
+      vi.mocked(linkService.fetchPaginated).mockImplementation(async () => {
         fetchingDuringCall = useLinksStore.getState().fetching
         return mockPaginatedResponse
       })
@@ -146,7 +146,7 @@ describe('linksStore', () => {
     })
 
     it('should handle fetch error', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockRejectedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockRejectedValueOnce(
         new Error('Network error'),
       )
 
@@ -171,7 +171,7 @@ describe('linksStore', () => {
           only_active: null,
         },
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -179,14 +179,14 @@ describe('linksStore', () => {
         await useLinksStore.getState().fetchLinks()
       })
 
-      expect(LinkAPI.fetchPaginated).toHaveBeenCalledWith(
+      expect(linkService.fetchPaginated).toHaveBeenCalledWith(
         expect.objectContaining({ page: 2, page_size: 50, search: 'test' }),
         expect.any(AbortSignal),
       )
     })
 
     it('should update currentQuery when query is provided', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -209,7 +209,7 @@ describe('linksStore', () => {
 
     it('should cancel previous request on new fetch', async () => {
       let abortedCount = 0
-      vi.mocked(LinkAPI.fetchPaginated).mockImplementation(
+      vi.mocked(linkService.fetchPaginated).mockImplementation(
         async (_, signal) => {
           await new Promise((resolve) => setTimeout(resolve, 50))
           if (signal?.aborted) {
@@ -239,7 +239,7 @@ describe('linksStore', () => {
 
   describe('applyFilter', () => {
     it('should apply filter and fetch links', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -255,7 +255,7 @@ describe('linksStore', () => {
         })
       })
 
-      expect(LinkAPI.fetchPaginated).toHaveBeenCalled()
+      expect(linkService.fetchPaginated).toHaveBeenCalled()
       const state = useLinksStore.getState()
       expect(state.currentQuery.search).toBe('test')
     })
@@ -272,7 +272,7 @@ describe('linksStore', () => {
           only_active: null,
         },
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -310,7 +310,7 @@ describe('linksStore', () => {
           only_active: null,
         },
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -330,7 +330,7 @@ describe('linksStore', () => {
 
   describe('goToPage', () => {
     it('should go to specified page', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce({
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce({
         ...mockPaginatedResponse,
         pagination: { ...mockPaginatedResponse.pagination, page: 3 },
       })
@@ -351,7 +351,7 @@ describe('linksStore', () => {
 
   describe('setPageSize', () => {
     it('should update page size and reset to page 1', async () => {
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValue({
+      vi.mocked(linkService.fetchPaginated).mockResolvedValue({
         code: 200,
         message: 'OK',
         data: [mockLink],
@@ -374,8 +374,8 @@ describe('linksStore', () => {
 
   describe('createLink', () => {
     it('should create link and refetch', async () => {
-      vi.mocked(LinkAPI.create).mockResolvedValueOnce(undefined)
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.create).mockResolvedValueOnce(undefined)
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -389,16 +389,16 @@ describe('linksStore', () => {
         })
       })
 
-      expect(LinkAPI.create).toHaveBeenCalled()
-      expect(LinkAPI.fetchPaginated).toHaveBeenCalled()
+      expect(linkService.create).toHaveBeenCalled()
+      expect(linkService.fetchPaginated).toHaveBeenCalled()
     })
 
     it('should set creating to true during creation', async () => {
       let creatingDuringCall = false
-      vi.mocked(LinkAPI.create).mockImplementation(async () => {
+      vi.mocked(linkService.create).mockImplementation(async () => {
         creatingDuringCall = useLinksStore.getState().creating
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -416,7 +416,7 @@ describe('linksStore', () => {
     })
 
     it('should handle create error', async () => {
-      vi.mocked(LinkAPI.create).mockRejectedValueOnce(
+      vi.mocked(linkService.create).mockRejectedValueOnce(
         new Error('Create failed'),
       )
 
@@ -443,8 +443,8 @@ describe('linksStore', () => {
 
   describe('updateLink', () => {
     it('should update link and refetch', async () => {
-      vi.mocked(LinkAPI.update).mockResolvedValueOnce(undefined)
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.update).mockResolvedValueOnce(undefined)
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -458,16 +458,19 @@ describe('linksStore', () => {
         })
       })
 
-      expect(LinkAPI.update).toHaveBeenCalledWith('test123', expect.any(Object))
-      expect(LinkAPI.fetchPaginated).toHaveBeenCalled()
+      expect(linkService.update).toHaveBeenCalledWith(
+        'test123',
+        expect.any(Object),
+      )
+      expect(linkService.fetchPaginated).toHaveBeenCalled()
     })
 
     it('should set updating to true during update', async () => {
       let updatingDuringCall = false
-      vi.mocked(LinkAPI.update).mockImplementation(async () => {
+      vi.mocked(linkService.update).mockImplementation(async () => {
         updatingDuringCall = useLinksStore.getState().updating
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -485,7 +488,7 @@ describe('linksStore', () => {
     })
 
     it('should handle update error', async () => {
-      vi.mocked(LinkAPI.update).mockRejectedValueOnce(
+      vi.mocked(linkService.update).mockRejectedValueOnce(
         new Error('Update failed'),
       )
 
@@ -512,8 +515,8 @@ describe('linksStore', () => {
 
   describe('deleteLink', () => {
     it('should delete link and refetch', async () => {
-      vi.mocked(LinkAPI.delete).mockResolvedValueOnce(undefined)
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce({
+      vi.mocked(linkService.delete).mockResolvedValueOnce(undefined)
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce({
         code: 200,
         message: 'OK',
         data: [],
@@ -524,17 +527,17 @@ describe('linksStore', () => {
         await useLinksStore.getState().deleteLink('test123')
       })
 
-      expect(LinkAPI.delete).toHaveBeenCalledWith('test123')
-      expect(LinkAPI.fetchPaginated).toHaveBeenCalled()
+      expect(linkService.delete).toHaveBeenCalledWith('test123')
+      expect(linkService.fetchPaginated).toHaveBeenCalled()
     })
 
     it('should set deleting to true during deletion', async () => {
       let deletingDuringCall = false
-      vi.mocked(LinkAPI.delete).mockImplementation(async () => {
+      vi.mocked(linkService.delete).mockImplementation(async () => {
         deletingDuringCall = useLinksStore.getState().deleting
         return undefined
       })
-      vi.mocked(LinkAPI.fetchPaginated).mockResolvedValueOnce(
+      vi.mocked(linkService.fetchPaginated).mockResolvedValueOnce(
         mockPaginatedResponse,
       )
 
@@ -546,7 +549,7 @@ describe('linksStore', () => {
     })
 
     it('should handle delete error', async () => {
-      vi.mocked(LinkAPI.delete).mockRejectedValueOnce(
+      vi.mocked(linkService.delete).mockRejectedValueOnce(
         new Error('Delete failed'),
       )
 

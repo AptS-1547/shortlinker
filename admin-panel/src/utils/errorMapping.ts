@@ -1,5 +1,5 @@
 import type { ApiError } from '@/services/http'
-import { ErrorCode } from '@/services/types.generated'
+import { ErrorCode } from '@/services/types'
 
 /**
  * 类型守卫：判断错误是否为 ApiError

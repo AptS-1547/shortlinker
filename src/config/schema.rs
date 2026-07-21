@@ -10,49 +10,42 @@ use std::sync::OnceLock;
 
 use serde::Serialize;
 use strum::IntoEnumIterator;
-use ts_rs::TS;
 
 use aster_forge_config::{ConfigDefinition, ConfigValueType};
 
 use super::definitions::{CONFIG_REGISTRY, action_for_key, keys};
-use super::types::{ActionType, TS_EXPORT_PATH};
+use super::types::ActionType;
 use super::{HttpMethod, SameSitePolicy, ValueType};
 
 /// Schema 缓存
 static SCHEMA_CACHE: OnceLock<Vec<ConfigSchema>> = OnceLock::new();
 
 /// 单个 enum 选项
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct EnumOption {
     pub value: String,
     pub label: String,
-    #[ts(optional)]
     pub label_i18n_key: Option<String>,
-    #[ts(optional)]
     pub description: Option<String>,
-    #[ts(optional)]
     pub description_i18n_key: Option<String>,
 }
 
 /// 配置项的 schema 元信息
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = TS_EXPORT_PATH)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigSchema {
     pub key: String,
     pub value_type: ValueType,
     pub default_value: String,
     pub description: String,
-    #[ts(optional)]
     pub category: Option<String>,
-    #[ts(optional)]
     pub enum_options: Option<Vec<EnumOption>>,
     pub requires_restart: bool,
     pub editable: bool,
     /// 排序顺序（基于 Forge registry 中定义的顺序）
     pub order: usize,
     /// 可执行的 action（如生成 token）
-    #[ts(optional)]
     pub action: Option<ActionType>,
 }
 
@@ -214,14 +207,6 @@ mod tests {
         for opt in &options {
             assert!(opt.value.parse::<HttpMethod>().is_ok());
         }
-    }
-
-    #[test]
-    fn export_typescript_types() {
-        let cfg = ts_rs::Config::default();
-        EnumOption::export_all(&cfg).expect("Failed to export EnumOption");
-        ConfigSchema::export_all(&cfg).expect("Failed to export ConfigSchema");
-        println!("Schema TypeScript types exported to {}", TS_EXPORT_PATH);
     }
 
     /// 注册表一致性检查：所有 EnumArray 和 Enum 类型必须有 enum_options

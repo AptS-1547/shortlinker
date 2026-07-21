@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { DateRange } from '@/components/analytics'
 import {
@@ -7,22 +7,14 @@ import {
   DateRangeSelector,
   DeviceAnalytics,
   GeoDistribution,
-  getDateRange,
   ReferrerChart,
   TopLinksChart,
   TrendChart,
 } from '@/components/analytics'
 import PageHeader from '@/components/layout/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
-import { analyticsService } from '@/services/analyticsService'
-import type {
-  DeviceAnalyticsResponse,
-  GeoStats,
-  GroupBy,
-  ReferrerStats,
-  TopLink,
-  TrendData,
-} from '@/services/types.generated'
+import { useAnalyticsData } from '@/hooks/useAnalyticsData'
+import type { GroupBy } from '@/services/types'
 
 export default function AnalyticsPage() {
   const { t } = useTranslation()
@@ -30,81 +22,16 @@ export default function AnalyticsPage() {
   // State
   const [dateRange, setDateRange] = useState<DateRange>('30d')
   const [groupBy, setGroupBy] = useState<GroupBy>('day')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Data
-  const [trendData, setTrendData] = useState<TrendData | null>(null)
-  const [topLinks, setTopLinks] = useState<TopLink[]>([])
-  const [referrers, setReferrers] = useState<ReferrerStats[]>([])
-  const [geoStats, setGeoStats] = useState<GeoStats[]>([])
-  const [deviceData, setDeviceData] = useState<DeviceAnalyticsResponse | null>(
-    null,
-  )
-
-  // Fetch data
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const { start, end } = getDateRange(dateRange)
-    const params = {
-      start_date: start,
-      end_date: end,
-      group_by: groupBy,
-      limit: 10,
-    }
-
-    try {
-      const [trends, top, refs, geo, devices] = await Promise.all([
-        analyticsService.getTrends(params),
-        analyticsService.getTopLinks(params),
-        analyticsService.getReferrers(params),
-        analyticsService.getGeoStats(params),
-        analyticsService.getDeviceStats(params),
-      ])
-
-      setTrendData(trends)
-      setTopLinks(top)
-      setReferrers(refs)
-      setGeoStats(geo)
-      setDeviceData(devices)
-    } catch (err) {
-      console.error('Failed to fetch analytics:', err)
-      setError(t('analytics.error.fetchFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [dateRange, groupBy, t])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Export handler
-  const handleExport = async () => {
-    try {
-      const { start, end } = getDateRange(dateRange)
-      const blob = await analyticsService.exportReport({
-        start_date: start,
-        end_date: end,
-        group_by: null,
-        limit: null,
-      })
-
-      // Download
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `analytics_${dateRange}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Export failed:', err)
-    }
-  }
+  const {
+    loading,
+    error,
+    trendData,
+    topLinks,
+    referrers,
+    geoStats,
+    deviceData,
+    exportReport,
+  } = useAnalyticsData(dateRange, groupBy)
 
   // Calculate total clicks
   const totalClicks =
@@ -140,7 +67,7 @@ export default function AnalyticsPage() {
             setDateRange={setDateRange}
             groupBy={groupBy}
             setGroupBy={setGroupBy}
-            onExport={handleExport}
+            onExport={exportReport}
           />
         }
       />

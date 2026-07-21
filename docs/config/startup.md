@@ -19,7 +19,6 @@
 |--------|------|--------|------|
 | `database.database_url` | String | `shortlinks.db` | 数据库连接 URL 或文件路径（后端会自动从该值推断数据库类型） |
 | `database.pool_size` | Integer | `20` | 连接池大小（仅 MySQL/PostgreSQL 生效；SQLite 使用内置池配置） |
-| `database.timeout` | Integer | `30` | *(当前版本暂未使用；连接超时固定为 8s)* |
 | `database.retry_count` | Integer | `3` | 部分数据库操作的重试次数 |
 | `database.retry_base_delay_ms` | Integer | `100` | 重试基础延迟（毫秒） |
 | `database.retry_max_delay_ms` | Integer | `2000` | 重试最大延迟（毫秒） |
@@ -34,7 +33,6 @@
 | `cache.default_ttl` | Integer | `3600` | 默认缓存过期时间（秒） |
 | `cache.redis.url` | String | `redis://127.0.0.1:6379/` | Redis 连接地址 |
 | `cache.redis.key_prefix` | String | `shortlinker:` | Redis 键前缀 |
-| `cache.memory.max_capacity` | Integer | `10000` | 内存缓存最大容量 |
 
 ### 日志配置
 
@@ -45,9 +43,8 @@
 | `logging.file` | String | *(空)* | 日志文件路径（为空则输出到 stdout） |
 | `logging.max_backups` | Integer | `5` | 日志轮转保留文件数 |
 | `logging.enable_rotation` | Boolean | `true` | 是否启用轮转（当前为按天轮转） |
-| `logging.max_size` | Integer | `100` | *(当前版本暂未使用；轮转按天而非按大小)* |
 
-> 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置设置（例如 `logging.format`、`logging.file`）。
+> 日志格式与文件输出通过 `config.toml` 的 `[logging]` 配置设置（例如 `logging.format`、`logging.file`）。环境变量 `RUST_LOG` 设置有效时优先于 `logging.level`。
 
 ### IPC 配置
 

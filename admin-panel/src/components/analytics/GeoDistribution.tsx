@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { GeoStats } from '@/services/types.generated'
+import type { GeoStats } from '@/services/types'
 import { COLORS } from './utils'
 
 interface GeoDistributionProps {

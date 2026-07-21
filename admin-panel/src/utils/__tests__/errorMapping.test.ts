@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiError } from '@/services/http'
-import { ErrorCode } from '@/services/types.generated'
+import { ErrorCode } from '@/services/types'
 import {
   getErrorI18nKey,
   getUserFriendlyErrorMessage,

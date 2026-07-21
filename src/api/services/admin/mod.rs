@@ -9,14 +9,14 @@
 
 pub mod analytics;
 pub mod auth;
-mod batch_ops;
-mod config_ops;
+pub(crate) mod batch_ops;
+pub(crate) mod config_ops;
 pub mod error_code;
-mod export_import;
+pub(crate) mod export_import;
 mod helpers;
-mod link_crud;
+pub(crate) mod link_crud;
 pub mod routes;
-mod types;
+pub(crate) mod types;
 
 // 重新导出类型
 pub use types::*;

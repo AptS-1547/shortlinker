@@ -16,9 +16,9 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { useLinkImport } from '@/hooks/useLinkImport'
 import { cn } from '@/lib/utils'
-import { batchService } from '@/services/batchService'
-import type { ImportMode, ImportResponse } from '@/services/types'
+import type { ImportMode } from '@/services/types'
 
 // 与后端 MAX_IMPORT_FILE_SIZE 保持一致 (src/api/services/admin/export_import.rs)
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -28,8 +28,6 @@ interface LinkImportDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
 }
-
-type ImportState = 'idle' | 'uploading' | 'success' | 'error'
 
 export function LinkImportDialog({
   open,
@@ -41,18 +39,16 @@ export function LinkImportDialog({
 
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>('skip')
-  const [state, setState] = useState<ImportState>('idle')
-  const [result, setResult] = useState<ImportResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const { state, result, error, uploadProgress, importLinks, reset, fail } =
+    useLinkImport(onSuccess)
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0]
       if (selectedFile) {
         if (selectedFile.size > MAX_FILE_SIZE) {
-          setError(
+          fail(
             t('links.import.fileTooLarge', {
               maxSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB`,
             }),
@@ -60,43 +56,23 @@ export function LinkImportDialog({
           return
         }
         setFile(selectedFile)
-        setState('idle')
-        setResult(null)
-        setError(null)
+        reset()
       }
     },
-    [t],
+    [fail, reset, t],
   )
 
   const handleImport = useCallback(async () => {
     if (!file) return
-
-    setState('uploading')
-    setUploadProgress(0)
-    setError(null)
-
-    try {
-      const response = await batchService.importLinks(file, mode, (percent) => {
-        setUploadProgress(percent)
-      })
-      setResult(response)
-      setState('success')
-      onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('links.import.error'))
-      setState('error')
-    }
-  }, [file, mode, onSuccess, t])
+    await importLinks(file, mode)
+  }, [file, importLinks, mode])
 
   const handleClose = useCallback(() => {
     setFile(null)
     setMode('skip')
-    setState('idle')
-    setResult(null)
-    setError(null)
-    setUploadProgress(0)
+    reset()
     onOpenChange(false)
-  }, [onOpenChange])
+  }, [onOpenChange, reset])
 
   const handleSelectFile = useCallback(() => {
     fileInputRef.current?.click()
@@ -128,7 +104,7 @@ export function LinkImportDialog({
       const droppedFile = e.dataTransfer.files?.[0]
       if (droppedFile?.name.endsWith('.csv')) {
         if (droppedFile.size > MAX_FILE_SIZE) {
-          setError(
+          fail(
             t('links.import.fileTooLarge', {
               maxSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB`,
             }),
@@ -136,12 +112,10 @@ export function LinkImportDialog({
           return
         }
         setFile(droppedFile)
-        setState('idle')
-        setResult(null)
-        setError(null)
+        reset()
       }
     },
-    [t],
+    [fail, reset, t],
   )
 
   return (
@@ -188,8 +162,7 @@ export function LinkImportDialog({
                     onClick={(e) => {
                       e.stopPropagation()
                       setFile(null)
-                      setState('idle')
-                      setResult(null)
+                      reset()
                     }}
                   >
                     <X className="h-3 w-3" />

@@ -1,14 +1,21 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, sea_query::OnConflict,
+    QueryOrder, Set,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use aster_forge_db::system_config::{
+    Model as ForgeSystemConfig, SystemConfigDbBinding, SystemConfigUpsert,
+};
+
 use crate::config::ValueType;
 use crate::config::definitions::CONFIG_REGISTRY;
 use crate::errors::{Result, ShortlinkerError};
-use migration::entities::{config_history, system_config};
+use migration::entities::config_history;
+
+pub(crate) static SYSTEM_CONFIG_BINDING: SystemConfigDbBinding =
+    SystemConfigDbBinding::new(&CONFIG_REGISTRY, &[]);
 
 /// 配置项的完整信息
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,16 +29,11 @@ pub struct ConfigItem {
 }
 
 impl ConfigItem {
-    fn from_model(model: system_config::Model) -> Self {
-        let value_type = CONFIG_REGISTRY
-            .get(&model.key)
-            .map(|definition| ValueType::from_forge(definition.key, definition.value_type))
-            .unwrap_or_else(|| model.value_type.parse().unwrap_or(ValueType::String));
-
+    fn from_model(model: ForgeSystemConfig) -> Self {
         Self {
+            value_type: ValueType::from_forge(&model.key, model.value_type),
             key: model.key,
             value: Arc::new(model.value),
-            value_type,
             requires_restart: model.requires_restart,
             is_sensitive: model.is_sensitive,
             updated_at: model.updated_at,
@@ -84,171 +86,88 @@ impl ConfigStore {
         Self { db }
     }
 
-    /// 获取单个配置值
-    pub async fn get(&self, key: &str) -> Result<Option<String>> {
-        let result = system_config::Entity::find_by_id(key)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to query config '{}': {}",
-                    key, e
-                ))
-            })?;
-
-        Ok(result.map(|m| m.value))
-    }
-
-    /// 获取单个配置的完整信息
-    pub async fn get_full(&self, key: &str) -> Result<Option<ConfigItem>> {
-        let result = system_config::Entity::find_by_id(key)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to query config '{}': {}",
-                    key, e
-                ))
-            })?;
-
-        Ok(result.map(ConfigItem::from_model))
-    }
-
-    /// 获取配置并解析为指定类型
-    pub async fn get_typed<T: std::str::FromStr>(&self, key: &str) -> Result<Option<T>> {
-        let value = self.get(key).await?;
-        match value {
-            Some(v) => match v.parse::<T>() {
-                Ok(parsed) => Ok(Some(parsed)),
-                Err(_) => Err(ShortlinkerError::database_operation(format!(
-                    "Failed to parse config '{}' value '{}'",
-                    key, v
-                ))),
-            },
-            None => Ok(None),
-        }
-    }
-
-    /// 获取 bool 类型配置
-    pub async fn get_bool(&self, key: &str) -> Result<Option<bool>> {
-        let value = self.get(key).await?;
-        match value {
-            Some(v) => {
-                let v_lower = v.to_lowercase();
-                Ok(Some(
-                    v_lower == "true" || v_lower == "1" || v_lower == "yes",
-                ))
-            }
-            None => Ok(None),
-        }
-    }
-
-    /// 获取 i64 类型配置
-    pub async fn get_int(&self, key: &str) -> Result<Option<i64>> {
-        self.get_typed::<i64>(key).await
-    }
-
     /// 设置配置值
     pub async fn set(&self, key: &str, value: &str) -> Result<ConfigUpdateResult> {
-        // 先获取旧值和元信息
-        let old_record = system_config::Entity::find_by_id(key)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to query config '{}': {}",
-                    key, e
-                ))
-            })?;
+        let retry_config = aster_forge_db::retry::RetryConfig::deadlock();
+        let key = key.to_string();
+        let value = value.to_string();
+        aster_forge_db::transaction::with_transaction_retry(
+            &self.db,
+            &retry_config,
+            |txn| {
+                let key = key.clone();
+                let value = value.clone();
+                Box::pin(async move {
+                    SYSTEM_CONFIG_BINDING.lock_by_key(txn, &key).await?;
+                    let old_record = SYSTEM_CONFIG_BINDING
+                        .find_by_key(txn, &key)
+                        .await?
+                        .ok_or_else(|| {
+                            aster_forge_db::DbError::non_retryable(format!(
+                                "Config key '{}' does not exist",
+                                key
+                            ))
+                        })?;
+                    let old_value = old_record.value.clone();
 
-        let (old_value, requires_restart, is_sensitive) = match &old_record {
-            Some(r) => (Some(r.value.clone()), r.requires_restart, r.is_sensitive),
-            None => {
-                return Err(ShortlinkerError::database_operation(format!(
-                    "Config key '{}' does not exist",
-                    key
-                )));
-            }
-        };
+                    if old_value == value {
+                        return Ok(ConfigUpdateResult {
+                            key,
+                            value,
+                            requires_restart: old_record.requires_restart,
+                            is_sensitive: old_record.is_sensitive,
+                            old_value: Some(old_value),
+                        });
+                    }
 
-        // 如果值没变，直接返回
-        if old_value.as_deref() == Some(value) {
-            return Ok(ConfigUpdateResult {
-                key: key.to_string(),
-                value: value.to_string(),
-                requires_restart,
-                is_sensitive,
-                old_value,
-            });
-        }
+                    let updated = SYSTEM_CONFIG_BINDING
+                        .upsert(
+                            txn,
+                            SystemConfigUpsert {
+                                key: &key,
+                                value: &value,
+                                visibility: None,
+                                updated_by: None,
+                            },
+                        )
+                        .await?;
+                    let is_sensitive = updated.is_sensitive;
+                    let (history_old_value, history_new_value) = if is_sensitive {
+                        (Some("[REDACTED]".to_string()), "[REDACTED]".to_string())
+                    } else {
+                        (Some(old_value.clone()), value)
+                    };
 
-        // 检查是否为敏感配置（优先使用定义，回退到数据库标记）
-        let is_sensitive_config = CONFIG_REGISTRY
-            .get(key)
-            .map(|definition| definition.is_sensitive)
-            .unwrap_or(is_sensitive);
+                    config_history::ActiveModel {
+                        id: Default::default(),
+                        config_key: Set(key),
+                        old_value: Set(history_old_value),
+                        new_value: Set(history_new_value),
+                        changed_at: Set(updated.updated_at),
+                        changed_by: Set(None),
+                    }
+                    .insert(txn)
+                    .await
+                    .map_err(aster_forge_db::DbError::from)?;
 
-        // 记录变更历史（敏感配置的值脱敏为 [REDACTED]）
-        let (history_old_value, history_new_value) = if is_sensitive_config {
-            (
-                old_value.as_ref().map(|_| "[REDACTED]".to_string()),
-                "[REDACTED]".to_string(),
-            )
-        } else {
-            (old_value.clone(), value.to_string())
-        };
-
-        let old_record = old_record.expect("existing config record was checked above");
-        aster_forge_db::transaction::with_transaction(&self.db, async |txn| {
-            let mut active_model: system_config::ActiveModel = old_record.clone().into();
-            active_model.value = Set(value.to_string());
-            active_model.updated_at = Set(chrono::Utc::now());
-
-            active_model.update(txn).await.map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to update config '{}': {}",
-                    key, e
-                ))
-            })?;
-
-            config_history::ActiveModel {
-                id: Default::default(),
-                config_key: Set(key.to_string()),
-                old_value: Set(history_old_value.clone()),
-                new_value: Set(history_new_value.clone()),
-                changed_at: Set(chrono::Utc::now()),
-                changed_by: Set(None),
-            }
-            .insert(txn)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to record config change history: {}",
-                    e
-                ))
-            })?;
-
-            Ok::<(), ShortlinkerError>(())
-        })
-        .await?;
-
-        Ok(ConfigUpdateResult {
-            key: key.to_string(),
-            value: value.to_string(),
-            requires_restart,
-            is_sensitive,
-            old_value,
-        })
+                    Ok(ConfigUpdateResult {
+                        key: updated.key,
+                        value: updated.value,
+                        requires_restart: updated.requires_restart,
+                        is_sensitive,
+                        old_value: Some(old_value),
+                    })
+                })
+            },
+            aster_forge_db::DbError::is_retryable,
+        )
+        .await
+        .map_err(ShortlinkerError::from)
     }
 
     /// 获取所有配置
     pub async fn get_all(&self) -> Result<HashMap<String, ConfigItem>> {
-        let records = system_config::Entity::find()
-            .all(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("Failed to query all configs: {}", e))
-            })?;
+        let records = SYSTEM_CONFIG_BINDING.find_all(&self.db).await?;
 
         let mut map = HashMap::new();
         for r in records {
@@ -284,204 +203,5 @@ impl ConfigStore {
                 changed_by: r.changed_by,
             })
             .collect())
-    }
-
-    /// 检查配置是否存在
-    pub async fn exists(&self, key: &str) -> Result<bool> {
-        let count = system_config::Entity::find_by_id(key)
-            .count(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to check config '{}': {}",
-                    key, e
-                ))
-            })?;
-
-        Ok(count > 0)
-    }
-
-    /// 原子性插入配置（如果不存在）
-    ///
-    /// 使用 `INSERT ... ON CONFLICT DO NOTHING` 避免 TOCTOU 竞态条件。
-    ///
-    /// 返回值:
-    /// - `Ok(true)`: 插入成功（配置之前不存在）
-    /// - `Ok(false)`: 配置已存在，未执行插入
-    pub async fn insert_if_not_exists(
-        &self,
-        key: &str,
-        value: &str,
-        value_type: aster_forge_config::ConfigValueType,
-        requires_restart: bool,
-        is_sensitive: bool,
-    ) -> Result<bool> {
-        let model = system_config::ActiveModel {
-            key: Set(key.to_string()),
-            value: Set(value.to_string()),
-            value_type: Set(value_type.as_str().to_string()),
-            requires_restart: Set(requires_restart),
-            is_sensitive: Set(is_sensitive),
-            updated_at: Set(chrono::Utc::now()),
-        };
-
-        // 使用 ON CONFLICT DO NOTHING 实现原子性的 "insert if not exists"
-        let result = system_config::Entity::insert(model)
-            .on_conflict(
-                OnConflict::column(system_config::Column::Key)
-                    .do_nothing()
-                    .to_owned(),
-            )
-            .exec(&self.db)
-            .await;
-
-        match result {
-            Ok(_) => Ok(true),
-            Err(sea_orm::DbErr::RecordNotInserted) => Ok(false), // PostgreSQL
-            Err(e) => {
-                // 某些数据库后端在 do_nothing 时可能返回特定错误
-                let err_str = e.to_string().to_lowercase();
-                if err_str.contains("no rows") || err_str.contains("record not inserted") {
-                    Ok(false)
-                } else {
-                    Err(ShortlinkerError::database_operation(format!(
-                        "Failed to insert config '{}': {}",
-                        key, e
-                    )))
-                }
-            }
-        }
-    }
-
-    /// 同步配置项的元信息（不修改 value / updated_at）
-    ///
-    /// 用于配置定义变更后的兼容处理，确保数据库中的：
-    /// - value_type
-    /// - requires_restart
-    /// - is_sensitive
-    ///
-    /// 与代码中的定义保持一致。
-    ///
-    /// 返回值表示是否发生了更新。
-    pub async fn sync_metadata(
-        &self,
-        key: &str,
-        value_type: aster_forge_config::ConfigValueType,
-        requires_restart: bool,
-        is_sensitive: bool,
-    ) -> Result<bool> {
-        let record = system_config::Entity::find_by_id(key)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!(
-                    "Failed to query config '{}': {}",
-                    key, e
-                ))
-            })?;
-
-        let Some(r) = record else {
-            return Ok(false);
-        };
-
-        let desired_value_type = value_type.as_str().to_string();
-        let current_value_type = r.value_type.clone();
-        let current_requires_restart = r.requires_restart;
-        let current_is_sensitive = r.is_sensitive;
-
-        let mut changed = false;
-        let mut active_model: system_config::ActiveModel = r.into();
-
-        if current_value_type != desired_value_type {
-            active_model.value_type = Set(desired_value_type);
-            changed = true;
-        }
-
-        if current_requires_restart != requires_restart {
-            active_model.requires_restart = Set(requires_restart);
-            changed = true;
-        }
-
-        if current_is_sensitive != is_sensitive {
-            active_model.is_sensitive = Set(is_sensitive);
-            changed = true;
-        }
-
-        if !changed {
-            return Ok(false);
-        }
-
-        active_model.update(&self.db).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to sync metadata for config '{}': {}",
-                key, e
-            ))
-        })?;
-
-        Ok(true)
-    }
-
-    /// 获取配置表中的记录数
-    pub async fn count(&self) -> Result<u64> {
-        let count = system_config::Entity::find()
-            .count(&self.db)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::database_operation(format!("Failed to count configs: {}", e))
-            })?;
-
-        Ok(count)
-    }
-
-    /// 确保所有配置项存在,不存在则使用默认值初始化
-    ///
-    /// 遍历 Forge registry 的默认 seed，插入数据库中不存在的配置。
-    /// 同时同步配置的元数据（value_type, requires_restart, is_sensitive）。
-    ///
-    /// 应在服务启动时调用，确保首次启动时配置表不为空。
-    pub async fn ensure_defaults(&self) -> Result<usize> {
-        use tracing::{debug, info};
-
-        let mut inserted_count = 0;
-        let seeds = CONFIG_REGISTRY.default_seed_records().map_err(|error| {
-            ShortlinkerError::validation(format!("Invalid config registry defaults: {}", error))
-        })?;
-
-        for seed in seeds {
-            // 尝试插入（如果不存在）
-            let inserted = self
-                .insert_if_not_exists(
-                    &seed.key,
-                    &seed.value,
-                    seed.value_type,
-                    seed.requires_restart,
-                    seed.is_sensitive,
-                )
-                .await?;
-
-            if inserted {
-                debug!("Initialized config '{}' with default value", seed.key);
-                inserted_count += 1;
-            } else {
-                // 配置已存在，同步元数据
-                if self
-                    .sync_metadata(
-                        &seed.key,
-                        seed.value_type,
-                        seed.requires_restart,
-                        seed.is_sensitive,
-                    )
-                    .await?
-                {
-                    debug!("Synced metadata for config '{}'", seed.key);
-                }
-            }
-        }
-
-        if inserted_count > 0 {
-            info!("Initialized {} default configuration items", inserted_count);
-        }
-
-        Ok(inserted_count)
     }
 }

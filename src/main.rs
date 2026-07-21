@@ -6,7 +6,7 @@
 //!
 //! Mode selection is based on command-line arguments and compile-time features.
 
-use aster_forge_logging::{LoggingConfig as ForgeLoggingConfig, init_logging};
+use aster_forge_logging::init_logging;
 use aster_forge_panic::PanicHookConfig;
 use clap::Parser;
 
@@ -73,13 +73,7 @@ async fn main() -> anyhow::Result<()> {
             #[cfg(feature = "server")]
             {
                 // Initialize logging system based on config
-                let log_result = init_logging(&ForgeLoggingConfig {
-                    level: config.logging.level.clone(),
-                    format: config.logging.format.clone(),
-                    file: config.logging.file.clone().unwrap_or_default(),
-                    enable_rotation: config.logging.enable_rotation,
-                    max_backups: config.logging.max_backups,
-                });
+                let log_result = init_logging(&config.logging);
                 let _log_guard = log_result.guard;
                 if let Some(warning) = log_result.warning {
                     eprintln!("Warning: {}", warning);

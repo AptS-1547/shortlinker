@@ -1,10 +1,6 @@
+use aster_forge_logging::LoggingConfig;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumIter, EnumMessage, IntoEnumIterator};
-use ts_rs::TS;
-
-/// 输出目录常量（用于测试导出）
-#[cfg(test)]
-use super::types::TS_EXPORT_PATH;
 
 /// 获取默认的 HTTP 方法 JSON 数组
 ///
@@ -25,12 +21,11 @@ pub fn default_http_methods_json() -> String {
     Serialize,
     Deserialize,
     Default,
-    TS,
     EnumIter,
     AsRefStr,
     EnumMessage,
 )]
-#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "PascalCase")]
 #[strum(serialize_all = "PascalCase")]
 pub enum SameSitePolicy {
@@ -69,8 +64,8 @@ impl std::str::FromStr for SameSitePolicy {
 }
 
 /// HTTP 方法枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS, EnumIter, AsRefStr)]
-#[ts(export, export_to = "../admin-panel/src/services/types.generated.ts")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, AsRefStr)]
+#[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "UPPERCASE")]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum HttpMethod {
@@ -231,8 +226,6 @@ pub struct DatabaseConfig {
     pub database_url: String,
     #[serde(default = "default_database_pool_size")]
     pub pool_size: u32,
-    #[serde(default = "default_database_timeout")]
-    pub timeout: u64,
     #[serde(default = "default_retry_count")]
     pub retry_count: u32,
     #[serde(default = "default_retry_base_delay_ms")]
@@ -251,8 +244,6 @@ pub struct CacheConfig {
     pub default_ttl: u64,
     #[serde(default)]
     pub redis: RedisConfig,
-    #[serde(default)]
-    pub memory: MemoryConfig,
 }
 
 /// Redis 配置
@@ -262,34 +253,6 @@ pub struct RedisConfig {
     pub url: String,
     #[serde(default = "default_redis_key_prefix")]
     pub key_prefix: String,
-}
-
-/// 内存缓存配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryConfig {
-    #[serde(default = "default_memory_capacity")]
-    pub max_capacity: u64,
-}
-
-/// 日志配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoggingConfig {
-    #[serde(default = "default_log_level")]
-    pub level: String,
-    #[serde(default = "default_log_format")]
-    pub format: String,
-    #[serde(default = "default_log_file")]
-    pub file: Option<String>,
-    /// 单个日志文件最大大小（MB）
-    ///
-    /// **注意**: 当前版本未使用此字段，日志轮转按天而非按大小。
-    /// 保留字段以保持配置文件向后兼容。
-    #[serde(default = "default_max_size")]
-    pub max_size: u64,
-    #[serde(default = "default_max_backups")]
-    pub max_backups: u32,
-    #[serde(default = "default_enable_rotation")]
-    pub enable_rotation: bool,
 }
 
 // ============================================================
@@ -314,10 +277,6 @@ fn default_database_url() -> String {
 
 fn default_database_pool_size() -> u32 {
     20
-}
-
-fn default_database_timeout() -> u64 {
-    30
 }
 
 fn default_retry_count() -> u32 {
@@ -348,34 +307,6 @@ fn default_redis_key_prefix() -> String {
     "shortlinker:".to_string()
 }
 
-fn default_memory_capacity() -> u64 {
-    10000
-}
-
-fn default_log_level() -> String {
-    "info".to_string()
-}
-
-fn default_log_format() -> String {
-    "text".to_string()
-}
-
-fn default_log_file() -> Option<String> {
-    None
-}
-
-fn default_max_size() -> u64 {
-    100
-}
-
-fn default_max_backups() -> u32 {
-    5
-}
-
-fn default_enable_rotation() -> bool {
-    true
-}
-
 // ============================================================
 // Default implementations
 // ============================================================
@@ -396,7 +327,6 @@ impl Default for DatabaseConfig {
         Self {
             database_url: default_database_url(),
             pool_size: default_database_pool_size(),
-            timeout: default_database_timeout(),
             retry_count: default_retry_count(),
             retry_base_delay_ms: default_retry_base_delay_ms(),
             retry_max_delay_ms: default_retry_max_delay_ms(),
@@ -410,7 +340,6 @@ impl Default for CacheConfig {
             cache_type: default_cache_type(),
             default_ttl: default_cache_ttl(),
             redis: RedisConfig::default(),
-            memory: MemoryConfig::default(),
         }
     }
 }
@@ -420,27 +349,6 @@ impl Default for RedisConfig {
         Self {
             url: default_redis_url(),
             key_prefix: default_redis_key_prefix(),
-        }
-    }
-}
-
-impl Default for MemoryConfig {
-    fn default() -> Self {
-        Self {
-            max_capacity: default_memory_capacity(),
-        }
-    }
-}
-
-impl Default for LoggingConfig {
-    fn default() -> Self {
-        Self {
-            level: default_log_level(),
-            format: default_log_format(),
-            file: default_log_file(),
-            max_size: default_max_size(),
-            max_backups: default_max_backups(),
-            enable_rotation: default_enable_rotation(),
         }
     }
 }
@@ -579,15 +487,66 @@ mod tests {
     use super::*;
 
     #[test]
-    fn export_typescript_types() {
-        // 运行此测试会自动生成 TypeScript 类型文件
-        // cargo test export_typescript_types -- --nocapture
-        let cfg = ts_rs::Config::default();
+    fn static_logging_defaults_match_forge() {
+        assert_eq!(
+            StaticConfig::default().logging,
+            aster_forge_logging::LoggingConfig::default()
+        );
+    }
 
-        // Export enums
-        SameSitePolicy::export_all(&cfg).expect("Failed to export SameSitePolicy");
-        HttpMethod::export_all(&cfg).expect("Failed to export HttpMethod");
+    #[test]
+    fn static_logging_serialization_uses_forge_schema() {
+        let serialized =
+            toml::to_string(&StaticConfig::default()).expect("static config should serialize");
 
-        println!("TypeScript types exported to {}", TS_EXPORT_PATH);
+        assert!(serialized.contains("[logging]"));
+        assert!(serialized.contains("file = \"\""));
+        assert!(!serialized.contains("max_size"));
+    }
+
+    #[test]
+    fn legacy_logging_max_size_is_ignored() {
+        let config: StaticConfig = toml::from_str(
+            r#"
+            [logging]
+            level = "debug"
+            max_size = 100
+            "#,
+        )
+        .expect("legacy logging config should remain readable");
+
+        assert_eq!(config.logging.level, "debug");
+        assert_eq!(config.logging.file, "");
+        assert_eq!(config.logging.max_backups, 5);
+        assert!(config.logging.enable_rotation);
+    }
+
+    #[test]
+    fn legacy_unused_database_and_memory_cache_fields_are_ignored() {
+        let config: StaticConfig = toml::from_str(
+            r#"
+            [database]
+            database_url = "legacy.db"
+            timeout = 30
+
+            [cache]
+            type = "memory"
+            default_ttl = 120
+
+            [cache.memory]
+            max_capacity = 50000
+            "#,
+        )
+        .expect("legacy unused static fields should remain readable");
+
+        assert_eq!(config.database.database_url, "legacy.db");
+        assert_eq!(config.cache.cache_type, "memory");
+        assert_eq!(config.cache.default_ttl, 120);
+
+        let serialized = toml::to_string(&config).expect("static config should serialize");
+        let serialized: toml::Value =
+            toml::from_str(&serialized).expect("serialized static config should parse");
+        assert!(serialized["database"].get("timeout").is_none());
+        assert!(serialized["cache"].get("memory").is_none());
     }
 }

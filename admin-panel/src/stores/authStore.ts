@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { AuthAPI } from '@/services/api'
+import { authService } from '@/services/authService'
 import { authLogger } from '@/utils/logger'
 
 // Token 刷新提前量（秒）- 在过期前多少秒刷新
@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isChecking: true })
     try {
       // Verify token via API call - cookie is automatically sent
-      const isValid = await AuthAPI.verifyToken()
+      const isValid = await authService.verifyToken()
       authLogger.info('checkAuthStatus: verify result =', isValid)
       set({ isAuthenticated: isValid, hasChecked: true })
 
@@ -142,7 +142,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (password: string) => {
     authLogger.info('login: attempting login')
     try {
-      const result = await AuthAPI.login({ password })
+      const result = await authService.login({ password })
       const expiresAt = Date.now() + result.expiresIn * 1000
       authLogger.info('login: success, expiresIn =', result.expiresIn, 's')
       set({ isAuthenticated: true, hasChecked: true, expiresAt })
@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     get().stopAutoRefresh()
     clearExpiresAt()
     try {
-      await AuthAPI.logout()
+      await authService.logout()
       authLogger.info('logout: API call success')
     } catch (error) {
       authLogger.error('logout: API call failed', error)
@@ -173,7 +173,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: async () => {
     authLogger.info('refreshToken: starting refresh')
     try {
-      const result = await AuthAPI.refreshToken()
+      const result = await authService.refreshToken()
       const expiresAt = Date.now() + result.expiresIn * 1000
       set({ expiresAt })
       saveExpiresAt(expiresAt)
