@@ -105,7 +105,7 @@ serde_repr = "0.1"
 rand = { version = "0.10.2", default-features = false, features = ["std", "std_rng", "thread_rng"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
 async-trait = "0.1.91"
-tokio = { version = "1.53.0", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+tokio = { version = "1.53.1", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
 bytes = "1.12"
 tracing = { version = "0.1.44", default-features = false }
 dashmap = "6.2.1"
@@ -120,7 +120,7 @@ rust-embed = "8.12.0"
 uuid = { version = "1.24", features = ["v4"] }
 rustls = "0.23.42"
 toml = "1.1"
-sea-orm = { version = "2.0.0-rc.38", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
+sea-orm = { version = "2.0.0", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 arc-swap = "1"
 actix-cors = "0.7"
@@ -154,7 +154,7 @@ windows-sys = { version = "0.61", features = [
 [dev-dependencies]
 actix-rt = "2.11"
 tempfile = "3.27"
-tokio = { version = "1.53.0", features = ["full"] }
+tokio = { version = "1.53.1", features = ["full"] }
 criterion = { version = "0.8", features = ["async_tokio"] }
 
 [[bench]]
