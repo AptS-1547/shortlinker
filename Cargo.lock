@@ -599,6 +599,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_actix_middleware"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "actix-governor",
  "actix-web",
@@ -617,6 +618,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_actix_observability"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "actix-web",
  "aster_forge_metrics",
@@ -626,6 +628,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_api"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "chrono",
  "serde",
@@ -635,6 +638,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_cache"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "async-trait",
  "bloomfilter",
@@ -652,6 +656,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_config"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "aster_forge_utils",
  "async-trait",
@@ -667,6 +672,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_crypto"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "argon2",
  "rand_core 0.6.4",
@@ -677,6 +683,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_db"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "aster_forge_api",
  "aster_forge_metrics",
@@ -692,6 +699,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_logging"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "serde",
  "tracing-appender",
@@ -701,6 +709,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_metrics"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "prometheus",
  "sysinfo",
@@ -713,6 +722,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_panic"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "chrono",
 ]
@@ -720,6 +730,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_runtime"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "aster_forge_utils",
  "async-trait",
@@ -735,6 +746,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_tasks"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "aster_forge_runtime",
  "aster_forge_utils",
@@ -753,6 +765,7 @@ dependencies = [
 [[package]]
 name = "aster_forge_utils"
 version = "0.1.0"
+source = "git+https://github.com/AsterCommunity/AsterForge#be08aba4b4e99d3d698be9362e6892decff442d2"
 dependencies = [
  "http 1.4.2",
  "httpdate",
@@ -2682,9 +2695,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.186"
+version = "0.2.187"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
+checksum = "a7743783ea728ef5c31194c6590797eed286449b4a4e87d626d8a51f0a94e732"
 
 [[package]]
 name = "libm"

@@ -75,22 +75,6 @@ path = "src/main.rs"
 [workspace]
 members = [".", "migration"]
 
-# During the migration we compile against the sibling Forge checkout so API
-# changes are validated locally before moving to a remote git revision.
-[patch."https://github.com/AsterCommunity/AsterForge"]
-aster_forge_actix_middleware = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_actix_middleware" }
-aster_forge_actix_observability = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_actix_observability" }
-aster_forge_cache = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_cache" }
-aster_forge_config = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_config" }
-aster_forge_crypto = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_crypto" }
-aster_forge_db = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_db" }
-aster_forge_logging = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_logging" }
-aster_forge_metrics = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_metrics" }
-aster_forge_panic = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_panic" }
-aster_forge_runtime = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_runtime" }
-aster_forge_tasks = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_tasks" }
-aster_forge_utils = { path = "/Users/esap/Desktop/Github/AsterForge/crates/aster_forge_utils" }
-
 [dependencies]
 aster_forge_actix_middleware = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_middleware", features = ["metrics"] }
 aster_forge_actix_observability = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_observability" }
