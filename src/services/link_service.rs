@@ -18,7 +18,7 @@ use crate::services::LinkCache;
 use crate::storage::{LinkFilter, SeaOrmStorage, ShortLink};
 use crate::utils::TimeParser;
 use crate::utils::generate_random_code;
-use crate::utils::password::{process_imported_password, process_new_password};
+use crate::utils::password::process_new_password;
 
 // ============ Request/Response DTOs ============
 
@@ -55,16 +55,6 @@ pub struct LinkCreateResult {
     pub link: ShortLink,
     /// Whether the code was auto-generated
     pub generated_code: bool,
-}
-
-/// Single import item
-#[deprecated(since = "0.6.0", note = "Use `ImportLinkItemRich` instead")]
-#[derive(Debug, Clone)]
-pub struct ImportLinkItem {
-    pub code: String,
-    pub target: String,
-    pub expires_at: Option<String>,
-    pub password: Option<String>,
 }
 
 /// Import conflict resolution mode
@@ -106,25 +96,6 @@ mod import_mode_tests {
     fn test_import_mode_default() {
         assert_eq!(ImportMode::default(), ImportMode::Skip);
     }
-}
-
-/// Result of import operation
-#[deprecated(since = "0.6.0", note = "Use `ImportBatchResult` instead")]
-#[allow(deprecated)]
-#[derive(Debug, Clone, Default)]
-pub struct ImportResult {
-    pub success: usize,
-    pub skipped: usize,
-    pub failed: usize,
-    pub errors: Vec<ImportError>,
-}
-
-/// Single import error
-#[deprecated(since = "0.6.0", note = "Use `ImportBatchFailedItem` instead")]
-#[derive(Debug, Clone)]
-pub struct ImportError {
-    pub code: String,
-    pub message: String,
 }
 
 // ============ Batch Import DTOs ============
@@ -443,166 +414,6 @@ impl LinkService {
     }
 
     // ============ Batch Operations ============
-
-    /// Import multiple links
-    #[deprecated(since = "0.6.0", note = "Use `import_links_batch` instead")]
-    #[allow(deprecated)]
-    pub async fn import_links(
-        &self,
-        links: Vec<ImportLinkItem>,
-        mode: ImportMode,
-    ) -> Result<ImportResult, ShortlinkerError> {
-        let mut result = ImportResult::default();
-
-        // Step 1: Validate URLs and collect codes
-        struct ValidatedItem {
-            code: String,
-            target: String,
-            expires_at: Option<String>,
-            password: Option<String>,
-        }
-
-        let mut codes_to_check: Vec<String> = Vec::new();
-        let mut valid_items: Vec<ValidatedItem> = Vec::new();
-
-        for item in links {
-            // Validate URL first
-            if let Err(e) = aster_forge_utils::url::parse_http_url(&item.target, "target URL") {
-                result.failed += 1;
-                result.errors.push(ImportError {
-                    code: item.code,
-                    message: e.to_string(),
-                });
-                continue;
-            }
-
-            codes_to_check.push(item.code.clone());
-            valid_items.push(ValidatedItem {
-                code: item.code,
-                target: item.target,
-                expires_at: item.expires_at,
-                password: item.password,
-            });
-        }
-
-        // Step 2: Batch fetch existing links (1 query instead of N)
-        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
-        let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
-            ShortlinkerError::database_operation(format!(
-                "Failed to batch check existing links: {}",
-                e
-            ))
-        })?;
-
-        // Step 3: Process each item with in-memory existence check
-        let mut links_to_save: Vec<ShortLink> = Vec::new();
-
-        for item in valid_items {
-            let existing = existing_map.get(&item.code);
-
-            // Handle existence based on mode
-            if existing.is_some() {
-                match mode {
-                    ImportMode::Skip => {
-                        result.skipped += 1;
-                        continue;
-                    }
-                    ImportMode::Error => {
-                        result.failed += 1;
-                        result.errors.push(ImportError {
-                            code: item.code,
-                            message: "Already exists".to_string(),
-                        });
-                        continue;
-                    }
-                    ImportMode::Overwrite => {
-                        // Continue processing
-                    }
-                }
-            }
-
-            // Parse expiration time
-            let expires_at = match self.parse_expires_at(item.expires_at.as_deref()) {
-                Ok(dt) => dt,
-                Err(e) => {
-                    result.failed += 1;
-                    result.errors.push(ImportError {
-                        code: item.code,
-                        message: e.to_string(),
-                    });
-                    continue;
-                }
-            };
-
-            // Process password (import path: preserve existing hashes)
-            let password = match process_imported_password(item.password.as_deref()) {
-                Ok(pwd) => pwd,
-                Err(_) => {
-                    result.failed += 1;
-                    result.errors.push(ImportError {
-                        code: item.code,
-                        message: "Failed to hash password".to_string(),
-                    });
-                    continue;
-                }
-            };
-
-            // Preserve created_at and click if overwriting
-            let (created_at, click) = if let Some(existing_link) = existing {
-                (existing_link.created_at, existing_link.click)
-            } else {
-                (Utc::now(), 0)
-            };
-
-            links_to_save.push(ShortLink {
-                code: item.code,
-                target: item.target,
-                created_at,
-                expires_at,
-                password,
-                click,
-            });
-        }
-
-        // Step 4: Batch save to storage (single transaction)
-        if !links_to_save.is_empty() {
-            if let Err(e) = self.storage.batch_set(links_to_save.clone()).await {
-                // If batch fails, all items in this batch are failed
-                for link in &links_to_save {
-                    result.failed += 1;
-                    result.errors.push(ImportError {
-                        code: link.code.clone(),
-                        message: format!("Failed to save: {}", e),
-                    });
-                }
-            } else {
-                result.success += links_to_save.len();
-                // Batch update cache
-                for link in &links_to_save {
-                    self.update_cache(link).await;
-                }
-            }
-        }
-
-        info!(
-            "LinkService: imported {} links, {} skipped, {} failed",
-            result.success, result.skipped, result.failed
-        );
-
-        Ok(result)
-    }
-
-    /// Export all links
-    #[deprecated(since = "0.6.0", note = "Use `export_links_stream` instead")]
-    pub async fn export_links(&self) -> Result<Vec<ShortLink>, ShortlinkerError> {
-        let links_map = self.storage.load_all().await.map_err(|e| {
-            ShortlinkerError::database_operation(format!("Failed to load links: {}", e))
-        })?;
-
-        let links: Vec<ShortLink> = links_map.into_values().collect();
-        info!("LinkService: exported {} links", links.len());
-        Ok(links)
-    }
 
     /// 流式导出链接（游标分页）
     ///

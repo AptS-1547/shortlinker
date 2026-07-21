@@ -21,8 +21,6 @@ use tracing::{debug, info};
 use crate::errors::ShortlinkerError;
 use crate::storage::SeaOrmStorage;
 
-use migration::entities::click_log;
-
 // ============ 公共类型定义 ============
 
 /// 分组方式
@@ -580,39 +578,6 @@ impl AnalyticsService {
             bot_percentage,
             total_with_ua: total_with_ua as u64,
         })
-    }
-
-    /// 导出点击日志（带分页限制）
-    #[deprecated(since = "0.6.0", note = "Use `export_click_logs_stream` instead")]
-    pub async fn export_click_logs(
-        &self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        limit: u64,
-    ) -> Result<Vec<click_log::Model>, ShortlinkerError> {
-        info!(
-            "Analytics: export_click_logs from {} to {}, limit={}",
-            start, end, limit
-        );
-
-        let limit = limit.min(100000);
-        let logs = self
-            .storage
-            .export_click_logs(start, end, limit)
-            .await
-            .map_err(|e| {
-                ShortlinkerError::analytics_query_failed(format!(
-                    "Failed to export click logs: {}",
-                    e
-                ))
-            })?;
-
-        debug!(
-            "Analytics: export_click_logs returned {} records",
-            logs.len()
-        );
-
-        Ok(logs)
     }
 
     /// 流式导出点击日志（游标分页）

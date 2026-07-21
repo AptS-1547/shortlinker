@@ -14,7 +14,7 @@ RUN bun install --frozen-lockfile --registry https://registry.npmjs.org
 RUN bun run build
 
 # 多阶段构建 - 构建阶段
-FROM rust:1.94-slim AS builder
+FROM rust:1-slim AS builder
 
 # 安装 musl 工具链（项目使用 rustls，不需要 OpenSSL）
 RUN apt-get update && apt-get install -y \

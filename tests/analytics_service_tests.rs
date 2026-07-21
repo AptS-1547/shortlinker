@@ -2,7 +2,7 @@
 //!
 //! 覆盖 parse_date_range、parse_date_range_strict、
 //! get_trends、get_top_links、get_referrers、get_geo_stats、
-//! get_link_analytics、get_device_analytics、export_click_logs、
+//! get_link_analytics、get_device_analytics、export_click_logs_stream、
 //! 以及 v2 查询方法。
 
 use std::sync::{Arc, Once};

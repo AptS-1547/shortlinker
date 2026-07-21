@@ -9,10 +9,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use shortlinker::config::init_config;
 use shortlinker::errors::ShortlinkerError;
-#[allow(deprecated)]
 use shortlinker::services::{
-    CreateLinkRequest, ImportLinkItem, ImportLinkItemRich, ImportMode, LinkService,
-    UpdateLinkRequest,
+    CreateLinkRequest, ImportLinkItemRich, ImportMode, LinkService, UpdateLinkRequest,
 };
 use shortlinker::services::{LinkCache, LinkCacheLookup};
 use shortlinker::storage::backend::SeaOrmStorage;
@@ -602,153 +600,29 @@ mod query_tests {
 }
 
 // =============================================================================
-// Import/Export Tests
+// Export Tests
 // =============================================================================
 
 #[cfg(test)]
-mod import_export_tests {
+mod export_tests {
     use super::*;
+    use futures_util::StreamExt;
 
     #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_import_links_skip_mode() {
+    async fn test_export_links_stream() {
         let (service, _temp) = create_test_service().await;
 
-        // Create existing link
-        let req = create_request(Some("existing"), "https://old.com");
-        service.create_link(req).await.unwrap();
-
-        // Import with skip mode
-        let items = vec![
-            ImportLinkItem {
-                code: "existing".to_string(),
-                target: "https://new.com".to_string(),
-                expires_at: None,
-                password: None,
-            },
-            ImportLinkItem {
-                code: "new_link".to_string(),
-                target: "https://new.com".to_string(),
-                expires_at: None,
-                password: None,
-            },
-        ];
-
-        let result = service.import_links(items, ImportMode::Skip).await.unwrap();
-
-        assert_eq!(result.success, 1);
-        assert_eq!(result.skipped, 1);
-        assert_eq!(result.failed, 0);
-
-        // Verify existing wasn't overwritten
-        let link = service.get_link("existing").await.unwrap().unwrap();
-        assert_eq!(link.target, "https://old.com");
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_import_links_overwrite_mode() {
-        let (service, _temp) = create_test_service().await;
-
-        // Create existing link
-        let req = create_request(Some("overwrite_import"), "https://old.com");
-        service.create_link(req).await.unwrap();
-
-        // Import with overwrite mode
-        let items = vec![ImportLinkItem {
-            code: "overwrite_import".to_string(),
-            target: "https://new.com".to_string(),
-            expires_at: None,
-            password: None,
-        }];
-
-        let result = service
-            .import_links(items, ImportMode::Overwrite)
-            .await
-            .unwrap();
-
-        assert_eq!(result.success, 1);
-        assert_eq!(result.skipped, 0);
-
-        // Verify it was overwritten
-        let link = service.get_link("overwrite_import").await.unwrap().unwrap();
-        assert_eq!(link.target, "https://new.com");
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_import_links_error_mode() {
-        let (service, _temp) = create_test_service().await;
-
-        // Create existing link
-        let req = create_request(Some("error_import"), "https://old.com");
-        service.create_link(req).await.unwrap();
-
-        // Import with error mode
-        let items = vec![
-            ImportLinkItem {
-                code: "error_import".to_string(),
-                target: "https://new.com".to_string(),
-                expires_at: None,
-                password: None,
-            },
-            ImportLinkItem {
-                code: "new_one".to_string(),
-                target: "https://new.com".to_string(),
-                expires_at: None,
-                password: None,
-            },
-        ];
-
-        let result = service
-            .import_links(items, ImportMode::Error)
-            .await
-            .unwrap();
-
-        assert_eq!(result.success, 1);
-        assert_eq!(result.failed, 1);
-        assert_eq!(result.errors.len(), 1);
-        assert_eq!(result.errors[0].code, "error_import");
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_import_links_invalid_url() {
-        let (service, _temp) = create_test_service().await;
-
-        let items = vec![
-            ImportLinkItem {
-                code: "valid".to_string(),
-                target: "https://valid.com".to_string(),
-                expires_at: None,
-                password: None,
-            },
-            ImportLinkItem {
-                code: "invalid".to_string(),
-                target: "not-a-url".to_string(),
-                expires_at: None,
-                password: None,
-            },
-        ];
-
-        let result = service.import_links(items, ImportMode::Skip).await.unwrap();
-
-        assert_eq!(result.success, 1);
-        assert_eq!(result.failed, 1);
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_export_links() {
-        let (service, _temp) = create_test_service().await;
-
-        // Create some links
         for i in 0..3 {
-            let req = create_request(Some(&format!("export_{}", i)), "https://example.com");
+            let req = create_request(Some(&format!("export_{i}")), "https://example.com");
             service.create_link(req).await.unwrap();
         }
 
-        let exported = service.export_links().await.unwrap();
+        let mut stream = service.export_links_stream(LinkFilter::default(), 2);
+        let mut exported = Vec::new();
+        while let Some(batch) = stream.next().await {
+            exported.extend(batch.unwrap());
+        }
+
         assert_eq!(exported.len(), 3);
     }
 }
@@ -971,21 +845,6 @@ mod edge_cases {
             .unwrap();
 
         assert_eq!(links.len(), 1);
-    }
-
-    #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_import_empty_list() {
-        let (service, _temp) = create_test_service().await;
-
-        let result = service
-            .import_links(vec![], ImportMode::Skip)
-            .await
-            .unwrap();
-
-        assert_eq!(result.success, 0);
-        assert_eq!(result.skipped, 0);
-        assert_eq!(result.failed, 0);
     }
 
     #[tokio::test]
