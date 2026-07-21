@@ -17,7 +17,7 @@ These settings live in `config.toml` and require restart to take effect.
 
 | TOML key | Type | Default | Description |
 |--------|------|---------|-------------|
-| `database.database_url` | String | `shortlinks.db` | Database URL or file path (backend type inferred from this value) |
+| `database.database_url` | String | `sqlite://shortlinks.db?mode=rwc` | Database URL; legacy bare SQLite paths are adapted at the connection boundary |
 | `database.pool_size` | Integer | `20` | Pool size (MySQL/PostgreSQL only; SQLite uses built-in pool settings) |
 | `database.retry_count` | Integer | `3` | Retry count for some DB operations |
 | `database.retry_base_delay_ms` | Integer | `100` | Retry base delay (ms) |

@@ -93,6 +93,7 @@ mod url_inference_tests {
     #[test]
     fn test_infer_sqlite_memory() {
         assert_eq!(infer_backend_from_url(":memory:").unwrap(), "sqlite");
+        assert_eq!(infer_backend_from_url("sqlite::memory:").unwrap(), "sqlite");
     }
 
     #[test]
@@ -194,6 +195,35 @@ mod connection_tests {
         let conn =
             aster_forge_db::connect(&aster_forge_db::DatabaseConfig::new("sqlite::memory:")).await;
         assert!(conn.is_ok(), "Should connect to in-memory SQLite");
+    }
+
+    #[tokio::test]
+    async fn test_storage_accepts_legacy_bare_sqlite_path() {
+        init_test_config();
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("legacy.db");
+
+        let storage = SeaOrmStorage::new(
+            db_path.to_string_lossy().as_ref(),
+            "sqlite",
+            NoopMetrics::arc(),
+        )
+        .await
+        .expect("legacy bare SQLite path should be adapted before Forge");
+
+        assert_eq!(storage.count().await.unwrap(), 0);
+        assert!(db_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_storage_accepts_legacy_memory_alias() {
+        init_test_config();
+
+        let storage = SeaOrmStorage::new(":memory:", "sqlite", NoopMetrics::arc())
+            .await
+            .expect("legacy memory alias should be adapted before Forge");
+
+        assert_eq!(storage.count().await.unwrap(), 0);
     }
 
     #[tokio::test]

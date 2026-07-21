@@ -25,7 +25,7 @@ host = "127.0.0.1"
 port = 8080
 
 [database]
-database_url = "shortlinks.db"
+database_url = "sqlite://shortlinks.db?mode=rwc"
 
 [logging]
 level = "info"

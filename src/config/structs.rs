@@ -272,7 +272,7 @@ fn default_cpu_count() -> usize {
 }
 
 fn default_database_url() -> String {
-    "shortlinks.db".to_string()
+    "sqlite://shortlinks.db?mode=rwc".to_string()
 }
 
 fn default_database_pool_size() -> u32 {
@@ -485,6 +485,14 @@ impl Default for IpcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn static_database_default_uses_forge_compatible_sqlite_url() {
+        assert_eq!(
+            StaticConfig::default().database.database_url,
+            "sqlite://shortlinks.db?mode=rwc"
+        );
+    }
 
     #[test]
     fn static_logging_defaults_match_forge() {

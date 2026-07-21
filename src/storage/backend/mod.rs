@@ -13,6 +13,7 @@ mod query;
 
 pub use analytics::{GeoRow, GroupBy, ReferrerRow, TopLinkRow, TrendRow, UaStatsRow};
 
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -33,7 +34,7 @@ pub use operations::upsert;
 
 /// 从数据库 URL 推断数据库类型
 pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
-    if database_url.starts_with("sqlite://")
+    if database_url.starts_with("sqlite:")
         || database_url.ends_with(".db")
         || database_url.ends_with(".sqlite")
         || database_url == ":memory:"
@@ -45,7 +46,7 @@ pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
         Ok("postgres".to_string())
     } else {
         Err(ShortlinkerError::database_config(format!(
-            "Failed to infer database type from URL: {}. Supported URL schemes: sqlite://, mysql://, mariadb://, postgres://",
+            "Failed to infer database type from URL: {}. Supported URL schemes: sqlite:, mysql://, mariadb://, postgres://",
             database_url
         )))
     }
@@ -105,7 +106,21 @@ impl SeaOrmStorage {
             max_delay_ms: config.database.retry_max_delay_ms,
         };
 
-        let mut forge_config = aster_forge_db::DatabaseConfig::new(database_url);
+        // 新配置使用标准 SQLite URL；这里保留旧版允许的裸文件路径和
+        // `:memory:`，在进入 Forge/SeaORM 连接层前转换为等价连接串。
+        let database_url = if backend_name == "sqlite" {
+            if database_url == ":memory:" {
+                Cow::Borrowed("sqlite::memory:")
+            } else if database_url.starts_with("sqlite:") {
+                Cow::Borrowed(database_url)
+            } else {
+                Cow::Owned(format!("sqlite://{database_url}?mode=rwc"))
+            }
+        } else {
+            Cow::Borrowed(database_url)
+        };
+
+        let mut forge_config = aster_forge_db::DatabaseConfig::new(database_url.as_ref());
         forge_config.pool_size = config.database.pool_size;
         forge_config.retry_count = config.database.retry_count;
         let db = aster_forge_db::connect_with_metrics(&forge_config, metrics.forge_recorder())

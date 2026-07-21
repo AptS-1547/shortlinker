@@ -43,7 +43,7 @@ port = 8080
 # Database Configuration
 # ==============================================================================
 [database]
-# Database connection URL or file path
+# Database connection URL or legacy file path
 # Type is auto-detected from URL scheme:
 #   - sqlite:// or .db/.sqlite file -> SQLite
 #   - postgres:// or postgresql://  -> PostgreSQL
@@ -51,10 +51,10 @@ port = 8080
 #   - mariadb://                     -> MariaDB (uses MySQL protocol)
 #
 # Examples:
-#   SQLite:     "shortlinks.db" or "sqlite:///path/to/db.sqlite"
+#   SQLite:     "sqlite://shortlinks.db?mode=rwc" or "sqlite:///path/to/db.sqlite?mode=rwc"
 #   PostgreSQL: "postgres://user:pass@localhost:5432/shortlinker"
 #   MySQL:      "mysql://user:pass@localhost:3306/shortlinker"
-database_url = "shortlinks.db"
+database_url = "sqlite://shortlinks.db?mode=rwc"
 
 # Connection pool size
 # Increase for high-traffic deployments

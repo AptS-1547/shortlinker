@@ -17,7 +17,7 @@
 
 | TOML 键 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `database.database_url` | String | `shortlinks.db` | 数据库连接 URL 或文件路径（后端会自动从该值推断数据库类型） |
+| `database.database_url` | String | `sqlite://shortlinks.db?mode=rwc` | 数据库连接 URL；旧版裸 SQLite 文件路径仍会在连接边界转换 |
 | `database.pool_size` | Integer | `20` | 连接池大小（仅 MySQL/PostgreSQL 生效；SQLite 使用内置池配置） |
 | `database.retry_count` | Integer | `3` | 部分数据库操作的重试次数 |
 | `database.retry_base_delay_ms` | Integer | `100` | 重试基础延迟（毫秒） |
