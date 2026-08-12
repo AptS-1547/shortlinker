@@ -8,4 +8,9 @@ ignore = [
     # JWTs exclusively with HS256 and shared secrets. No RSA private-key signing
     # or decryption oracle is exposed, and upstream has no fixed release yet.
     "RUSTSEC-2023-0071",
+    # rust_decimal 1.42.1 declares rkyv 0.7.46 as an optional dependency, so
+    # Cargo retains it in Cargo.lock even though no workspace feature enables
+    # rkyv (`cargo tree --target all -i rkyv@0.7.46` has no reverse dependency).
+    # Remove this exception when rust_decimal stops locking rkyv 0.7.
+    "RUSTSEC-2026-0235",
 ]

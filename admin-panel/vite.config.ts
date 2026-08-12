@@ -46,7 +46,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
     // 确保只有一个 React 实例，防止 hooks 失效
     dedupe: ['react', 'react-dom'],

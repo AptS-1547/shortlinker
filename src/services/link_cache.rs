@@ -69,7 +69,7 @@ impl ForgeLinkCache {
         let config = crate::config::get_config();
         let objects = aster_forge_cache::create_cache(&aster_forge_cache::CacheConfig {
             backend: config.cache.cache_type.clone(),
-            endpoint: config.cache.redis.url.clone(),
+            endpoint: aster_forge_cache::CacheEndpoint::url(config.cache.redis.url.clone()),
             default_ttl: config.cache.default_ttl,
         })
         .await;

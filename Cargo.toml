@@ -104,24 +104,24 @@ serde_json = "1.0"
 serde_repr = "0.1"
 rand = { version = "0.10.2", default-features = false, features = ["std", "std_rng", "thread_rng"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
-async-trait = "0.1.91"
+async-trait = "0.1.92"
 tokio = { version = "1.53.1", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
 bytes = "1.12"
 tracing = { version = "0.1.44", default-features = false }
 dashmap = "6.2.1"
 crossbeam-channel = "0.5"
-moka = { version = "0.12.15", default-features = false, features = ["future", "sync"] }
+moka = { version = "0.12.16", default-features = false, features = ["future", "sync"] }
 colored = "3.1.1"
 num_cpus = { version = "1.17.0", default-features = false }
 actix-service = "2.0.3"
-futures-util = "0.3.33"
+futures-util = "0.3.34"
 anyhow = { version = "1.0.104", features = ["backtrace"] }
 rust-embed = "8.12.0"
 uuid = { version = "1.24", features = ["v4"] }
-rustls = "0.23.42"
+rustls = "0.23.43"
 toml = "1.1"
-sea-orm = { version = "2.0.0", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+sea-orm = { version = "2.0.1", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 arc-swap = "1"
 actix-cors = "0.7"
 utoipa = { version = "5.5.0", features = ["actix_extras", "chrono", "repr"], optional = true }
@@ -133,9 +133,9 @@ actix-governor = "0.10.0"
 rpassword = "7"
 tokio-util = "0.7"
 subtle = "2"
-base64 = "0.22"
+base64 = "0.23"
 maxminddb = "0.30"
-ureq = { version = "3.3.0", features = ["json"] }
+ureq = { version = "3.4.0", features = ["json"] }
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 woothee = "0.13"
 urlencoding = "2.1.3"
