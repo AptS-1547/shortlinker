@@ -168,7 +168,7 @@ async fn test_e2e_ping() {
             version,
             uptime_secs,
         } => {
-            assert!(!version.is_empty());
+            assert_ne!(version, "");
             assert!(uptime_secs < 3600);
         }
         other => panic!("Expected Pong, got {:?}", other),

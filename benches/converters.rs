@@ -88,17 +88,19 @@ fn bench_batch_conversion(c: &mut Criterion) {
     let mut group = c.benchmark_group("converters/batch");
 
     for batch_size in [10, 100, 1000] {
-        group.throughput(Throughput::Elements(batch_size as u64));
+        group.throughput(Throughput::Elements(
+            u64::try_from(batch_size).expect("bench size fits u64"),
+        ));
 
         group.bench_function(format!("model_to_shortlink_{}", batch_size), |b| {
             let models: Vec<_> = (0..batch_size)
-                .map(|i| short_link::Model {
+                .map(|i: usize| short_link::Model {
                     short_code: format!("code_{}", i),
                     target_url: format!("https://example.com/{}", i),
                     created_at: Utc::now(),
                     expires_at: Some(Utc::now() + Duration::days(7)),
                     password: None,
-                    click_count: i as i64,
+                    click_count: i64::try_from(i).unwrap_or(i64::MAX),
                 })
                 .collect();
 

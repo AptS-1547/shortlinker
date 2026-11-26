@@ -1,3 +1,5 @@
+//! 运行时配置持久化测试：config_store 的更新、历史与敏感值处理。
+
 use aster_forge_db::system_config::SystemConfigDbBinding;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, Database};

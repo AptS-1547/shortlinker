@@ -30,23 +30,46 @@ pub enum LinkCacheLookup {
 /// Cache health data presented by the shortlinker health endpoint.
 #[derive(Debug, Clone)]
 pub struct LinkCacheHealth {
+    /// Overall health verdict (e.g. `"healthy"`, `"degraded"`).
     pub status: String,
+    /// Configured object-cache backend name (e.g. `"memory"`, `"redis"`).
     pub cache_type: String,
+    /// Whether the Bloom existence filter is part of the query chain.
     pub bloom_filter_enabled: bool,
+    /// Whether the negative (not-found) cache is enabled.
     pub negative_cache_enabled: bool,
+    /// Diagnostic message from the most recent backend failure; `None` when healthy.
     pub error: Option<String>,
 }
 
 /// Shortlinker-owned cache policy shared by redirect and link-management paths.
 #[async_trait]
 pub trait LinkCache: Send + Sync {
+    /// Runs the Bloom -> negative cache -> object cache lookup chain for `key`.
     async fn get(&self, key: &str) -> LinkCacheLookup;
+
+    /// Caches `value` under `key` for `ttl_secs`; `None` means the backend default TTL.
     async fn insert(&self, key: &str, value: ShortLink, ttl_secs: Option<u64>);
+
+    /// Evicts `key` from the object and negative caches after a link change.
     async fn remove(&self, key: &str);
+
+    /// Clears every cached entry across all layers.
     async fn invalidate_all(&self);
+
+    /// Rebuilds the Bloom filter (and related layers) from storage in batches.
     async fn rebuild_all(&self) -> Result<()>;
+
+    /// Records that `key` does not exist so future lookups short-circuit
+    /// in the negative cache instead of hitting storage.
     async fn mark_not_found(&self, key: &str);
+
+    /// Cheap Bloom pre-check; `false` proves the code does not exist
+    /// (subject to the configured false-positive rate).
     async fn bloom_check(&self, key: &str) -> bool;
+
+    /// Probes the cache backends and returns the health snapshot for the
+    /// health endpoint.
     async fn health_check(&self) -> LinkCacheHealth;
 }
 

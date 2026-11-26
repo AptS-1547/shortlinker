@@ -238,7 +238,6 @@ pub async fn import_links_streaming(
                     ..
                 }) => {
                     on_progress(&phase, processed, total);
-                    continue;
                 }
                 Some(resp @ IpcResponse::ImportResult { .. }) => {
                     return Ok(resp);
@@ -306,8 +305,8 @@ pub async fn export_links() -> Result<Vec<ShortLink>, IpcError> {
                 .map_err(|e| IpcError::ProtocolError(e.to_string()))?
             {
                 Some(IpcResponse::ExportChunk { links }) => {
+                    // Try decoding more from buffer
                     all_links.extend(links);
-                    continue; // Try decoding more from buffer
                 }
                 Some(IpcResponse::ExportDone { .. }) => {
                     return Ok(all_links);

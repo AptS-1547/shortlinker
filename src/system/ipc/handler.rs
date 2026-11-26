@@ -15,6 +15,7 @@ use crate::services::{
     UpdateLinkRequest, validate_import_rows,
 };
 use crate::storage::{LinkFilter, ShortLink};
+use crate::system::reload::ReloadTarget;
 use crate::system::reload::get_reload_coordinator;
 
 /// Server start time for uptime calculation
@@ -51,35 +52,29 @@ pub fn init_config_service(service: Arc<ConfigService>) {
 
 /// Get server uptime in seconds
 fn get_uptime_secs() -> u64 {
-    START_TIME.get().map(|t| t.elapsed().as_secs()).unwrap_or(0)
+    START_TIME.get().map_or(0, |t| t.elapsed().as_secs())
 }
 
 /// Convert ShortlinkerError to IpcResponse::Error
-fn error_response(err: ShortlinkerError) -> IpcResponse {
+fn error_response(err: &ShortlinkerError) -> IpcResponse {
     IpcResponse::Error {
         code: err.code().to_string(),
         message: err.to_string(),
     }
 }
 
-/// Get the LinkService or return a service-unavailable error response
-#[allow(clippy::result_large_err)]
-fn get_link_service() -> Result<&'static Arc<LinkService>, IpcResponse> {
-    LINK_SERVICE.get().ok_or_else(|| {
-        error_response(ShortlinkerError::service_unavailable(
-            "Service not initialized",
-        ))
-    })
+/// Get the LinkService or return a service-unavailable error
+fn get_link_service() -> Result<&'static Arc<LinkService>, ShortlinkerError> {
+    LINK_SERVICE
+        .get()
+        .ok_or_else(|| ShortlinkerError::service_unavailable("Service not initialized"))
 }
 
-/// Get the ConfigService or return a service-unavailable error response
-#[allow(clippy::result_large_err)]
-fn get_config_service() -> Result<&'static Arc<ConfigService>, IpcResponse> {
-    CONFIG_SERVICE.get().ok_or_else(|| {
-        error_response(ShortlinkerError::service_unavailable(
-            "ConfigService not initialized",
-        ))
-    })
+/// Get the ConfigService or return a service-unavailable error
+fn get_config_service() -> Result<&'static Arc<ConfigService>, ShortlinkerError> {
+    CONFIG_SERVICE
+        .get()
+        .ok_or_else(|| ShortlinkerError::service_unavailable("ConfigService not initialized"))
 }
 
 /// Handle an IPC command and return a response
@@ -92,72 +87,9 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
             uptime_secs: get_uptime_secs(),
         },
 
-        IpcCommand::Reload { target } => {
-            info!("IPC reload request received: {:?}", target);
+        IpcCommand::Reload { target } => handle_reload(target).await,
 
-            let Some(coordinator) = get_reload_coordinator() else {
-                warn!("ReloadCoordinator not initialized");
-                return IpcResponse::Error {
-                    code: "NOT_INITIALIZED".to_string(),
-                    message: "ReloadCoordinator not initialized".to_string(),
-                };
-            };
-
-            match coordinator.reload(target).await {
-                Ok(result) => {
-                    info!(
-                        "IPC reload completed: {:?} in {}ms",
-                        target, result.duration_ms
-                    );
-                    IpcResponse::ReloadResult {
-                        success: true,
-                        target,
-                        duration_ms: result.duration_ms,
-                        message: None,
-                    }
-                }
-                Err(e) => {
-                    warn!("IPC reload failed: {:?} - {}", target, e);
-                    IpcResponse::ReloadResult {
-                        success: false,
-                        target,
-                        duration_ms: 0,
-                        message: Some(e.to_string()),
-                    }
-                }
-            }
-        }
-
-        IpcCommand::GetStatus => {
-            let coordinator = get_reload_coordinator();
-            let status = coordinator.map(|c| c.status());
-
-            // Get links count from service if available
-            let links_count = if let Some(service) = LINK_SERVICE.get() {
-                service
-                    .get_stats()
-                    .await
-                    .map(|s| s.total_links)
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-
-            IpcResponse::Status {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                uptime_secs: get_uptime_secs(),
-                is_reloading: status.as_ref().map(|s| s.is_reloading).unwrap_or(false),
-                last_data_reload: status
-                    .as_ref()
-                    .and_then(|s| s.last_data_reload.as_ref())
-                    .map(|r| r.finished_at.to_rfc3339()),
-                last_config_reload: status
-                    .as_ref()
-                    .and_then(|s| s.last_config_reload.as_ref())
-                    .map(|r| r.finished_at.to_rfc3339()),
-                links_count,
-            }
-        }
+        IpcCommand::GetStatus => handle_get_status().await,
 
         IpcCommand::Shutdown => {
             info!("IPC shutdown request received");
@@ -209,7 +141,7 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
             warn!(
                 "ImportLinks(stream_progress=true) reached handle_command — should be handled by server.rs streaming path"
             );
-            error_response(ShortlinkerError::internal_error(
+            error_response(&ShortlinkerError::internal_error(
                 "Streaming import must be handled by streaming path",
             ))
         }
@@ -220,7 +152,7 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
             warn!(
                 "ExportLinks reached handle_command — should be handled by server.rs streaming path"
             );
-            error_response(ShortlinkerError::internal_error(
+            error_response(&ShortlinkerError::internal_error(
                 "ExportLinks must be handled by streaming path",
             ))
         }
@@ -228,9 +160,9 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
         IpcCommand::GetLinkStats => handle_get_stats().await,
 
         // ============ Config Management Commands ============
-        IpcCommand::ConfigList { category } => handle_config_list(category).await,
+        IpcCommand::ConfigList { category } => handle_config_list(category.as_deref()),
 
-        IpcCommand::ConfigGet { key } => handle_config_get(key).await,
+        IpcCommand::ConfigGet { key } => handle_config_get(&key),
 
         IpcCommand::ConfigSet { key, value } => handle_config_set(key, value).await,
 
@@ -242,6 +174,71 @@ pub async fn handle_command(cmd: IpcCommand) -> IpcResponse {
 
 // ============ Link Management Handlers ============
 
+/// Handle a reload request through the ReloadCoordinator
+async fn handle_reload(target: ReloadTarget) -> IpcResponse {
+    info!("IPC reload request received: {:?}", target);
+
+    let Some(coordinator) = get_reload_coordinator() else {
+        warn!("ReloadCoordinator not initialized");
+        return IpcResponse::Error {
+            code: "NOT_INITIALIZED".to_string(),
+            message: "ReloadCoordinator not initialized".to_string(),
+        };
+    };
+
+    match coordinator.reload(target).await {
+        Ok(result) => {
+            info!(
+                "IPC reload completed: {:?} in {}ms",
+                target, result.duration_ms
+            );
+            IpcResponse::ReloadResult {
+                success: true,
+                target,
+                duration_ms: result.duration_ms,
+                message: None,
+            }
+        }
+        Err(e) => {
+            warn!("IPC reload failed: {:?} - {}", target, e);
+            IpcResponse::ReloadResult {
+                success: false,
+                target,
+                duration_ms: 0,
+                message: Some(e.to_string()),
+            }
+        }
+    }
+}
+
+/// Build the current server status response
+async fn handle_get_status() -> IpcResponse {
+    let coordinator = get_reload_coordinator();
+    let status = coordinator.map(|c| c.status());
+
+    // Get links count from service if available
+    let links_count = if let Some(service) = LINK_SERVICE.get() {
+        service.get_stats().await.map_or(0, |s| s.total_links)
+    } else {
+        0
+    };
+
+    IpcResponse::Status {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        uptime_secs: get_uptime_secs(),
+        is_reloading: status.as_ref().is_some_and(|s| s.is_reloading),
+        last_data_reload: status
+            .as_ref()
+            .and_then(|s| s.last_data_reload.as_ref())
+            .map(|r| r.finished_at.to_rfc3339()),
+        last_config_reload: status
+            .as_ref()
+            .and_then(|s| s.last_config_reload.as_ref())
+            .map(|r| r.finished_at.to_rfc3339()),
+        links_count,
+    }
+}
+
 async fn handle_add_link(
     code: Option<String>,
     target: String,
@@ -251,7 +248,7 @@ async fn handle_add_link(
 ) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     let req = CreateLinkRequest {
@@ -267,26 +264,26 @@ async fn handle_add_link(
             link: result.link,
             generated_code: result.generated_code,
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_remove_link(code: String) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     match service.delete_link(&code).await {
         Ok(()) => IpcResponse::LinkDeleted { code },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     match service.batch_delete_links(codes).await {
@@ -303,7 +300,7 @@ async fn handle_batch_delete_links(codes: Vec<String>) -> IpcResponse {
                 })
                 .collect(),
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -315,7 +312,7 @@ async fn handle_update_link(
 ) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     let req = UpdateLinkRequest {
@@ -326,26 +323,26 @@ async fn handle_update_link(
 
     match service.update_link(&code, req).await {
         Ok(link) => IpcResponse::LinkUpdated { link },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_get_link(code: String) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     match service.get_link(&code).await {
         Ok(link) => IpcResponse::LinkFound { link },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     let filter = LinkFilter {
@@ -359,18 +356,18 @@ async fn handle_list_links(page: u64, page_size: u64, search: Option<String>) ->
     match service.list_links(filter, page, page_size).await {
         Ok((links, total)) => IpcResponse::LinkList {
             links,
-            total: total as usize,
+            total: usize::try_from(total).unwrap_or(usize::MAX),
             page,
             page_size,
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     // Convert IPC ImportLinkData to ImportLinkItemRaw, then validate via shared logic
@@ -405,7 +402,7 @@ async fn handle_import_links(links: Vec<ImportLinkData>, overwrite: bool) -> Ipc
                 errors,
             }
         }
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -419,23 +416,23 @@ type LinkBatchStream =
 /// Returns `None` if the service is not initialized.
 pub fn export_links_stream() -> Option<LinkBatchStream> {
     let service = LINK_SERVICE.get()?;
-    let stream = service.export_links_stream(LinkFilter::default(), 10000);
+    let stream = service.export_links_stream(&LinkFilter::default(), 10000);
     Some(stream)
 }
 
 async fn handle_get_stats() -> IpcResponse {
     let service = match get_link_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     match service.get_stats().await {
         Ok(stats) => IpcResponse::StatsResult {
             total_links: stats.total_links,
-            total_clicks: stats.total_clicks as i64,
+            total_clicks: i64::try_from(stats.total_clicks).unwrap_or(i64::MAX),
             active_links: stats.active_links,
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
@@ -584,24 +581,20 @@ fn to_config_item_data(view: ConfigItemView) -> ConfigItemData {
     }
 }
 
-async fn handle_config_list(category: Option<String>) -> IpcResponse {
+fn handle_config_list(category: Option<&str>) -> IpcResponse {
     let service = match get_config_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     let all = service.get_all();
     let configs: Vec<ConfigItemData> = all
         .into_iter()
-        .filter(|item| {
-            if let Some(ref cat) = category {
-                CONFIG_REGISTRY
-                    .get(&item.key)
-                    .map(|definition| definition.category == cat.as_str())
-                    .unwrap_or(false)
-            } else {
-                true
-            }
+        .filter(|item| match category {
+            Some(cat) => CONFIG_REGISTRY
+                .get(&item.key)
+                .is_some_and(|definition| definition.category == cat),
+            None => true,
         })
         .map(to_config_item_data)
         .collect();
@@ -609,24 +602,24 @@ async fn handle_config_list(category: Option<String>) -> IpcResponse {
     IpcResponse::ConfigListResult { configs }
 }
 
-async fn handle_config_get(key: String) -> IpcResponse {
+fn handle_config_get(key: &str) -> IpcResponse {
     let service = match get_config_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
-    match service.get(&key) {
+    match service.get(key) {
         Ok(view) => IpcResponse::ConfigGetResult {
             config: to_config_item_data(view),
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_config_set(key: String, value: String) -> IpcResponse {
     let service = match get_config_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     if !CONFIG_REGISTRY.contains_key(&key) {
@@ -652,24 +645,21 @@ async fn handle_config_set(key: String, value: String) -> IpcResponse {
             code: "CONFIG_INVALID_VALUE".to_string(),
             message,
         },
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_config_reset(key: String) -> IpcResponse {
     let service = match get_config_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
-    let definition = match CONFIG_REGISTRY.get(&key) {
-        Some(definition) => definition,
-        None => {
-            return IpcResponse::Error {
-                code: "CONFIG_NOT_FOUND".to_string(),
-                message: format!("Unknown configuration key: '{}'", key),
-            };
-        }
+    let Some(definition) = CONFIG_REGISTRY.get(&key) else {
+        return IpcResponse::Error {
+            code: "CONFIG_NOT_FOUND".to_string(),
+            message: format!("Unknown configuration key: '{}'", key),
+        };
     };
 
     let default_value = (definition.default_fn)();
@@ -685,14 +675,14 @@ async fn handle_config_reset(key: String) -> IpcResponse {
                 message: view.message,
             }
         }
-        Err(e) => error_response(e),
+        Err(e) => error_response(&e),
     }
 }
 
 async fn handle_config_import(configs: Vec<super::types::ConfigImportItem>) -> IpcResponse {
     let service = match get_config_service() {
         Ok(s) => s,
-        Err(e) => return e,
+        Err(e) => return error_response(&e),
     };
 
     let mut success = 0usize;

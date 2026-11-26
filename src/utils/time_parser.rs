@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 
+/// 过期时间字符串解析器（RFC3339 与相对时间格式）
 #[derive(Debug, Clone)]
 pub struct TimeParser;
 
@@ -45,8 +46,7 @@ impl TimeParser {
             let digit_end = remaining
                 .char_indices()
                 .find(|(_, c)| !c.is_ascii_digit())
-                .map(|(i, _)| i)
-                .unwrap_or(remaining.len());
+                .map_or(remaining.len(), |(i, _)| i);
 
             if digit_end == 0 {
                 return Err(format!("Invalid time format: '{}'", input));
@@ -63,8 +63,7 @@ impl TimeParser {
             let unit_end = remaining
                 .char_indices()
                 .find(|(_, c)| !c.is_alphabetic())
-                .map(|(i, _)| i)
-                .unwrap_or(remaining.len());
+                .map_or(remaining.len(), |(i, _)| i);
 
             if unit_end == 0 {
                 return Err(format!("Missing time unit after number '{}'", num));
@@ -165,13 +164,13 @@ mod tests {
 
         // 测试单个单位
         let result = TimeParser::parse_expire_time("1d").unwrap();
-        assert!((result - now).num_days() == 1);
+        assert_eq!((result - now).num_days(), 1);
 
         let result = TimeParser::parse_expire_time("2w").unwrap();
-        assert!((result - now).num_days() == 14);
+        assert_eq!((result - now).num_days(), 14);
 
         let result = TimeParser::parse_expire_time("1y").unwrap();
-        assert!((result - now).num_days() == 365);
+        assert_eq!((result - now).num_days(), 365);
 
         // 测试组合格式
         let result = TimeParser::parse_expire_time("1d2h30m").unwrap();

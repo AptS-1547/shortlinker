@@ -1,9 +1,9 @@
 //! UTM Source 追踪字段迁移
 //!
 //! 添加 source 字段用于区分 QR Code / 直接访问 / Referrer 来源：
-//! - click_logs: 添加 source 列
-//! - click_stats_hourly: 添加 source_counts 列
-//! - click_stats_daily: 添加 top_sources 列
+//! - `click_logs`: 添加 `source` 列
+//! - `click_stats_hourly`: 添加 `source_counts` 列
+//! - `click_stats_daily`: 添加 `top_sources` 列
 
 use sea_orm_migration::prelude::*;
 

@@ -19,7 +19,7 @@ pub fn model_to_shortlink(model: short_link::Model) -> ShortLink {
 
 /// 将 ShortLink 转换为 ActiveModel（用于插入/更新）
 pub fn shortlink_to_active_model(link: &ShortLink, is_new: bool) -> short_link::ActiveModel {
-    use sea_orm::ActiveValue::*;
+    use sea_orm::ActiveValue::{NotSet, Set};
 
     short_link::ActiveModel {
         short_code: Set(link.code.clone()),

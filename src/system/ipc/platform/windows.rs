@@ -24,6 +24,9 @@ struct SecurityDescriptorGuard {
 impl Drop for SecurityDescriptorGuard {
     fn drop(&mut self) {
         if !self.sd.is_null() {
+            // SAFETY: `sd` 指向 `ConvertStringSecurityDescriptorToSecurityDescriptorW`
+            // 分配的本地内存；每个 guard 只释放一次，drop 后不再访问该指针。
+            #[expect(unsafe_code, reason = "LocalFree has no safe wrapper in windows-sys")]
             unsafe {
                 windows_sys::Win32::Foundation::LocalFree(self.sd);
             }
@@ -44,6 +47,12 @@ fn create_pipe_with_acl(pipe_name: &str, first_instance: bool) -> io::Result<Nam
 
     let mut sd_ptr: *mut c_void = std::ptr::null_mut();
 
+    // SAFETY: `sddl.as_ptr()` 指向以 NUL 结尾的 UTF-16 缓冲区且调用期间不被释放；
+    // 成功时系统写回一个有效描述符指针到 `sd_ptr`。
+    #[expect(
+        unsafe_code,
+        reason = "SDDL conversion is only exposed as a raw Win32 call"
+    )]
     let ret = unsafe {
         ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl.as_ptr(),
@@ -59,12 +68,23 @@ fn create_pipe_with_acl(pipe_name: &str, first_instance: bool) -> io::Result<Nam
 
     let _guard = SecurityDescriptorGuard { sd: sd_ptr };
 
+    #[expect(
+        cast_possible_truncation,
+        reason = "SECURITY_ATTRIBUTES size is far below u32::MAX"
+    )]
+    let sa_len = std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32;
     let mut sa = SECURITY_ATTRIBUTES {
-        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        nLength: sa_len,
         lpSecurityDescriptor: sd_ptr,
         bInheritHandle: 0,
     };
 
+    // SAFETY: `sa` 指向栈上有效的 SECURITY_ATTRIBUTES，其中描述符指针刚由 SDDL
+    // 调用产生；tokio 在创建管道期间同步读取该结构。
+    #[expect(
+        unsafe_code,
+        reason = "tokio named-pipe ACL creation is only exposed as a raw API"
+    )]
     let server = unsafe {
         ServerOptions::new()
             .first_pipe_instance(first_instance)

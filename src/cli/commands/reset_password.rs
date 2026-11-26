@@ -65,8 +65,7 @@ fn prompt_password_with_confirm() -> Result<String, String> {
 fn atty_check() -> bool {
     #[cfg(unix)]
     {
-        use nix::libc;
-        unsafe { libc::isatty(libc::STDIN_FILENO) != 0 }
+        nix::unistd::isatty(std::io::stdin()).is_ok_and(std::convert::identity)
     }
     #[cfg(windows)]
     {
@@ -74,7 +73,11 @@ fn atty_check() -> bool {
         use windows_sys::Win32::System::Console::GetConsoleMode;
         let handle = io::stdin().as_raw_handle();
         let mut mode = 0;
-        unsafe { GetConsoleMode(handle as *mut _, &mut mode) != 0 }
+        // SAFETY: `handle` 是 stdin 的原始句柄，`GetConsoleMode` 只读取该句柄并
+        // 写入一个本地 `u32`，不持有指针超出调用生命周期。
+        #[expect(unsafe_code, reason = "Win32 console mode query has no safe wrapper")]
+        let ok = unsafe { GetConsoleMode(handle as *mut _, &mut mode) };
+        ok != 0
     }
     #[cfg(not(any(unix, windows)))]
     {

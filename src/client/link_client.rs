@@ -20,6 +20,7 @@ pub struct LinkClient {
 }
 
 impl LinkClient {
+    /// Create a client bound to the shared service context.
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
@@ -51,7 +52,7 @@ impl LinkClient {
                     link,
                     generated_code,
                 }),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -69,7 +70,7 @@ impl LinkClient {
             ipc::remove_link(code),
             |resp| match resp {
                 IpcResponse::LinkDeleted { .. } => Ok(()),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -104,7 +105,7 @@ impl LinkClient {
                         })
                         .collect(),
                 }),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -133,7 +134,7 @@ impl LinkClient {
             ipc::update_link(code, target, expires_at, password),
             |resp| match resp {
                 IpcResponse::LinkUpdated { link } => Ok(link),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -151,7 +152,7 @@ impl LinkClient {
             ipc::get_link(code),
             |resp| match resp {
                 IpcResponse::LinkFound { link } => Ok(link),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -174,7 +175,7 @@ impl LinkClient {
             ipc::list_links(page, page_size, search),
             |resp| match resp {
                 IpcResponse::LinkList { links, total, .. } => Ok((links, total as u64)),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -213,7 +214,7 @@ impl LinkClient {
                     errors,
                     ..
                 } => Ok(convert_import_result(success, skipped, errors)),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -234,6 +235,8 @@ impl LinkClient {
         overwrite: bool,
         on_progress: impl Fn(&crate::system::ipc::types::ImportPhase, usize, usize) + Send + Sync,
     ) -> Result<ImportBatchResult, ClientError> {
+        use crate::system::ipc::types::ImportPhase;
+
         let ctx = self.ctx.clone();
 
         // IPC path
@@ -255,7 +258,7 @@ impl LinkClient {
                 Ok(IpcResponse::Error { code, message }) => {
                     return Err(ClientError::ServerError { code, message });
                 }
-                Ok(other) => return Err(unexpected_response(other)),
+                Ok(other) => return Err(unexpected_response(&other)),
                 Err(crate::system::ipc::IpcError::ServerNotRunning) => {
                     // Fall through to fallback
                 }
@@ -264,7 +267,6 @@ impl LinkClient {
         }
 
         // Fallback path: use chunked import with progress
-        use crate::system::ipc::types::ImportPhase;
         let service = ctx.get_link_service().await?;
         let mode = ImportMode::from_overwrite_flag(overwrite);
 
@@ -280,6 +282,8 @@ impl LinkClient {
 
     /// Export all links
     pub async fn export_links(&self) -> Result<Vec<ShortLink>, ClientError> {
+        use futures_util::StreamExt;
+
         let ctx = self.ctx.clone();
         // IPC path: streaming export returns Vec<ShortLinkData> directly
         if ipc::is_server_running() {
@@ -297,9 +301,8 @@ impl LinkClient {
         }
 
         // Fallback: use stream + collect
-        use futures_util::StreamExt;
         let service = ctx.get_link_service().await?;
-        let mut stream = service.export_links_stream(crate::storage::LinkFilter::default(), 10000);
+        let mut stream = service.export_links_stream(&crate::storage::LinkFilter::default(), 10000);
         let mut all_links = Vec::new();
         while let Some(batch) = stream.next().await {
             let links = batch.map_err(ClientError::Service)?;
@@ -320,10 +323,10 @@ impl LinkClient {
                     active_links,
                 } => Ok(LinkStats {
                     total_links,
-                    total_clicks: total_clicks.max(0) as usize,
+                    total_clicks: usize::try_from(total_clicks.max(0)).unwrap_or(usize::MAX),
                     active_links,
                 }),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_link_service().await?;
@@ -359,7 +362,7 @@ fn convert_import_result(
     }
 }
 
-fn unexpected_response(resp: IpcResponse) -> ClientError {
+fn unexpected_response(resp: &IpcResponse) -> ClientError {
     ClientError::Ipc(crate::system::ipc::IpcError::ProtocolError(format!(
         "Unexpected response: {:?}",
         resp
@@ -372,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_unexpected_response_pong() {
-        let err = unexpected_response(IpcResponse::Pong {
+        let err = unexpected_response(&IpcResponse::Pong {
             version: "1.0".into(),
             uptime_secs: 0,
         });
@@ -383,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_unexpected_response_shutting_down() {
-        let err = unexpected_response(IpcResponse::ShuttingDown);
+        let err = unexpected_response(&IpcResponse::ShuttingDown);
         assert!(matches!(err, ClientError::Ipc(_)));
     }
 }

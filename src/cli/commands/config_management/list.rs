@@ -15,12 +15,8 @@ struct ConfigOutput {
     value_type: String,
     requires_restart: bool,
     editable: bool,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     sensitive: bool,
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
 }
 
 /// List all configurations via ConfigClient

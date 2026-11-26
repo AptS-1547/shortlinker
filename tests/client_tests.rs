@@ -467,8 +467,12 @@ async fn test_batch_delete_all_exist() {
         .await
         .unwrap();
     assert_eq!(result.deleted.len(), 3);
-    assert!(result.not_found.is_empty());
-    assert!(result.errors.is_empty());
+    assert_eq!(result.not_found, [] as [std::string::String; 0]);
+    assert!(
+        result.errors.is_empty(),
+        "errors should be empty: {:?}",
+        result.errors
+    );
 }
 
 #[tokio::test]
@@ -498,8 +502,8 @@ async fn test_batch_delete_some_not_found() {
 async fn test_batch_delete_empty() {
     let (client, _td) = create_test_link_client().await;
     let result = client.batch_delete(vec![]).await.unwrap();
-    assert!(result.deleted.is_empty());
-    assert!(result.not_found.is_empty());
+    assert_eq!(result.deleted, [] as [std::string::String; 0]);
+    assert_eq!(result.not_found, [] as [std::string::String; 0]);
 }
 
 // =============================================================================
@@ -644,7 +648,7 @@ async fn test_create_link_auto_generate_code() {
         .await
         .unwrap();
     assert!(result.generated_code);
-    assert!(!result.link.code.is_empty());
+    assert_ne!(result.link.code, "");
 }
 
 #[tokio::test]

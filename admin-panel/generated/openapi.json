@@ -10,7 +10,7 @@
     "license": {
       "name": "MIT"
     },
-    "version": "0.6.0"
+    "version": "0.6.1"
   },
   "paths": {
     "/admin/v1/analytics/devices": {
@@ -53,10 +53,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -130,10 +130,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -203,10 +203,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -280,10 +280,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -357,10 +357,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -434,10 +434,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -839,6 +839,7 @@
           {
             "name": "limit",
             "in": "query",
+            "description": "最多返回的历史记录条数，默认 20，服务端会截断到最大 100",
             "required": false,
             "schema": {
               "type": [
@@ -875,6 +876,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码（1-based），默认 1",
             "required": false,
             "schema": {
               "type": [
@@ -887,6 +889,7 @@
           {
             "name": "page_size",
             "in": "query",
+            "description": "每页条数，默认 20，服务端会截断到 1..=100",
             "required": false,
             "schema": {
               "type": [
@@ -899,6 +902,7 @@
           {
             "name": "created_after",
             "in": "query",
+            "description": "只返回该时间之后创建的链接，接受 `TimeParser` 支持的格式",
             "required": false,
             "schema": {
               "type": [
@@ -910,6 +914,7 @@
           {
             "name": "created_before",
             "in": "query",
+            "description": "只返回该时间之前创建的链接，接受 `TimeParser` 支持的格式",
             "required": false,
             "schema": {
               "type": [
@@ -921,6 +926,7 @@
           {
             "name": "only_expired",
             "in": "query",
+            "description": "为 `true` 时只返回已过期的链接",
             "required": false,
             "schema": {
               "type": [
@@ -932,6 +938,7 @@
           {
             "name": "only_active",
             "in": "query",
+            "description": "为 `true` 时只返回未过期的链接（含无过期时间的链接）",
             "required": false,
             "schema": {
               "type": [
@@ -943,6 +950,7 @@
           {
             "name": "search",
             "in": "query",
+            "description": "搜索关键字，对短码和目标 URL 做模糊匹配",
             "required": false,
             "schema": {
               "type": [
@@ -1113,6 +1121,7 @@
           {
             "name": "search",
             "in": "query",
+            "description": "只导出短码或目标 URL 模糊匹配该关键字的链接",
             "required": false,
             "schema": {
               "type": [
@@ -1124,6 +1133,7 @@
           {
             "name": "created_after",
             "in": "query",
+            "description": "只导出该时间之后创建的链接，接受 `TimeParser` 支持的格式",
             "required": false,
             "schema": {
               "type": [
@@ -1135,6 +1145,7 @@
           {
             "name": "created_before",
             "in": "query",
+            "description": "只导出该时间之前创建的链接，接受 `TimeParser` 支持的格式",
             "required": false,
             "schema": {
               "type": [
@@ -1146,6 +1157,7 @@
           {
             "name": "only_expired",
             "in": "query",
+            "description": "为 `true` 时只导出已过期的链接",
             "required": false,
             "schema": {
               "type": [
@@ -1157,6 +1169,7 @@
           {
             "name": "only_active",
             "in": "query",
+            "description": "为 `true` 时只导出未过期的链接（含无过期时间的链接）",
             "required": false,
             "schema": {
               "type": [
@@ -1368,10 +1381,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -1457,10 +1470,10 @@
             "schema": {
               "oneOf": [
                 {
-                  "type": "null"
+                  "$ref": "#/components/schemas/GroupBy"
                 },
                 {
-                  "$ref": "#/components/schemas/GroupBy"
+                  "type": "null"
                 }
               ]
             }
@@ -1542,11 +1555,11 @@
           "group_by": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/GroupBy",
                 "description": "分组方式"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -1570,6 +1583,7 @@
       },
       "ApiResponse_AuthSuccessResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1577,7 +1591,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1590,20 +1605,24 @@
               "expires_in": {
                 "type": "integer",
                 "format": "int64",
+                "description": "会话（JWT）有效期，单位秒",
                 "minimum": 0
               },
               "message": {
-                "type": "string"
+                "type": "string",
+                "description": "登录成功的提示文本"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_BatchResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1611,10 +1630,12 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
+            "description": "批量操作结果（部分成功语义：成功与失败条目并列返回）",
             "required": [
               "success",
               "failed"
@@ -1624,23 +1645,27 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/BatchFailedItem"
-                }
+                },
+                "description": "处理失败的条目列表"
               },
               "success": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "description": "处理成功的短码列表"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ConfigActionResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1648,7 +1673,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1658,17 +1684,20 @@
             ],
             "properties": {
               "value": {
-                "type": "string"
+                "type": "string",
+                "description": "action 产出的值（如生成的 token）；敏感值由此接口直接返回，仅供调用方立即使用"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ConfigItemResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1676,7 +1705,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1691,19 +1721,24 @@
             ],
             "properties": {
               "is_sensitive": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "是否为敏感配置；该值为 `true` 时 `value` 只能是占位符，不能用于回填"
               },
               "key": {
-                "type": "string"
+                "type": "string",
+                "description": "配置 key，与 `config/definitions.rs` 注册的标识一致"
               },
               "requires_restart": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "修改后是否需要重启进程才能生效；否则热重载即时生效"
               },
               "updated_at": {
-                "type": "string"
+                "type": "string",
+                "description": "最近一次更新时间，RFC 3339 格式"
               },
               "value": {
-                "type": "string"
+                "type": "string",
+                "description": "展示用的当前值；敏感配置返回 `[REDACTED]` 占位符而非真实值"
               },
               "value_type": {
                 "$ref": "#/components/schemas/ValueType",
@@ -1712,12 +1747,14 @@
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ConfigUpdateResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1725,7 +1762,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1739,32 +1777,39 @@
             ],
             "properties": {
               "is_sensitive": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "是否为敏感配置"
               },
               "key": {
-                "type": "string"
+                "type": "string",
+                "description": "被更新的配置 key"
               },
               "message": {
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "更新触发的附加信息（如校验提示）；无附加信息时为 `null`"
               },
               "requires_restart": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "是否需要重启才能生效"
               },
               "value": {
-                "type": "string"
+                "type": "string",
+                "description": "更新后的展示值；敏感配置为 `[REDACTED]` 占位符"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_DeviceAnalyticsResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1772,7 +1817,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1787,40 +1833,47 @@
             "properties": {
               "bot_percentage": {
                 "type": "number",
-                "format": "double"
+                "format": "double",
+                "description": "点击中 Bot（爬虫/自动化 UA）占比（0-100）"
               },
               "browsers": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/CategoryStatsResponse"
-                }
+                },
+                "description": "浏览器维度统计，按点击次数降序"
               },
               "devices": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/CategoryStatsResponse"
-                }
+                },
+                "description": "设备类型维度统计，按点击次数降序"
               },
               "operating_systems": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/CategoryStatsResponse"
-                }
+                },
+                "description": "操作系统维度统计，按点击次数降序"
               },
               "total_with_ua": {
                 "type": "integer",
                 "format": "int64",
+                "description": "统计区间内带 User-Agent 信息的点击总数，是各分类百分比的分母",
                 "minimum": 0
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ExecuteAndSaveResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1828,7 +1881,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1843,23 +1897,28 @@
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "执行结果的附加信息；无附加信息时为 `null`"
               },
               "requires_restart": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "新值是否需要重启才能生效"
               },
               "success": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "action 是否执行并保存成功"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ImportResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1867,7 +1926,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1882,35 +1942,42 @@
             "properties": {
               "failed_count": {
                 "type": "integer",
+                "description": "导入失败的行数",
                 "minimum": 0
               },
               "failed_items": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/ImportFailedItem"
-                }
+                },
+                "description": "失败行的明细列表"
               },
               "skipped_count": {
                 "type": "integer",
+                "description": "按导入模式跳过的行数（如 skip 模式下短码已存在）",
                 "minimum": 0
               },
               "success_count": {
                 "type": "integer",
+                "description": "成功写入的行数",
                 "minimum": 0
               },
               "total_rows": {
                 "type": "integer",
+                "description": "CSV 中的数据行总数（不含表头）",
                 "minimum": 0
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_LinkAnalytics": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1918,7 +1985,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -1932,37 +2000,44 @@
             ],
             "properties": {
               "code": {
-                "type": "string"
+                "type": "string",
+                "description": "短码"
               },
               "geo_distribution": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/GeoStats"
-                }
+                },
+                "description": "点击次数最高的前 10 个地区分布"
               },
               "top_referrers": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/ReferrerStats"
-                }
+                },
+                "description": "点击次数最高的前 10 个来源"
               },
               "total_clicks": {
                 "type": "integer",
                 "format": "int64",
+                "description": "统计区间内的点击总数",
                 "minimum": 0
               },
               "trend": {
-                "$ref": "#/components/schemas/TrendData"
+                "$ref": "#/components/schemas/TrendData",
+                "description": "区间内按天分组的点击趋势"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_LinkResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -1970,10 +2045,12 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
+            "description": "短链接详情响应",
             "required": [
               "code",
               "target",
@@ -1985,38 +2062,46 @@
             "properties": {
               "click_count": {
                 "type": "integer",
+                "description": "该链接累计点击次数",
                 "minimum": 0
               },
               "code": {
-                "type": "string"
+                "type": "string",
+                "description": "短码"
               },
               "created_at": {
-                "type": "string"
+                "type": "string",
+                "description": "创建时间，RFC 3339 格式"
               },
               "expires_at": {
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "过期时间，RFC 3339 格式；`null` 表示永不过期"
               },
               "password": {
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "链接密码的哈希值（不回传明文）；`null` 表示未启用密码保护"
               },
               "target": {
-                "type": "string"
+                "type": "string",
+                "description": "跳转目标 URL"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_MessageResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2024,7 +2109,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -2034,17 +2120,20 @@
             ],
             "properties": {
               "message": {
-                "type": "string"
+                "type": "string",
+                "description": "操作结果描述文本"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_PostNewLink": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2052,10 +2141,12 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
+            "description": "创建短链接请求体（单条创建与批量创建共用）",
             "required": [
               "target"
             ],
@@ -2064,38 +2155,45 @@
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "自定义短码；省略或为空时由服务端按短码策略自动生成"
               },
               "expires_at": {
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "过期时间，接受 `TimeParser` 的灵活格式（RFC3339 或 `1d`/`2w`/`1d2h` 等相对时间）；省略表示永不过期"
               },
               "force": {
                 "type": [
                   "boolean",
                   "null"
-                ]
+                ],
+                "description": "短码已存在时是否覆盖，默认 `false`（冲突时直接返回错误）"
               },
               "password": {
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "description": "链接访问密码明文，服务端入库前统一做哈希；省略表示不启用密码保护"
               },
               "target": {
-                "type": "string"
+                "type": "string",
+                "description": "跳转目标 URL，创建和更新时都会经过格式校验"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_ReloadResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2103,7 +2201,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -2116,20 +2215,24 @@
               "duration_ms": {
                 "type": "integer",
                 "format": "int64",
+                "description": "重载耗时，单位毫秒",
                 "minimum": 0
               },
               "message": {
-                "type": "string"
+                "type": "string",
+                "description": "重载完成的提示文本"
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_StatsResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2137,7 +2240,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -2150,25 +2254,30 @@
             "properties": {
               "active_links": {
                 "type": "integer",
+                "description": "当前未过期的链接数量",
                 "minimum": 0
               },
               "total_clicks": {
                 "type": "integer",
+                "description": "所有链接的累计点击次数之和",
                 "minimum": 0
               },
               "total_links": {
                 "type": "integer",
+                "description": "短链接总数",
                 "minimum": 0
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_TrendData": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2176,7 +2285,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "object",
@@ -2205,12 +2315,14 @@
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_ConfigHistoryResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2218,7 +2330,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2235,40 +2348,48 @@
               ],
               "properties": {
                 "changed_at": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "变更时间，RFC 3339 格式"
                 },
                 "changed_by": {
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "变更操作者标识；无法归因（如导入路径）时为 `null`"
                 },
                 "config_key": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "发生变更的配置 key"
                 },
                 "id": {
                   "type": "integer",
-                  "format": "int32"
+                  "format": "int32",
+                  "description": "历史记录主键，按时间递增"
                 },
                 "new_value": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "变更后的值（敏感配置为 `[REDACTED]`）"
                 },
                 "old_value": {
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "变更前的值（敏感配置为 `[REDACTED]`）；首次赋值时为 `null`"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_ConfigItemResponse": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2276,7 +2397,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2293,19 +2415,24 @@
               ],
               "properties": {
                 "is_sensitive": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "是否为敏感配置；该值为 `true` 时 `value` 只能是占位符，不能用于回填"
                 },
                 "key": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "配置 key，与 `config/definitions.rs` 注册的标识一致"
                 },
                 "requires_restart": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "修改后是否需要重启进程才能生效；否则热重载即时生效"
                 },
                 "updated_at": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "最近一次更新时间，RFC 3339 格式"
                 },
                 "value": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "展示用的当前值；敏感配置返回 `[REDACTED]` 占位符而非真实值"
                 },
                 "value_type": {
                   "$ref": "#/components/schemas/ValueType",
@@ -2315,12 +2442,14 @@
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_ConfigSchema": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2328,7 +2457,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2348,11 +2478,11 @@
                 "action": {
                   "oneOf": [
                     {
-                      "type": "null"
-                    },
-                    {
                       "$ref": "#/components/schemas/ActionType",
                       "description": "可执行的 action（如生成 token）"
+                    },
+                    {
+                      "type": "null"
                     }
                   ]
                 },
@@ -2360,16 +2490,20 @@
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "所属配置分组（如 analytics、api）；`None` 表示未分组。"
                 },
                 "default_value": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "默认值的字符串形式（由 registry 的 default_fn 生成）。"
                 },
                 "description": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "配置项说明文案。"
                 },
                 "editable": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "是否允许在运行时通过管理接口修改。"
                 },
                 "enum_options": {
                   "type": [
@@ -2378,10 +2512,12 @@
                   ],
                   "items": {
                     "$ref": "#/components/schemas/EnumOption"
-                  }
+                  },
+                  "description": "enum 类型的可选值列表；非 enum 类型为 `None`。"
                 },
                 "key": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "配置 key，与 registry 注册名一致。"
                 },
                 "order": {
                   "type": "integer",
@@ -2389,21 +2525,25 @@
                   "minimum": 0
                 },
                 "requires_restart": {
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "修改后是否需要重启进程才能生效。"
                 },
                 "value_type": {
-                  "$ref": "#/components/schemas/ValueType"
+                  "$ref": "#/components/schemas/ValueType",
+                  "description": "值的类型分类，决定前端表单控件与后端校验方式。"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_GeoStats": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2411,7 +2551,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2428,26 +2569,31 @@
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "城市名称；GeoIP 未命中城市信息时为 `null`"
                 },
                 "count": {
                   "type": "integer",
                   "format": "int64",
+                  "description": "该地区的点击次数",
                   "minimum": 0
                 },
                 "country": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "国家/地区名称，来自 GeoIP 解析；无法解析时为 `Unknown`"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_ReferrerStats": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2455,7 +2601,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2471,25 +2618,30 @@
                 "count": {
                   "type": "integer",
                   "format": "int64",
+                  "description": "该来源的点击次数",
                   "minimum": 0
                 },
                 "percentage": {
                   "type": "number",
-                  "format": "double"
+                  "format": "double",
+                  "description": "占本次返回的各来源点击数之和的百分比（0-100）"
                 },
                 "referrer": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "来源页 URL 或主机；直接访问（无 Referer）时为 `(direct)`"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
       "ApiResponse_Vec_TopLink": {
         "type": "object",
+        "description": "管理 API 统一响应包装",
         "required": [
           "code",
           "message"
@@ -2497,7 +2649,8 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码：0（`ErrorCode::Success`）表示成功，非 0 取值见 `ErrorCode`"
           },
           "data": {
             "type": "array",
@@ -2512,16 +2665,19 @@
                 "clicks": {
                   "type": "integer",
                   "format": "int64",
+                  "description": "统计区间内的点击次数",
                   "minimum": 0
                 },
                 "code": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "短码"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           }
         }
       },
@@ -2536,15 +2692,18 @@
           "expires_in": {
             "type": "integer",
             "format": "int64",
+            "description": "会话（JWT）有效期，单位秒",
             "minimum": 0
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "登录成功的提示文本"
           }
         }
       },
       "BatchCreateRequest": {
         "type": "object",
+        "description": "批量创建短链接请求",
         "required": [
           "links"
         ],
@@ -2553,12 +2712,14 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PostNewLink"
-            }
+            },
+            "description": "要创建的链接列表，每项语义同 `PostNewLink`"
           }
         }
       },
       "BatchDeleteRequest": {
         "type": "object",
+        "description": "批量删除短链接请求",
         "required": [
           "codes"
         ],
@@ -2567,34 +2728,40 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "要删除的短码列表，短码不存在时计入失败项"
           }
         }
       },
       "BatchFailedItem": {
         "type": "object",
+        "description": "批量操作中的单条失败详情",
         "required": [
           "code",
           "error"
         ],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "操作失败的短码"
           },
           "error": {
-            "type": "string"
+            "type": "string",
+            "description": "失败原因描述"
           },
           "error_code": {
             "type": [
               "integer",
               "null"
             ],
-            "format": "int32"
+            "format": "int32",
+            "description": "预留的业务错误码（`ErrorCode` 数值），当前批量操作总是省略"
           }
         }
       },
       "BatchResponse": {
         "type": "object",
+        "description": "批量操作结果（部分成功语义：成功与失败条目并列返回）",
         "required": [
           "success",
           "failed"
@@ -2604,33 +2771,39 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BatchFailedItem"
-            }
+            },
+            "description": "处理失败的条目列表"
           },
           "success": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "处理成功的短码列表"
           }
         }
       },
       "BatchUpdateItem": {
         "type": "object",
+        "description": "批量更新中的单条更新项",
         "required": [
           "code",
           "payload"
         ],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "要更新的短码"
           },
           "payload": {
-            "$ref": "#/components/schemas/PostNewLink"
+            "$ref": "#/components/schemas/PostNewLink",
+            "description": "更新内容，字段语义同创建请求"
           }
         }
       },
       "BatchUpdateRequest": {
         "type": "object",
+        "description": "批量更新短链接请求",
         "required": [
           "updates"
         ],
@@ -2639,7 +2812,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BatchUpdateItem"
-            }
+            },
+            "description": "要更新的链接列表，按短码逐条定位"
           }
         }
       },
@@ -2655,14 +2829,17 @@
           "count": {
             "type": "integer",
             "format": "int64",
+            "description": "该分类的点击次数",
             "minimum": 0
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "分类名称（如浏览器名 `Chrome`、系统名 `Windows`、设备类型 `mobile`）；UA 缺失时为 `Unknown`"
           },
           "percentage": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "占同维度各分类点击数之和的百分比（0-100）"
           }
         }
       },
@@ -2674,7 +2851,8 @@
         ],
         "properties": {
           "action": {
-            "$ref": "#/components/schemas/ActionType"
+            "$ref": "#/components/schemas/ActionType",
+            "description": "要执行的 action 类型，只有注册了对应 action 的配置 key 才接受"
           }
         }
       },
@@ -2686,7 +2864,8 @@
         ],
         "properties": {
           "value": {
-            "type": "string"
+            "type": "string",
+            "description": "action 产出的值（如生成的 token）；敏感值由此接口直接返回，仅供调用方立即使用"
           }
         }
       },
@@ -2703,29 +2882,35 @@
         ],
         "properties": {
           "changed_at": {
-            "type": "string"
+            "type": "string",
+            "description": "变更时间，RFC 3339 格式"
           },
           "changed_by": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "变更操作者标识；无法归因（如导入路径）时为 `null`"
           },
           "config_key": {
-            "type": "string"
+            "type": "string",
+            "description": "发生变更的配置 key"
           },
           "id": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "历史记录主键，按时间递增"
           },
           "new_value": {
-            "type": "string"
+            "type": "string",
+            "description": "变更后的值（敏感配置为 `[REDACTED]`）"
           },
           "old_value": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "变更前的值（敏感配置为 `[REDACTED]`）；首次赋值时为 `null`"
           }
         }
       },
@@ -2742,19 +2927,24 @@
         ],
         "properties": {
           "is_sensitive": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否为敏感配置；该值为 `true` 时 `value` 只能是占位符，不能用于回填"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "配置 key，与 `config/definitions.rs` 注册的标识一致"
           },
           "requires_restart": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "修改后是否需要重启进程才能生效；否则热重载即时生效"
           },
           "updated_at": {
-            "type": "string"
+            "type": "string",
+            "description": "最近一次更新时间，RFC 3339 格式"
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "description": "展示用的当前值；敏感配置返回 `[REDACTED]` 占位符而非真实值"
           },
           "value_type": {
             "$ref": "#/components/schemas/ValueType",
@@ -2778,11 +2968,11 @@
           "action": {
             "oneOf": [
               {
-                "type": "null"
-              },
-              {
                 "$ref": "#/components/schemas/ActionType",
                 "description": "可执行的 action（如生成 token）"
+              },
+              {
+                "type": "null"
               }
             ]
           },
@@ -2790,16 +2980,20 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "所属配置分组（如 analytics、api）；`None` 表示未分组。"
           },
           "default_value": {
-            "type": "string"
+            "type": "string",
+            "description": "默认值的字符串形式（由 registry 的 default_fn 生成）。"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "配置项说明文案。"
           },
           "editable": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否允许在运行时通过管理接口修改。"
           },
           "enum_options": {
             "type": [
@@ -2808,10 +3002,12 @@
             ],
             "items": {
               "$ref": "#/components/schemas/EnumOption"
-            }
+            },
+            "description": "enum 类型的可选值列表；非 enum 类型为 `None`。"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "配置 key，与 registry 注册名一致。"
           },
           "order": {
             "type": "integer",
@@ -2819,10 +3015,12 @@
             "minimum": 0
           },
           "requires_restart": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "修改后是否需要重启进程才能生效。"
           },
           "value_type": {
-            "$ref": "#/components/schemas/ValueType"
+            "$ref": "#/components/schemas/ValueType",
+            "description": "值的类型分类，决定前端表单控件与后端校验方式。"
           }
         }
       },
@@ -2834,7 +3032,8 @@
         ],
         "properties": {
           "value": {
-            "type": "string"
+            "type": "string",
+            "description": "要写入的新配置值，服务端按该 key 的 value_type 做校验"
           }
         }
       },
@@ -2850,22 +3049,27 @@
         ],
         "properties": {
           "is_sensitive": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否为敏感配置"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "被更新的配置 key"
           },
           "message": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "更新触发的附加信息（如校验提示）；无附加信息时为 `null`"
           },
           "requires_restart": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否需要重启才能生效"
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "description": "更新后的展示值；敏感配置为 `[REDACTED]` 占位符"
           }
         }
       },
@@ -2882,29 +3086,34 @@
         "properties": {
           "bot_percentage": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "点击中 Bot（爬虫/自动化 UA）占比（0-100）"
           },
           "browsers": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CategoryStatsResponse"
-            }
+            },
+            "description": "浏览器维度统计，按点击次数降序"
           },
           "devices": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CategoryStatsResponse"
-            }
+            },
+            "description": "设备类型维度统计，按点击次数降序"
           },
           "operating_systems": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CategoryStatsResponse"
-            }
+            },
+            "description": "操作系统维度统计，按点击次数降序"
           },
           "total_with_ua": {
             "type": "integer",
             "format": "int64",
+            "description": "统计区间内带 User-Agent 信息的点击总数，是各分类百分比的分母",
             "minimum": 0
           }
         }
@@ -2921,25 +3130,30 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "选项的说明文案；`None` 表示无说明。"
           },
           "description_i18n_key": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "description 对应的 i18n key；`None` 表示无翻译条目。"
           },
           "label": {
-            "type": "string"
+            "type": "string",
+            "description": "前端展示文案（未接入 i18n 时的默认语言）。"
           },
           "label_i18n_key": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "label 对应的 i18n key；`None` 表示无翻译条目。"
           },
           "value": {
-            "type": "string"
+            "type": "string",
+            "description": "写入存储与提交校验使用的实际取值。"
           }
         }
       },
@@ -3037,13 +3251,16 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "执行结果的附加信息；无附加信息时为 `null`"
           },
           "requires_restart": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "新值是否需要重启才能生效"
           },
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "action 是否执行并保存成功"
           }
         }
       },
@@ -3055,31 +3272,36 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "只导出该时间之后创建的链接，接受 `TimeParser` 支持的格式"
           },
           "created_before": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "只导出该时间之前创建的链接，接受 `TimeParser` 支持的格式"
           },
           "only_active": {
             "type": [
               "boolean",
               "null"
-            ]
+            ],
+            "description": "为 `true` 时只导出未过期的链接（含无过期时间的链接）"
           },
           "only_expired": {
             "type": [
               "boolean",
               "null"
-            ]
+            ],
+            "description": "为 `true` 时只导出已过期的链接"
           },
           "search": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "只导出短码或目标 URL 模糊匹配该关键字的链接"
           }
         }
       },
@@ -3096,50 +3318,59 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "城市名称；GeoIP 未命中城市信息时为 `null`"
           },
           "count": {
             "type": "integer",
             "format": "int64",
+            "description": "该地区的点击次数",
             "minimum": 0
           },
           "country": {
-            "type": "string"
+            "type": "string",
+            "description": "国家/地区名称，来自 GeoIP 解析；无法解析时为 `Unknown`"
           }
         }
       },
       "GetLinksQuery": {
         "type": "object",
+        "description": "链接列表查询参数（分页与过滤条件）",
         "properties": {
           "created_after": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "只返回该时间之后创建的链接，接受 `TimeParser` 支持的格式"
           },
           "created_before": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "只返回该时间之前创建的链接，接受 `TimeParser` 支持的格式"
           },
           "only_active": {
             "type": [
               "boolean",
               "null"
-            ]
+            ],
+            "description": "为 `true` 时只返回未过期的链接（含无过期时间的链接）"
           },
           "only_expired": {
             "type": [
               "boolean",
               "null"
-            ]
+            ],
+            "description": "为 `true` 时只返回已过期的链接"
           },
           "page": {
             "type": [
               "integer",
               "null"
             ],
+            "description": "页码（1-based），默认 1",
             "minimum": 0
           },
           "page_size": {
@@ -3147,13 +3378,15 @@
               "integer",
               "null"
             ],
+            "description": "每页条数，默认 20，服务端会截断到 1..=100",
             "minimum": 0
           },
           "search": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "搜索关键字，对短码和目标 URL 做模糊匹配"
           }
         }
       },
@@ -3178,22 +3411,27 @@
         ],
         "properties": {
           "bloom_filter_enabled": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否启用了 Bloom 存在性过滤器"
           },
           "cache_type": {
-            "type": "string"
+            "type": "string",
+            "description": "缓存类型标识（如 `memory`、`redis`、`composite`）"
           },
           "error": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "检查失败时的错误描述，健康时省略"
           },
           "negative_cache_enabled": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "是否启用了负缓存（不存在的短码缓存）"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "缓存健康状态，取值 `healthy` 或 `unhealthy`"
           }
         }
       },
@@ -3207,15 +3445,17 @@
           "cache": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/HealthCacheCheck",
+                "description": "缓存层检查结果；未启用缓存时省略"
               },
               {
-                "$ref": "#/components/schemas/HealthCacheCheck"
+                "type": "null"
               }
             ]
           },
           "storage": {
-            "$ref": "#/components/schemas/HealthStorageCheck"
+            "$ref": "#/components/schemas/HealthStorageCheck",
+            "description": "存储层检查结果，始终存在"
           }
         }
       },
@@ -3231,22 +3471,27 @@
         ],
         "properties": {
           "checks": {
-            "$ref": "#/components/schemas/HealthChecks"
+            "$ref": "#/components/schemas/HealthChecks",
+            "description": "各组件检查结果"
           },
           "response_time_ms": {
             "type": "integer",
             "format": "int32",
+            "description": "本次健康检查耗时，单位毫秒",
             "minimum": 0
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "整体健康状态，取值 `healthy` 或 `unhealthy`"
           },
           "timestamp": {
-            "type": "string"
+            "type": "string",
+            "description": "检查完成时刻，RFC 3339 格式"
           },
           "uptime": {
             "type": "integer",
             "format": "int32",
+            "description": "服务进程运行时长，单位秒",
             "minimum": 0
           }
         }
@@ -3260,10 +3505,12 @@
         ],
         "properties": {
           "storage_type": {
-            "type": "string"
+            "type": "string",
+            "description": "存储后端类型标识（如 `sqlite`、`mysql`、`postgres`）"
           },
           "support_click": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "该后端是否支持点击计数写入"
           }
         }
       },
@@ -3277,28 +3524,33 @@
         ],
         "properties": {
           "backend": {
-            "$ref": "#/components/schemas/HealthStorageBackend"
+            "$ref": "#/components/schemas/HealthStorageBackend",
+            "description": "存储后端描述信息"
           },
           "error": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "检查失败时的错误描述，健康时省略"
           },
           "links_count": {
             "type": [
               "integer",
               "null"
             ],
+            "description": "当前存储的短链接数量；后端无法统计时为 `null`",
             "minimum": 0
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "存储健康状态，取值 `healthy` 或 `unhealthy`"
           }
         }
       },
       "HistoryQuery": {
         "type": "object",
+        "description": "配置历史查询参数",
         "properties": {
           "limit": {
             "type": [
@@ -3306,6 +3558,7 @@
               "null"
             ],
             "format": "int64",
+            "description": "最多返回的历史记录条数，默认 20，服务端会截断到最大 100",
             "minimum": 0
           }
         }
@@ -3333,17 +3586,20 @@
         ],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "导入失败的短码（来自 CSV 的 code 列）"
           },
           "error": {
-            "type": "string"
+            "type": "string",
+            "description": "失败原因描述"
           },
           "error_code": {
             "type": [
               "integer",
               "null"
             ],
-            "format": "int32"
+            "format": "int32",
+            "description": "预留的业务错误码（`ErrorCode` 数值），当前导入流程总是省略"
           },
           "row": {
             "type": [
@@ -3377,24 +3633,29 @@
         "properties": {
           "failed_count": {
             "type": "integer",
+            "description": "导入失败的行数",
             "minimum": 0
           },
           "failed_items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ImportFailedItem"
-            }
+            },
+            "description": "失败行的明细列表"
           },
           "skipped_count": {
             "type": "integer",
+            "description": "按导入模式跳过的行数（如 skip 模式下短码已存在）",
             "minimum": 0
           },
           "success_count": {
             "type": "integer",
+            "description": "成功写入的行数",
             "minimum": 0
           },
           "total_rows": {
             "type": "integer",
+            "description": "CSV 中的数据行总数（不含表头）",
             "minimum": 0
           }
         }
@@ -3411,32 +3672,38 @@
         ],
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "短码"
           },
           "geo_distribution": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GeoStats"
-            }
+            },
+            "description": "点击次数最高的前 10 个地区分布"
           },
           "top_referrers": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReferrerStats"
-            }
+            },
+            "description": "点击次数最高的前 10 个来源"
           },
           "total_clicks": {
             "type": "integer",
             "format": "int64",
+            "description": "统计区间内的点击总数",
             "minimum": 0
           },
           "trend": {
-            "$ref": "#/components/schemas/TrendData"
+            "$ref": "#/components/schemas/TrendData",
+            "description": "区间内按天分组的点击趋势"
           }
         }
       },
       "LinkResponse": {
         "type": "object",
+        "description": "短链接详情响应",
         "required": [
           "code",
           "target",
@@ -3448,39 +3715,47 @@
         "properties": {
           "click_count": {
             "type": "integer",
+            "description": "该链接累计点击次数",
             "minimum": 0
           },
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "短码"
           },
           "created_at": {
-            "type": "string"
+            "type": "string",
+            "description": "创建时间，RFC 3339 格式"
           },
           "expires_at": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "过期时间，RFC 3339 格式；`null` 表示永不过期"
           },
           "password": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "链接密码的哈希值（不回传明文）；`null` 表示未启用密码保护"
           },
           "target": {
-            "type": "string"
+            "type": "string",
+            "description": "跳转目标 URL"
           }
         }
       },
       "LoginCredentials": {
         "type": "object",
+        "description": "管理后台登录凭据",
         "required": [
           "password"
         ],
         "properties": {
           "password": {
-            "type": "string"
+            "type": "string",
+            "description": "管理后台密码明文，只出现在登录请求体中，服务端校验后不会回传"
           }
         }
       },
@@ -3492,12 +3767,14 @@
         ],
         "properties": {
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "操作结果描述文本"
           }
         }
       },
       "PaginatedResponse_Vec_LinkResponse": {
         "type": "object",
+        "description": "分页列表的统一响应包装",
         "required": [
           "code",
           "message",
@@ -3506,12 +3783,14 @@
         "properties": {
           "code": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "业务状态码，语义同 `ApiResponse::code`"
           },
           "data": {
             "type": "array",
             "items": {
               "type": "object",
+              "description": "短链接详情响应",
               "required": [
                 "code",
                 "target",
@@ -3523,42 +3802,51 @@
               "properties": {
                 "click_count": {
                   "type": "integer",
+                  "description": "该链接累计点击次数",
                   "minimum": 0
                 },
                 "code": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "短码"
                 },
                 "created_at": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "创建时间，RFC 3339 格式"
                 },
                 "expires_at": {
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "过期时间，RFC 3339 格式；`null` 表示永不过期"
                 },
                 "password": {
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "description": "链接密码的哈希值（不回传明文）；`null` 表示未启用密码保护"
                 },
                 "target": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "跳转目标 URL"
                 }
               }
             }
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "人类可读的状态描述"
           },
           "pagination": {
-            "$ref": "#/components/schemas/PaginationInfo"
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页元信息"
           }
         }
       },
       "PaginationInfo": {
         "type": "object",
+        "description": "分页元信息",
         "required": [
           "page",
           "page_size",
@@ -3568,24 +3856,29 @@
         "properties": {
           "page": {
             "type": "integer",
+            "description": "当前页码（1-based）",
             "minimum": 0
           },
           "page_size": {
             "type": "integer",
+            "description": "本页实际使用的每页条数",
             "minimum": 0
           },
           "total": {
             "type": "integer",
+            "description": "满足过滤条件的记录总数",
             "minimum": 0
           },
           "total_pages": {
             "type": "integer",
+            "description": "按 `total` 与 `page_size` 向上取整得到的总页数",
             "minimum": 0
           }
         }
       },
       "PostNewLink": {
         "type": "object",
+        "description": "创建短链接请求体（单条创建与批量创建共用）",
         "required": [
           "target"
         ],
@@ -3594,28 +3887,33 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "自定义短码；省略或为空时由服务端按短码策略自动生成"
           },
           "expires_at": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "过期时间，接受 `TimeParser` 的灵活格式（RFC3339 或 `1d`/`2w`/`1d2h` 等相对时间）；省略表示永不过期"
           },
           "force": {
             "type": [
               "boolean",
               "null"
-            ]
+            ],
+            "description": "短码已存在时是否覆盖，默认 `false`（冲突时直接返回错误）"
           },
           "password": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "链接访问密码明文，服务端入库前统一做哈希；省略表示不启用密码保护"
           },
           "target": {
-            "type": "string"
+            "type": "string",
+            "description": "跳转目标 URL，创建和更新时都会经过格式校验"
           }
         }
       },
@@ -3631,14 +3929,17 @@
           "count": {
             "type": "integer",
             "format": "int64",
+            "description": "该来源的点击次数",
             "minimum": 0
           },
           "percentage": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "占本次返回的各来源点击数之和的百分比（0-100）"
           },
           "referrer": {
-            "type": "string"
+            "type": "string",
+            "description": "来源页 URL 或主机；直接访问（无 Referer）时为 `(direct)`"
           }
         }
       },
@@ -3653,10 +3954,12 @@
           "duration_ms": {
             "type": "integer",
             "format": "int64",
+            "description": "重载耗时，单位毫秒",
             "minimum": 0
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "description": "重载完成的提示文本"
           }
         }
       },
@@ -3680,14 +3983,17 @@
         "properties": {
           "active_links": {
             "type": "integer",
+            "description": "当前未过期的链接数量",
             "minimum": 0
           },
           "total_clicks": {
             "type": "integer",
+            "description": "所有链接的累计点击次数之和",
             "minimum": 0
           },
           "total_links": {
             "type": "integer",
+            "description": "短链接总数",
             "minimum": 0
           }
         }
@@ -3703,10 +4009,12 @@
           "clicks": {
             "type": "integer",
             "format": "int64",
+            "description": "统计区间内的点击次数",
             "minimum": 0
           },
           "code": {
-            "type": "string"
+            "type": "string",
+            "description": "短码"
           }
         }
       },

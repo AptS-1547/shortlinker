@@ -88,8 +88,8 @@ fn bench_drain(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("drain");
 
-    for num_entries in [100, 1000, 10000] {
-        group.throughput(Throughput::Elements(num_entries as u64));
+    for num_entries in [100u64, 1000, 10_000] {
+        group.throughput(Throughput::Elements(num_entries));
         group.bench_with_input(
             BenchmarkId::new("entries", num_entries),
             &num_entries,
@@ -117,9 +117,9 @@ fn bench_high_concurrency_different_keys(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("increment/high_concurrency");
 
-    for num_threads in [32, 64, 128] {
-        let ops_per_thread = 100;
-        group.throughput(Throughput::Elements((num_threads * ops_per_thread) as u64));
+    for num_threads in [32u64, 64, 128] {
+        let ops_per_thread: u64 = 100;
+        group.throughput(Throughput::Elements(num_threads * ops_per_thread));
         group.bench_with_input(
             BenchmarkId::new("threads_different_keys", num_threads),
             &num_threads,
@@ -152,8 +152,8 @@ fn bench_high_concurrency_different_keys(c: &mut Criterion) {
 fn bench_large_batch_flush(c: &mut Criterion) {
     let mut group = c.benchmark_group("flush/large_batch");
 
-    for num_entries in [10000, 50000, 100000] {
-        group.throughput(Throughput::Elements(num_entries as u64));
+    for num_entries in [10_000u64, 50_000, 100_000] {
+        group.throughput(Throughput::Elements(num_entries));
         group.sample_size(10); // 减少采样次数，因为大批量操作较慢
 
         group.bench_with_input(
@@ -188,10 +188,10 @@ fn bench_hotspot_keys(c: &mut Criterion) {
 
     // 10 个热点 key，每个被访问 1000 次
     let num_hotspot_keys = 10;
-    let accesses_per_key = 1000;
+    let accesses_per_key: u64 = 1000;
     let total_ops = num_hotspot_keys * accesses_per_key;
 
-    group.throughput(Throughput::Elements(total_ops as u64));
+    group.throughput(Throughput::Elements(total_ops));
     group.bench_function("10_keys_1000_each", |b| {
         b.to_async(&rt).iter(|| async {
             let manager = Arc::new(create_manager());

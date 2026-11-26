@@ -1,6 +1,6 @@
 //! 分析查询索引优化
 //!
-//! 为 click_logs 表添加索引以优化全局地理和来源查询
+//! 为 `click_logs` 表添加索引以优化全局地理和来源查询
 
 use sea_orm_migration::prelude::*;
 

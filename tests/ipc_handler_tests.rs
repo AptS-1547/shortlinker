@@ -161,7 +161,7 @@ async fn test_ping_command() {
             version,
             uptime_secs,
         } => {
-            assert!(!version.is_empty());
+            assert_ne!(version, "");
             // uptime should be very small in tests
             assert!(uptime_secs < 3600);
         }
@@ -225,7 +225,7 @@ async fn test_add_link_auto_generate_code() {
             link,
             generated_code,
         } => {
-            assert!(!link.code.is_empty());
+            assert_ne!(link.code, "");
             assert_eq!(link.target, "https://example.com/auto");
             assert!(generated_code);
         }
@@ -482,14 +482,17 @@ async fn test_export_links_command() {
     .await;
 
     // Export uses streaming now — use export_links_stream() directly
-    use futures_util::StreamExt;
     let stream = export_links_stream().expect("export_links_stream should return Some");
-    let batches: Vec<_> = stream.collect().await;
-    let all_links: Vec<_> = batches
-        .into_iter()
-        .filter_map(|r| r.ok())
-        .flatten()
-        .collect();
+    let all_links: Vec<_> = {
+        use futures_util::StreamExt as _;
+        stream
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter_map(std::result::Result::ok)
+            .flatten()
+            .collect()
+    };
     assert!(!all_links.is_empty());
 }
 
@@ -523,8 +526,8 @@ async fn test_config_list_command() {
             assert!(!configs.is_empty(), "Should return at least one config");
             // Verify each config has required fields
             for cfg in &configs {
-                assert!(!cfg.key.is_empty());
-                assert!(!cfg.category.is_empty());
+                assert_ne!(cfg.key, "");
+                assert_ne!(cfg.category, "");
             }
         }
         other => panic!("Expected ConfigListResult, got {:?}", other),

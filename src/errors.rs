@@ -11,9 +11,17 @@ macro_rules! define_shortlinker_errors {
     ($(
         $variant:ident($code:literal, $type_name:literal)
     ),* $(,)?) => {
+        /// Shortlinker 统一错误类型。
+        ///
+        /// 每个变体绑定一个稳定的 `E0xx` 错误码（[`ShortlinkerError::code`]）和
+        /// 一个面向用户的错误类型名（[`ShortlinkerError::error_type`]），
+        /// 变体内嵌的字符串是描述具体失败原因的消息文本。
         #[derive(Debug, Clone)]
         pub enum ShortlinkerError {
-            $($variant(String),)*
+            $(
+                #[doc = concat!("错误码 `", $code, "`（", $type_name, "）。")]
+                $variant(String),
+            )*
         }
 
         impl ShortlinkerError {
@@ -164,148 +172,183 @@ impl std::error::Error for ShortlinkerError {}
 // 便捷的构造函数
 impl ShortlinkerError {
     // 基础设施错误
+    /// 创建缓存连接错误（E001）：缓存服务连接建立或保活失败。
     pub fn cache_connection<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CacheConnection(msg.into())
     }
 
+    /// 创建缓存插件缺失错误（E002）：请求的缓存实现未注册或不存在。
     pub fn cache_plugin_not_found<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CachePluginNotFound(msg.into())
     }
 
+    /// 创建数据库配置错误（E003）：数据库 URL 或连接参数非法、缺失。
     pub fn database_config<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::DatabaseConfig(msg.into())
     }
 
+    /// 创建数据库连接错误（E004）：数据库连接建立失败。
     pub fn database_connection<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::DatabaseConnection(msg.into())
     }
 
+    /// 创建数据库操作错误（E005）：查询、写入等语句执行失败。
     pub fn database_operation<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::DatabaseOperation(msg.into())
     }
 
+    /// 创建文件操作错误（E006）：文件读写等 IO 操作失败。
     pub fn file_operation<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::FileOperation(msg.into())
     }
 
+    /// 创建校验错误（E007）：输入参数未通过合法性校验。
     pub fn validation<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::Validation(msg.into())
     }
 
+    /// 创建资源不存在错误（E008）：请求的短链或其他资源查无此值。
     pub fn not_found<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::NotFound(msg.into())
     }
 
+    /// 创建序列化错误（E009）：序列化或反序列化失败。
     pub fn serialization<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::Serialization(msg.into())
     }
 
+    /// 创建通知服务错误（E010）：通知服务器发送失败。
     pub fn notify_server<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::NotifyServer(msg.into())
     }
 
     // 认证错误
+    /// 创建密码错误（E011）：提供的密码与存储的哈希不匹配。
     pub fn auth_password_invalid<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AuthPasswordInvalid(msg.into())
     }
 
+    /// 创建令牌过期错误（E012）：访问令牌已超过有效期。
     pub fn auth_token_expired<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AuthTokenExpired(msg.into())
     }
 
+    /// 创建令牌无效错误（E013）：令牌签名、格式或声明非法。
     pub fn auth_token_invalid<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AuthTokenInvalid(msg.into())
     }
 
+    /// 创建限流错误（E014）：认证尝试触发登录/刷新限流。
     pub fn auth_rate_limit_exceeded<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AuthRateLimitExceeded(msg.into())
     }
 
     // 链接业务错误
+    /// 创建非法 URL 错误（E020）：目标 URL 未通过格式校验。
     pub fn link_invalid_url<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkInvalidUrl(msg.into())
     }
 
+    /// 创建短码冲突错误（E021）：目标短码已被其他链接占用。
     pub fn link_already_exists<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkAlreadyExists(msg.into())
     }
 
+    /// 创建非法过期时间错误（E022）：过期时间格式非法或早于当前时间。
     pub fn link_invalid_expire_time<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkInvalidExpireTime(msg.into())
     }
 
+    /// 创建密码哈希错误（E023）：密码哈希计算失败。
     pub fn link_password_hash_error<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkPasswordHashError(msg.into())
     }
 
+    /// 创建非法短码错误（E024）：短码为空或含非法字符。
     pub fn link_invalid_code<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkInvalidCode(msg.into())
     }
 
+    /// 创建保留短码错误（E025）：短码命中系统保留字列表。
     pub fn link_reserved_code<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::LinkReservedCode(msg.into())
     }
 
     // 导入导出错误
+    /// 创建 CSV 解析错误（E030）：CSV 内容无法按预期格式解析。
     pub fn csv_parse_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CsvParseFailed(msg.into())
     }
 
+    /// 创建 CSV 生成错误（E031）：导出 CSV 内容时生成失败。
     pub fn csv_generation_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CsvGenerationFailed(msg.into())
     }
 
+    /// 创建 CSV 文件缺失错误（E032）：上传或指定的 CSV 文件不存在。
     pub fn csv_file_missing<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::CsvFileMissing(msg.into())
     }
 
+    /// 创建导入失败错误（E033）：批量导入出现无法归类的整体失败。
     pub fn import_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ImportFailed(msg.into())
     }
 
+    /// 创建导出失败错误（E034）：导出流程中途失败。
     pub fn export_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ExportFailed(msg.into())
     }
 
+    /// 创建非法 multipart 错误（E035）：multipart 上传数据非法或字段缺失。
     pub fn invalid_multipart_data<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::InvalidMultipartData(msg.into())
     }
 
+    /// 创建文件读取错误（E036）：上传文件内容读取失败。
     pub fn file_read_error<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::FileReadError(msg.into())
     }
 
     // 配置错误
+    /// 创建配置不存在错误（E040）：配置 key 未在注册表中声明。
     pub fn config_not_found<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ConfigNotFound(msg.into())
     }
 
+    /// 创建配置更新失败错误（E041）：配置写入、校验或持久化失败。
     pub fn config_update_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ConfigUpdateFailed(msg.into())
     }
 
+    /// 创建配置重载失败错误（E042）：配置热重载执行失败。
     pub fn config_reload_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ConfigReloadFailed(msg.into())
     }
 
     // 通用 HTTP 错误
+    /// 创建服务不可用错误（E050）：依赖组件不可用导致请求暂时无法处理。
     pub fn service_unavailable<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::ServiceUnavailable(msg.into())
     }
 
+    /// 创建内部错误（E051）：未归类的服务器内部失败。
     pub fn internal_error<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::InternalError(msg.into())
     }
 
     // Analytics 错误
+    /// 创建统计查询失败错误（E060）：分析数据查询执行失败。
     pub fn analytics_query_failed<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AnalyticsQueryFailed(msg.into())
     }
 
+    /// 创建统计对象缺失错误（E061）：统计查询的目标短链不存在。
     pub fn analytics_link_not_found<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AnalyticsLinkNotFound(msg.into())
     }
 
+    /// 创建非法日期范围错误（E062）：统计查询的起止日期非法或区间无效。
     pub fn analytics_invalid_date_range<T: Into<String>>(msg: T) -> Self {
         ShortlinkerError::AnalyticsInvalidDateRange(msg.into())
     }
@@ -353,11 +396,11 @@ impl ShortlinkerError {
             "E042" => ShortlinkerError::ConfigReloadFailed(message),
             // 通用 HTTP
             "E050" => ShortlinkerError::ServiceUnavailable(message),
-            "E051" => ShortlinkerError::InternalError(message),
             // Analytics
             "E060" => ShortlinkerError::AnalyticsQueryFailed(message),
             "E061" => ShortlinkerError::AnalyticsLinkNotFound(message),
             "E062" => ShortlinkerError::AnalyticsInvalidDateRange(message),
+            // E051（InternalError）与未知错误码共用兜底分支
             _ => ShortlinkerError::InternalError(message),
         }
     }
@@ -388,6 +431,7 @@ impl From<serde_json::Error> for ShortlinkerError {
     }
 }
 
+/// 全局便捷 Result 别名，错误类型固定为 [`ShortlinkerError`]。
 pub type Result<T> = std::result::Result<T, ShortlinkerError>;
 
 /// ShortlinkerError → ErrorCode 自动转换

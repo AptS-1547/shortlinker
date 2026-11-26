@@ -39,6 +39,7 @@ impl Default for SystemClient {
 }
 
 impl SystemClient {
+    /// Create a new system operations client.
     pub fn new() -> Self {
         Self
     }

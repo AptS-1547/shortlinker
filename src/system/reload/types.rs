@@ -63,7 +63,10 @@ impl ReloadResult {
     /// Create a successful reload result
     pub fn success(target: ReloadTarget, started_at: DateTime<Utc>) -> Self {
         let finished_at = Utc::now();
-        let duration_ms = (finished_at - started_at).num_milliseconds().max(0) as u64;
+        let duration_ms = (finished_at - started_at)
+            .num_milliseconds()
+            .max(0)
+            .cast_unsigned();
         Self {
             target,
             success: true,
@@ -77,7 +80,10 @@ impl ReloadResult {
     /// Create a failed reload result
     pub fn failure(target: ReloadTarget, started_at: DateTime<Utc>, error: String) -> Self {
         let finished_at = Utc::now();
-        let duration_ms = (finished_at - started_at).num_milliseconds().max(0) as u64;
+        let duration_ms = (finished_at - started_at)
+            .num_milliseconds()
+            .max(0)
+            .cast_unsigned();
         Self {
             target,
             success: false,

@@ -122,7 +122,7 @@ async fn create_test_service() -> (LinkService, TempDir) {
 /// Helper to create a basic CreateLinkRequest
 fn create_request(code: Option<&str>, target: &str) -> CreateLinkRequest {
     CreateLinkRequest {
-        code: code.map(|s| s.to_string()),
+        code: code.map(ToString::to_string),
         target: target.to_string(),
         force: false,
         expires_at: None,
@@ -161,7 +161,7 @@ mod create_link_tests {
 
         assert!(result.is_ok());
         let result = result.unwrap();
-        assert!(!result.link.code.is_empty());
+        assert_ne!(result.link.code, "");
         assert!(result.generated_code);
     }
 
@@ -431,7 +431,7 @@ mod update_link_tests {
         let update_req = UpdateLinkRequest {
             target: "https://example.com".to_string(),
             expires_at: None,
-            password: Some("".to_string()), // Empty string = remove
+            password: Some(String::new()), // Empty string = remove
         };
         let result = service.update_link("remove_pwd", update_req).await;
 
@@ -617,7 +617,7 @@ mod export_tests {
             service.create_link(req).await.unwrap();
         }
 
-        let mut stream = service.export_links_stream(LinkFilter::default(), 2);
+        let mut stream = service.export_links_stream(&LinkFilter::default(), 2);
         let mut exported = Vec::new();
         while let Some(batch) = stream.next().await {
             exported.extend(batch.unwrap());
@@ -799,7 +799,7 @@ mod edge_cases {
         let (service, _temp) = create_test_service().await;
 
         let req = CreateLinkRequest {
-            code: Some("".to_string()), // Empty string
+            code: Some(String::new()), // Empty string
             target: "https://example.com".to_string(),
             force: false,
             expires_at: None,
@@ -808,7 +808,7 @@ mod edge_cases {
         let result = service.create_link(req).await.unwrap();
 
         assert!(result.generated_code);
-        assert!(!result.link.code.is_empty());
+        assert_ne!(result.link.code, "");
     }
 
     #[tokio::test]
@@ -955,7 +955,7 @@ mod batch_operations_tests {
         assert_eq!(result.success.len(), 2);
         // All should have generated codes
         for item in &result.success {
-            assert!(!item.code.is_empty());
+            assert_ne!(item.code, "");
         }
     }
 
@@ -1175,7 +1175,7 @@ mod batch_operations_tests {
         let result = service.batch_delete_links(codes).await.unwrap();
 
         assert_eq!(result.deleted.len(), 2);
-        assert!(result.not_found.is_empty());
+        assert_eq!(result.not_found, [] as [String; 0]);
 
         // Verify deleted
         assert!(service.get_link("del1").await.unwrap().is_none());
@@ -1191,7 +1191,7 @@ mod batch_operations_tests {
         let codes = vec!["never_existed1".to_string(), "never_existed2".to_string()];
         let result = service.batch_delete_links(codes).await.unwrap();
 
-        assert!(result.deleted.is_empty());
+        assert!(result.deleted.is_empty(), "deleted should be empty");
         assert_eq!(result.not_found.len(), 2);
     }
 
@@ -1215,7 +1215,7 @@ mod batch_operations_tests {
         let (service, _temp) = create_test_service().await;
 
         let result = service.batch_delete_links(vec![]).await.unwrap();
-        assert!(result.deleted.is_empty());
-        assert!(result.not_found.is_empty());
+        assert_eq!(result.deleted, [] as [String; 0]);
+        assert_eq!(result.not_found, [] as [String; 0]);
     }
 }

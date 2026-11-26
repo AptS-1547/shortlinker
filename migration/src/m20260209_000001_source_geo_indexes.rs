@@ -1,8 +1,8 @@
 //! Source 和 Geo 字段索引优化
 //!
-//! 为 click_logs 表添加以下索引：
-//! - idx_click_logs_source_time: source + clicked_at（用于来源统计查询）
-//! - idx_click_logs_geo: country + city + clicked_at（用于地理分布查询）
+//! 为 `click_logs` 表添加以下索引：
+//! - `idx_click_logs_source_time`: `source` + `clicked_at`（用于来源统计查询）
+//! - `idx_click_logs_geo`: `country` + `city` + `clicked_at`（用于地理分布查询）
 
 use sea_orm_migration::prelude::*;
 

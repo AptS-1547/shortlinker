@@ -16,11 +16,17 @@ use crate::utils::password::process_imported_password;
 /// `CsvLinkRow`、`ImportLinkData` 等均可直接转为此类型。
 #[derive(Debug, Clone)]
 pub struct ImportLinkItemRaw {
+    /// 短链接代码
     pub code: String,
+    /// 目标 URL
     pub target: String,
+    /// 创建时间（RFC3339 字符串）
     pub created_at: String,
+    /// 过期时间（RFC3339 字符串，可为空）
     pub expires_at: Option<String>,
+    /// 密码（明文或已哈希，由验证阶段统一处理）
     pub password: Option<String>,
+    /// 初始点击计数
     pub click_count: usize,
     /// CSV 行号（1-based），仅 Admin API 设置，IPC/CSV 路径为 None
     pub row_num: Option<usize>,
@@ -43,7 +49,9 @@ impl From<ImportLinkData> for ImportLinkItemRaw {
 /// 单行验证错误
 #[derive(Debug, Clone)]
 pub struct ImportRowError {
+    /// 出错的短链接代码
     pub code: String,
+    /// 具体验证错误
     pub error: ShortlinkerError,
     /// 来源行号，直接从 `ImportLinkItemRaw.row_num` 透传
     pub row_num: Option<usize>,
@@ -79,15 +87,16 @@ pub fn validate_import_row(raw: ImportLinkItemRaw) -> Result<ImportLinkItemRich,
     }
 
     // 3. 解析 created_at
-    let created_at = DateTime::parse_from_rfc3339(&raw.created_at)
-        .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|_| {
+    let created_at = DateTime::parse_from_rfc3339(&raw.created_at).map_or_else(
+        |_| {
             warn!(
                 "Import: invalid created_at '{}' for code '{}', using now",
                 raw.created_at, raw.code
             );
             Utc::now()
-        });
+        },
+        |dt| dt.with_timezone(&Utc),
+    );
 
     // 4. 解析 expires_at
     let expires_at = raw.expires_at.as_ref().and_then(|s| {

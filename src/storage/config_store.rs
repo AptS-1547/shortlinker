@@ -20,11 +20,18 @@ pub(crate) static SYSTEM_CONFIG_BINDING: SystemConfigDbBinding =
 /// 配置项的完整信息
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigItem {
+    /// 配置 key，与 registry 注册名一致（点分命名，如 `api.jwt_secret`）。
     pub key: String,
+    /// 当前值的字符串形式；敏感配置经 `to_string` 后仍是原始值，
+    /// 脱敏在上层 service 完成，Arc 用于跨任务共享避免拷贝。
     pub value: Arc<String>,
+    /// 值的类型分类（string/number/bool/enum 等），决定解析与校验方式。
     pub value_type: ValueType,
+    /// 修改后是否需要重启进程才能生效。
     pub requires_restart: bool,
+    /// 是否为敏感配置；展示与导出时需要脱敏。
     pub is_sensitive: bool,
+    /// 最近一次更新的时间（UTC）。
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -58,21 +65,32 @@ impl aster_forge_config::RuntimeConfigRecord for ConfigItem {
 /// 配置更新结果
 #[derive(Debug, Clone)]
 pub struct ConfigUpdateResult {
+    /// 被更新的配置 key。
     pub key: String,
+    /// 更新后的值（原始形式，未脱敏）。
     pub value: String,
+    /// 该配置是否需要重启才能生效。
     pub requires_restart: bool,
+    /// 该配置是否为敏感配置。
     pub is_sensitive: bool,
+    /// 更新前的值；`None` 表示该 key 之前不存在。
     pub old_value: Option<String>,
 }
 
 /// 配置变更历史记录
 #[derive(Debug, Clone)]
 pub struct ConfigHistoryEntry {
+    /// 历史记录主键，按时间递增。
     pub id: i32,
+    /// 发生变更的配置 key。
     pub config_key: String,
+    /// 变更前的值；`None` 表示首次写入。
     pub old_value: Option<String>,
+    /// 变更后的值。
     pub new_value: String,
+    /// 变更时间（UTC）。
     pub changed_at: chrono::DateTime<chrono::Utc>,
+    /// 操作者标识；`None` 表示未记录。
     pub changed_by: Option<String>,
 }
 
@@ -82,6 +100,7 @@ pub struct ConfigStore {
 }
 
 impl ConfigStore {
+    /// 基于已有数据库连接创建配置存储。
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -121,7 +140,7 @@ impl ConfigStore {
                     }
 
                     let updated = SYSTEM_CONFIG_BINDING
-                        .upsert(
+                        .upsert_prevalidated(
                             txn,
                             SystemConfigUpsert {
                                 key: &key,
@@ -139,7 +158,7 @@ impl ConfigStore {
                     };
 
                     config_history::ActiveModel {
-                        id: Default::default(),
+                        id: sea_orm::ActiveValue::default(),
                         config_key: Set(key),
                         old_value: Set(history_old_value),
                         new_value: Set(history_new_value),

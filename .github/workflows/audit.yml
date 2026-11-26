@@ -6,22 +6,22 @@ on:
     paths:
       - '**/Cargo.toml'
       - 'Cargo.lock'
+      - 'deny.toml'
       - 'admin-panel/package.json'
       - 'admin-panel/bun.lock'
       - 'docs/package.json'
       - 'docs/bun.lock'
-      - '.cargo/audit.toml'
       - '.github/workflows/audit.yml'
   pull_request:
     branches: [master, develop]
     paths:
       - '**/Cargo.toml'
       - 'Cargo.lock'
+      - 'deny.toml'
       - 'admin-panel/package.json'
       - 'admin-panel/bun.lock'
       - 'docs/package.json'
       - 'docs/bun.lock'
-      - '.cargo/audit.toml'
       - '.github/workflows/audit.yml'
   schedule:
     # Every Monday at 09:17 UTC (17:17 Asia/Shanghai).
@@ -36,19 +36,21 @@ permissions:
   contents: read
 
 jobs:
-  rust-audit:
-    name: Rust dependency audit
+  rust-deny:
+    name: Rust dependency check (cargo-deny)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.22.0
 
-      - name: Run cargo audit
-        run: cargo audit -D warnings
+      - name: Run cargo deny
+        run: cargo deny check
 
   admin-panel-audit:
     name: Admin panel dependency audit

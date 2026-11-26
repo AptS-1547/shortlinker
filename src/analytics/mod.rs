@@ -1,8 +1,14 @@
+/// 全局点击管理器的注册与访问入口
 pub mod global;
+/// 点击计数的小时级 rollup 异步写入器
 pub mod hourly_writer;
+/// 点击事件的缓冲与批量落盘管理器
 pub mod manager;
+/// 数据保留策略与过期数据清理任务
 pub mod retention;
+/// 点击数据的小时/每日聚合统计
 pub mod rollup;
+/// 点击计数与详细日志的 Sink 抽象
 pub mod sink;
 
 pub use hourly_writer::HourlyRollupWriter;
@@ -27,7 +33,7 @@ pub(crate) fn truncate_to_hour(ts: DateTime<Utc>) -> DateTime<Utc> {
 }
 
 /// 从 JSON 字符串解析计数 HashMap
-pub(crate) fn parse_json_counts(json_str: &Option<String>) -> HashMap<String, usize> {
+pub(crate) fn parse_json_counts(json_str: Option<&String>) -> HashMap<String, usize> {
     match json_str {
         Some(s) if !s.is_empty() => serde_json::from_str(s).unwrap_or_else(|e| {
             warn!(
@@ -98,6 +104,7 @@ impl ClickDetail {
     }
 
     /// 设置地理位置信息
+    #[must_use]
     pub fn with_geo(mut self, country: Option<String>, city: Option<String>) -> Self {
         self.country = country;
         self.city = city;

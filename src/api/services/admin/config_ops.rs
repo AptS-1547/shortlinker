@@ -13,12 +13,17 @@ use super::types::{ReloadResponse, ValueType};
 #[derive(Debug, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigItemResponse {
+    /// 配置 key，与 `config/definitions.rs` 注册的标识一致
     pub key: String,
+    /// 展示用的当前值；敏感配置返回 `[REDACTED]` 占位符而非真实值
     pub value: String,
     /// 值类型
     pub value_type: ValueType,
+    /// 修改后是否需要重启进程才能生效；否则热重载即时生效
     pub requires_restart: bool,
+    /// 是否为敏感配置；该值为 `true` 时 `value` 只能是占位符，不能用于回填
     pub is_sensitive: bool,
+    /// 最近一次更新时间，RFC 3339 格式
     pub updated_at: String,
 }
 
@@ -26,6 +31,7 @@ pub struct ConfigItemResponse {
 #[derive(Debug, Deserialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigUpdateRequest {
+    /// 要写入的新配置值，服务端按该 key 的 value_type 做校验
     pub value: String,
 }
 
@@ -33,10 +39,15 @@ pub struct ConfigUpdateRequest {
 #[derive(Debug, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigUpdateResponse {
+    /// 被更新的配置 key
     pub key: String,
+    /// 更新后的展示值；敏感配置为 `[REDACTED]` 占位符
     pub value: String,
+    /// 是否需要重启才能生效
     pub requires_restart: bool,
+    /// 是否为敏感配置
     pub is_sensitive: bool,
+    /// 更新触发的附加信息（如校验提示）；无附加信息时为 `null`
     #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub message: Option<String>,
 }
@@ -45,12 +56,18 @@ pub struct ConfigUpdateResponse {
 #[derive(Debug, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigHistoryResponse {
+    /// 历史记录主键，按时间递增
     pub id: i32,
+    /// 发生变更的配置 key
     pub config_key: String,
+    /// 变更前的值（敏感配置为 `[REDACTED]`）；首次赋值时为 `null`
     #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub old_value: Option<String>,
+    /// 变更后的值（敏感配置为 `[REDACTED]`）
     pub new_value: String,
+    /// 变更时间，RFC 3339 格式
     pub changed_at: String,
+    /// 变更操作者标识；无法归因（如导入路径）时为 `null`
     #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub changed_by: Option<String>,
 }
@@ -61,6 +78,7 @@ pub struct ConfigHistoryResponse {
 #[derive(Debug, Deserialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigActionRequest {
+    /// 要执行的 action 类型，只有注册了对应 action 的配置 key 才接受
     pub action: crate::config::types::ActionType,
 }
 
@@ -68,6 +86,7 @@ pub struct ConfigActionRequest {
 #[derive(Debug, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigActionResponse {
+    /// action 产出的值（如生成的 token）；敏感值由此接口直接返回，仅供调用方立即使用
     pub value: String,
 }
 
@@ -75,18 +94,23 @@ pub struct ConfigActionResponse {
 #[derive(Debug, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ExecuteAndSaveResponse {
+    /// action 是否执行并保存成功
     pub success: bool,
+    /// 新值是否需要重启才能生效
     pub requires_restart: bool,
+    /// 执行结果的附加信息；无附加信息时为 `null`
     #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub message: Option<String>,
 }
 
+/// 配置历史查询参数
 #[derive(Debug, Deserialize)]
 #[cfg_attr(
     all(debug_assertions, feature = "openapi"),
     derive(utoipa::IntoParams, utoipa::ToSchema)
 )]
 pub struct HistoryQuery {
+    /// 最多返回的历史记录条数，默认 20，服务端会截断到最大 100
     pub limit: Option<u64>,
 }
 

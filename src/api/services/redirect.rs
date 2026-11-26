@@ -32,9 +32,11 @@ use crate::services::{GeoIpProvider, LinkCache, LinkCacheLookup};
 use crate::storage::{SeaOrmStorage, ShortLink};
 use crate::utils::is_valid_short_code;
 
+/// 短链接重定向服务（Bloom -> 负缓存 -> 对象缓存 -> 存储的热路径）
 pub struct RedirectService {}
 
 impl RedirectService {
+    /// 处理短链接访问请求，返回 307 重定向并异步记录点击统计
     pub async fn handle_redirect(
         req: HttpRequest,
         path: web::Path<String>,
@@ -71,7 +73,7 @@ impl RedirectService {
         match cache.get(&capture_path).await {
             LinkCacheLookup::Found(link) => {
                 Self::update_click(&capture_path, &req, geoip);
-                Self::finish_redirect(&req, link, &metrics)
+                Self::finish_redirect(&req, &link, &metrics)
             }
             LinkCacheLookup::Miss => {
                 trace!("Cache miss for path: {}", &capture_path);
@@ -85,7 +87,7 @@ impl RedirectService {
                         Some(ttl) => {
                             Self::update_click(&capture_path, &req, geoip);
                             cache.insert(&capture_path, link.clone(), Some(ttl)).await;
-                            Self::finish_redirect(&req, link, &metrics)
+                            Self::finish_redirect(&req, &link, &metrics)
                         }
                     },
                     Ok(None) => {
@@ -194,7 +196,7 @@ impl RedirectService {
                 });
 
                 peer.map(|peer| {
-                    aster_forge_actix_middleware::client_ip::real_ip_from_headers(
+                    aster_forge_middleware::actix::client_ip::real_ip_from_headers(
                         req.headers(),
                         peer,
                         &trusted,
@@ -210,7 +212,7 @@ impl RedirectService {
 
     fn finish_redirect(
         req: &HttpRequest,
-        link: ShortLink,
+        link: &ShortLink,
         metrics: &Arc<dyn MetricsRecorder>,
     ) -> HttpResponse {
         metrics.inc_redirect("307");
@@ -267,8 +269,7 @@ impl RedirectService {
             .split('&')
             .filter(|part| {
                 part.find('=')
-                    .map(|pos| UTM_KEYS.contains(&&part[..pos]))
-                    .unwrap_or(false)
+                    .is_some_and(|pos| UTM_KEYS.contains(&&part[..pos]))
             })
             .collect()
     }

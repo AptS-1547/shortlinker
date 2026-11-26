@@ -49,10 +49,14 @@ pub struct AnalyticsQuery {
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum GroupBy {
+    /// 按小时分组，标签形如 `2026-01-01 08:00`
     Hour,
+    /// 按天分组（默认值），标签形如 `2026-01-01`
     #[default]
     Day,
+    /// 按周分组，标签形如 `2026-W02`
     Week,
+    /// 按月分组，标签形如 `2026-01`
     Month,
 }
 
@@ -92,7 +96,9 @@ impl From<ServiceTrendData> for TrendData {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct TopLink {
+    /// 短码
     pub code: String,
+    /// 统计区间内的点击次数
     pub clicks: u64,
 }
 
@@ -109,8 +115,11 @@ impl From<ServiceTopLink> for TopLink {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ReferrerStats {
+    /// 来源页 URL 或主机；直接访问（无 Referer）时为 `(direct)`
     pub referrer: String,
+    /// 该来源的点击次数
     pub count: u64,
+    /// 占本次返回的各来源点击数之和的百分比（0-100）
     pub percentage: f64,
 }
 
@@ -128,9 +137,12 @@ impl From<ServiceReferrerStats> for ReferrerStats {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct GeoStats {
+    /// 国家/地区名称，来自 GeoIP 解析；无法解析时为 `Unknown`
     pub country: String,
+    /// 城市名称；GeoIP 未命中城市信息时为 `null`
     #[cfg_attr(all(debug_assertions, feature = "openapi"), schema(required))]
     pub city: Option<String>,
+    /// 该地区的点击次数
     pub count: u64,
 }
 
@@ -148,10 +160,15 @@ impl From<ServiceGeoStats> for GeoStats {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct LinkAnalytics {
+    /// 短码
     pub code: String,
+    /// 统计区间内的点击总数
     pub total_clicks: u64,
+    /// 区间内按天分组的点击趋势
     pub trend: TrendData,
+    /// 点击次数最高的前 10 个来源
     pub top_referrers: Vec<ReferrerStats>,
+    /// 点击次数最高的前 10 个地区分布
     pub geo_distribution: Vec<GeoStats>,
 }
 
@@ -171,10 +188,15 @@ impl From<ServiceLinkAnalytics> for LinkAnalytics {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct DeviceAnalyticsResponse {
+    /// 浏览器维度统计，按点击次数降序
     pub browsers: Vec<CategoryStatsResponse>,
+    /// 操作系统维度统计，按点击次数降序
     pub operating_systems: Vec<CategoryStatsResponse>,
+    /// 设备类型维度统计，按点击次数降序
     pub devices: Vec<CategoryStatsResponse>,
+    /// 点击中 Bot（爬虫/自动化 UA）占比（0-100）
     pub bot_percentage: f64,
+    /// 统计区间内带 User-Agent 信息的点击总数，是各分类百分比的分母
     pub total_with_ua: u64,
 }
 
@@ -182,8 +204,11 @@ pub struct DeviceAnalyticsResponse {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct CategoryStatsResponse {
+    /// 分类名称（如浏览器名 `Chrome`、系统名 `Windows`、设备类型 `mobile`）；UA 缺失时为 `Unknown`
     pub name: String,
+    /// 该分类的点击次数
     pub count: u64,
+    /// 占同维度各分类点击数之和的百分比（0-100）
     pub percentage: f64,
 }
 

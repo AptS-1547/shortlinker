@@ -26,52 +26,69 @@ use migration::entities::{
 /// 趋势查询结果行
 #[derive(Debug, FromQueryResult, Clone)]
 pub struct TrendRow {
+    /// 桶标签，格式随粒度变化（如 `%Y-%m-%d` 或 `%Y-%m-%d %H:00`）。
     pub label: String,
+    /// 该桶内的点击次数。
     pub count: i64,
 }
 
 /// 来源查询结果行
 #[derive(Debug, FromQueryResult, Clone)]
 pub struct ReferrerRow {
+    /// 流量来源标识（utm_source 参数、ref:{domain} 或 direct）；NULL 表示未记录。
     pub referrer: Option<String>,
+    /// 该来源的点击次数。
     pub count: i64,
 }
 
 /// 地理位置查询结果行
 #[derive(Debug, FromQueryResult, Clone)]
 pub struct GeoRow {
+    /// ISO 3166-1 alpha-2 国家代码；NULL 表示 GeoIP 未解析。
     pub country: Option<String>,
+    /// 城市名称；NULL 表示 GeoIP 未解析或该粒度不存储城市。
     pub city: Option<String>,
+    /// 该 (国家, 城市) 组合的点击次数。
     pub count: i64,
 }
 
 /// 热门链接查询结果行
 #[derive(Debug, FromQueryResult, Clone)]
 pub struct TopLinkRow {
+    /// 短码。
     pub short_code: String,
+    /// 时间范围内的点击次数。
     pub count: i64,
 }
 
 /// UA 统计查询结果行
 #[derive(Debug, FromQueryResult, Clone)]
 pub struct UaStatsRow {
+    /// 分组维度的取值（浏览器名/系统名/设备类别）；NULL 表示该维度未解析。
     pub field_value: Option<String>,
+    /// 该取值的点击次数。
     pub count: i64,
 }
 
 /// Bot 统计原始查询结果
 #[derive(Debug, FromQueryResult)]
 struct BotStatsRaw {
+    /// `user_agents.is_bot = true` 的点击数。
     pub bot_count: i64,
+    /// 时间范围内带 UA 关联的点击总数。
     pub total: i64,
 }
 
 /// 分组方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupBy {
+    /// 按小时分桶。
     Hour,
+    /// 按天分桶。
     Day,
+    /// 按 ISO 周分桶。
     Week,
+    /// 按自然月分桶。
     Month,
 }
 
@@ -627,6 +644,10 @@ impl super::SeaOrmStorage {
     ) -> anyhow::Result<Vec<ReferrerRow>> {
         // 时间范围硬性限制
         const MAX_QUERY_DAYS: i64 = 90;
+        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
+        const MAX_HOURLY_RECORDS: u64 = 2160;
+        // 聚合 key 数量上限，防止 OOM
+        const MAX_AGGREGATED_KEYS: usize = 1000;
         let duration = end - start;
         if duration.num_days() > MAX_QUERY_DAYS {
             return Err(anyhow::anyhow!(
@@ -642,9 +663,6 @@ impl super::SeaOrmStorage {
             );
         }
 
-        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
-        const MAX_HOURLY_RECORDS: u64 = 2160;
-
         let records = click_stats_hourly::Entity::find()
             .filter(click_stats_hourly::Column::ShortCode.eq(code))
             .filter(click_stats_hourly::Column::HourBucket.gte(start))
@@ -653,7 +671,7 @@ impl super::SeaOrmStorage {
             .all(&self.db)
             .await?;
 
-        if records.len() >= MAX_HOURLY_RECORDS as usize {
+        if u64::try_from(records.len()).unwrap_or(u64::MAX) >= MAX_HOURLY_RECORDS {
             warn!(
                 "get_link_referrers_from_rollup: Query hit limit ({} records), results may be incomplete",
                 MAX_HOURLY_RECORDS
@@ -661,7 +679,6 @@ impl super::SeaOrmStorage {
         }
 
         // 聚合所有记录的 source 统计（限制 key 数量防止 OOM）
-        const MAX_AGGREGATED_KEYS: usize = 1000;
         let mut aggregated: HashMap<String, i64> = HashMap::new();
         for record in records {
             if let Some(ref json_str) = record.source_counts
@@ -710,6 +727,10 @@ impl super::SeaOrmStorage {
     ) -> anyhow::Result<Vec<GeoRow>> {
         // 时间范围硬性限制
         const MAX_QUERY_DAYS: i64 = 90;
+        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
+        const MAX_HOURLY_RECORDS: u64 = 2160;
+        // 聚合 key 数量上限，防止 OOM
+        const MAX_AGGREGATED_KEYS: usize = 1000;
         let duration = end - start;
         if duration.num_days() > MAX_QUERY_DAYS {
             return Err(anyhow::anyhow!(
@@ -725,9 +746,6 @@ impl super::SeaOrmStorage {
             );
         }
 
-        // 限制查询记录数，防止内存溢出（90天 * 24小时 = 2160）
-        const MAX_HOURLY_RECORDS: u64 = 2160;
-
         let records = click_stats_hourly::Entity::find()
             .filter(click_stats_hourly::Column::ShortCode.eq(code))
             .filter(click_stats_hourly::Column::HourBucket.gte(start))
@@ -736,7 +754,7 @@ impl super::SeaOrmStorage {
             .all(&self.db)
             .await?;
 
-        if records.len() >= MAX_HOURLY_RECORDS as usize {
+        if u64::try_from(records.len()).unwrap_or(u64::MAX) >= MAX_HOURLY_RECORDS {
             warn!(
                 "get_link_geo_from_rollup: Query hit limit ({} records), results may be incomplete",
                 MAX_HOURLY_RECORDS
@@ -744,7 +762,6 @@ impl super::SeaOrmStorage {
         }
 
         // 聚合所有记录的 country 统计（限制 key 数量防止 OOM）
-        const MAX_AGGREGATED_KEYS: usize = 1000;
         let mut aggregated: HashMap<String, i64> = HashMap::new();
         for record in records {
             if let Some(ref json_str) = record.country_counts
@@ -840,9 +857,9 @@ impl super::SeaOrmStorage {
         end: DateTime<Utc>,
         page_size: u64,
     ) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<click_log::Model>>> + Send + 'static>> {
-        let db = self.db.clone();
-
         use futures_util::stream;
+
+        let db = self.db.clone();
 
         Box::pin(stream::unfold(
             (None::<i64>, db, start, end, page_size, false),

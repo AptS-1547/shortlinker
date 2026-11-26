@@ -1,3 +1,5 @@
+//! OpenAPI 契约生成测试：重写 admin-panel/generated/openapi.json 作为前后端类型同步的事实源。
+
 #![cfg(all(debug_assertions, feature = "openapi"))]
 //! OpenAPI 生成和 wire contract 回归测试。
 

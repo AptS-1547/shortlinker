@@ -49,7 +49,7 @@ where
             format!("{}/v1/auth/refresh", admin_prefix),
             format!("{}/v1/auth/logout", admin_prefix),
         ];
-        let csrf_names = aster_forge_actix_middleware::csrf::CsrfTokenNames::new(
+        let csrf_names = aster_forge_middleware::actix::csrf::CsrfTokenNames::new(
             constants::CSRF_COOKIE_NAME,
             "X-CSRF-Token",
         )
@@ -63,10 +63,11 @@ where
     }
 }
 
+/// CSRF 校验中间件的 Actix 服务封装，对写操作和认证端点强制校验 token
 pub struct CsrfMiddleware<S> {
     service: Rc<S>,
     auth_endpoints: Vec<String>,
-    csrf_names: aster_forge_actix_middleware::csrf::CsrfTokenNames,
+    csrf_names: aster_forge_middleware::actix::csrf::CsrfTokenNames,
 }
 
 impl<S, B> CsrfMiddleware<S>
@@ -154,7 +155,7 @@ where
 
             // 4. Cookie 认证需要验证 CSRF Token
             if let Err(error) =
-                aster_forge_actix_middleware::csrf::ensure_service_double_submit_token_with_names(
+                aster_forge_middleware::actix::csrf::ensure_service_double_submit_token_with_names(
                     &req,
                     &csrf_names,
                 )

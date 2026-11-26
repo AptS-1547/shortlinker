@@ -41,7 +41,7 @@ assets/                 README 和管理面板使用的静态资源
 
 ## 技术栈
 
-- 后端：Rust 2024，最低 Rust 版本以 `Cargo.toml` 的 `rust-version` 为准（当前为 1.88），Actix-web、Tokio、SeaORM、Serde、Tracing。
+- 后端：Rust 2024，最低 Rust 版本以 `Cargo.toml` 的 `rust-version` 为准（当前为 1.95.0），Actix-web、Tokio、SeaORM、Serde、Tracing。依赖审计使用 cargo-deny（`deny.toml`），workspace lints 见根 `Cargo.toml` 的 `[workspace.lints]`。
 - 数据库：SQLite 默认，兼容 MySQL 和 PostgreSQL；数据库类型由 database URL 推断。
 - 缓存：Bloom existence filter、negative cache、object cache 和 composite cache；重定向路径依赖这条查询链。
 - 认证：管理 API 支持 Bearer Token/JWT 和 Cookie，会话刷新、CSRF 与登录/刷新限流由现有中间件负责。

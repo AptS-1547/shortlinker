@@ -29,11 +29,14 @@ pub fn default_http_methods_json() -> String {
 #[serde(rename_all = "PascalCase")]
 #[strum(serialize_all = "PascalCase")]
 pub enum SameSitePolicy {
+    /// 最严格：仅同站请求携带 Cookie，跨站跳转回站时也不发送
     #[strum(message = "Most secure, only same-site requests carry cookies")]
     Strict,
+    /// 默认值：允许顶级导航（如从外部链接点入）携带 Cookie，兼顾安全与可用性
     #[default]
     #[strum(message = "Default, allows top-level navigation to carry cookies")]
     Lax,
+    /// 不限制跨站发送，浏览器要求必须同时设置 `Secure` 属性，仅 HTTPS 下可用
     #[strum(message = "No restrictions, requires Secure attribute")]
     None,
 }
@@ -69,12 +72,19 @@ impl std::str::FromStr for SameSitePolicy {
 #[serde(rename_all = "UPPERCASE")]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum HttpMethod {
+    /// `GET`，用于管理 API 查询类操作的白名单
     Get,
+    /// `POST`，用于创建类操作
     Post,
+    /// `PUT`，用于整体替换类操作
     Put,
+    /// `DELETE`，用于删除类操作
     Delete,
+    /// `PATCH`，用于局部更新类操作
     Patch,
+    /// `HEAD`，与 `GET` 同语义但不返回响应体
     Head,
+    /// `OPTIONS`，用于 CORS 预检等方法探测
     Options,
 }
 
@@ -125,16 +135,22 @@ impl std::str::FromStr for HttpMethod {
 /// 通过 Admin Panel 或 API 进行管理，使用 RuntimeConfig 读取。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StaticConfig {
+    /// HTTP 服务器监听地址、端口、worker 数等，缺省时使用 `ServerConfig` 默认值
     #[serde(default)]
     pub server: ServerConfig,
+    /// 数据库连接 URL、连接池与重试策略，缺省时使用本地 SQLite
     #[serde(default)]
     pub database: DatabaseConfig,
+    /// 缓存后端类型与默认 TTL，缺省时使用内存缓存
     #[serde(default)]
     pub cache: CacheConfig,
+    /// 日志级别、输出文件与轮转策略，直接复用 AsterForge 的日志配置
     #[serde(default)]
     pub logging: LoggingConfig,
+    /// GeoIP 解析来源（本地 MaxMindDB 文件或外部 API）
     #[serde(default)]
     pub analytics: AnalyticsConfig,
+    /// IPC 服务器开关、socket 路径与各操作超时
     #[serde(default)]
     pub ipc: IpcConfig,
 }
@@ -209,12 +225,16 @@ impl StaticConfig {
 /// 服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
+    /// HTTP 监听地址，默认 `127.0.0.1`；对外服务时需改为 `0.0.0.0`
     #[serde(default = "default_server_host")]
     pub host: String,
+    /// HTTP 监听端口，默认 8080
     #[serde(default = "default_server_port")]
     pub port: u16,
+    /// Unix domain socket 监听路径（仅 Unix 生效）；设置后服务器改走 UDS 而非 TCP 监听
     #[serde(default)]
     pub unix_socket: Option<String>,
+    /// Actix worker 进程数，默认取宿主机 CPU 核数，服务端会截断到最大 32
     #[serde(default = "default_cpu_count")]
     pub cpu_count: usize,
 }
@@ -222,14 +242,19 @@ pub struct ServerConfig {
 /// 数据库连接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
+    /// 数据库连接 URL，由 scheme 推断方言（`sqlite://`、`mysql://`、`postgres://`）；默认本地 SQLite 文件 `sqlite://shortlinks.db?mode=rwc`
     #[serde(default = "default_database_url")]
     pub database_url: String,
+    /// 连接池最大连接数，默认 20
     #[serde(default = "default_database_pool_size")]
     pub pool_size: u32,
+    /// 连接失败后的重试次数，默认 3
     #[serde(default = "default_retry_count")]
     pub retry_count: u32,
+    /// 重试的初始退避延迟，单位毫秒，默认 100
     #[serde(default = "default_retry_base_delay_ms")]
     pub retry_base_delay_ms: u64,
+    /// 重试退避延迟的上限，单位毫秒，默认 2000
     #[serde(default = "default_retry_max_delay_ms")]
     pub retry_max_delay_ms: u64,
 }
@@ -237,11 +262,14 @@ pub struct DatabaseConfig {
 /// 缓存系统配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheConfig {
+    /// 对象缓存后端类型，传给 `aster_forge_cache::create_cache`（如 `memory`、`redis`）；默认 `memory`
     #[serde(rename = "type")]
     #[serde(default = "default_cache_type")]
     pub cache_type: String,
+    /// 缓存条目的默认 TTL，单位秒，默认 3600
     #[serde(default = "default_cache_ttl")]
     pub default_ttl: u64,
+    /// Redis 后端连接参数，仅在 `cache_type` 选择 Redis 时使用
     #[serde(default)]
     pub redis: RedisConfig,
 }
@@ -249,8 +277,10 @@ pub struct CacheConfig {
 /// Redis 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RedisConfig {
+    /// Redis 连接 URL，默认本机 `redis://127.0.0.1:6379/`
     #[serde(default = "default_redis_url")]
     pub url: String,
+    /// 所有缓存 key 的统一前缀，默认 `shortlinker:`，用于多实例共享同一 Redis 时隔离命名空间
     #[serde(default = "default_redis_key_prefix")]
     pub key_prefix: String,
 }

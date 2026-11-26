@@ -15,11 +15,17 @@ use crate::system::reload::ReloadTarget;
 /// Import link data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportLinkData {
+    /// Short link code; the client may omit or duplicate codes, conflicts are resolved by `overwrite`.
     pub code: String,
+    /// Redirect target URL to import.
     pub target: String,
+    /// Creation timestamp in RFC 3339 format.
     pub created_at: String,
+    /// Expiration timestamp in RFC 3339 format, or `None` for a never-expiring link.
     pub expires_at: Option<String>,
+    /// Optional password protecting the link; plain text values are hashed on import, existing Argon2 hashes are kept as-is.
     pub password: Option<String>,
+    /// Pre-existing click count preserved from the source installation.
     pub click_count: usize,
 }
 
@@ -39,7 +45,9 @@ impl From<&crate::services::ImportLinkItemRich> for ImportLinkData {
 /// Import error data for IPC transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportErrorData {
+    /// Short link code the failure relates to.
     pub code: String,
+    /// Human-readable description of why the entry failed.
     pub message: String,
     /// 结构化错误码（如 "E020"），用于客户端区分具体失败原因
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -49,25 +57,40 @@ pub struct ImportErrorData {
 /// Config item data for IPC transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigItemData {
+    /// Configuration key, e.g. `api.admin_token`.
     pub key: String,
+    /// Current value; sensitive entries are masked before transfer.
     pub value: String,
+    /// Category identifier the entry belongs to (see `config/definitions.rs`).
     pub category: String,
+    /// Declared value type name, e.g. `"String"`, `"Number"`, `"Boolean"`.
     pub value_type: String,
+    /// Factory default value as a string.
     pub default_value: String,
+    /// Whether changing this entry only takes effect after a server restart.
     pub requires_restart: bool,
+    /// Whether the entry may be edited through the admin panel and IPC.
     pub editable: bool,
+    /// Whether the value must be masked in listings, logs and exports.
     pub sensitive: bool,
+    /// Human-readable description shown in the admin panel.
     pub description: String,
+    /// Allowed values for enum-style entries, `None` for free-form types.
     pub enum_options: Option<Vec<String>>,
+    /// Last modification timestamp in RFC 3339 format, empty when never changed.
     pub updated_at: String,
 }
 
 /// Import progress phase
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportPhase {
+    /// Validating entries: URL format, short code format and field sanity.
     Validating,
+    /// Checking imported codes against existing links for conflicts.
     ConflictCheck,
+    /// Persisting validated entries to storage.
     Writing,
+    /// Refreshing caches after the written entries.
     CacheUpdate,
 }
 
@@ -85,7 +108,9 @@ impl fmt::Display for ImportPhase {
 /// Config import item for batch import
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigImportItem {
+    /// Configuration key to set.
     pub key: String,
+    /// Raw string value; normalized and validated by the server before persisting.
     pub value: String,
 }
 
@@ -96,7 +121,10 @@ pub enum IpcCommand {
     Ping,
 
     /// Reload request with specific target
-    Reload { target: ReloadTarget },
+    Reload {
+        /// Subsystem to reload (data, config or everything).
+        target: ReloadTarget,
+    },
 
     /// Query current server status
     GetStatus,
@@ -107,40 +135,63 @@ pub enum IpcCommand {
     // ============ Link Management Commands ============
     /// Add a new short link
     AddLink {
+        /// Requested short code, or `None` to let the server generate a random one.
         code: Option<String>,
+        /// Redirect target URL.
         target: String,
+        /// Whether to overwrite an existing link with the same code.
         force: bool,
+        /// Expiration timestamp in RFC 3339 format, or `None` for a never-expiring link.
         expires_at: Option<String>,
+        /// Optional password protecting the link, hashed by the server.
         password: Option<String>,
     },
 
     /// Remove a short link
-    RemoveLink { code: String },
+    RemoveLink {
+        /// Short code of the link to delete.
+        code: String,
+    },
 
     /// Batch delete short links
-    BatchDeleteLinks { codes: Vec<String> },
+    BatchDeleteLinks {
+        /// Short codes to delete; per-code results are reported in `BatchDeleteResult`.
+        codes: Vec<String>,
+    },
 
     /// Update an existing short link
     UpdateLink {
+        /// Short code of the link to update.
         code: String,
+        /// New redirect target URL.
         target: String,
+        /// New expiration timestamp in RFC 3339 format; `None` keeps the existing expiration.
         expires_at: Option<String>,
+        /// New password in plain text (hashed server-side); `None` keeps the existing one, an empty string removes it.
         password: Option<String>,
     },
 
     /// Get a single short link
-    GetLink { code: String },
+    GetLink {
+        /// Short code to look up.
+        code: String,
+    },
 
     /// List all short links with pagination
     ListLinks {
+        /// 1-based page number.
         page: u64,
+        /// Number of entries per page.
         page_size: u64,
+        /// Optional case-insensitive substring filter matched against code and target.
         search: Option<String>,
     },
 
     /// Import multiple links
     ImportLinks {
+        /// Entries to import; see `ImportLinkData` for the per-entry fields.
         links: Vec<ImportLinkData>,
+        /// Whether existing codes are overwritten instead of reported as conflicts.
         overwrite: bool,
         /// Request streaming progress reports (default false for backward compatibility)
         #[serde(default)]
@@ -155,19 +206,36 @@ pub enum IpcCommand {
 
     // ============ Config Management Commands ============
     /// List all configurations
-    ConfigList { category: Option<String> },
+    ConfigList {
+        /// Optional category filter; `None` returns every category.
+        category: Option<String>,
+    },
 
     /// Get a single configuration
-    ConfigGet { key: String },
+    ConfigGet {
+        /// Configuration key to fetch.
+        key: String,
+    },
 
     /// Set a configuration value
-    ConfigSet { key: String, value: String },
+    ConfigSet {
+        /// Configuration key to update.
+        key: String,
+        /// New raw string value; normalized and validated by the server.
+        value: String,
+    },
 
     /// Reset a configuration to default
-    ConfigReset { key: String },
+    ConfigReset {
+        /// Configuration key to reset.
+        key: String,
+    },
 
     /// Batch import configurations
-    ConfigImport { configs: Vec<ConfigImportItem> },
+    ConfigImport {
+        /// Entries to apply in order; see `ConfigImportItem`.
+        configs: Vec<ConfigImportItem>,
+    },
 }
 
 impl IpcCommand {
@@ -249,100 +317,160 @@ pub enum IpcResponse {
     // ============ Link Management Responses ============
     /// Link created successfully
     LinkCreated {
+        /// The newly created link as persisted.
         link: ShortLink,
         /// Generated code if none was provided
         generated_code: bool,
     },
 
     /// Link deleted successfully
-    LinkDeleted { code: String },
+    LinkDeleted {
+        /// Short code that was removed.
+        code: String,
+    },
 
     /// Batch delete result
     BatchDeleteResult {
+        /// Codes that were deleted.
         deleted: Vec<String>,
+        /// Codes that did not exist and were left untouched.
         not_found: Vec<String>,
+        /// Per-code failures that prevented deletion.
         errors: Vec<ImportErrorData>,
     },
 
     /// Link updated successfully
-    LinkUpdated { link: ShortLink },
+    LinkUpdated {
+        /// The link snapshot after applying the update.
+        link: ShortLink,
+    },
 
     /// Get link result
-    LinkFound { link: Option<ShortLink> },
+    LinkFound {
+        /// The matching link, or `None` when the code does not exist.
+        link: Option<ShortLink>,
+    },
 
     /// List links result
     LinkList {
+        /// Entries of the requested page.
         links: Vec<ShortLink>,
+        /// Total number of links matching the filter, across all pages.
         total: usize,
+        /// 1-based page number this result corresponds to.
         page: u64,
+        /// Page size the result was produced with.
         page_size: u64,
     },
 
     /// Import result
     ImportResult {
+        /// Entries that were written.
         success: usize,
+        /// Entries skipped without overwriting (conflicts when `overwrite` is false).
         skipped: usize,
+        /// Entries that failed validation or persistence.
         failed: usize,
+        /// Failure details, one per failed entry.
         errors: Vec<ImportErrorData>,
     },
 
     /// Import progress (streaming import)
     ImportProgress {
+        /// Phase the import is currently in.
         phase: ImportPhase,
+        /// Entries handled so far in this phase, for percentage display.
         processed: usize,
+        /// Total entries to process.
         total: usize,
+        /// Entries written so far.
         success: usize,
+        /// Entries skipped so far.
         skipped: usize,
+        /// Entries failed so far.
         failed: usize,
     },
 
     /// Export result
-    ExportResult { links: Vec<ShortLink> },
+    ExportResult {
+        /// All links, sent in a single message when streaming is not requested.
+        links: Vec<ShortLink>,
+    },
 
     /// Export chunk (streaming export)
-    ExportChunk { links: Vec<ShortLink> },
+    ExportChunk {
+        /// Batch of links; repeated messages until `ExportDone` arrives.
+        links: Vec<ShortLink>,
+    },
 
     /// Export done marker (streaming export)
-    ExportDone { total: usize },
+    ExportDone {
+        /// Total number of links across all chunks.
+        total: usize,
+    },
 
     /// Stats result
     StatsResult {
+        /// Number of links in storage.
         total_links: usize,
+        /// Sum of recorded clicks across all links.
         total_clicks: i64,
+        /// Number of links that are not expired.
         active_links: usize,
     },
 
     // ============ Config Management Responses ============
     /// Config list result
-    ConfigListResult { configs: Vec<ConfigItemData> },
+    ConfigListResult {
+        /// Config entries, optionally filtered by category.
+        configs: Vec<ConfigItemData>,
+    },
 
     /// Config get result
-    ConfigGetResult { config: ConfigItemData },
+    ConfigGetResult {
+        /// The requested config entry.
+        config: ConfigItemData,
+    },
 
     /// Config set result
     ConfigSetResult {
+        /// Configuration key that was updated.
         key: String,
+        /// Persisted value after normalization; masked when sensitive.
         value: String,
+        /// Whether the change requires a server restart to take effect.
         requires_restart: bool,
+        /// Whether the entry is sensitive and its value must be masked.
         is_sensitive: bool,
+        /// Previous value; currently always `None` because ConfigService does not expose it.
         old_value: Option<String>,
+        /// Optional server note about the change, e.g. an applied action.
         message: Option<String>,
     },
 
     /// Config reset result
     ConfigResetResult {
+        /// Configuration key that was reset.
         key: String,
+        /// Restored default value; masked when sensitive.
         value: String,
+        /// Whether the reset requires a server restart to take effect.
         requires_restart: bool,
+        /// Whether the entry is sensitive and its value must be masked.
         is_sensitive: bool,
+        /// Optional server note about the reset.
         message: Option<String>,
     },
 
     /// Config import result
     ConfigImportResult {
+        /// Entries that were applied.
         success: usize,
+        /// Entries skipped, e.g. identical to the current value.
         skipped: usize,
+        /// Entries that failed validation or persistence.
         failed: usize,
+        /// Failure details, one per failed entry.
         errors: Vec<ImportErrorData>,
     },
 }

@@ -5,6 +5,7 @@ use colored::Colorize;
 use crate::cli::CliError;
 use crate::client::LinkClient;
 
+/// Create a short link through the IPC client and print the result.
 pub async fn add_link(
     client: &LinkClient,
     short_code: Option<String>,

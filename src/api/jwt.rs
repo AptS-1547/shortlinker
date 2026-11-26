@@ -17,20 +17,30 @@ pub fn get_jwt_service() -> &'static JwtService {
 /// Access Token Claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessClaims {
+    /// Token subject; always `"admin"` (the single management account).
     pub sub: String,
+    /// Issue time as a Unix timestamp (seconds, UTC).
     pub iat: i64,
+    /// Expiry time as a Unix timestamp (seconds, UTC); now + `access_token_minutes`.
     pub exp: i64,
+    /// Token ID (UUID v4) uniquely identifying this access token.
     pub jti: String,
+    /// Fixed `"access"`; validation rejects tokens carrying any other value.
     pub token_type: String,
 }
 
 /// Refresh Token Claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefreshClaims {
+    /// Token subject; always `"admin"` (the single management account).
     pub sub: String,
+    /// Issue time as a Unix timestamp (seconds, UTC).
     pub iat: i64,
+    /// Expiry time as a Unix timestamp (seconds, UTC); now + `refresh_token_days`.
     pub exp: i64,
+    /// Token ID (UUID v4) uniquely identifying this refresh token.
     pub jti: String,
+    /// Fixed `"refresh"`; validation rejects tokens carrying any other value.
     pub token_type: String,
 }
 
@@ -43,19 +53,34 @@ pub struct JwtService {
 }
 
 impl JwtService {
-    pub fn new(secret: &str, access_token_minutes: u64, refresh_token_days: u64) -> Self {
-        Self {
-            encoding_key: EncodingKey::from_secret(secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(secret.as_bytes()),
+    /// Creates a JWT service from a shared secret.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the secret is empty (jsonwebtoken 12 rejects
+    /// empty HMAC keys).
+    pub fn new(
+        secret: &str,
+        access_token_minutes: u64,
+        refresh_token_days: u64,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        Ok(Self {
+            encoding_key: EncodingKey::from_secret(secret.as_bytes())?,
+            decoding_key: DecodingKey::from_secret(secret.as_bytes())?,
             access_token_minutes,
             refresh_token_days,
-        }
+        })
     }
 
     /// Create JwtService from config
     ///
     /// Note: JWT secret is initialized in database by `ensure_defaults()` at startup,
     /// so the fallback to random token should never trigger in normal operation.
+    ///
+    /// # Panics
+    ///
+    /// 仅当 secret 为空导致 HMAC key 构建失败时 panic；上方 filter 与随机 token
+    /// fallback 已保证 secret 非空，正常不会触发。
     pub fn from_config() -> Self {
         let rt = crate::config::get_runtime_config();
 
@@ -70,11 +95,18 @@ impl JwtService {
                 crate::utils::generate_secure_token(32)
             });
 
+        // Non-empty secrets never fail HMAC key construction; the empty case is
+        // filtered out above and by the random-token fallback.
+        #[expect(
+            clippy::expect_used,
+            reason = "from_config guarantees a non-empty secret before building keys"
+        )]
         Self::new(
             &jwt_secret,
             rt.get_u64_or(crate::config::keys::API_ACCESS_TOKEN_MINUTES, 15),
             rt.get_u64_or(crate::config::keys::API_REFRESH_TOKEN_DAYS, 7),
         )
+        .expect("JWT secret is guaranteed non-empty")
     }
 
     /// Generate Access Token (short-lived)
@@ -83,7 +115,9 @@ impl JwtService {
         let claims = AccessClaims {
             sub: "admin".to_string(),
             iat: now.timestamp(),
-            exp: (now + Duration::minutes(self.access_token_minutes as i64)).timestamp(),
+            exp: (now
+                + Duration::minutes(i64::try_from(self.access_token_minutes).unwrap_or(i64::MAX)))
+            .timestamp(),
             jti: uuid::Uuid::new_v4().to_string(),
             token_type: "access".to_string(),
         };
@@ -97,7 +131,8 @@ impl JwtService {
         let claims = RefreshClaims {
             sub: "admin".to_string(),
             iat: now.timestamp(),
-            exp: (now + Duration::days(self.refresh_token_days as i64)).timestamp(),
+            exp: (now + Duration::days(i64::try_from(self.refresh_token_days).unwrap_or(i64::MAX)))
+                .timestamp(),
             jti: uuid::Uuid::new_v4().to_string(),
             token_type: "refresh".to_string(),
         };
@@ -146,7 +181,7 @@ mod tests {
     use super::*;
 
     fn create_test_service() -> JwtService {
-        JwtService::new("test_secret_key_32_bytes_long!!", 15, 7)
+        JwtService::new("test_secret_key_32_bytes_long!!", 15, 7).expect("test secret is non-empty")
     }
 
     #[test]
@@ -203,7 +238,8 @@ mod tests {
     #[test]
     fn test_wrong_secret_rejected() {
         let service1 = create_test_service();
-        let service2 = JwtService::new("different_secret_key_32_bytes!!", 15, 7);
+        let service2 = JwtService::new("different_secret_key_32_bytes!!", 15, 7)
+            .expect("test secret is non-empty");
 
         let token = service1.generate_access_token().unwrap();
         let result = service2.validate_access_token(&token);
@@ -226,7 +262,8 @@ mod tests {
         };
 
         let encoding_key =
-            jsonwebtoken::EncodingKey::from_secret(b"test_secret_key_32_bytes_long!!");
+            jsonwebtoken::EncodingKey::from_secret(b"test_secret_key_32_bytes_long!!")
+                .expect("test secret is non-empty");
         let token =
             jsonwebtoken::encode(&jsonwebtoken::Header::default(), &claims, &encoding_key).unwrap();
 

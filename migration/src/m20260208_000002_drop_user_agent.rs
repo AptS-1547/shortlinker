@@ -1,6 +1,6 @@
-//! 删除 click_logs.user_agent 列
+//! 删除 `click_logs.user_agent` 列
 //!
-//! 该字段已被 user_agent_hash 替代，不再需要存储原始 UA 字符串。
+//! 该字段已被 `user_agent_hash` 替代，不再需要存储原始 UA 字符串。
 
 use sea_orm_migration::prelude::*;
 

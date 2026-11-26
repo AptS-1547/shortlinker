@@ -1,8 +1,10 @@
 pub mod definitions;
 mod r#impl;
+/// 运行时可热更新的配置存储与键名常量
 pub mod runtime_config;
 pub mod schema;
 mod structs;
+/// 配置 API 的展示类型定义
 pub mod types;
 
 pub use r#impl::{get_config, get_ipc_socket_override, init_config, set_ipc_socket_override};

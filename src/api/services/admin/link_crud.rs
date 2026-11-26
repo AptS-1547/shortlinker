@@ -96,9 +96,9 @@ pub async fn get_all_links(
 
     match service.list_links(filter, page, page_size).await {
         Ok((links, total)) => {
-            let total = total as usize;
-            let page = page as usize;
-            let page_size = page_size as usize;
+            let total = usize::try_from(total).unwrap_or(0);
+            let page = usize::try_from(page).unwrap_or(0);
+            let page_size = usize::try_from(page_size).unwrap_or(1);
             let total_pages = total.div_ceil(page_size);
 
             let paginated_links: Vec<LinkResponse> =

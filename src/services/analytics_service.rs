@@ -20,74 +20,102 @@ use tracing::{debug, info};
 
 use crate::errors::ShortlinkerError;
 use crate::storage::SeaOrmStorage;
+use crate::utils::percentage;
 
 // ============ 公共类型定义 ============
 
 /// 分组方式
 #[derive(Debug, Clone, Copy, Default)]
 pub enum GroupBy {
+    /// 按小时分组，标签形如 `2026-01-01 08:00`（仅原始查询支持）
     Hour,
+    /// 按天分组（默认值），标签形如 `2026-01-01`
     #[default]
     Day,
+    /// 按周分组，标签形如 `2026-W02`
     Week,
+    /// 按月分组，标签形如 `2026-01`
     Month,
 }
 
 /// 点击趋势数据
 #[derive(Debug, Clone)]
 pub struct TrendData {
+    /// 各时间桶的标签，格式由 `GroupBy` 决定，与 `values` 一一对应
     pub labels: Vec<String>,
+    /// 各时间桶内的点击次数，与 `labels` 一一对应
     pub values: Vec<u64>,
 }
 
 /// 热门链接
 #[derive(Debug, Clone)]
 pub struct TopLink {
+    /// 短码
     pub code: String,
+    /// 统计区间内的点击次数
     pub clicks: u64,
 }
 
 /// 来源统计
 #[derive(Debug, Clone)]
 pub struct ReferrerStats {
+    /// 来源页 URL 或主机；直接访问（无 Referer）时为 `(direct)`
     pub referrer: String,
+    /// 该来源的点击次数
     pub count: u64,
+    /// 占本次返回的各来源点击数之和的百分比（0-100）
     pub percentage: f64,
 }
 
 /// 地理位置统计
 #[derive(Debug, Clone)]
 pub struct GeoStats {
+    /// 国家/地区名称，来自 GeoIP 解析；无法解析时为 `Unknown`
     pub country: String,
+    /// 城市名称；GeoIP 未命中城市信息时为 `None`
     pub city: Option<String>,
+    /// 该地区的点击次数
     pub count: u64,
 }
 
 /// 单链接分析数据
 #[derive(Debug, Clone)]
 pub struct LinkAnalytics {
+    /// 短码
     pub code: String,
+    /// 统计区间内的点击总数
     pub total_clicks: u64,
+    /// 区间内按天分组的点击趋势
     pub trend: TrendData,
+    /// 点击次数最高的前 10 个来源
     pub top_referrers: Vec<ReferrerStats>,
+    /// 点击次数最高的前 10 个地区分布
     pub geo_distribution: Vec<GeoStats>,
 }
 
 /// 设备分析数据
 #[derive(Debug, Clone)]
 pub struct DeviceAnalytics {
+    /// 浏览器维度统计，按点击次数降序
     pub browsers: Vec<CategoryStats>,
+    /// 操作系统维度统计，按点击次数降序
     pub operating_systems: Vec<CategoryStats>,
+    /// 设备类型维度统计，按点击次数降序
     pub devices: Vec<CategoryStats>,
+    /// 点击中 Bot（爬虫/自动化 UA）占比（0-100）
     pub bot_percentage: f64,
+    /// 带有效 User-Agent 信息的点击总数，是 `bot_percentage` 的分母
     pub total_with_ua: u64,
 }
 
 /// 分类统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CategoryStats {
+    /// 分类名称（浏览器名、系统名或设备类型）；UA 字段缺失时为 `Unknown`
     pub name: String,
+    /// 该分类的点击次数
     pub count: u64,
+    /// 占同维度各分类点击数之和的百分比（0-100）
     pub percentage: f64,
 }
 
@@ -224,7 +252,7 @@ impl AnalyticsService {
         let mut values = Vec::with_capacity(results.len());
         for row in results {
             labels.push(row.label);
-            values.push(row.count as u64);
+            values.push(u64::try_from(row.count).unwrap_or(0));
         }
 
         debug!(
@@ -247,7 +275,7 @@ impl AnalyticsService {
             start, end, limit
         );
 
-        let limit = limit.min(100) as u64;
+        let limit = u64::from(limit.min(100));
         let results = self
             .storage
             .get_top_links(start, end, limit)
@@ -260,7 +288,7 @@ impl AnalyticsService {
             .into_iter()
             .map(|row| TopLink {
                 code: row.short_code,
-                clicks: row.count as u64,
+                clicks: u64::try_from(row.count).unwrap_or(0),
             })
             .collect();
 
@@ -286,7 +314,7 @@ impl AnalyticsService {
             start, end, limit
         );
 
-        let limit = limit.min(100) as u64;
+        let limit = u64::from(limit.min(100));
         let results = self
             .storage
             .get_global_referrers(start, end, limit)
@@ -299,18 +327,17 @@ impl AnalyticsService {
             })?;
 
         // 从聚合结果计算总数（limit 内的总数）
-        let total: u64 = results.iter().map(|r| r.count as u64).sum();
+        let total: u64 = results
+            .iter()
+            .map(|r| u64::try_from(r.count).unwrap_or(0))
+            .sum();
 
         let referrer_stats: Vec<ReferrerStats> = results
             .into_iter()
             .map(|row| {
                 let referrer = row.referrer.unwrap_or_else(|| "(direct)".to_string());
-                let count = row.count as u64;
-                let percentage = if total > 0 {
-                    (count as f64 / total as f64) * 100.0
-                } else {
-                    0.0
-                };
+                let count = u64::try_from(row.count).unwrap_or(0);
+                let percentage = percentage(count, total);
                 ReferrerStats {
                     referrer,
                     count,
@@ -339,7 +366,7 @@ impl AnalyticsService {
             start, end, limit
         );
 
-        let limit = limit.min(100) as u64;
+        let limit = u64::from(limit.min(100));
         let results = self
             .storage
             .get_global_geo(start, end, limit)
@@ -353,7 +380,7 @@ impl AnalyticsService {
             .map(|row| GeoStats {
                 country: row.country.unwrap_or_else(|| "Unknown".to_string()),
                 city: row.city,
-                count: row.count as u64,
+                count: u64::try_from(row.count).unwrap_or(0),
             })
             .collect();
 
@@ -393,7 +420,10 @@ impl AnalyticsService {
         // 转换趋势数据
         let trend = TrendData {
             labels: trend_rows.iter().map(|r| r.label.clone()).collect(),
-            values: trend_rows.iter().map(|r| r.count as u64).collect(),
+            values: trend_rows
+                .iter()
+                .map(|r| u64::try_from(r.count).unwrap_or(0))
+                .collect(),
         };
 
         // 转换来源统计结果
@@ -401,12 +431,8 @@ impl AnalyticsService {
             .into_iter()
             .map(|row| {
                 let referrer = row.referrer.unwrap_or_else(|| "(direct)".to_string());
-                let count = row.count as u64;
-                let percentage = if total_clicks > 0 {
-                    (count as f64 / total_clicks as f64) * 100.0
-                } else {
-                    0.0
-                };
+                let count = u64::try_from(row.count).unwrap_or(0);
+                let percentage = percentage(count, total_clicks);
                 ReferrerStats {
                     referrer,
                     count,
@@ -421,7 +447,7 @@ impl AnalyticsService {
             .map(|row| GeoStats {
                 country: row.country.unwrap_or_else(|| "Unknown".to_string()),
                 city: row.city,
-                count: row.count as u64,
+                count: u64::try_from(row.count).unwrap_or(0),
             })
             .collect();
 
@@ -456,7 +482,7 @@ impl AnalyticsService {
             code, start, end, limit
         );
 
-        let limit = limit.min(20) as u64;
+        let limit = u64::from(limit.min(20));
 
         // 并发执行 4 个查询
         let (browsers, os, devices, bot_stats) = tokio::try_join!(
@@ -469,29 +495,26 @@ impl AnalyticsService {
 
         // 转换为 CategoryStats 并计算百分比
         let to_category = |rows: Vec<crate::storage::backend::UaStatsRow>| -> Vec<CategoryStats> {
-            let total: u64 = rows.iter().map(|r| r.count as u64).sum();
+            let total: u64 = rows
+                .iter()
+                .map(|r| u64::try_from(r.count).unwrap_or(0))
+                .sum();
             rows.into_iter()
                 .map(|r| {
-                    let count = r.count as u64;
+                    let count = u64::try_from(r.count).unwrap_or(0);
                     CategoryStats {
                         name: r.field_value.unwrap_or_else(|| "Unknown".to_string()),
                         count,
-                        percentage: if total > 0 {
-                            (count as f64 / total as f64) * 100.0
-                        } else {
-                            0.0
-                        },
+                        percentage: percentage(count, total),
                     }
                 })
                 .collect()
         };
 
         let (bot_count, total_with_ua) = bot_stats;
-        let bot_percentage = if total_with_ua > 0 {
-            (bot_count as f64 / total_with_ua as f64) * 100.0
-        } else {
-            0.0
-        };
+        let bot_count = u64::try_from(bot_count).unwrap_or(0);
+        let total_with_ua = u64::try_from(total_with_ua).unwrap_or(0);
+        let bot_percentage = percentage(bot_count, total_with_ua);
 
         debug!(
             "Analytics: get_link_device_analytics for '{}' returned {} browsers, {} os, {} devices, bot={:.1}%",
@@ -507,7 +530,7 @@ impl AnalyticsService {
             operating_systems: to_category(os),
             devices: to_category(devices),
             bot_percentage,
-            total_with_ua: total_with_ua as u64,
+            total_with_ua,
         })
     }
 
@@ -526,7 +549,7 @@ impl AnalyticsService {
             start, end, limit
         );
 
-        let limit = limit.min(20) as u64;
+        let limit = u64::from(limit.min(20));
 
         // 并发执行 4 个查询
         let (browsers, os, devices, bot_stats) = tokio::try_join!(
@@ -539,29 +562,26 @@ impl AnalyticsService {
 
         // 转换为 CategoryStats 并计算百分比
         let to_category = |rows: Vec<crate::storage::backend::UaStatsRow>| -> Vec<CategoryStats> {
-            let total: u64 = rows.iter().map(|r| r.count as u64).sum();
+            let total: u64 = rows
+                .iter()
+                .map(|r| u64::try_from(r.count).unwrap_or(0))
+                .sum();
             rows.into_iter()
                 .map(|r| {
-                    let count = r.count as u64;
+                    let count = u64::try_from(r.count).unwrap_or(0);
                     CategoryStats {
                         name: r.field_value.unwrap_or_else(|| "Unknown".to_string()),
                         count,
-                        percentage: if total > 0 {
-                            (count as f64 / total as f64) * 100.0
-                        } else {
-                            0.0
-                        },
+                        percentage: percentage(count, total),
                     }
                 })
                 .collect()
         };
 
         let (bot_count, total_with_ua) = bot_stats;
-        let bot_percentage = if total_with_ua > 0 {
-            (bot_count as f64 / total_with_ua as f64) * 100.0
-        } else {
-            0.0
-        };
+        let bot_count = u64::try_from(bot_count).unwrap_or(0);
+        let total_with_ua = u64::try_from(total_with_ua).unwrap_or(0);
+        let bot_percentage = percentage(bot_count, total_with_ua);
 
         debug!(
             "Analytics: get_device_analytics returned {} browsers, {} os, {} devices, bot={:.1}%",
@@ -576,7 +596,7 @@ impl AnalyticsService {
             operating_systems: to_category(os),
             devices: to_category(devices),
             bot_percentage,
-            total_with_ua: total_with_ua as u64,
+            total_with_ua,
         })
     }
 
@@ -637,6 +657,8 @@ impl AnalyticsService {
                     .await
             }
             GroupBy::Week | GroupBy::Month => {
+                use std::collections::BTreeMap;
+
                 // 从天汇总读取，在 service 层做二次聚合
                 let start_date = start.date_naive();
                 let end_date = end.date_naive();
@@ -657,7 +679,6 @@ impl AnalyticsService {
                     _ => unreachable!(),
                 };
 
-                use std::collections::BTreeMap;
                 let mut grouped: BTreeMap<String, i64> = BTreeMap::new();
                 for row in &daily_results {
                     if let Ok(date) = chrono::NaiveDate::parse_from_str(&row.label, "%Y-%m-%d") {
@@ -680,7 +701,7 @@ impl AnalyticsService {
         let mut values = Vec::with_capacity(results.len());
         for row in results {
             labels.push(row.label);
-            values.push(row.count as u64);
+            values.push(u64::try_from(row.count).unwrap_or(0));
         }
 
         debug!(
@@ -704,19 +725,16 @@ impl AnalyticsService {
             code, start, end, group_by
         );
 
-        let results = match group_by {
-            GroupBy::Hour => {
-                self.storage
-                    .get_link_trend_from_hourly(code, start, end)
-                    .await
-            }
-            _ => {
-                let start_date = start.date_naive();
-                let end_date = end.date_naive();
-                self.storage
-                    .get_link_trend_from_daily(code, start_date, end_date)
-                    .await
-            }
+        let results = if let GroupBy::Hour = group_by {
+            self.storage
+                .get_link_trend_from_hourly(code, start, end)
+                .await
+        } else {
+            let start_date = start.date_naive();
+            let end_date = end.date_naive();
+            self.storage
+                .get_link_trend_from_daily(code, start_date, end_date)
+                .await
         }
         .map_err(|e| {
             ShortlinkerError::analytics_query_failed(format!("Link trend query failed: {}", e))
@@ -726,7 +744,7 @@ impl AnalyticsService {
         let mut values = Vec::with_capacity(results.len());
         for row in results {
             labels.push(row.label);
-            values.push(row.count as u64);
+            values.push(u64::try_from(row.count).unwrap_or(0));
         }
 
         debug!(
@@ -762,18 +780,17 @@ impl AnalyticsService {
                 ))
             })?;
 
-        let total: u64 = results.iter().map(|r| r.count as u64).sum();
+        let total: u64 = results
+            .iter()
+            .map(|r| u64::try_from(r.count).unwrap_or(0))
+            .sum();
 
         let referrer_stats: Vec<ReferrerStats> = results
             .into_iter()
             .map(|row| {
                 let referrer = row.referrer.unwrap_or_else(|| "(direct)".to_string());
-                let count = row.count as u64;
-                let percentage = if total > 0 {
-                    (count as f64 / total as f64) * 100.0
-                } else {
-                    0.0
-                };
+                let count = u64::try_from(row.count).unwrap_or(0);
+                let percentage = percentage(count, total);
                 ReferrerStats {
                     referrer,
                     count,
@@ -817,7 +834,7 @@ impl AnalyticsService {
             .map(|row| GeoStats {
                 country: row.country.unwrap_or_else(|| "Unknown".to_string()),
                 city: row.city,
-                count: row.count as u64,
+                count: u64::try_from(row.count).unwrap_or(0),
             })
             .collect();
 
@@ -857,7 +874,7 @@ impl AnalyticsService {
             .into_iter()
             .map(|row| TopLink {
                 code: row.short_code,
-                clicks: row.count as u64,
+                clicks: u64::try_from(row.count).unwrap_or(0),
             })
             .collect();
 

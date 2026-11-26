@@ -1,5 +1,10 @@
+//! Shortlinker 数据库 migration crate。
+//!
+//! 按 `SeaORM` 约定提供版本化迁移和与表结构对应的实体定义；
+//! 迁移必须保持幂等且按时间戳顺序执行，历史迁移的语义不可修改。
 pub use sea_orm_migration::prelude::*;
 
+/// `SeaORM` 实体定义，与各迁移创建出的表结构一一对应。
 pub mod entities;
 mod m020251023_000001_initial_table;
 mod m020260111_000001_system_config;
@@ -16,6 +21,7 @@ mod m20260209_000002_analytics_indexes_v2;
 mod m20260209_000003_global_daily_rollup;
 mod m20260721_000001_forge_system_config;
 
+/// 迁移入口，按声明顺序聚合全部迁移供 `sea-orm-cli` 与运行时使用。
 pub struct Migrator;
 
 #[async_trait::async_trait]

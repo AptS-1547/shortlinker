@@ -133,7 +133,9 @@ impl CookieBuilder {
             constants::ACCESS_COOKIE_NAME.to_string(),
             token,
             "/".to_string(),
-            actix_web::cookie::time::Duration::minutes(self.access_token_minutes as i64),
+            actix_web::cookie::time::Duration::minutes(
+                i64::try_from(self.access_token_minutes).unwrap_or(i64::MAX),
+            ),
         )
     }
 
@@ -143,7 +145,9 @@ impl CookieBuilder {
             constants::REFRESH_COOKIE_NAME.to_string(),
             token,
             refresh_path,
-            actix_web::cookie::time::Duration::days(self.refresh_token_days as i64),
+            actix_web::cookie::time::Duration::days(
+                i64::try_from(self.refresh_token_days).unwrap_or(i64::MAX),
+            ),
         )
     }
 
@@ -178,7 +182,7 @@ impl CookieBuilder {
         cookie.set_same_site(SameSite::Lax);
         // 与 access token 同步过期
         cookie.set_max_age(actix_web::cookie::time::Duration::minutes(
-            self.access_token_minutes as i64,
+            i64::try_from(self.access_token_minutes).unwrap_or(i64::MAX),
         ));
         if let Some(ref domain) = self.domain {
             cookie.set_domain(domain.clone());
@@ -201,7 +205,7 @@ impl CookieBuilder {
         cookie
     }
 
-    pub fn refresh_cookie_name(&self) -> &str {
+    pub fn refresh_cookie_name() -> &'static str {
         constants::REFRESH_COOKIE_NAME
     }
 

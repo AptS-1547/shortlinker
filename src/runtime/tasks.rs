@@ -99,8 +99,8 @@ async fn run_user_agent_flush(
 ) {
     loop {
         tokio::select! {
-            _ = shutdown_token.cancelled() => break,
-            _ = tokio::time::sleep(Duration::from_secs(30)) => {
+            () = shutdown_token.cancelled() => break,
+            () = tokio::time::sleep(Duration::from_secs(30)) => {
                 if let Some(store) = crate::services::get_user_agent_store()
                     && let Err(error) = store.flush_pending(&database).await
                 {
@@ -120,8 +120,8 @@ async fn run_bloom_rebuild(cache: Arc<dyn LinkCache>, shutdown_token: Cancellati
             return;
         }
         tokio::select! {
-            _ = shutdown_token.cancelled() => return,
-            _ = tokio::time::sleep(Duration::from_secs(interval)) => {
+            () = shutdown_token.cancelled() => return,
+            () = tokio::time::sleep(Duration::from_secs(interval)) => {
                 if let Err(error) = cache.rebuild_all().await {
                     error!(%error, "periodic Bloom filter rebuild failed");
                 }
@@ -132,16 +132,16 @@ async fn run_bloom_rebuild(cache: Arc<dyn LinkCache>, shutdown_token: Cancellati
 
 async fn run_retention(task: Arc<DataRetentionTask>, shutdown_token: CancellationToken) {
     tokio::select! {
-        _ = shutdown_token.cancelled() => return,
-        _ = tokio::time::sleep(Duration::from_secs(300)) => {}
+        () = shutdown_token.cancelled() => return,
+        () = tokio::time::sleep(Duration::from_secs(300)) => {}
     }
     loop {
         if let Err(error) = task.run_cleanup().await {
             error!(%error, "data retention task failed");
         }
         tokio::select! {
-            _ = shutdown_token.cancelled() => return,
-            _ = tokio::time::sleep(Duration::from_secs(24 * 60 * 60)) => {}
+            () = shutdown_token.cancelled() => return,
+            () = tokio::time::sleep(Duration::from_hours(24)) => {}
         }
     }
 }

@@ -4,6 +4,7 @@ use tracing::{trace, warn};
 
 use super::manager::ClickManager;
 
+/// 进程级全局点击管理器实例（启动时初始化一次）
 pub static GLOBAL_CLICK_MANAGER: OnceLock<Arc<ClickManager>> = OnceLock::new();
 
 /// 全局标志：是否应该停止详细日志记录（因为超过行数限制）
@@ -19,13 +20,11 @@ pub fn set_global_click_manager(manager: Arc<ClickManager>) {
 
 /// 获取全局点击管理器
 pub fn get_click_manager() -> Option<&'static Arc<ClickManager>> {
-    match GLOBAL_CLICK_MANAGER.get() {
-        Some(manager) => Some(manager),
-        None => {
-            trace!("GLOBAL_CLICK_MANAGER has not been initialized yet");
-            None
-        }
-    }
+    let Some(manager) = GLOBAL_CLICK_MANAGER.get() else {
+        trace!("GLOBAL_CLICK_MANAGER has not been initialized yet");
+        return None;
+    };
+    Some(manager)
 }
 
 /// 检查是否应该停止详细日志记录

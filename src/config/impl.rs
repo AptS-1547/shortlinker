@@ -13,6 +13,10 @@ static IPC_SOCKET_OVERRIDE: OnceLock<String> = OnceLock::new();
 ///
 /// Returns an Arc pointer to the configuration, which is cheap to clone
 /// and doesn't hold any locks.
+///
+/// # Panics
+///
+/// 当配置未初始化（未先调用 [`init_config`]）时 panic。
 pub fn get_config() -> Arc<StaticConfig> {
     CONFIG
         .get()

@@ -437,8 +437,8 @@ mod batch_tests {
         let (storage, _temp) = create_temp_storage().await;
 
         let (deleted, not_found) = storage.batch_remove(&[]).await.unwrap();
-        assert!(deleted.is_empty());
-        assert!(not_found.is_empty());
+        assert_eq!(deleted, [] as [String; 0]);
+        assert_eq!(not_found, [] as [String; 0]);
     }
 
     #[tokio::test]

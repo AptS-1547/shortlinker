@@ -1,6 +1,7 @@
 use colored::Colorize;
 use std::env;
 
+/// Print the standalone help text shown when the CLI runs without clap subcommands.
 pub fn show_help() {
     let program_name = env::args()
         .next()

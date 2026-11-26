@@ -48,6 +48,7 @@ pub struct DataRetentionTask {
 }
 
 impl DataRetentionTask {
+    /// 从运行时配置读取保留策略参数并创建数据保留任务
     pub fn new(storage: Arc<SeaOrmStorage>, rollup_manager: Arc<RollupManager>) -> Self {
         // 从运行时配置读取保留天数
         let runtime_config = get_runtime_config();
@@ -189,7 +190,9 @@ impl DataRetentionTask {
             .await?
             .unwrap_or(0);
 
-        if current_count as u64 <= self.max_log_rows {
+        let current: u64 = u64::try_from(current_count).unwrap_or(0);
+
+        if current <= self.max_log_rows {
             debug!(
                 "Click logs count {} is within limit {}",
                 current_count, self.max_log_rows
@@ -197,7 +200,7 @@ impl DataRetentionTask {
             return Ok(0);
         }
 
-        let rows_to_delete = current_count as u64 - self.max_log_rows;
+        let rows_to_delete = current - self.max_log_rows;
         info!(
             "Click logs count {} exceeds limit {}, need to delete {} rows",
             current_count, self.max_log_rows, rows_to_delete
@@ -253,7 +256,7 @@ impl DataRetentionTask {
             .await?
             .unwrap_or(0);
 
-        let should_stop = current_count as u64 >= self.max_log_rows;
+        let should_stop = u64::try_from(current_count).unwrap_or(0) >= self.max_log_rows;
         set_detailed_logging_stopped(should_stop);
 
         if should_stop {
@@ -275,7 +278,8 @@ impl DataRetentionTask {
     /// 清理过期的原始点击日志（分批删除避免长事务）
     async fn cleanup_raw_logs(&self) -> anyhow::Result<u64> {
         let db = self.storage.get_db();
-        let cutoff = Utc::now() - Duration::days(self.raw_log_retention_days as i64);
+        let cutoff = Utc::now()
+            - Duration::days(i64::try_from(self.raw_log_retention_days).unwrap_or(i64::MAX));
 
         let mut total_deleted = 0u64;
         let mut iterations = 0;

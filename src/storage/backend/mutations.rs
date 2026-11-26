@@ -16,6 +16,7 @@ use crate::storage::ShortLink;
 use migration::entities::short_link;
 
 impl SeaOrmStorage {
+    /// 写入（upsert）一条短链接记录并失效计数缓存
     pub async fn set(&self, link: ShortLink) -> Result<()> {
         let db = &self.db;
 
@@ -36,6 +37,7 @@ impl SeaOrmStorage {
         Ok(())
     }
 
+    /// 按短码删除链接记录，短码不存在时报错
     pub async fn remove(&self, code: &str) -> Result<()> {
         let code_owned = code.to_string();
 

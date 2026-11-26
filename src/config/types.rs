@@ -23,12 +23,17 @@ pub enum ActionType {
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum ValueType {
+    /// 字符串类型
     String,
+    /// 整数类型
     Int,
     /// 浮点数类型，前端渲染为数字输入（step=0.01）
     Float,
+    /// 布尔类型，前端渲染为开关
     Bool,
+    /// JSON 对象类型
     Json,
+    /// 单选枚举类型（需配合 enum_options）
     Enum,
     /// 字符串数组类型，前端渲染为 Tag Input
     StringArray,
@@ -75,8 +80,7 @@ impl std::str::FromStr for ValueType {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "string" => Ok(Self::String),
-            "multiline" => Ok(Self::String),
+            "string" | "multiline" => Ok(Self::String),
             "int" | "number" => Ok(Self::Int),
             "float" => Ok(Self::Float),
             "bool" | "boolean" => Ok(Self::Bool),

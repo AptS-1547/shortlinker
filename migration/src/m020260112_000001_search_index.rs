@@ -42,13 +42,10 @@ impl MigrationTrait for Migration {
                 .await
                 .ok(); // 忽略错误（索引可能已存在）
             }
-            DatabaseBackend::Sqlite => {
-                // SQLite: 不做任何操作
-                // SQLite 的 B-Tree 索引对 LIKE '%keyword%' 无效
-                // FTS5 需要虚拟表，复杂度高，SQLite 通常用于小规模部署
-            }
             _ => {
-                // 其他数据库：不做任何操作
+                // SQLite 与其他数据库：不做任何操作。
+                // SQLite 的 B-Tree 索引对 LIKE '%keyword%' 无效，
+                // FTS5 需要虚拟表，复杂度高，SQLite 通常用于小规模部署
             }
         }
 
@@ -92,11 +89,8 @@ impl MigrationTrait for Migration {
                     .await
                     .ok(); // 忽略错误（索引可能不存在）
             }
-            DatabaseBackend::Sqlite => {
-                // 无操作
-            }
             _ => {
-                // 其他数据库：无操作
+                // SQLite 与其他数据库：无操作
             }
         }
 

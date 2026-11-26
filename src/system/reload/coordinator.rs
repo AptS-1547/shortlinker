@@ -126,7 +126,7 @@ impl ReloadCoordinator for DefaultReloadCoordinator {
             );
         }
 
-        result.map(|_| reload_result)
+        result.map(|()| reload_result)
     }
 
     fn status(&self) -> ReloadStatus {

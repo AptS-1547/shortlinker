@@ -75,6 +75,42 @@ pub async fn config_export(
     Ok(())
 }
 
+/// 校验结果：(有效配置(key, 敏感标记, 归一化值), 跳过列表, 无效列表)
+type ValidatedImportConfigs<'a> = (
+    Vec<(&'a ExportConfig, bool, String)>,
+    Vec<(String, String)>,
+    Vec<(String, String)>,
+);
+
+/// 校验待导入配置：按注册表分拣为 (有效, 跳过, 无效) 三组
+fn validate_import_configs(configs: &[ExportConfig]) -> ValidatedImportConfigs<'_> {
+    let mut valid_configs = Vec::new();
+    let mut skipped = Vec::new();
+    let mut invalid = Vec::new();
+    let validation_lookup = std::collections::HashMap::new();
+
+    for cfg in configs {
+        // Check if key exists
+        let Some(definition) = CONFIG_REGISTRY.get(&cfg.key) else {
+            skipped.push((cfg.key.clone(), "Unknown key".to_string()));
+            continue;
+        };
+
+        let normalized =
+            match CONFIG_REGISTRY.normalize_value(&validation_lookup, &cfg.key, &cfg.value) {
+                Ok(normalized) => normalized,
+                Err(error) => {
+                    invalid.push((cfg.key.clone(), error.to_string()));
+                    continue;
+                }
+            };
+
+        valid_configs.push((cfg, definition.is_sensitive, normalized));
+    }
+
+    (valid_configs, skipped, invalid)
+}
+
 /// Import configurations from file via ConfigClient
 pub async fn config_import(
     client: &ConfigClient,
@@ -96,32 +132,7 @@ pub async fn config_import(
         import_data.exported_at.dimmed()
     );
     // Validate all configs first
-    let mut valid_configs = Vec::new();
-    let mut skipped = Vec::new();
-    let mut invalid = Vec::new();
-    let validation_lookup = std::collections::HashMap::new();
-
-    for cfg in &import_data.configs {
-        // Check if key exists
-        let definition = match CONFIG_REGISTRY.get(&cfg.key) {
-            Some(definition) => definition,
-            None => {
-                skipped.push((cfg.key.clone(), "Unknown key".to_string()));
-                continue;
-            }
-        };
-
-        let normalized =
-            match CONFIG_REGISTRY.normalize_value(&validation_lookup, &cfg.key, &cfg.value) {
-                Ok(normalized) => normalized,
-                Err(error) => {
-                    invalid.push((cfg.key.clone(), error.to_string()));
-                    continue;
-                }
-            };
-
-        valid_configs.push((cfg, definition.is_sensitive, normalized));
-    }
+    let (valid_configs, skipped, invalid) = validate_import_configs(&import_data.configs);
 
     // Show preview
     if !valid_configs.is_empty() {

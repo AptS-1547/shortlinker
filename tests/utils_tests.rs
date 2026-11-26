@@ -1,3 +1,5 @@
+//! 通用工具函数测试：短码生成唯一性与格式约束。
+
 use shortlinker::utils::generate_random_code;
 use std::collections::HashSet;
 
@@ -11,7 +13,7 @@ fn generate_random_code_length() {
 #[test]
 fn generate_random_code_zero() {
     let code = generate_random_code(0);
-    assert!(code.is_empty());
+    assert_eq!(code, "");
 }
 
 #[test]

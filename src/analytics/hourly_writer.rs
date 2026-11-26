@@ -31,6 +31,7 @@ pub struct HourlyRollupWriter<'a, C: ConnectionTrait> {
 }
 
 impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
+    /// 创建绑定到指定数据库连接的小时汇总写入器
     pub fn new(db: &'a C, retry_config: RetryConfig) -> Self {
         Self { db, retry_config }
     }
@@ -165,7 +166,7 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
             let key = (code.clone(), *hour_bucket);
             if let Some(record) = existing_records.get(&key) {
                 // 合并现有数据
-                let merged = self.merge_aggregation(record, agg);
+                let merged = Self::merge_aggregation(record, agg);
                 to_update.push((record.id, merged));
             } else {
                 // 新记录
@@ -232,7 +233,6 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
 
     /// 合并 aggregation 数据
     fn merge_aggregation(
-        &self,
         record: &click_stats_hourly::Model,
         agg: &ClickAggregation,
     ) -> ClickAggregation {
@@ -248,19 +248,19 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         );
 
         // 合并 referrers
-        let existing_referrers = parse_json_counts(&record.referrer_counts);
+        let existing_referrers = parse_json_counts(record.referrer_counts.as_ref());
         for (k, v) in existing_referrers {
             *merged.referrers.entry(k).or_insert(0) += v;
         }
 
         // 合并 countries
-        let existing_countries = parse_json_counts(&record.country_counts);
+        let existing_countries = parse_json_counts(record.country_counts.as_ref());
         for (k, v) in existing_countries {
             *merged.countries.entry(k).or_insert(0) += v;
         }
 
         // 合并 sources
-        let existing_sources = parse_json_counts(&record.source_counts);
+        let existing_sources = parse_json_counts(record.source_counts.as_ref());
         for (k, v) in existing_sources {
             *merged.sources.entry(k).or_insert(0) += v;
         }
@@ -303,12 +303,12 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
         records: &[(i64, ClickAggregation)],
         _backend: DatabaseBackend,
     ) -> Result<(), sea_orm::DbErr> {
+        // 使用 CASE WHEN 批量更新，类似 click_sink.rs 的实现
+        use sea_orm::sea_query::{CaseStatement, SimpleExpr};
+
         if records.is_empty() {
             return Ok(());
         }
-
-        // 使用 CASE WHEN 批量更新，类似 click_sink.rs 的实现
-        use sea_orm::sea_query::{CaseStatement, SimpleExpr};
 
         let ids: Vec<i64> = records.iter().map(|(id, _)| *id).collect();
 
@@ -421,10 +421,16 @@ impl<'a, C: ConnectionTrait> HourlyRollupWriter<'a, C> {
     }
 }
 
-impl<'a, C> HourlyRollupWriter<'a, C>
+impl<C> HourlyRollupWriter<'_, C>
 where
     C: ConnectionTrait + TransactionTrait,
 {
+    /// 在事务中更新小时计数并同步累计全局小时汇总
+    ///
+    /// # Arguments
+    /// - `updates`: (short_code, click_count) 列表
+    /// - `timestamp`: 点击时间戳，用于确定 hour_bucket
+    /// - `op_prefix`: 操作名前缀，用于重试日志
     pub async fn increment_hourly_counts(
         &self,
         updates: &[(String, usize)],
@@ -451,7 +457,9 @@ where
                         .map_err(aster_forge_db::DbError::from)?;
 
                     let total_clicks = updates.iter().fold(0usize, |total, (_, count)| {
-                        total.saturating_add((*count).min(i64::MAX as usize))
+                        total.saturating_add(
+                            (*count).min(usize::try_from(i64::MAX).unwrap_or(usize::MAX)),
+                        )
                     });
                     writer
                         .upsert_global_hourly(
@@ -472,6 +480,11 @@ where
         Ok(())
     }
 
+    /// 按小时桶 upsert 带详细维度（来源/国家/流量来源）的小时汇总
+    ///
+    /// # Arguments
+    /// - `aggregated`: (short_code, hour_bucket) -> 聚合数据 的映射
+    /// - `op_prefix`: 操作名前缀，用于重试日志
     pub async fn upsert_hourly_with_details(
         &self,
         aggregated: &HashMap<(String, DateTime<Utc>), ClickAggregation>,

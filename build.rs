@@ -1,3 +1,6 @@
+//! 构建脚本：确保 admin-panel 构建产物目录存在，供 rust-embed 在
+//! 非 `embed` 场景（本地开发）下编译通过。
+
 use std::env;
 use std::fs;
 use std::path::Path;

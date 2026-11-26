@@ -1,8 +1,8 @@
 //! 分析查询索引优化 (第二批)
 //!
 //! 添加以下索引：
-//! - click_stats_hourly.short_code 单列索引（用于单链接查询优化）
-//! - user_agents.is_bot 索引（用于 Bot 统计查询）
+//! - `click_stats_hourly.short_code` 单列索引（用于单链接查询优化）
+//! - `user_agents.is_bot` 索引（用于 Bot 统计查询）
 
 use sea_orm_migration::prelude::*;
 

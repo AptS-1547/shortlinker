@@ -47,7 +47,7 @@ impl PlatformOps for UnixPlatform {
                         if current_pid == 1 && old_pid == 1 {
                             info!("Container restart detected, removing old PID file");
                             let _ = fs::remove_file(pid_file);
-                        } else if signal::kill(Pid::from_raw(old_pid as i32), None).is_ok() {
+                        } else if signal::kill(Pid::from_raw(old_pid.cast_signed()), None).is_ok() {
                             // Process is still running but IPC is not responding.
                             // This is safer than assuming stale and continuing.
                             error!(
@@ -82,9 +82,8 @@ impl PlatformOps for UnixPlatform {
         if let Err(e) = fs::write(pid_file, pid.to_string()) {
             error!("Failed to write PID file: {}", e);
             return Err(e);
-        } else {
-            debug!("Server PID: {}", pid);
         }
+        debug!("Server PID: {}", pid);
 
         Ok(())
     }

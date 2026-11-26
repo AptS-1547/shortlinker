@@ -3,7 +3,9 @@ pub mod click_stats_daily;
 pub mod click_stats_global_daily;
 pub mod click_stats_global_hourly;
 pub mod click_stats_hourly;
+/// 配置变更历史实体（`config_history` 表）。
 pub mod config_history;
+/// 短链接实体（`short_links` 表）。
 pub mod short_link;
 pub mod user_agent;
 

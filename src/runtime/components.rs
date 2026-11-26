@@ -9,9 +9,9 @@ use actix_web::{
     middleware::{Compress, Condition, DefaultHeaders},
     web,
 };
-use anyhow::Result;
-use aster_forge_actix_middleware::metrics::MetricsMiddleware;
-use aster_forge_actix_middleware::request_id::RequestIdMiddleware;
+use anyhow::{Result, anyhow};
+use aster_forge_middleware::actix::metrics::MetricsMiddleware;
+use aster_forge_middleware::actix::request_id::RequestIdMiddleware;
 use aster_forge_runtime::{RuntimeComponentKind, RuntimeServiceComponent};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -124,7 +124,7 @@ fn build_cors_middleware(cors_config: &CorsSettings) -> Cors {
     }
 
     // Configure max age
-    cors = cors.max_age(cors_config.max_age as usize);
+    cors = cors.max_age(usize::try_from(cors_config.max_age).unwrap_or(usize::MAX));
 
     // Configure credentials with security check
     // Disallow any_origin + credentials combination as it's a security vulnerability
@@ -136,6 +136,95 @@ fn build_cors_middleware(cors_config: &CorsSettings) -> Cors {
     }
 
     cors
+}
+
+/// 检查并记录代理检测模式 + Unix Socket 模式
+fn log_client_ip_mode(config: &crate::config::StaticConfig, rt: &crate::config::RuntimeConfig) {
+    // Check and log proxy detection mode + Unix Socket mode
+    #[cfg(unix)]
+    let is_tcp_mode = if let Some(ref socket_path) = config.server.unix_socket {
+        info!(
+            "Unix Socket mode enabled: {}. \
+             Local proxy transport is trusted; configure the proxy to set \
+             X-Forwarded-For for per-client login rate limiting and analytics.",
+            socket_path
+        );
+        false
+    } else {
+        true
+    };
+    #[cfg(not(unix))]
+    let is_tcp_mode = true;
+
+    if !is_tcp_mode {
+        return;
+    }
+
+    let trusted_proxies_json = rt.get_or(keys::API_TRUSTED_PROXIES, "[]");
+    let trusted_proxies: Vec<String> = match serde_json::from_str(&trusted_proxies_json) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(
+                "Invalid JSON for trusted_proxies '{}': {}, using empty list",
+                trusted_proxies_json, e
+            );
+            Vec::new()
+        }
+    };
+    if trusted_proxies.is_empty() {
+        info!(
+            "Client IP extraction: direct peer mode enabled. \
+             X-Forwarded-For is ignored until api.trusted_proxies is configured."
+        );
+    } else {
+        info!(
+            "Client IP extraction: explicit trusted proxies configured: {:?}",
+            trusted_proxies
+        );
+    }
+}
+
+/// 组装产品路由：admin / health / 前端静态资源 / 重定向
+fn product_routes(
+    admin_prefix: &str,
+    health_prefix: &str,
+    frontend_prefix: &str,
+) -> actix_web::Scope {
+    web::scope("")
+        .service(
+            web::scope(admin_prefix)
+                .wrap(CsrfGuard)
+                .wrap(AdminAuth)
+                .service(admin_v1_routes()),
+        )
+        .service(
+            web::scope(health_prefix)
+                .wrap(HealthAuth)
+                .service(health_routes()),
+        )
+        .service(
+            web::scope(frontend_prefix)
+                .wrap(FrontendGuard)
+                .service(frontend_routes()),
+        )
+        .service(redirect_routes())
+}
+
+/// 加载并校验 CORS 配置，同时记录代理检测 / Unix Socket 模式
+fn init_http_runtime_config(
+    config: &crate::config::StaticConfig,
+    rt: &crate::config::RuntimeConfig,
+) -> CorsSettings {
+    // Load CORS configuration from RuntimeConfig
+    let cors_config = CorsSettings::from_runtime_config();
+
+    // Validate CORS configuration at startup (runs once, not per worker)
+    validate_cors_config(&cors_config);
+
+    // Check and log proxy detection mode + Unix Socket mode
+    log_client_ip_mode(config, rt);
+
+    cors_config
 }
 
 /// Run the HTTP server
@@ -170,7 +259,6 @@ pub fn http_component(
 
     // Load configuration (after database sync in prepare_server_startup)
     let config = crate::config::get_config();
-    let rt = get_runtime_config();
 
     let cpu_count = config.server.cpu_count.min(32);
     info!("Using {} CPU cores for the server", cpu_count);
@@ -182,54 +270,14 @@ pub fn http_component(
 
     let forge_metrics = metrics.forge_recorder();
 
-    // Load CORS configuration from RuntimeConfig
-    let cors_config = CorsSettings::from_runtime_config();
-
-    // Validate CORS configuration at startup (runs once, not per worker)
-    validate_cors_config(&cors_config);
-
-    // Check and log proxy detection mode + Unix Socket mode
-    #[allow(unused_mut)]
-    let mut is_tcp_mode = true;
-    #[cfg(unix)]
-    if let Some(ref socket_path) = config.server.unix_socket {
-        info!(
-            "Unix Socket mode enabled: {}. \
-             Local proxy transport is trusted; configure the proxy to set \
-             X-Forwarded-For for per-client login rate limiting and analytics.",
-            socket_path
-        );
-        is_tcp_mode = false;
-    }
-
-    if is_tcp_mode {
-        let trusted_proxies_json = rt.get_or(keys::API_TRUSTED_PROXIES, "[]");
-        let trusted_proxies: Vec<String> = match serde_json::from_str(&trusted_proxies_json) {
-            Ok(v) => v,
-            Err(e) => {
-                warn!(
-                    "Invalid JSON for trusted_proxies '{}': {}, using empty list",
-                    trusted_proxies_json, e
-                );
-                Vec::new()
-            }
-        };
-        if trusted_proxies.is_empty() {
-            info!(
-                "Client IP extraction: direct peer mode enabled. \
-                 X-Forwarded-For is ignored until api.trusted_proxies is configured."
-            );
-        } else {
-            info!(
-                "Client IP extraction: explicit trusted proxies configured: {:?}",
-                trusted_proxies
-            );
-        }
-    }
+    // Load + validate CORS configuration and log proxy/socket mode (runs once, not per worker)
+    let cors_config = init_http_runtime_config(&config, get_runtime_config());
 
     // Configure HTTP server
     let metrics_for_server = metrics.clone();
     let forge_metrics_for_server = forge_metrics.clone();
+    #[cfg(feature = "metrics")]
+    let metrics_provider_for_server = startup.metrics_provider.clone();
     let server = HttpServer::new(move || {
         // Build CORS middleware (Condition::new skips it entirely when disabled)
         let cors = build_cors_middleware(&cors_config);
@@ -253,35 +301,32 @@ pub fn http_component(
                 forge_metrics_for_server.clone(),
             ));
 
-        app.wrap(aster_forge_actix_middleware::security_headers::default_headers())
+        // Prometheus export provider is only present with the `metrics`
+        // feature; the observability resource reads it from app data.
+        #[cfg(feature = "metrics")]
+        let app = if let Some(provider) = metrics_provider_for_server.as_ref() {
+            app.app_data(web::Data::new(provider.clone()))
+        } else {
+            app
+        };
+
+        app.wrap(aster_forge_middleware::actix::security_headers::default_headers())
             .wrap(
                 DefaultHeaders::new()
                     .add(("Connection", "keep-alive"))
                     .add(("Keep-Alive", "timeout=30, max=1000"))
                     .add(("Cache-Control", "no-cache, no-store, must-revalidate")),
             )
-            .service(
-                web::scope(&admin_prefix)
-                    .wrap(CsrfGuard)
-                    .wrap(AdminAuth)
-                    .service(admin_v1_routes()),
-            )
-            .service(
-                web::scope(&health_prefix)
-                    .wrap(HealthAuth)
-                    .service(health_routes()),
-            )
-            .service(
-                web::scope(&frontend_prefix)
-                    .wrap(FrontendGuard)
-                    .service(frontend_routes()),
-            )
-            .service(redirect_routes())
+            .service(product_routes(
+                &admin_prefix,
+                &health_prefix,
+                &frontend_prefix,
+            ))
     })
     .disable_signals()
     .keep_alive(std::time::Duration::from_secs(30))
-    .client_request_timeout(std::time::Duration::from_millis(5000))
-    .client_disconnect_timeout(std::time::Duration::from_millis(1000))
+    .client_request_timeout(std::time::Duration::from_secs(5))
+    .client_disconnect_timeout(std::time::Duration::from_secs(1))
     .workers(cpu_count);
 
     // Bind to Unix socket or TCP address
@@ -308,7 +353,7 @@ pub fn http_component(
             Some(server.bind(bind_address)?)
         }
     }
-    .expect("Server binding failed")
+    .ok_or_else(|| anyhow!("Server binding failed"))?
     .run();
     let server_handle = server.handle();
 

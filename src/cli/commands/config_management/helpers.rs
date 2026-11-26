@@ -56,7 +56,7 @@ pub async fn notify_config_change(requires_restart: bool) {
             // Server is not running, try to hot-reload in CLI process
             if let Some(rc) = try_get_runtime_config() {
                 match rc.reload().await {
-                    Ok(_) => {
+                    Ok(()) => {
                         println!(
                             "{} Configuration saved (server not running)",
                             "ℹ".bold().blue()

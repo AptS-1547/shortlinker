@@ -16,25 +16,47 @@ use tracing::{debug, info, warn};
 
 use crate::metrics::MetricsRecorder;
 
+/// 服务器启动期组装好的全部运行时组件，由 [`prepare_server_startup`]
+/// 一次性构建并交给 HTTP server 使用。
 pub struct StartupContext {
+    /// 进程级单实例守护句柄；持有期间阻止第二个实例同时运行。
     pub process_guard: crate::system::platform::ProcessGuard,
+    /// 数据库存储后端。
     pub storage: Arc<SeaOrmStorage>,
+    /// 链接缓存（Bloom/负缓存/对象缓存组合）。
     pub cache: Arc<dyn LinkCache>,
+    /// 链接业务服务，共享给 HTTP 管理 API 与 IPC/CLI。
     pub link_service: Arc<LinkService>,
+    /// 点击分析查询服务。
     pub analytics_service: Arc<AnalyticsService>,
+    /// 运行时配置管理服务。
     pub config_service: Arc<ConfigService>,
+    /// 路由前缀等路由相关配置。
     pub route_config: RouteConfig,
+    /// 指标记录器；`metrics` feature 关闭时为 no-op 实现。
     pub metrics: Arc<dyn MetricsRecorder>,
+    /// Prometheus 导出 provider；`metrics` feature 开启且 Forge 管线启动成功
+    /// 时为 `Some`，供 HTTP 装配注入 `/metrics` 端点。
+    pub metrics_provider: Option<aster_forge_metrics::MetricsProvider>,
+    /// 点击事件聚合管理器；分析功能关闭时为 `None`。
     pub click_manager: Option<Arc<ClickManager>>,
+    /// 原始点击事件的接收端；分析功能关闭时为 `None`，
+    /// 由独立写线程消费以避免阻塞重定向热路径。
     pub raw_event_receiver: Option<Receiver<RawClickEvent>>,
+    /// 数据保留策略后台任务；分析功能关闭时为 `None`。
     pub retention_task: Option<Arc<DataRetentionTask>>,
 }
 
+/// HTTP 路由前缀配置
 #[derive(Clone, Debug)]
 pub struct RouteConfig {
+    /// 管理 API 的 URL 前缀（含开头斜杠）。
     pub admin_prefix: String,
+    /// 健康检查端点的 URL 前缀（含开头斜杠）。
     pub health_prefix: String,
+    /// 前端静态资源的 URL 前缀（含开头斜杠）。
     pub frontend_prefix: String,
+    /// 是否挂载内置管理面板前端路由。
     pub enable_frontend: bool,
 }
 
@@ -51,14 +73,15 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         .install_default()
         .map_err(|e| anyhow::anyhow!("Failed to install rustls crypto provider: {:?}", e))?;
 
-    let metrics: Arc<dyn MetricsRecorder> = crate::metrics::create_metrics_recorder();
+    let metrics_runtime = crate::metrics::create_metrics_runtime();
+    let metrics = metrics_runtime.recorder.clone();
 
     let storage = StorageFactory::create(metrics.clone())
         .await
         .context("Failed to create storage backend")?;
     info!(
         "Using storage backend: {}",
-        storage.get_backend_config().await.storage_type
+        storage.get_backend_config().storage_type
     );
 
     // 初始化运行时配置系统
@@ -82,57 +105,9 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     );
 
     // 初始化点击计数器（从 RuntimeConfig 读取配置）
-    let rt = get_runtime_config();
-    let enable_click_tracking = rt.get_bool_or(keys::CLICK_ENABLE_TRACKING, true);
-    let flush_interval = rt.get_u64_or(keys::CLICK_FLUSH_INTERVAL, 30);
-    let max_clicks_before_flush = rt.get_u64_or(keys::CLICK_MAX_CLICKS_BEFORE_FLUSH, 100);
+    let (click_manager, raw_event_receiver) = init_click_tracking(&storage, &metrics);
 
-    let mut click_manager = None;
-    let mut raw_event_receiver = None;
-    if enable_click_tracking {
-        if let Some(sink) = storage.as_click_sink() {
-            // 检查是否启用详细日志
-            let enable_detailed_logging =
-                rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
-
-            let mgr = if enable_detailed_logging {
-                // SeaOrmStorage 实现了 DetailedClickSink trait
-                let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
-                info!("Detailed click logging enabled, initializing with DetailedClickSink");
-                let (manager, rx) = ClickManager::with_detailed_logging(
-                    sink,
-                    detailed_sink,
-                    Duration::from_secs(flush_interval),
-                    max_clicks_before_flush as usize,
-                    metrics.clone(),
-                );
-                let mgr = Arc::new(manager);
-                raw_event_receiver = Some(rx);
-
-                mgr
-            } else {
-                let manager = ClickManager::new(
-                    sink,
-                    Duration::from_secs(flush_interval),
-                    max_clicks_before_flush as usize,
-                    metrics.clone(),
-                );
-                Arc::new(manager)
-            };
-
-            set_global_click_manager(mgr.clone());
-            click_manager = Some(mgr);
-
-            debug!(
-                "ClickManager initialized with {} seconds and {} max clicks before flush",
-                flush_interval, max_clicks_before_flush
-            );
-        } else {
-            warn!("Click sink is not available, ClickManager will not be initialized");
-        }
-    } else {
-        warn!("Click tracking is disabled in configuration");
-    }
+    // 初始化缓存
 
     // 初始化缓存
     let cache = ForgeLinkCache::create(metrics.clone(), storage.clone())
@@ -162,6 +137,7 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
     let config_service = Arc::new(ConfigService::new().context("Failed to create ConfigService")?);
 
     // 初始化数据清理后台任务
+    let rt = get_runtime_config();
     let enable_auto_rollup = rt.get_bool_or(keys::ANALYTICS_ENABLE_AUTO_ROLLUP, true);
     let retention_task = if enable_auto_rollup {
         let rollup_manager = Arc::new(RollupManager::new(storage.clone()));
@@ -210,10 +186,68 @@ pub async fn prepare_server_startup() -> Result<StartupContext> {
         config_service,
         route_config,
         metrics,
+        metrics_provider: metrics_runtime.provider,
         click_manager,
         raw_event_receiver,
         retention_task,
     })
+}
+
+/// 初始化点击计数器（从 RuntimeConfig 读取配置），
+/// 返回 (ClickManager, 原始事件接收端)；分析功能关闭时两者为 `None`。
+fn init_click_tracking(
+    storage: &Arc<SeaOrmStorage>,
+    metrics: &Arc<dyn MetricsRecorder>,
+) -> (Option<Arc<ClickManager>>, Option<Receiver<RawClickEvent>>) {
+    let rt = get_runtime_config();
+    let enable_click_tracking = rt.get_bool_or(keys::CLICK_ENABLE_TRACKING, true);
+    let flush_interval = rt.get_u64_or(keys::CLICK_FLUSH_INTERVAL, 30);
+    let max_clicks_before_flush = rt.get_u64_or(keys::CLICK_MAX_CLICKS_BEFORE_FLUSH, 100);
+
+    if !enable_click_tracking {
+        warn!("Click tracking is disabled in configuration");
+        return (None, None);
+    }
+
+    let Some(sink) = storage.as_click_sink() else {
+        warn!("Click sink is not available, ClickManager will not be initialized");
+        return (None, None);
+    };
+
+    // 检查是否启用详细日志
+    let enable_detailed_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_DETAILED_LOGGING, false);
+
+    let (manager, raw_event_receiver) = if enable_detailed_logging {
+        // SeaOrmStorage 实现了 DetailedClickSink trait
+        let detailed_sink: Arc<dyn crate::analytics::DetailedClickSink> = storage.clone();
+        info!("Detailed click logging enabled, initializing with DetailedClickSink");
+        let (manager, rx) = ClickManager::with_detailed_logging(
+            sink,
+            detailed_sink,
+            Duration::from_secs(flush_interval),
+            usize::try_from(max_clicks_before_flush).unwrap_or(usize::MAX),
+            metrics.clone(),
+        );
+        (manager, Some(rx))
+    } else {
+        let manager = ClickManager::new(
+            sink,
+            Duration::from_secs(flush_interval),
+            usize::try_from(max_clicks_before_flush).unwrap_or(usize::MAX),
+            metrics.clone(),
+        );
+        (manager, None)
+    };
+
+    let mgr = Arc::new(manager);
+    set_global_click_manager(mgr.clone());
+
+    debug!(
+        "ClickManager initialized with {} seconds and {} max clicks before flush",
+        flush_interval, max_clicks_before_flush
+    );
+
+    (Some(mgr), raw_event_receiver)
 }
 
 fn check_component_enabled(route_config: &RouteConfig) {
@@ -294,7 +328,10 @@ pub(crate) fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
     let enable_ip_logging = rt.get_bool_or(keys::ANALYTICS_ENABLE_IP_LOGGING, true);
 
     // derive_source: utm_source > ref:{domain} > direct
-    let source = derive_source_from_raw(&event.query, &event.referrer);
+    let source = Some(derive_source_from_raw(
+        event.query.as_ref(),
+        event.referrer.as_ref(),
+    ));
 
     // UA hash
     let user_agent_hash = event
@@ -318,23 +355,23 @@ pub(crate) fn process_raw_click_event(event: RawClickEvent) -> ClickDetail {
 
 /// 从原始数据推导流量来源
 #[inline]
-fn derive_source_from_raw(query: &Option<String>, referrer: &Option<String>) -> Option<String> {
+fn derive_source_from_raw(query: Option<&String>, referrer: Option<&String>) -> String {
     // 1. 检查 utm_source 参数
     if let Some(query) = query
         && let Some(utm_source) = extract_query_param(query, "utm_source")
     {
-        return Some(utm_source.into_owned());
+        return utm_source.into_owned();
     }
 
     // 2. 有 Referer → ref:{domain}
     if let Some(referer_url) = referrer
         && let Some(domain) = extract_domain(referer_url)
     {
-        return Some(format!("ref:{}", domain));
+        return format!("ref:{}", domain);
     }
 
     // 3. direct
-    Some("direct".to_string())
+    "direct".to_string()
 }
 
 /// 提取 URL 中的指定查询参数值

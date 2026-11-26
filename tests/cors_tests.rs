@@ -172,17 +172,11 @@ async fn test_cors_set_enabled() {
     let result = rt.set("cors.enabled", "true").await;
 
     // Test passes if either:
+    // Test passes if either:
     // 1. Set operation succeeds and value is updated
+    //    (value might be cached and not immediately visible; expected for RuntimeConfig)
     // 2. Set operation fails (e.g., validation error)
-    match result {
-        Ok(_) => {
-            // If set succeeded, value might be cached and not immediately visible
-            // This is expected behavior for RuntimeConfig
-        }
-        Err(_) => {
-            // Set failed, which is also acceptable (e.g., validation)
-        }
-    }
+    let _ = result;
 }
 
 #[tokio::test]
@@ -196,16 +190,9 @@ async fn test_cors_set_max_age() {
 
     // Test passes if either:
     // 1. Set operation succeeds
+    //    (value might be cached and not immediately visible; expected for RuntimeConfig)
     // 2. Set operation fails (e.g., validation error)
-    match result {
-        Ok(_) => {
-            // If set succeeded, value might be cached and not immediately visible
-            // This is expected behavior for RuntimeConfig
-        }
-        Err(_) => {
-            // Set failed, which is also acceptable
-        }
-    }
+    let _ = result;
 }
 
 // =============================================================================
@@ -235,10 +222,15 @@ async fn test_cors_preflight_request() {
     let resp = test::call_service(&app, req).await;
 
     // Without CORS middleware, OPTIONS should still be handled by the app
-    // (returns 404 if no explicit OPTIONS handler, or 200 if handled)
+    // (returns 200 if handled, or a routing rejection that is not a 5xx).
+    // actix-web 4.20 replies 405 Method Not Allowed when the route exists but
+    // has no OPTIONS handler (previously 404); both prove the router engaged.
     assert!(
-        resp.status() == StatusCode::NOT_FOUND || resp.status() == StatusCode::OK,
-        "OPTIONS request should be handled"
+        matches!(
+            resp.status(),
+            StatusCode::OK | StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED
+        ),
+        "OPTIONS request should be handled without a 5xx"
     );
 }
 

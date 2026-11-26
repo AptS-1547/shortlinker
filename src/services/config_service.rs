@@ -19,38 +19,56 @@ const REDACTED: &str = "[REDACTED]";
 /// 配置项视图（敏感值已屏蔽）
 #[derive(Debug, Clone)]
 pub struct ConfigItemView {
+    /// 配置 key，与 registry 注册名一致。
     pub key: String,
+    /// 展示用的值；敏感配置为 `[REDACTED]` 占位符而非真实值。
     pub value: String,
+    /// 值的类型分类（string/number/bool/enum 等）。
     pub value_type: ValueType,
+    /// 修改后是否需要重启进程才能生效。
     pub requires_restart: bool,
+    /// 是否为敏感配置；敏感项的 `value` 不可用于回填真实值。
     pub is_sensitive: bool,
+    /// 最近一次更新的时间（UTC）。
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// 配置更新结果视图（敏感值已屏蔽）
 #[derive(Debug, Clone)]
 pub struct ConfigUpdateView {
+    /// 被更新的配置 key。
     pub key: String,
+    /// 展示用的更新后值；敏感配置为 `[REDACTED]` 占位符。
     pub value: String,
+    /// 该配置是否需要重启才能生效。
     pub requires_restart: bool,
+    /// 该配置是否为敏感配置。
     pub is_sensitive: bool,
+    /// 更新后触发的附加信息（如 action 执行结果）；`None` 表示无。
     pub message: Option<String>,
 }
 
 /// 配置历史记录视图（敏感值已屏蔽）
 #[derive(Debug, Clone)]
 pub struct ConfigHistoryView {
+    /// 历史记录主键，按时间递增。
     pub id: i32,
+    /// 发生变更的配置 key。
     pub config_key: String,
+    /// 变更前的值；`None` 表示首次写入。敏感配置的值为脱敏占位符。
     pub old_value: Option<String>,
+    /// 变更后的值；敏感配置的值为脱敏占位符。
     pub new_value: String,
+    /// 变更时间（UTC）。
     pub changed_at: chrono::DateTime<chrono::Utc>,
+    /// 操作者标识；`None` 表示未记录。
     pub changed_by: Option<String>,
 }
 
 /// 配置 reload 结果
 #[derive(Debug, Clone)]
 pub struct ConfigReloadResult {
+    /// reload 完成耗时（毫秒）。
     pub duration_ms: u64,
 }
 
@@ -160,8 +178,7 @@ impl ConfigService {
         let is_sensitive = self
             .runtime_config
             .get_full(key)
-            .map(|item| item.is_sensitive)
-            .unwrap_or(true);
+            .is_some_and(|item| item.is_sensitive);
 
         Ok(history
             .into_iter()

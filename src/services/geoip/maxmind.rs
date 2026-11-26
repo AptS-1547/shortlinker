@@ -36,7 +36,7 @@ impl GeoIpLookup for MaxMindProvider {
 
         // 新版 API: 字段直接访问，不再是 Option
         let country = city.country.iso_code.map(String::from);
-        let city_name = city.city.names.english.map(|s| s.to_string());
+        let city_name = city.city.names.english.map(String::from);
 
         trace!(
             "MaxMind lookup for {}: country={:?}, city={:?}",

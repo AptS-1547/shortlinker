@@ -6,6 +6,7 @@ use crate::cli::CliError;
 use crate::client::LinkClient;
 use crate::storage::ShortLink;
 
+/// Fetch all short links and print them as a formatted list.
 pub async fn list_links(client: &LinkClient) -> Result<(), CliError> {
     let (links, total) = client.list_links(1, 1000, None).await?;
 

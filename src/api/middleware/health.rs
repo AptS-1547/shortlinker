@@ -15,6 +15,7 @@ use crate::api::jwt::get_jwt_service;
 use crate::api::services::admin::{ApiResponse, ErrorCode};
 use crate::config::{get_runtime_config, keys};
 
+/// 健康检查端点认证的 Transform 入口
 #[derive(Clone)]
 pub struct HealthAuth;
 
@@ -36,6 +37,7 @@ where
     }
 }
 
+/// 健康检查端点的 Bearer Token 认证中间件
 pub struct HealthAuthMiddleware<S> {
     service: Rc<S>,
 }

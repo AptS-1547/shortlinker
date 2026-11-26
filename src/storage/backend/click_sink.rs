@@ -25,6 +25,10 @@ use migration::entities::{click_log, short_link};
 #[async_trait]
 impl ClickSink for SeaOrmStorage {
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()> {
+        // 分批处理，避免超出 SQLite 999 变量限制
+        // 每条记录使用 2 个变量（code 和 count），预留一些空间
+        const BATCH_SIZE: usize = 400;
+
         if updates.is_empty() {
             return Ok(());
         }
@@ -40,10 +44,6 @@ impl ClickSink for SeaOrmStorage {
         }
 
         let total_count = updates.len();
-
-        // 分批处理，避免超出 SQLite 999 变量限制
-        // 每条记录使用 2 个变量（code 和 count），预留一些空间
-        const BATCH_SIZE: usize = 400;
 
         // MySQL 用 LEAST，SQLite/PostgreSQL 用 MIN
         let clamp_fn = match self.db.get_database_backend() {

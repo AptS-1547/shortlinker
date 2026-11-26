@@ -66,7 +66,7 @@ fn create_test_responses() -> Vec<IpcResponse> {
                     created_at: chrono::Utc::now(),
                     expires_at: None,
                     password: None,
-                    click: (i * 100) as usize,
+                    click: usize::try_from(i * 100).unwrap_or(usize::MAX),
                 })
                 .collect(),
             total: 1000,
@@ -196,10 +196,10 @@ fn bench_batch_roundtrip(c: &mut Criterion) {
                     created_at: chrono::Utc::now(),
                     expires_at: None,
                     password: None,
-                    click: (i * 10) as usize,
+                    click: usize::try_from(i * 10).unwrap_or(usize::MAX),
                 })
                 .collect(),
-            total: num_links as usize,
+            total: usize::try_from(num_links).unwrap_or(usize::MAX),
             page: 1,
             page_size: num_links,
         };

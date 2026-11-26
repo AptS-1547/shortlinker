@@ -49,8 +49,8 @@ fn extract_codes_from_csv(csv_data: &[u8]) -> Vec<String> {
 
     reader
         .records()
-        .filter_map(|r| r.ok())
-        .filter_map(|record| record.get(0).map(|s| s.to_string()))
+        .filter_map(Result::ok)
+        .filter_map(|record| record.get(0).map(ToString::to_string))
         .filter(|code| !code.is_empty())
         .collect()
 }
@@ -60,9 +60,11 @@ fn extract_codes_from_csv(csv_data: &[u8]) -> Vec<String> {
 fn bench_csv_prescan(c: &mut Criterion) {
     let mut group = c.benchmark_group("import/csv_prescan");
 
-    for csv_size in [100, 1000, 10000] {
+    for csv_size in [100usize, 1000, 10_000] {
         let csv_data = generate_csv_data(csv_size);
-        group.throughput(Throughput::Elements(csv_size as u64));
+        group.throughput(Throughput::Elements(
+            u64::try_from(csv_size).unwrap_or(u64::MAX),
+        ));
         group.bench_with_input(BenchmarkId::new("rows", csv_size), &csv_data, |b, data| {
             b.iter(|| extract_codes_from_csv(data));
         });
@@ -76,7 +78,7 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
     let mut group = c.benchmark_group("import/bloom_prefilter");
 
     // 场景：DB 有 db_size 条记录，CSV 有 csv_size 条（全新 code）
-    for (db_size, csv_size) in [(0, 1000), (10000, 100), (100000, 1000)] {
+    for (db_size, csv_size) in [(0usize, 1_000), (10_000, 100), (100_000, 1_000)] {
         let filter = BloomFilter::new(BloomConfig::new(100_000, 0.001)).unwrap();
 
         // 模拟 DB 中已有的 codes 加入 Bloom Filter
@@ -87,11 +89,13 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
         let csv_codes: Vec<String> = (0..csv_size).map(|i| format!("new_code_{}", i)).collect();
 
         let label = format!("db{}_csv{}", db_size, csv_size);
-        group.throughput(Throughput::Elements(csv_size as u64));
+        group.throughput(Throughput::Elements(
+            u64::try_from(csv_size).unwrap_or(u64::MAX),
+        ));
 
         // 方案 A：Bloom 预筛选
         let codes = csv_codes.clone();
-        group.bench_with_input(BenchmarkId::new("bloom_filter", &label), &(), |b, _| {
+        group.bench_with_input(BenchmarkId::new("bloom_filter", &label), &(), |b, ()| {
             b.iter(|| {
                 let mut maybe_exist = Vec::new();
                 for code in &codes {
@@ -107,7 +111,7 @@ fn bench_bloom_prefilter(c: &mut Criterion) {
         let existing_set: HashSet<String> =
             (0..db_size).map(|i| format!("existing_{}", i)).collect();
         let codes = csv_codes.clone();
-        group.bench_with_input(BenchmarkId::new("hashset_lookup", &label), &(), |b, _| {
+        group.bench_with_input(BenchmarkId::new("hashset_lookup", &label), &(), |b, ()| {
             b.iter(|| {
                 let mut conflicts = Vec::new();
                 for code in &codes {
@@ -148,10 +152,12 @@ fn bench_bloom_with_conflicts(c: &mut Criterion) {
         csv_codes.extend((0..new_count).map(|i| format!("new_code_{}", i)));
 
         let label = format!("csv{}_conflict{}pct", csv_size, conflict_pct);
-        group.throughput(Throughput::Elements(csv_size as u64));
+        group.throughput(Throughput::Elements(
+            u64::try_from(csv_size).unwrap_or(u64::MAX),
+        ));
 
         let codes = csv_codes.clone();
-        group.bench_with_input(BenchmarkId::new("bloom_prefilter", &label), &(), |b, _| {
+        group.bench_with_input(BenchmarkId::new("bloom_prefilter", &label), &(), |b, ()| {
             b.iter(|| {
                 let mut maybe_exist = Vec::new();
                 for code in &codes {
@@ -184,7 +190,9 @@ fn bench_conflict_strategy(c: &mut Criterion) {
     let csv_codes: Vec<String> = (0..csv_size).map(|i| format!("code_{}", i)).collect();
 
     // 策略 1：Overwrite 模式（零检测）
-    group.throughput(Throughput::Elements(csv_size as u64));
+    group.throughput(Throughput::Elements(
+        u64::try_from(csv_size).unwrap_or(u64::MAX),
+    ));
     let data = csv_data.clone();
     group.bench_function("overwrite_no_check", |b| {
         b.iter(|| {

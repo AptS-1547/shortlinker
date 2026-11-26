@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 use shortlinker::config::init_config;
 use shortlinker::metrics::NoopMetrics;
-use shortlinker::services::{AnalyticsService, GroupBy};
+use shortlinker::services::{AnalyticsService, CategoryStats, GroupBy};
 use shortlinker::storage::backend::SeaOrmStorage;
 
 // =============================================================================
@@ -191,8 +191,8 @@ mod service_query_tests {
         let result = svc.get_trends(start, end, GroupBy::Day).await;
         assert!(result.is_ok(), "get_trends 失败: {:?}", result);
         let data = result.unwrap();
-        assert!(data.labels.is_empty());
-        assert!(data.values.is_empty());
+        assert_eq!(data.labels, [] as [std::string::String; 0]);
+        assert_eq!(data.values, [] as [u64; 0]);
     }
 
     #[tokio::test]
@@ -266,7 +266,7 @@ mod service_query_tests {
         let analytics = result.unwrap();
         assert_eq!(analytics.code, "nonexistent");
         assert_eq!(analytics.total_clicks, 0);
-        assert!(analytics.trend.labels.is_empty());
+        assert_eq!(analytics.trend.labels, [] as [std::string::String; 0]);
     }
 
     #[tokio::test]
@@ -282,7 +282,7 @@ mod service_query_tests {
         // Empty DB should yield no batches or an empty batch
         match batch {
             None => {} // stream ended immediately
-            Some(Ok(rows)) => assert!(rows.is_empty()),
+            Some(Ok(rows)) => assert_eq!(rows, [] as [migration::entities::click_log::Model; 0]),
             Some(Err(e)) => panic!("Unexpected error: {}", e),
         }
     }
@@ -324,7 +324,7 @@ mod v2_query_tests {
 
         let result = svc.get_trends_v2(start, end, GroupBy::Hour).await;
         assert!(result.is_ok());
-        assert!(result.unwrap().labels.is_empty());
+        assert_eq!(result.unwrap().labels, [] as [std::string::String; 0]);
     }
 
     #[tokio::test]
@@ -441,15 +441,11 @@ mod device_analytics_tests {
         // user_agents 表可能不存在或为空，接受 Ok 或 Err
         let result = svc.get_device_analytics(start, end, 10).await;
         // 空数据库上可能成功（空结果）或失败（表不存在）
-        match result {
-            Ok(analytics) => {
-                assert!(analytics.browsers.is_empty());
-                assert_eq!(analytics.bot_percentage, 0.0);
-            }
-            Err(_) => {
-                // user_agents JOIN 在空 DB 上可能失败，可接受
-            }
+        if let Ok(analytics) = result {
+            assert_eq!(analytics.browsers, [] as [CategoryStats; 0]);
+            assert_eq!(analytics.bot_percentage, 0.0);
         }
+        // Err: user_agents JOIN 在空 DB 上可能失败，可接受
     }
 
     #[tokio::test]
@@ -462,14 +458,10 @@ mod device_analytics_tests {
         let result = svc
             .get_link_device_analytics("nonexistent", start, end, 10)
             .await;
-        match result {
-            Ok(analytics) => {
-                assert!(analytics.browsers.is_empty());
-                assert_eq!(analytics.total_with_ua, 0);
-            }
-            Err(_) => {
-                // 可接受
-            }
+        if let Ok(analytics) = result {
+            assert_eq!(analytics.browsers, [] as [CategoryStats; 0]);
+            assert_eq!(analytics.total_with_ua, 0);
         }
+        // Err: user_agents JOIN 在空 DB 上可能失败，可接受
     }
 }

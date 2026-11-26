@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use tracing::{debug, info};
 
 use super::HourlyRollupWriter;
@@ -32,6 +32,7 @@ pub struct ClickAggregation {
 }
 
 impl ClickAggregation {
+    /// 创建仅有计数、无详细维度的聚合数据
     pub fn new(count: usize) -> Self {
         Self {
             count,
@@ -41,6 +42,7 @@ impl ClickAggregation {
         }
     }
 
+    /// 将另一份聚合数据累加到当前聚合
     pub fn merge(&mut self, other: &ClickAggregation) {
         self.count += other.count;
         for (k, v) in &other.referrers {
@@ -62,6 +64,7 @@ pub struct RollupManager {
 }
 
 impl RollupManager {
+    /// 使用全局配置中的数据库重试参数创建汇总管理器
     pub fn new(storage: Arc<SeaOrmStorage>) -> Self {
         let config = crate::config::get_config();
         let retry_config = RetryConfig {
@@ -146,12 +149,7 @@ impl RollupManager {
         let db = self.storage.get_db();
 
         // 获取该日期所有小时汇总
-        let start = target_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
-        let end = (target_date + Duration::days(1))
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_utc();
-
+        let (start, end) = Self::hour_range(target_date);
         let hourly_records = click_stats_hourly::Entity::find()
             .filter(click_stats_hourly::Column::HourBucket.gte(start))
             .filter(click_stats_hourly::Column::HourBucket.lt(end))
@@ -163,57 +161,11 @@ impl RollupManager {
         }
 
         // 按 short_code 聚合（预分配容量）
-        let mut aggregated: HashMap<String, ClickAggregation> =
-            HashMap::with_capacity(hourly_records.len());
+        let aggregated = Self::aggregate_hourly_records(&hourly_records);
 
-        for record in &hourly_records {
-            let agg = aggregated
-                .entry(record.short_code.clone())
-                .or_insert_with(|| ClickAggregation::new(0));
+        let daily_models = Self::build_daily_models(&aggregated, target_date)?;
 
-            agg.count = agg
-                .count
-                .saturating_add(record.click_count.max(0).try_into().unwrap_or(usize::MAX));
-
-            // 合并 referrer 统计
-            let referrers = super::parse_json_counts(&record.referrer_counts);
-            for (k, v) in referrers {
-                *agg.referrers.entry(k).or_insert(0) += v;
-            }
-
-            // 合并 country 统计
-            let countries = super::parse_json_counts(&record.country_counts);
-            for (k, v) in countries {
-                *agg.countries.entry(k).or_insert(0) += v;
-            }
-
-            // 合并 source 统计
-            let sources = super::parse_json_counts(&record.source_counts);
-            for (k, v) in sources {
-                *agg.sources.entry(k).or_insert(0) += v;
-            }
-        }
-
-        let mut daily_models = Vec::with_capacity(aggregated.len());
-        for (code, agg) in &aggregated {
-            let top_referrers = Self::get_top_n(&agg.referrers, 10);
-            let top_countries = Self::get_top_n(&agg.countries, 10);
-            let top_sources = Self::get_top_n(&agg.sources, 10);
-            daily_models.push(click_stats_daily::ActiveModel {
-                short_code: Set(code.clone()),
-                day_bucket: Set(target_date),
-                click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
-                unique_referrers: Set(Some(i32::try_from(agg.referrers.len()).unwrap_or(i32::MAX))),
-                unique_countries: Set(Some(i32::try_from(agg.countries.len()).unwrap_or(i32::MAX))),
-                unique_sources: Set(Some(i32::try_from(agg.sources.len()).unwrap_or(i32::MAX))),
-                top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
-                top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
-                top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
-                ..Default::default()
-            });
-        }
-
-        let processed = aggregated.len() as u64;
+        let processed = u64::try_from(aggregated.len()).unwrap_or(u64::MAX);
 
         if !daily_models.is_empty() {
             aster_forge_db::retry::with_sea_orm_retry(
@@ -246,11 +198,101 @@ impl RollupManager {
         }
 
         // ---- 全局天汇总 ----
+        Self::upsert_global_daily(db, self.retry_config, &aggregated, target_date).await?;
+
+        info!(
+            "Hourly-to-daily rollup completed: {} links (date: {})",
+            processed, target_date
+        );
+        Ok(processed)
+    }
+
+    /// 计算 `target_date` 当天 [00:00, 次日 00:00) 的 UTC 时间范围
+    fn hour_range(target_date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
+        let start = target_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let end = (target_date + Duration::days(1))
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc();
+        (start, end)
+    }
+
+    /// 将小时汇总记录按短码聚合为 `ClickAggregation`
+    fn aggregate_hourly_records(
+        hourly_records: &[click_stats_hourly::Model],
+    ) -> HashMap<String, ClickAggregation> {
+        let mut aggregated: HashMap<String, ClickAggregation> =
+            HashMap::with_capacity(hourly_records.len());
+
+        for record in hourly_records {
+            let agg = aggregated
+                .entry(record.short_code.clone())
+                .or_insert_with(|| ClickAggregation::new(0));
+
+            agg.count = agg
+                .count
+                .saturating_add(record.click_count.max(0).try_into().unwrap_or(usize::MAX));
+
+            // 合并 referrer 统计
+            let referrers = super::parse_json_counts(record.referrer_counts.as_ref());
+            for (k, v) in referrers {
+                *agg.referrers.entry(k).or_insert(0) += v;
+            }
+
+            // 合并 country 统计
+            let countries = super::parse_json_counts(record.country_counts.as_ref());
+            for (k, v) in countries {
+                *agg.countries.entry(k).or_insert(0) += v;
+            }
+
+            // 合并 source 统计
+            let sources = super::parse_json_counts(record.source_counts.as_ref());
+            for (k, v) in sources {
+                *agg.sources.entry(k).or_insert(0) += v;
+            }
+        }
+
+        aggregated
+    }
+
+    /// 根据聚合结果构建天汇总 `ActiveModel` 列表
+    fn build_daily_models(
+        aggregated: &HashMap<String, ClickAggregation>,
+        target_date: NaiveDate,
+    ) -> anyhow::Result<Vec<click_stats_daily::ActiveModel>> {
+        let mut daily_models = Vec::with_capacity(aggregated.len());
+        for (code, agg) in aggregated {
+            let top_referrers = Self::get_top_n(&agg.referrers, 10);
+            let top_countries = Self::get_top_n(&agg.countries, 10);
+            let top_sources = Self::get_top_n(&agg.sources, 10);
+            daily_models.push(click_stats_daily::ActiveModel {
+                short_code: Set(code.clone()),
+                day_bucket: Set(target_date),
+                click_count: Set(i64::try_from(agg.count).unwrap_or(i64::MAX)),
+                unique_referrers: Set(Some(i32::try_from(agg.referrers.len()).unwrap_or(i32::MAX))),
+                unique_countries: Set(Some(i32::try_from(agg.countries.len()).unwrap_or(i32::MAX))),
+                unique_sources: Set(Some(i32::try_from(agg.sources.len()).unwrap_or(i32::MAX))),
+                top_referrers: Set(Some(serde_json::to_string(&top_referrers)?)),
+                top_countries: Set(Some(serde_json::to_string(&top_countries)?)),
+                top_sources: Set(Some(serde_json::to_string(&top_sources)?)),
+                ..Default::default()
+            });
+        }
+        Ok(daily_models)
+    }
+
+    /// 从已聚合的 per-code 数据中计算并 upsert 全局天汇总
+    async fn upsert_global_daily(
+        db: &DatabaseConnection,
+        retry_config: RetryConfig,
+        aggregated: &HashMap<String, ClickAggregation>,
+        target_date: NaiveDate,
+    ) -> anyhow::Result<()> {
         // 从已聚合的 per-code 数据中计算全局统计
         let total_clicks: i64 = aggregated
             .values()
             .map(|a| i64::try_from(a.count).unwrap_or(i64::MAX))
-            .fold(0i64, |acc, x| acc.saturating_add(x));
+            .fold(0i64, i64::saturating_add);
         let unique_links = i32::try_from(aggregated.len()).unwrap_or(i32::MAX);
 
         let mut global_referrers: HashMap<String, usize> = HashMap::new();
@@ -284,7 +326,7 @@ impl RollupManager {
         };
         aster_forge_db::retry::with_sea_orm_retry(
             "rollup_upsert_global_daily",
-            self.retry_config,
+            retry_config,
             || async {
                 click_stats_global_daily::Entity::insert(global_model.clone())
                     .on_conflict(
@@ -303,12 +345,7 @@ impl RollupManager {
             },
         )
         .await?;
-
-        info!(
-            "Hourly-to-daily rollup completed: {} links (date: {})",
-            processed, target_date
-        );
-        Ok(processed)
+        Ok(())
     }
 
     /// 清理过期的汇总数据
@@ -321,7 +358,8 @@ impl RollupManager {
         let now = Utc::now();
 
         // 清理过期的小时汇总
-        let hourly_cutoff = now - Duration::days(hourly_retention_days as i64);
+        let hourly_cutoff =
+            now - Duration::days(i64::try_from(hourly_retention_days).unwrap_or(i64::MAX));
         let hourly_deleted = click_stats_hourly::Entity::delete_many()
             .filter(click_stats_hourly::Column::HourBucket.lt(hourly_cutoff))
             .exec(db)
@@ -329,7 +367,9 @@ impl RollupManager {
             .rows_affected;
 
         // 清理过期的天汇总
-        let daily_cutoff = Self::truncate_to_day(now - Duration::days(daily_retention_days as i64));
+        let daily_cutoff = Self::truncate_to_day(
+            now - Duration::days(i64::try_from(daily_retention_days).unwrap_or(i64::MAX)),
+        );
         let daily_deleted = click_stats_daily::Entity::delete_many()
             .filter(click_stats_daily::Column::DayBucket.lt(daily_cutoff))
             .exec(db)

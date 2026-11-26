@@ -5,6 +5,7 @@ use colored::Colorize;
 use crate::cli::CliError;
 use crate::client::LinkClient;
 
+/// Update a short link's target URL, expiration, or password.
 pub async fn update_link(
     client: &LinkClient,
     short_code: String,

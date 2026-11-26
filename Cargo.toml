@@ -1,11 +1,12 @@
 [package]
 name = "shortlinker"
-version = "0.6.0"
+version = "0.6.1"
 description = "A minimalist URL shortener service supporting HTTP 307 redirection, built with Rust. Easy to deploy and lightning fast."
 authors = ["AptS-1547 <apts-1547@esaps.net>"]
 repository = "https://github.com/AptS-1547/shortlinker"
 edition = "2024"
 rust-version = "1.95.0"
+license = "MIT"
 
 [features]
 default = ["server", "cli"]  # 默认启用服务器和CLI功能
@@ -13,7 +14,8 @@ server = []           # 服务器功能（核心）
 cli = ["server"]      # CLI功能（依赖服务器）
 metrics = [
     "server",
-    "aster_forge_actix_observability/prometheus",
+    "dep:aster_forge_observability",
+    "aster_forge_observability/prometheus",
     "aster_forge_metrics/backend-prometheus",
 ]  # Prometheus 指标导出
 openapi = [
@@ -72,6 +74,9 @@ strip = true
 name = "shortlinker"
 path = "src/lib.rs"
 
+[lints]
+workspace = true
+
 # 二进制配置
 [[bin]]
 name = "shortlinker"
@@ -80,82 +85,171 @@ path = "src/main.rs"
 [workspace]
 members = [".", "migration"]
 
-[dependencies]
-aster_forge_actix_middleware = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_middleware", features = ["metrics"] }
-aster_forge_actix_observability = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_actix_observability" }
-aster_forge_api_docs_macros = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_api_docs_macros" }
-aster_forge_cache = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_cache", features = ["bloom", "memory", "redis"] }
-aster_forge_config = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_config" }
-aster_forge_crypto = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_crypto" }
-aster_forge_db = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_db", features = ["system-config"] }
-aster_forge_logging = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_logging" }
-aster_forge_metrics = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_metrics" }
-aster_forge_panic = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_panic" }
-aster_forge_runtime = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_runtime" }
-aster_forge_tasks = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_tasks", features = ["runtime-component"] }
-aster_forge_utils = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_utils" }
-clap = { version = "4", features = ["derive"] }
-migration = { path = "migration" }
-actix-web = { version = "4.14", features = ["compress-brotli", "compress-gzip"] }
-config = "0.15"
-dotenvy = "0.15"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_repr = "0.1"
-rand = { version = "0.10.2", default-features = false, features = ["std", "std_rng", "thread_rng"] }
-chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
-async-trait = "0.1.92"
-tokio = { version = "1.53.1", default-features = false, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
-bytes = "1.12"
-tracing = { version = "0.1.44", default-features = false }
-dashmap = "6.2.1"
-crossbeam-channel = "0.5"
-moka = { version = "0.12.16", default-features = false, features = ["future", "sync"] }
-colored = "3.1.1"
-num_cpus = { version = "1.17.0", default-features = false }
+[workspace.lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Suppressions must remain observable: `expect` reports when its justification goes stale.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+multiple_unsafe_ops_per_block = "deny"
+undocumented_unsafe_blocks = "deny"
+# 存量测试代码(docstrings/format!/测试辅助函数)为主的低信噪比 pedantic 项:
+# 对 #[cfg(test)] 辅助函数强加 must_use/# Errors 段、给专有名词加反引号属于
+# 纯噪音;安全硬约束(cast/unsafe/allow_attributes 系列)保持 deny 不放行。
+doc_markdown = "allow"
+uninlined_format_args = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+
+[workspace.dependencies]
+# Pin all Forge mechanisms together to the exact published crates.io versions.
+aster_forge_middleware = { version = "=0.1.0-alpha.6", features = ["metrics"] }
+aster_forge_observability = { version = "=0.1.0-alpha.5" }
+aster_forge_api_docs_macros = { version = "=0.1.0-alpha.1" }
+aster_forge_cache = { version = "=0.1.0-alpha.4", features = ["bloom", "memory", "redis"] }
+aster_forge_config = { version = "=0.1.0-alpha.4" }
+aster_forge_crypto = { version = "=0.1.0-alpha.4", features = ["password"] }
+aster_forge_db = { version = "=0.1.0-alpha.5", features = ["system-config"] }
+aster_forge_logging = { version = "=0.1.0-alpha.3" }
+aster_forge_metrics = { version = "=0.1.0-alpha.5" }
+aster_forge_panic = { version = "=0.1.0-alpha.4" }
+aster_forge_runtime = { version = "=0.1.0-alpha.4" }
+aster_forge_tasks = { version = "=0.1.0-alpha.4", features = ["runtime-component"] }
+aster_forge_utils = { version = "=0.1.0-alpha.4" }
+actix-web = { version = "4.20.0", features = ["compress-brotli", "compress-gzip"] }
+# actix-server 2.7.0 uses `actix_rt::net` and `actix_rt::signal` without
+# enabling the split features of actix-rt 2.16 (macros/net/signal are now
+# opt-in); remove this once actix-server declares them.
+actix-rt = "2.16.0"
+actix-cors = "0.7.2"
+actix-multipart = "0.8.9"
 actix-service = "2.0.3"
+anyhow = { version = "1.0.105", features = ["backtrace"] }
+arc-swap = "1.9.5"
+async-trait = "0.1.92"
+base64 = "0.23.1"
+bytes = "1.12.2"
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.6.10", features = ["derive"] }
+colored = "3.1.1"
+config = "0.15.27"
+crossbeam-channel = "0.5.17"
+csv = "1.4.0"
+dashmap = "6.2.1"
+dotenvy = "0.15.7"
 futures-util = "0.3.34"
-anyhow = { version = "1.0.104", features = ["backtrace"] }
-rust-embed = "8.12.0"
-uuid = { version = "1.24", features = ["v4"] }
-rustls = "0.23.43"
-toml = "1.1"
-sea-orm = { version = "2.0.1", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls", "chrono"] }
-jsonwebtoken = { version = "11", features = ["rust_crypto"] }
-arc-swap = "1"
-actix-cors = "0.7"
-utoipa = { version = "5.5.0", features = ["actix_extras", "chrono", "repr"], optional = true }
-csv = "1.4"
-actix-multipart = "0.8"
-strum = { version = "0.28", features = ["derive"] }
-governor = "0.10.4"
-actix-governor = "0.10.0"
-rpassword = "7"
-tokio-util = "0.7"
-subtle = "2"
-base64 = "0.23"
-maxminddb = "0.30"
-ureq = { version = "3.4.0", features = ["json"] }
-xxhash-rust = { version = "0.8", features = ["xxh64"] }
-woothee = "0.13"
+jsonwebtoken = { version = "12.0.0", features = ["rust_crypto"] }
+maxminddb = "0.33.0"
+moka = { version = "0.12.16", default-features = false, features = ["future", "sync"] }
+num_cpus = { version = "1.17.0", default-features = false }
+rand = { version = "0.10.4", default-features = false, features = ["std", "std_rng", "thread_rng"] }
+rust-embed = "8.14.0"
+rustls = "0.23.46"
+sea-orm = { version = "2.0.4", default-features = false, features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls"] }
+sea-orm-migration = { version = "2.0.4", default-features = false, features = ["cli", "runtime-tokio-rustls", "sqlx-postgres", "sqlx-mysql", "sqlx-sqlite"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_repr = "0.1.21"
+strum = { version = "0.28.0", features = ["derive"] }
+subtle = "2.6.1"
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", default-features = false }
+tokio-util = "0.7.20"
+toml = "1.2.3"
+tracing = { version = "0.1.44", default-features = false }
+ureq = { version = "3.5.2", features = ["json"] }
 urlencoding = "2.1.3"
-
-[target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = [
+utoipa = { version = "6.0.0", features = ["actix_extras", "chrono", "repr"] }
+uuid = { version = "1.29.3", features = ["v4"] }
+windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_System_Console",
 ] }
+woothee = "0.13.0"
+xxhash-rust = { version = "0.8.21", features = ["xxh64"] }
+criterion = { version = "0.8.2", features = ["async_tokio"] }
+migration = { path = "migration" }
+nix = { version = "0.31.4", default-features = false, features = ["signal", "process", "fs"] }
+rpassword = "7.5.5"
+
+[dependencies]
+aster_forge_middleware.workspace = true
+aster_forge_observability = { workspace = true, optional = true }
+aster_forge_api_docs_macros.workspace = true
+aster_forge_cache.workspace = true
+aster_forge_config.workspace = true
+aster_forge_crypto.workspace = true
+aster_forge_db.workspace = true
+aster_forge_logging.workspace = true
+aster_forge_metrics.workspace = true
+aster_forge_panic.workspace = true
+aster_forge_runtime.workspace = true
+aster_forge_tasks.workspace = true
+aster_forge_utils.workspace = true
+clap.workspace = true
+migration.workspace = true
+actix-web.workspace = true
+actix-rt.workspace = true
+config.workspace = true
+dotenvy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_repr.workspace = true
+rand.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+bytes.workspace = true
+tracing.workspace = true
+dashmap.workspace = true
+crossbeam-channel.workspace = true
+moka.workspace = true
+colored.workspace = true
+num_cpus.workspace = true
+actix-service.workspace = true
+futures-util.workspace = true
+anyhow.workspace = true
+rust-embed.workspace = true
+uuid.workspace = true
+rustls.workspace = true
+toml.workspace = true
+sea-orm = { workspace = true, features = ["chrono"] }
+jsonwebtoken.workspace = true
+arc-swap.workspace = true
+actix-cors.workspace = true
+utoipa = { workspace = true, optional = true }
+csv.workspace = true
+actix-multipart.workspace = true
+strum.workspace = true
+rpassword.workspace = true
+tokio-util.workspace = true
+subtle.workspace = true
+base64.workspace = true
+maxminddb.workspace = true
+ureq.workspace = true
+xxhash-rust.workspace = true
+woothee.workspace = true
+urlencoding.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+nix.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
 
 [dev-dependencies]
-actix-rt = "2.11"
-tempfile = "3.27"
-tokio = { version = "1.53.1", features = ["full"] }
-criterion = { version = "0.8", features = ["async_tokio"] }
+actix-rt.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["full"] }
+criterion.workspace = true
 
 [[bench]]
 name = "click_manager"

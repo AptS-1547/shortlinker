@@ -46,7 +46,12 @@ pub enum ClientError {
     /// Lazy service initialization failed
     InitFailed(String),
     /// Server returned a business error via IPC
-    ServerError { code: String, message: String },
+    ServerError {
+        /// Machine-readable error code from the server.
+        code: String,
+        /// Human-readable error message from the server.
+        message: String,
+    },
 }
 
 impl fmt::Display for ClientError {

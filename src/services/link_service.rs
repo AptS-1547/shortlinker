@@ -105,11 +105,17 @@ mod import_mode_tests {
 /// handler 负责 CSV 解析和字段验证，service 负责冲突检测、去重、写入和缓存更新。
 #[derive(Debug, Clone)]
 pub struct ImportLinkItemRich {
+    /// 短码，已通过格式校验。
     pub code: String,
+    /// 目标 URL，已通过格式校验。
     pub target: String,
+    /// 创建时间（UTC）；CSV 未提供时为导入时刻。
     pub created_at: DateTime<Utc>,
+    /// 过期时间（UTC）；`None` 表示永不过期。
     pub expires_at: Option<DateTime<Utc>>,
+    /// 已完成哈希的访问口令；`None` 表示无密码保护。
     pub password: Option<String>,
+    /// 导入时携带的初始点击计数，默认 0。
     pub click_count: usize,
     /// 来源行号（仅 CSV 导入路径设置），用于错误报告
     pub row_num: Option<usize>,
@@ -118,15 +124,20 @@ pub struct ImportLinkItemRich {
 /// 批量导入结果
 #[derive(Debug, Clone, Default)]
 pub struct ImportBatchResult {
+    /// 成功写入的条目数。
     pub success_count: usize,
+    /// 因已存在且导入模式为 skip 而跳过的条目数。
     pub skipped_count: usize,
+    /// 校验或写入失败的具体条目。
     pub failed_items: Vec<ImportBatchFailedItem>,
 }
 
 /// 批量导入失败项
 #[derive(Debug, Clone)]
 pub struct ImportBatchFailedItem {
+    /// 失败条目的短码。
     pub code: String,
+    /// 失败原因。
     pub error: ShortlinkerError,
     /// 来源行号，从 ImportLinkItemRich.row_num 透传
     pub row_num: Option<usize>,
@@ -137,29 +148,38 @@ pub struct ImportBatchFailedItem {
 /// Single successful batch operation item
 #[derive(Debug, Clone)]
 pub struct BatchSuccessItem {
+    /// Short code of the processed link.
     pub code: String,
+    /// The link state after the operation.
     pub link: ShortLink,
 }
 
 /// Single failed batch operation item
 #[derive(Debug, Clone)]
 pub struct BatchFailedItem {
+    /// Short code of the failed link.
     pub code: String,
+    /// Human-readable failure reason.
     pub reason: String,
 }
 
 /// Result of batch create/update operation
 #[derive(Debug, Clone, Default)]
 pub struct BatchOperationResult {
+    /// Links that were written successfully.
     pub success: Vec<BatchSuccessItem>,
+    /// Links that failed, in input order.
     pub failed: Vec<BatchFailedItem>,
 }
 
 /// Result of batch delete operation
 #[derive(Debug, Clone, Default)]
 pub struct BatchDeleteResult {
+    /// Short codes that were deleted.
     pub deleted: Vec<String>,
+    /// Short codes that did not exist.
     pub not_found: Vec<String>,
+    /// Deletions that failed with an error.
     pub errors: Vec<BatchFailedItem>,
 }
 
@@ -181,19 +201,19 @@ impl LinkService {
     }
 
     /// Get the configured random code length
-    fn random_code_length(&self) -> usize {
+    fn random_code_length() -> usize {
         try_get_runtime_config()
             .and_then(|rt| rt.get_usize(keys::FEATURES_RANDOM_CODE_LENGTH))
             .unwrap_or(6)
     }
 
     /// Get the default cache TTL
-    fn default_cache_ttl(&self) -> u64 {
+    fn default_cache_ttl() -> u64 {
         get_config().cache.default_ttl
     }
 
     /// Process password field - always hash, never accept pre-hashed values
-    fn process_password(&self, password: Option<&str>) -> Result<Option<String>, ShortlinkerError> {
+    fn process_password(password: Option<&str>) -> Result<Option<String>, ShortlinkerError> {
         process_new_password(password).map_err(|e| {
             error!("Failed to hash password: {}", e);
             ShortlinkerError::link_password_hash_error(e.to_string())
@@ -202,20 +222,19 @@ impl LinkService {
 
     /// Parse expiration time from flexible format
     fn parse_expires_at(
-        &self,
         expires_at: Option<&str>,
     ) -> Result<Option<DateTime<Utc>>, ShortlinkerError> {
         match expires_at {
             Some(s) if !s.is_empty() => TimeParser::parse_expire_time(s)
                 .map(Some)
-                .map_err(|e| ShortlinkerError::link_invalid_expire_time(e.to_string())),
+                .map_err(|e| ShortlinkerError::link_invalid_expire_time(e.clone())),
             _ => Ok(None),
         }
     }
 
     /// Update cache with a link
     async fn update_cache(&self, link: &ShortLink) {
-        let ttl = link.cache_ttl(self.default_cache_ttl());
+        let ttl = link.cache_ttl(Self::default_cache_ttl());
         self.cache.insert(&link.code, link.clone(), ttl).await;
     }
 
@@ -249,7 +268,7 @@ impl LinkService {
                 }
                 (c, false)
             }
-            None => (generate_random_code(self.random_code_length()), true),
+            None => (generate_random_code(Self::random_code_length()), true),
         };
 
         // Check if code already exists
@@ -265,10 +284,10 @@ impl LinkService {
         }
 
         // Parse expiration time
-        let expires_at = self.parse_expires_at(req.expires_at.as_deref())?;
+        let expires_at = Self::parse_expires_at(req.expires_at.as_deref())?;
 
         // Process password
-        let password = self.process_password(req.password.as_deref())?;
+        let password = Self::process_password(req.password.as_deref())?;
 
         // Preserve original created_at and click count if overwriting
         let (created_at, click) = if let Some(ref existing_link) = existing {
@@ -332,7 +351,7 @@ impl LinkService {
 
         // Parse expiration time (None = keep existing)
         let expires_at = if req.expires_at.is_some() {
-            self.parse_expires_at(req.expires_at.as_deref())?
+            Self::parse_expires_at(req.expires_at.as_deref())?
         } else {
             existing.expires_at
         };
@@ -421,7 +440,7 @@ impl LinkService {
     /// 用于大数据量导出场景，避免一次性加载全部数据到内存。
     pub fn export_links_stream(
         &self,
-        filter: LinkFilter,
+        filter: &LinkFilter,
         batch_size: u64,
     ) -> Pin<Box<dyn Stream<Item = crate::errors::Result<Vec<ShortLink>>> + Send + 'static>> {
         self.storage.stream_all_filtered_cursor(filter, batch_size)
@@ -470,31 +489,7 @@ impl LinkService {
         let all_codes: Vec<String> = items.iter().map(|item| item.code.clone()).collect();
 
         // 2. 冲突检测：Bloom filter 预筛选 + 精确查询
-        let existing_codes: HashSet<String> = match mode {
-            ImportMode::Overwrite => HashSet::new(),
-            ImportMode::Skip | ImportMode::Error => {
-                let mut maybe_exist = Vec::new();
-                for code in &all_codes {
-                    if self.cache.bloom_check(code).await {
-                        maybe_exist.push(code.clone());
-                    }
-                }
-
-                if maybe_exist.is_empty() {
-                    HashSet::new()
-                } else {
-                    self.storage
-                        .batch_check_codes_exist(&maybe_exist)
-                        .await
-                        .map_err(|e| {
-                            ShortlinkerError::database_operation(format!(
-                                "Failed to check existing codes: {}",
-                                e
-                            ))
-                        })?
-                }
-            }
-        };
+        let existing_codes = self.collect_existing_codes(&all_codes, mode).await?;
 
         debug!(
             "LinkService: import batch - {} items, {} existing codes found",
@@ -551,7 +546,7 @@ impl LinkService {
         let total = links_vec.len();
 
         if !links_vec.is_empty() {
-            let default_ttl = self.default_cache_ttl();
+            let default_ttl = Self::default_cache_ttl();
             let mut processed = 0usize;
 
             for chunk in links_vec.chunks(chunk_size) {
@@ -584,6 +579,39 @@ impl LinkService {
         Ok(result)
     }
 
+    /// 冲突检测：`Overwrite` 模式跳过检测，其余模式先经 Bloom filter 预筛选再精确查询
+    async fn collect_existing_codes(
+        &self,
+        all_codes: &[String],
+        mode: ImportMode,
+    ) -> Result<HashSet<String>, ShortlinkerError> {
+        match mode {
+            ImportMode::Overwrite => Ok(HashSet::new()),
+            ImportMode::Skip | ImportMode::Error => {
+                let mut maybe_exist = Vec::new();
+                for code in all_codes {
+                    if self.cache.bloom_check(code).await {
+                        maybe_exist.push(code.clone());
+                    }
+                }
+
+                if maybe_exist.is_empty() {
+                    return Ok(HashSet::new());
+                }
+
+                self.storage
+                    .batch_check_codes_exist(&maybe_exist)
+                    .await
+                    .map_err(|e| {
+                        ShortlinkerError::database_operation(format!(
+                            "Failed to check existing codes: {}",
+                            e
+                        ))
+                    })
+            }
+        }
+    }
+
     /// Batch create links
     ///
     /// Creates multiple links in a single operation. Each link is validated
@@ -592,8 +620,6 @@ impl LinkService {
         &self,
         requests: Vec<CreateLinkRequest>,
     ) -> Result<BatchOperationResult, ShortlinkerError> {
-        let mut result = BatchOperationResult::default();
-
         // Step 1: Collect codes and validate URLs
         struct ValidatedRequest {
             code: String,
@@ -603,6 +629,7 @@ impl LinkService {
             force: bool,
         }
 
+        let mut result = BatchOperationResult::default();
         let mut codes_to_check: Vec<String> = Vec::new();
         let mut valid_requests: Vec<ValidatedRequest> = Vec::new();
 
@@ -623,7 +650,7 @@ impl LinkService {
             // Generate code if not provided
             let code = match req.code.filter(|c| !c.is_empty()) {
                 Some(c) => c,
-                None => generate_random_code(self.random_code_length()),
+                None => generate_random_code(Self::random_code_length()),
             };
 
             codes_to_check.push(code.clone());
@@ -637,7 +664,7 @@ impl LinkService {
         }
 
         // Step 2: Batch check existing codes
-        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+        let codes_refs: Vec<&str> = codes_to_check.iter().map(String::as_str).collect();
         let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
             ShortlinkerError::database_operation(format!("Failed to batch check codes: {}", e))
         })?;
@@ -658,7 +685,7 @@ impl LinkService {
             }
 
             // Parse expiration time
-            let expires_at = match self.parse_expires_at(req.expires_at.as_deref()) {
+            let expires_at = match Self::parse_expires_at(req.expires_at.as_deref()) {
                 Ok(dt) => dt,
                 Err(e) => {
                     result.failed.push(BatchFailedItem {
@@ -670,7 +697,7 @@ impl LinkService {
             };
 
             // Process password
-            let password = match self.process_password(req.password.as_deref()) {
+            let password = match Self::process_password(req.password.as_deref()) {
                 Ok(pwd) => pwd,
                 Err(e) => {
                     result.failed.push(BatchFailedItem {
@@ -700,24 +727,9 @@ impl LinkService {
             links_to_save.push(new_link);
         }
 
-        // Step 4: Batch save to storage
-        if !links_to_save.is_empty() {
-            self.storage
-                .batch_set(links_to_save.clone())
-                .await
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("Failed to batch save: {}", e))
-                })?;
-
-            // Update cache for each saved link
-            for link in &links_to_save {
-                self.update_cache(link).await;
-                result.success.push(BatchSuccessItem {
-                    code: link.code.clone(),
-                    link: link.clone(),
-                });
-            }
-        }
+        // Step 4: Batch save to storage and refresh cache entries
+        self.save_and_cache_links(links_to_save, &mut result, "Failed to batch save")
+            .await?;
 
         info!(
             "LinkService: batch created {} links, {} failed",
@@ -728,6 +740,33 @@ impl LinkService {
         Ok(result)
     }
 
+    /// Batch save links to storage, refresh their cache entries and record successes
+    async fn save_and_cache_links(
+        &self,
+        links: Vec<ShortLink>,
+        result: &mut BatchOperationResult,
+        error_context: &str,
+    ) -> Result<(), ShortlinkerError> {
+        if links.is_empty() {
+            return Ok(());
+        }
+
+        self.storage.batch_set(links.clone()).await.map_err(|e| {
+            ShortlinkerError::database_operation(format!("{}: {}", error_context, e))
+        })?;
+
+        // Update cache for each saved link
+        for link in &links {
+            self.update_cache(link).await;
+            result.success.push(BatchSuccessItem {
+                code: link.code.clone(),
+                link: link.clone(),
+            });
+        }
+
+        Ok(())
+    }
+
     /// Batch update links
     ///
     /// Updates multiple links in a single operation. Each update is validated
@@ -736,8 +775,6 @@ impl LinkService {
         &self,
         updates: Vec<(String, UpdateLinkRequest)>,
     ) -> Result<BatchOperationResult, ShortlinkerError> {
-        let mut result = BatchOperationResult::default();
-
         // Step 1: Collect codes and validate URLs
         struct ValidatedUpdate {
             code: String,
@@ -745,6 +782,8 @@ impl LinkService {
             expires_at: Option<String>,
             password: Option<String>,
         }
+
+        let mut result = BatchOperationResult::default();
 
         let mut codes_to_check: Vec<String> = Vec::new();
         let mut valid_updates: Vec<ValidatedUpdate> = Vec::new();
@@ -769,7 +808,7 @@ impl LinkService {
         }
 
         // Step 2: Batch fetch existing links
-        let codes_refs: Vec<&str> = codes_to_check.iter().map(|s| s.as_str()).collect();
+        let codes_refs: Vec<&str> = codes_to_check.iter().map(String::as_str).collect();
         let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
             ShortlinkerError::database_operation(format!("Failed to batch fetch: {}", e))
         })?;
@@ -778,20 +817,17 @@ impl LinkService {
         let mut links_to_save: Vec<ShortLink> = Vec::new();
 
         for update in valid_updates {
-            let existing = match existing_map.get(&update.code) {
-                Some(link) => link,
-                None => {
-                    result.failed.push(BatchFailedItem {
-                        code: update.code,
-                        reason: "Link not found".to_string(),
-                    });
-                    continue;
-                }
+            let Some(existing) = existing_map.get(&update.code) else {
+                result.failed.push(BatchFailedItem {
+                    code: update.code,
+                    reason: "Link not found".to_string(),
+                });
+                continue;
             };
 
             // Parse expiration time (None = keep existing)
             let expires_at = if update.expires_at.is_some() {
-                match self.parse_expires_at(update.expires_at.as_deref()) {
+                match Self::parse_expires_at(update.expires_at.as_deref()) {
                     Ok(dt) => dt,
                     Err(e) => {
                         result.failed.push(BatchFailedItem {
@@ -832,24 +868,9 @@ impl LinkService {
             links_to_save.push(updated_link);
         }
 
-        // Step 4: Batch save to storage
-        if !links_to_save.is_empty() {
-            self.storage
-                .batch_set(links_to_save.clone())
-                .await
-                .map_err(|e| {
-                    ShortlinkerError::database_operation(format!("Failed to batch update: {}", e))
-                })?;
-
-            // Update cache for each saved link
-            for link in &links_to_save {
-                self.update_cache(link).await;
-                result.success.push(BatchSuccessItem {
-                    code: link.code.clone(),
-                    link: link.clone(),
-                });
-            }
-        }
+        // Step 4: Batch save to storage and refresh cache entries
+        self.save_and_cache_links(links_to_save, &mut result, "Failed to batch update")
+            .await?;
 
         info!(
             "LinkService: batch updated {} links, {} failed",
@@ -870,7 +891,7 @@ impl LinkService {
         let mut result = BatchDeleteResult::default();
 
         // Step 1: Batch check which codes exist
-        let codes_refs: Vec<&str> = codes.iter().map(|s| s.as_str()).collect();
+        let codes_refs: Vec<&str> = codes.iter().map(String::as_str).collect();
         let existing_map = self.storage.batch_get(&codes_refs).await.map_err(|e| {
             ShortlinkerError::database_operation(format!("Failed to batch check: {}", e))
         })?;

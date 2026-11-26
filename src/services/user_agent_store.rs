@@ -90,31 +90,31 @@ impl UserAgentStore {
         ParsedUserAgent {
             hash: hash.to_string(),
             ua_string: ua_string.to_string(),
-            browser_name: if result.name != "UNKNOWN" {
+            browser_name: if result.name == "UNKNOWN" {
+                None
+            } else {
                 Some(result.name.to_string())
-            } else {
-                None
             },
-            browser_version: if !result.version.is_empty() {
+            browser_version: if result.version.is_empty() {
+                None
+            } else {
                 Some(result.version.to_string())
-            } else {
-                None
             },
-            os_name: if result.os != "UNKNOWN" {
+            os_name: if result.os == "UNKNOWN" {
+                None
+            } else {
                 Some(result.os.to_string())
-            } else {
-                None
             },
-            os_version: if !result.os_version.is_empty() {
-                Some(result.os_version.to_string())
-            } else {
+            os_version: if result.os_version.is_empty() {
                 None
+            } else {
+                Some(result.os_version.to_string())
             },
             device_category: Some(result.category.to_string()),
-            device_vendor: if result.vendor != "UNKNOWN" {
-                Some(result.vendor.to_string())
-            } else {
+            device_vendor: if result.vendor == "UNKNOWN" {
                 None
+            } else {
+                Some(result.vendor.to_string())
             },
             is_bot: result.category == "crawler",
         }

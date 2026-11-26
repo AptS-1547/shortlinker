@@ -1,11 +1,51 @@
+/// CSV 导入导出处理
 pub mod csv_handler;
+/// 密码哈希与验证工具
 pub mod password;
+/// 时间字符串解析（RFC3339 与相对时间）
 pub mod time_parser;
 
 pub use time_parser::TimeParser;
 
 /// 短码最大长度
 pub const MAX_SHORT_CODE_LEN: usize = 128;
+
+/// 将 `u64` 计数转换为 `f64`。
+///
+/// `f64` 尾数只有 53 位，超过 2^53 的整数按 IEEE-754 就近舍入；拆分高低 32 位
+/// 经 `u32` 无损转换后再组合，舍入结果与 `as` 强制转换一致，但显式表达转换意图。
+///
+/// # Panics
+///
+/// 仅当 32 位拆分逻辑实现错误导致越界时 panic；`u64` 高/低 32 位必然落在
+/// `u32` 范围内，正常不会触发。
+#[must_use]
+pub fn u64_to_f64(value: u64) -> f64 {
+    let high = f64::from(u32::try_from(value >> 32).expect("u64 高 32 位必然落在 u32 范围内"));
+    let low =
+        f64::from(u32::try_from(value & 0xFFFF_FFFF).expect("u64 低 32 位必然落在 u32 范围内"));
+    // 2^32 是精确的 f64 值，乘法只调整指数不损失有效位
+    high * 4_294_967_296.0 + low
+}
+
+/// 将 `i64` 计数转换为 `f64`。
+///
+/// 与 `as f64` 一致：按 IEEE-754 就近舍入，符号保留。
+#[must_use]
+pub fn i64_to_f64(value: i64) -> f64 {
+    let magnitude = u64_to_f64(value.unsigned_abs());
+    if value < 0 { -magnitude } else { magnitude }
+}
+
+/// 计算 `count / total * 100` 的百分比；`total` 为 0 时返回 0.0。
+#[must_use]
+pub fn percentage(count: u64, total: u64) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        u64_to_f64(count) / u64_to_f64(total) * 100.0
+    }
+}
 
 /// 验证短码格式：非空、长度 ≤ 128，字符集 [a-zA-Z0-9_.-/]
 ///
@@ -28,11 +68,8 @@ pub fn is_valid_short_code(code: &str) -> bool {
 pub fn get_reserved_prefixes() -> Vec<String> {
     use crate::config::{keys, try_get_runtime_config};
 
-    let rt = match try_get_runtime_config() {
-        Some(rt) => rt,
-        None => {
-            return vec!["admin".into(), "health".into(), "panel".into()];
-        }
+    let Some(rt) = try_get_runtime_config() else {
+        return vec!["admin".into(), "health".into(), "panel".into()];
     };
 
     vec![
@@ -57,6 +94,7 @@ pub fn is_reserved_short_code(code: &str) -> bool {
         .any(|prefix| code == prefix || code.starts_with(&format!("{}/", prefix)))
 }
 
+/// 从固定字符集中随机生成指定长度的短码
 pub fn generate_random_code(length: usize) -> String {
     use std::iter;
 

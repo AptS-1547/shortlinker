@@ -24,70 +24,114 @@ use super::{HttpMethod, SameSitePolicy};
 
 /// 配置分类常量
 pub mod categories {
+    /// API 认证与安全类配置分类。
     pub const AUTH: &str = "auth";
+    /// Cookie 行为类配置分类。
     pub const COOKIE: &str = "cookie";
+    /// 产品功能开关类配置分类。
     pub const FEATURES: &str = "features";
+    /// 路由前缀类配置分类。
     pub const ROUTES: &str = "routes";
+    /// 跨域（CORS）类配置分类。
     pub const CORS: &str = "cors";
+    /// 点击追踪类配置分类。
     pub const TRACKING: &str = "tracking";
+    /// 详细分析统计类配置分类。
     pub const ANALYTICS: &str = "analytics";
+    /// 缓存行为类配置分类。
     pub const CACHE: &str = "cache";
 }
 
 /// Key 常量
 pub mod keys {
     // API 认证
+    /// 管理 API 认证 token，存储 Argon2 哈希，默认为空（需 reset-password 设置）。
     pub const API_ADMIN_TOKEN: &str = "api.admin_token";
+    /// 健康检查端点的专用认证 token；为空时回退到 admin token 鉴权，两者都为空则禁用健康端点。
     pub const API_HEALTH_TOKEN: &str = "api.health_token";
+    /// JWT 签名密钥；修改后需重启并使已签发令牌失效。
     pub const API_JWT_SECRET: &str = "api.jwt_secret";
+    /// 访问令牌有效期，单位分钟，正整数。
     pub const API_ACCESS_TOKEN_MINUTES: &str = "api.access_token_minutes";
+    /// 刷新令牌有效期，单位天，正整数。
     pub const API_REFRESH_TOKEN_DAYS: &str = "api.refresh_token_days";
+    /// 可信代理 IP/CIDR 列表（JSON 数组）；为空时信任直连客户端 IP。
     pub const API_TRUSTED_PROXIES: &str = "api.trusted_proxies";
 
     // Cookie 配置
+    /// 是否为 Cookie 设置 Secure 标志（仅 HTTPS 发送），`"true"`/`"false"`。
     pub const API_COOKIE_SECURE: &str = "api.cookie_secure";
+    /// Cookie SameSite 策略，取值 `Strict`/`Lax`/`None`。
     pub const API_COOKIE_SAME_SITE: &str = "api.cookie_same_site";
+    /// Cookie 域名；空字符串表示使用当前访问域。
     pub const API_COOKIE_DOMAIN: &str = "api.cookie_domain";
 
     // 功能配置
+    /// 随机生成短码的长度，正整数。
     pub const FEATURES_RANDOM_CODE_LENGTH: &str = "features.random_code_length";
+    /// 访问非法或不存在短码时的默认跳转 URL。
     pub const FEATURES_DEFAULT_URL: &str = "features.default_url";
+    /// 是否启用管理面板路由与静态资源，`"true"`/`"false"`。
     pub const FEATURES_ENABLE_ADMIN_PANEL: &str = "features.enable_admin_panel";
 
     // 点击统计
+    /// 是否启用点击计数与统计，`"true"`/`"false"`。
     pub const CLICK_ENABLE_TRACKING: &str = "click.enable_tracking";
+    /// 点击数据刷盘间隔，单位秒，正整数。
     pub const CLICK_FLUSH_INTERVAL: &str = "click.flush_interval";
+    /// 触发强制刷盘的累计点击数上限，正整数。
     pub const CLICK_MAX_CLICKS_BEFORE_FLUSH: &str = "click.max_clicks_before_flush";
 
     // 详细分析统计
+    /// 是否写入明细点击日志（`click_logs` 表），`"true"`/`"false"`。
     pub const ANALYTICS_ENABLE_DETAILED_LOGGING: &str = "analytics.enable_detailed_logging";
+    /// 明细点击日志保留天数，超期由保留任务按时间删除。
     pub const ANALYTICS_LOG_RETENTION_DAYS: &str = "analytics.log_retention_days";
+    /// 是否记录客户端 IP 地址，`"true"`/`"false"`；关闭以满足隐私合规。
     pub const ANALYTICS_ENABLE_IP_LOGGING: &str = "analytics.enable_ip_logging";
+    /// 是否对 IP 做 GeoIP 地理位置查询，`"true"`/`"false"`。
     pub const ANALYTICS_ENABLE_GEO_LOOKUP: &str = "analytics.enable_geo_lookup";
+    /// 小时级 rollup 数据保留天数，超期由 rollup 清理任务删除。
     pub const ANALYTICS_HOURLY_RETENTION_DAYS: &str = "analytics.hourly_retention_days";
+    /// 日级 rollup 数据保留天数，超期由 rollup 清理任务删除。
     pub const ANALYTICS_DAILY_RETENTION_DAYS: &str = "analytics.daily_retention_days";
+    /// 是否启用自动 rollup 聚合与过期数据清理，`"true"`/`"false"`。
     pub const ANALYTICS_ENABLE_AUTO_ROLLUP: &str = "analytics.enable_auto_rollup";
+    /// 点击日志采样率，`0.0`-`1.0`；`1.0` 记录全部点击。
     pub const ANALYTICS_SAMPLE_RATE: &str = "analytics.sample_rate";
+    /// `click_logs` 表最大行数；`0` 表示不限制。
     pub const ANALYTICS_MAX_LOG_ROWS: &str = "analytics.max_log_rows";
+    /// 明细日志超过行数上限后的动作：`cleanup`（删最旧）或 `stop`（停止记录）。
     pub const ANALYTICS_MAX_ROWS_ACTION: &str = "analytics.max_rows_action";
 
     // UTM 追踪
+    /// 是否把 UTM 参数（utm_source 等）透传到目标 URL，`"true"`/`"false"`。
     pub const UTM_ENABLE_PASSTHROUGH: &str = "utm.enable_passthrough";
 
     // 路由配置
+    /// 管理 API 路由前缀，以 `/` 开头。
     pub const ROUTES_ADMIN_PREFIX: &str = "routes.admin_prefix";
+    /// 健康检查路由前缀，以 `/` 开头。
     pub const ROUTES_HEALTH_PREFIX: &str = "routes.health_prefix";
+    /// 前端静态资源路由前缀，以 `/` 开头。
     pub const ROUTES_FRONTEND_PREFIX: &str = "routes.frontend_prefix";
 
     // CORS 配置
+    /// 是否启用 CORS 配置；关闭时仅允许同源请求，`"true"`/`"false"`。
     pub const CORS_ENABLED: &str = "cors.enabled";
+    /// 允许的来源列表（JSON 数组）；`["*"]` 表示任意来源，空数组表示仅同源。
     pub const CORS_ALLOWED_ORIGINS: &str = "cors.allowed_origins";
+    /// 允许的 HTTP 方法（JSON 数组），取值限定为标准方法枚举。
     pub const CORS_ALLOWED_METHODS: &str = "cors.allowed_methods";
+    /// 允许的请求头（JSON 数组）。
     pub const CORS_ALLOWED_HEADERS: &str = "cors.allowed_headers";
+    /// 预检请求（preflight）缓存时长，单位秒，非负整数。
     pub const CORS_MAX_AGE: &str = "cors.max_age";
+    /// 是否允许跨域请求携带凭据；不能与通配来源同时启用，`"true"`/`"false"`。
     pub const CORS_ALLOW_CREDENTIALS: &str = "cors.allow_credentials";
 
     // 缓存配置
+    /// Bloom 存在性过滤器周期性重建间隔，单位秒；`0` 表示关闭自动重建。
     pub const CACHE_BLOOM_REBUILD_INTERVAL: &str = "cache.bloom_rebuild_interval";
 }
 
@@ -349,419 +393,451 @@ fn normalize_sample_rate(
     }
 }
 
-aster_forge_config::define_config_registry! {
-pub static CONFIG_REGISTRY = [
-    // ========== API 认证 (auth) ==========
-    ConfigDefinition {
-        key: keys::API_ADMIN_TOKEN,
-        label_i18n_key: "config.keys.api.admin_token",
-        description_i18n_key: "config.descriptions.api.admin_token",
-        value_type: ConfigValueType::String,
-        default_fn: default_admin_token,
-        requires_restart: false,
-        is_sensitive: true,
-        category: categories::AUTH,
-        description: "Admin API authentication token (Argon2 hashed)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_HEALTH_TOKEN,
-        label_i18n_key: "config.keys.api.health_token",
-        description_i18n_key: "config.descriptions.api.health_token",
-        value_type: ConfigValueType::String,
-        default_fn: default_empty,
-        is_sensitive: true,
-        category: categories::AUTH,
-        description: "Health check endpoint authentication token",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_JWT_SECRET,
-        label_i18n_key: "config.keys.api.jwt_secret",
-        description_i18n_key: "config.descriptions.api.jwt_secret",
-        value_type: ConfigValueType::String,
-        default_fn: default_jwt_secret,
-        requires_restart: true,
-        is_sensitive: true,
-        category: categories::AUTH,
-        description: "JWT token signing secret key",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_TRUSTED_PROXIES,
-        label_i18n_key: "config.keys.api.trusted_proxies",
-        description_i18n_key: "config.descriptions.api.trusted_proxies",
-        value_type: ConfigValueType::StringArray,
-        default_fn: default_trusted_proxies,
-        normalize_fn: Some(normalize_trusted_proxies),
-        requires_restart: true,
-        category: categories::AUTH,
-        description: "Trusted proxy IPs or CIDRs (e.g., [\"10.0.0.1\", \"192.168.1.0/24\"]). Empty = trust no proxies, use connection IP only.",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_ACCESS_TOKEN_MINUTES,
-        label_i18n_key: "config.keys.api.access_token_minutes",
-        description_i18n_key: "config.descriptions.api.access_token_minutes",
-        value_type: ConfigValueType::Number,
-        default_fn: default_access_token_minutes,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::AUTH,
-        description: "Access token expiration time in minutes",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_REFRESH_TOKEN_DAYS,
-        label_i18n_key: "config.keys.api.refresh_token_days",
-        description_i18n_key: "config.descriptions.api.refresh_token_days",
-        value_type: ConfigValueType::Number,
-        default_fn: default_refresh_token_days,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::AUTH,
-        description: "Refresh token expiration time in days",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== Cookie 配置 (cookie) ==========
-    ConfigDefinition {
-        key: keys::API_COOKIE_SECURE,
-        label_i18n_key: "config.keys.api.cookie_secure",
-        description_i18n_key: "config.descriptions.api.cookie_secure",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_cookie_secure,
-        category: categories::COOKIE,
-        description: "Enable secure flag for cookies (HTTPS only)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_COOKIE_SAME_SITE,
-        label_i18n_key: "config.keys.api.cookie_same_site",
-        description_i18n_key: "config.descriptions.api.cookie_same_site",
-        value_type: ConfigValueType::StringEnum,
-        default_fn: default_cookie_same_site,
-        normalize_fn: Some(normalize_same_site),
-        category: categories::COOKIE,
-        description: "Cookie SameSite policy",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::API_COOKIE_DOMAIN,
-        label_i18n_key: "config.keys.api.cookie_domain",
-        description_i18n_key: "config.descriptions.api.cookie_domain",
-        value_type: ConfigValueType::String,
-        default_fn: default_empty,
-        category: categories::COOKIE,
-        description: "Cookie domain (empty for current domain)",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== 功能配置 (features) ==========
-    ConfigDefinition {
-        key: keys::FEATURES_RANDOM_CODE_LENGTH,
-        label_i18n_key: "config.keys.features.random_code_length",
-        description_i18n_key: "config.descriptions.features.random_code_length",
-        value_type: ConfigValueType::Number,
-        default_fn: default_random_code_length,
-        normalize_fn: Some(normalize_unsigned_integer),
-        category: categories::FEATURES,
-        description: "Length of randomly generated short codes",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::FEATURES_DEFAULT_URL,
-        label_i18n_key: "config.keys.features.default_url",
-        description_i18n_key: "config.descriptions.features.default_url",
-        value_type: ConfigValueType::String,
-        default_fn: default_default_url,
-        category: categories::FEATURES,
-        description: "Default redirect URL for invalid short codes",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::FEATURES_ENABLE_ADMIN_PANEL,
-        label_i18n_key: "config.keys.features.enable_admin_panel",
-        description_i18n_key: "config.descriptions.features.enable_admin_panel",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_enable_admin_panel,
-        requires_restart: true,
-        category: categories::FEATURES,
-        description: "Enable admin panel interface",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== 点击追踪 (tracking) ==========
-    ConfigDefinition {
-        key: keys::CLICK_ENABLE_TRACKING,
-        label_i18n_key: "config.keys.click.enable_tracking",
-        description_i18n_key: "config.descriptions.click.enable_tracking",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_enable_tracking,
-        requires_restart: true,
-        category: categories::TRACKING,
-        description: "Enable click tracking and analytics",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CLICK_FLUSH_INTERVAL,
-        label_i18n_key: "config.keys.click.flush_interval",
-        description_i18n_key: "config.descriptions.click.flush_interval",
-        value_type: ConfigValueType::Number,
-        default_fn: default_flush_interval,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::TRACKING,
-        description: "Click data flush interval in seconds",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CLICK_MAX_CLICKS_BEFORE_FLUSH,
-        label_i18n_key: "config.keys.click.max_clicks_before_flush",
-        description_i18n_key: "config.descriptions.click.max_clicks_before_flush",
-        value_type: ConfigValueType::Number,
-        default_fn: default_max_clicks_before_flush,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::TRACKING,
-        description: "Maximum clicks before forcing flush",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== 路由配置 (routes) ==========
-    ConfigDefinition {
-        key: keys::ROUTES_ADMIN_PREFIX,
-        label_i18n_key: "config.keys.routes.admin_prefix",
-        description_i18n_key: "config.descriptions.routes.admin_prefix",
-        value_type: ConfigValueType::String,
-        default_fn: default_admin_prefix,
-        requires_restart: true,
-        category: categories::ROUTES,
-        description: "Admin API route prefix",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ROUTES_HEALTH_PREFIX,
-        label_i18n_key: "config.keys.routes.health_prefix",
-        description_i18n_key: "config.descriptions.routes.health_prefix",
-        value_type: ConfigValueType::String,
-        default_fn: default_health_prefix,
-        requires_restart: true,
-        category: categories::ROUTES,
-        description: "Health check route prefix",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ROUTES_FRONTEND_PREFIX,
-        label_i18n_key: "config.keys.routes.frontend_prefix",
-        description_i18n_key: "config.descriptions.routes.frontend_prefix",
-        value_type: ConfigValueType::String,
-        default_fn: default_frontend_prefix,
-        requires_restart: true,
-        category: categories::ROUTES,
-        description: "Frontend assets route prefix",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== CORS 配置 (cors) ==========
-    ConfigDefinition {
-        key: keys::CORS_ENABLED,
-        label_i18n_key: "config.keys.cors.enabled",
-        description_i18n_key: "config.descriptions.cors.enabled",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_cors_enabled,
-        requires_restart: true,
-        category: categories::CORS,
-        description: "Enable CORS configuration. When disabled, uses browser's same-origin policy (no cross-origin requests allowed)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CORS_ALLOWED_ORIGINS,
-        label_i18n_key: "config.keys.cors.allowed_origins",
-        description_i18n_key: "config.descriptions.cors.allowed_origins",
-        value_type: ConfigValueType::StringArray,
-        default_fn: default_cors_allowed_origins,
-        requires_restart: true,
-        category: categories::CORS,
-        description: "Allowed origins for CORS (JSON array). Use [\"*\"] to allow any origin, empty array means same-origin only",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CORS_ALLOWED_METHODS,
-        label_i18n_key: "config.keys.cors.allowed_methods",
-        description_i18n_key: "config.descriptions.cors.allowed_methods",
-        value_type: ConfigValueType::StringEnumSet,
-        default_fn: default_cors_allowed_methods,
-        normalize_fn: Some(normalize_http_methods),
-        requires_restart: true,
-        category: categories::CORS,
-        description: "Allowed HTTP methods for CORS",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CORS_ALLOWED_HEADERS,
-        label_i18n_key: "config.keys.cors.allowed_headers",
-        description_i18n_key: "config.descriptions.cors.allowed_headers",
-        value_type: ConfigValueType::StringArray,
-        default_fn: default_cors_allowed_headers,
-        requires_restart: true,
-        category: categories::CORS,
-        description: "Allowed headers for CORS (JSON array)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CORS_MAX_AGE,
-        label_i18n_key: "config.keys.cors.max_age",
-        description_i18n_key: "config.descriptions.cors.max_age",
-        value_type: ConfigValueType::Number,
-        default_fn: default_cors_max_age,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::CORS,
-        description: "CORS preflight cache duration in seconds",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::CORS_ALLOW_CREDENTIALS,
-        label_i18n_key: "config.keys.cors.allow_credentials",
-        description_i18n_key: "config.descriptions.cors.allow_credentials",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_cors_allow_credentials,
-        requires_restart: true,
-        category: categories::CORS,
-        description: "Allow credentials in CORS requests. Cannot be used with wildcard origins for security reasons",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== 详细分析统计 (analytics) ==========
-    ConfigDefinition {
-        key: keys::ANALYTICS_ENABLE_DETAILED_LOGGING,
-        label_i18n_key: "config.keys.analytics.enable_detailed_logging",
-        description_i18n_key: "config.descriptions.analytics.enable_detailed_logging",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_analytics_enable_detailed_logging,
-        requires_restart: true,
-        category: categories::ANALYTICS,
-        description: "Enable detailed click logging (writes to click_logs table)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_LOG_RETENTION_DAYS,
-        label_i18n_key: "config.keys.analytics.log_retention_days",
-        description_i18n_key: "config.descriptions.analytics.log_retention_days",
-        value_type: ConfigValueType::Number,
-        default_fn: default_analytics_log_retention_days,
-        normalize_fn: Some(normalize_unsigned_integer),
-        category: categories::ANALYTICS,
-        description: "Raw click log retention period in days (cleaned by DataRetentionTask)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_ENABLE_IP_LOGGING,
-        label_i18n_key: "config.keys.analytics.enable_ip_logging",
-        description_i18n_key: "config.descriptions.analytics.enable_ip_logging",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_analytics_enable_ip_logging,
-        category: categories::ANALYTICS,
-        description: "Enable IP address logging (disable for privacy compliance)",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_ENABLE_GEO_LOOKUP,
-        label_i18n_key: "config.keys.analytics.enable_geo_lookup",
-        description_i18n_key: "config.descriptions.analytics.enable_geo_lookup",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_analytics_enable_geo_lookup,
-        category: categories::ANALYTICS,
-        description: "Enable geographic location lookup for IP addresses",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_HOURLY_RETENTION_DAYS,
-        label_i18n_key: "config.keys.analytics.hourly_retention_days",
-        description_i18n_key: "config.descriptions.analytics.hourly_retention_days",
-        value_type: ConfigValueType::Number,
-        default_fn: default_analytics_hourly_retention_days,
-        normalize_fn: Some(normalize_unsigned_integer),
-        category: categories::ANALYTICS,
-        description: "Hourly rollup data retention period in days",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_DAILY_RETENTION_DAYS,
-        label_i18n_key: "config.keys.analytics.daily_retention_days",
-        description_i18n_key: "config.descriptions.analytics.daily_retention_days",
-        value_type: ConfigValueType::Number,
-        default_fn: default_analytics_daily_retention_days,
-        normalize_fn: Some(normalize_unsigned_integer),
-        category: categories::ANALYTICS,
-        description: "Daily rollup data retention period in days",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_ENABLE_AUTO_ROLLUP,
-        label_i18n_key: "config.keys.analytics.enable_auto_rollup",
-        description_i18n_key: "config.descriptions.analytics.enable_auto_rollup",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_analytics_enable_auto_rollup,
-        requires_restart: true,
-        category: categories::ANALYTICS,
-        description: "Enable automatic rollup aggregation and data cleanup",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_SAMPLE_RATE,
-        label_i18n_key: "config.keys.analytics.sample_rate",
-        description_i18n_key: "config.descriptions.analytics.sample_rate",
-        value_type: ConfigValueType::Number,
-        default_fn: default_analytics_sample_rate,
-        normalize_fn: Some(normalize_sample_rate),
-        category: categories::ANALYTICS,
-        description: "Click log sampling rate (0.0-1.0). 1.0 = log all clicks, 0.1 = log 10% of clicks",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_MAX_LOG_ROWS,
-        label_i18n_key: "config.keys.analytics.max_log_rows",
-        description_i18n_key: "config.descriptions.analytics.max_log_rows",
-        value_type: ConfigValueType::Number,
-        default_fn: default_analytics_max_log_rows,
-        normalize_fn: Some(normalize_unsigned_integer),
-        category: categories::ANALYTICS,
-        description: "Maximum rows in click_logs table. 0 = unlimited",
-        ..ConfigDefinition::private_system()
-    },
-    ConfigDefinition {
-        key: keys::ANALYTICS_MAX_ROWS_ACTION,
-        label_i18n_key: "config.keys.analytics.max_rows_action",
-        description_i18n_key: "config.descriptions.analytics.max_rows_action",
-        value_type: ConfigValueType::StringEnum,
-        default_fn: default_analytics_max_rows_action,
-        normalize_fn: Some(normalize_max_rows_action),
-        category: categories::ANALYTICS,
-        description: "Action when max_log_rows exceeded: 'cleanup' (delete oldest) or 'stop' (stop logging)",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== UTM 追踪 (analytics) ==========
-    ConfigDefinition {
-        key: keys::UTM_ENABLE_PASSTHROUGH,
-        label_i18n_key: "config.keys.utm.enable_passthrough",
-        description_i18n_key: "config.descriptions.utm.enable_passthrough",
-        value_type: ConfigValueType::Boolean,
-        default_fn: default_utm_enable_passthrough,
-        category: categories::ANALYTICS,
-        description: "Enable UTM parameter passthrough to target URL (utm_source/medium/campaign/term/content)",
-        ..ConfigDefinition::private_system()
-    },
-    // ========== 缓存配置 (cache) ==========
-    ConfigDefinition {
-        key: keys::CACHE_BLOOM_REBUILD_INTERVAL,
-        label_i18n_key: "config.keys.cache.bloom_rebuild_interval",
-        description_i18n_key: "config.descriptions.cache.bloom_rebuild_interval",
-        value_type: ConfigValueType::Number,
-        default_fn: default_bloom_rebuild_interval,
-        normalize_fn: Some(normalize_unsigned_integer),
-        requires_restart: true,
-        category: categories::CACHE,
-        description: "Bloom filter periodic rebuild interval in seconds (0 = disabled)",
-        ..ConfigDefinition::private_system()
-    },
-];
+// `define_config_registry!` 展开生成的 `CONFIG_REGISTRY` 不携带文档，rustc
+// 要求"宏生成的 item 的文档必须来自宏展开本身"，因此无法在调用处直接补文档。
+// 用内部模块承载展开并在模块上 `expect`：抑制保持可观察——Forge 修复宏生成
+// 文档后此处会报 unfulfilled expectation，届时直接删除。
+#[expect(
+    missing_docs,
+    reason = "documentation must come from the macro expansion itself"
+)]
+mod registry {
+    // 宏展开引用上层辅助函数与类型；显式列出以满足 wildcard_imports
+    use super::{
+        ConfigDefinition, ConfigValueType, categories, default_access_token_minutes,
+        default_admin_prefix, default_admin_token, default_analytics_daily_retention_days,
+        default_analytics_enable_auto_rollup, default_analytics_enable_detailed_logging,
+        default_analytics_enable_geo_lookup, default_analytics_enable_ip_logging,
+        default_analytics_hourly_retention_days, default_analytics_log_retention_days,
+        default_analytics_max_log_rows, default_analytics_max_rows_action,
+        default_analytics_sample_rate, default_bloom_rebuild_interval, default_cookie_same_site,
+        default_cookie_secure, default_cors_allow_credentials, default_cors_allowed_headers,
+        default_cors_allowed_methods, default_cors_allowed_origins, default_cors_enabled,
+        default_cors_max_age, default_default_url, default_empty, default_enable_admin_panel,
+        default_enable_tracking, default_flush_interval, default_frontend_prefix,
+        default_health_prefix, default_jwt_secret, default_max_clicks_before_flush,
+        default_random_code_length, default_refresh_token_days, default_trusted_proxies,
+        default_utm_enable_passthrough, keys, normalize_http_methods, normalize_max_rows_action,
+        normalize_same_site, normalize_sample_rate, normalize_trusted_proxies,
+        normalize_unsigned_integer,
+    };
+
+    aster_forge_config::define_config_registry! {
+    pub static CONFIG_REGISTRY = [
+        // ========== API 认证 (auth) ==========
+        ConfigDefinition {
+            key: keys::API_ADMIN_TOKEN,
+            label_i18n_key: "config.keys.api.admin_token",
+            description_i18n_key: "config.descriptions.api.admin_token",
+            value_type: ConfigValueType::String,
+            default_fn: default_admin_token,
+            requires_restart: false,
+            is_sensitive: true,
+            category: categories::AUTH,
+            description: "Admin API authentication token (Argon2 hashed)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_HEALTH_TOKEN,
+            label_i18n_key: "config.keys.api.health_token",
+            description_i18n_key: "config.descriptions.api.health_token",
+            value_type: ConfigValueType::String,
+            default_fn: default_empty,
+            is_sensitive: true,
+            category: categories::AUTH,
+            description: "Health check endpoint authentication token",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_JWT_SECRET,
+            label_i18n_key: "config.keys.api.jwt_secret",
+            description_i18n_key: "config.descriptions.api.jwt_secret",
+            value_type: ConfigValueType::String,
+            default_fn: default_jwt_secret,
+            requires_restart: true,
+            is_sensitive: true,
+            category: categories::AUTH,
+            description: "JWT token signing secret key",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_TRUSTED_PROXIES,
+            label_i18n_key: "config.keys.api.trusted_proxies",
+            description_i18n_key: "config.descriptions.api.trusted_proxies",
+            value_type: ConfigValueType::StringArray,
+            default_fn: default_trusted_proxies,
+            normalize_fn: Some(normalize_trusted_proxies),
+            requires_restart: true,
+            category: categories::AUTH,
+            description: "Trusted proxy IPs or CIDRs (e.g., [\"10.0.0.1\", \"192.168.1.0/24\"]). Empty = trust no proxies, use connection IP only.",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_ACCESS_TOKEN_MINUTES,
+            label_i18n_key: "config.keys.api.access_token_minutes",
+            description_i18n_key: "config.descriptions.api.access_token_minutes",
+            value_type: ConfigValueType::Number,
+            default_fn: default_access_token_minutes,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::AUTH,
+            description: "Access token expiration time in minutes",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_REFRESH_TOKEN_DAYS,
+            label_i18n_key: "config.keys.api.refresh_token_days",
+            description_i18n_key: "config.descriptions.api.refresh_token_days",
+            value_type: ConfigValueType::Number,
+            default_fn: default_refresh_token_days,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::AUTH,
+            description: "Refresh token expiration time in days",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== Cookie 配置 (cookie) ==========
+        ConfigDefinition {
+            key: keys::API_COOKIE_SECURE,
+            label_i18n_key: "config.keys.api.cookie_secure",
+            description_i18n_key: "config.descriptions.api.cookie_secure",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_cookie_secure,
+            category: categories::COOKIE,
+            description: "Enable secure flag for cookies (HTTPS only)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_COOKIE_SAME_SITE,
+            label_i18n_key: "config.keys.api.cookie_same_site",
+            description_i18n_key: "config.descriptions.api.cookie_same_site",
+            value_type: ConfigValueType::StringEnum,
+            default_fn: default_cookie_same_site,
+            normalize_fn: Some(normalize_same_site),
+            category: categories::COOKIE,
+            description: "Cookie SameSite policy",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::API_COOKIE_DOMAIN,
+            label_i18n_key: "config.keys.api.cookie_domain",
+            description_i18n_key: "config.descriptions.api.cookie_domain",
+            value_type: ConfigValueType::String,
+            default_fn: default_empty,
+            category: categories::COOKIE,
+            description: "Cookie domain (empty for current domain)",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== 功能配置 (features) ==========
+        ConfigDefinition {
+            key: keys::FEATURES_RANDOM_CODE_LENGTH,
+            label_i18n_key: "config.keys.features.random_code_length",
+            description_i18n_key: "config.descriptions.features.random_code_length",
+            value_type: ConfigValueType::Number,
+            default_fn: default_random_code_length,
+            normalize_fn: Some(normalize_unsigned_integer),
+            category: categories::FEATURES,
+            description: "Length of randomly generated short codes",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::FEATURES_DEFAULT_URL,
+            label_i18n_key: "config.keys.features.default_url",
+            description_i18n_key: "config.descriptions.features.default_url",
+            value_type: ConfigValueType::String,
+            default_fn: default_default_url,
+            category: categories::FEATURES,
+            description: "Default redirect URL for invalid short codes",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::FEATURES_ENABLE_ADMIN_PANEL,
+            label_i18n_key: "config.keys.features.enable_admin_panel",
+            description_i18n_key: "config.descriptions.features.enable_admin_panel",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_enable_admin_panel,
+            requires_restart: true,
+            category: categories::FEATURES,
+            description: "Enable admin panel interface",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== 点击追踪 (tracking) ==========
+        ConfigDefinition {
+            key: keys::CLICK_ENABLE_TRACKING,
+            label_i18n_key: "config.keys.click.enable_tracking",
+            description_i18n_key: "config.descriptions.click.enable_tracking",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_enable_tracking,
+            requires_restart: true,
+            category: categories::TRACKING,
+            description: "Enable click tracking and analytics",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CLICK_FLUSH_INTERVAL,
+            label_i18n_key: "config.keys.click.flush_interval",
+            description_i18n_key: "config.descriptions.click.flush_interval",
+            value_type: ConfigValueType::Number,
+            default_fn: default_flush_interval,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::TRACKING,
+            description: "Click data flush interval in seconds",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CLICK_MAX_CLICKS_BEFORE_FLUSH,
+            label_i18n_key: "config.keys.click.max_clicks_before_flush",
+            description_i18n_key: "config.descriptions.click.max_clicks_before_flush",
+            value_type: ConfigValueType::Number,
+            default_fn: default_max_clicks_before_flush,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::TRACKING,
+            description: "Maximum clicks before forcing flush",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== 路由配置 (routes) ==========
+        ConfigDefinition {
+            key: keys::ROUTES_ADMIN_PREFIX,
+            label_i18n_key: "config.keys.routes.admin_prefix",
+            description_i18n_key: "config.descriptions.routes.admin_prefix",
+            value_type: ConfigValueType::String,
+            default_fn: default_admin_prefix,
+            requires_restart: true,
+            category: categories::ROUTES,
+            description: "Admin API route prefix",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ROUTES_HEALTH_PREFIX,
+            label_i18n_key: "config.keys.routes.health_prefix",
+            description_i18n_key: "config.descriptions.routes.health_prefix",
+            value_type: ConfigValueType::String,
+            default_fn: default_health_prefix,
+            requires_restart: true,
+            category: categories::ROUTES,
+            description: "Health check route prefix",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ROUTES_FRONTEND_PREFIX,
+            label_i18n_key: "config.keys.routes.frontend_prefix",
+            description_i18n_key: "config.descriptions.routes.frontend_prefix",
+            value_type: ConfigValueType::String,
+            default_fn: default_frontend_prefix,
+            requires_restart: true,
+            category: categories::ROUTES,
+            description: "Frontend assets route prefix",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== CORS 配置 (cors) ==========
+        ConfigDefinition {
+            key: keys::CORS_ENABLED,
+            label_i18n_key: "config.keys.cors.enabled",
+            description_i18n_key: "config.descriptions.cors.enabled",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_cors_enabled,
+            requires_restart: true,
+            category: categories::CORS,
+            description: "Enable CORS configuration. When disabled, uses browser's same-origin policy (no cross-origin requests allowed)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CORS_ALLOWED_ORIGINS,
+            label_i18n_key: "config.keys.cors.allowed_origins",
+            description_i18n_key: "config.descriptions.cors.allowed_origins",
+            value_type: ConfigValueType::StringArray,
+            default_fn: default_cors_allowed_origins,
+            requires_restart: true,
+            category: categories::CORS,
+            description: "Allowed origins for CORS (JSON array). Use [\"*\"] to allow any origin, empty array means same-origin only",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CORS_ALLOWED_METHODS,
+            label_i18n_key: "config.keys.cors.allowed_methods",
+            description_i18n_key: "config.descriptions.cors.allowed_methods",
+            value_type: ConfigValueType::StringEnumSet,
+            default_fn: default_cors_allowed_methods,
+            normalize_fn: Some(normalize_http_methods),
+            requires_restart: true,
+            category: categories::CORS,
+            description: "Allowed HTTP methods for CORS",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CORS_ALLOWED_HEADERS,
+            label_i18n_key: "config.keys.cors.allowed_headers",
+            description_i18n_key: "config.descriptions.cors.allowed_headers",
+            value_type: ConfigValueType::StringArray,
+            default_fn: default_cors_allowed_headers,
+            requires_restart: true,
+            category: categories::CORS,
+            description: "Allowed headers for CORS (JSON array)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CORS_MAX_AGE,
+            label_i18n_key: "config.keys.cors.max_age",
+            description_i18n_key: "config.descriptions.cors.max_age",
+            value_type: ConfigValueType::Number,
+            default_fn: default_cors_max_age,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::CORS,
+            description: "CORS preflight cache duration in seconds",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::CORS_ALLOW_CREDENTIALS,
+            label_i18n_key: "config.keys.cors.allow_credentials",
+            description_i18n_key: "config.descriptions.cors.allow_credentials",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_cors_allow_credentials,
+            requires_restart: true,
+            category: categories::CORS,
+            description: "Allow credentials in CORS requests. Cannot be used with wildcard origins for security reasons",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== 详细分析统计 (analytics) ==========
+        ConfigDefinition {
+            key: keys::ANALYTICS_ENABLE_DETAILED_LOGGING,
+            label_i18n_key: "config.keys.analytics.enable_detailed_logging",
+            description_i18n_key: "config.descriptions.analytics.enable_detailed_logging",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_analytics_enable_detailed_logging,
+            requires_restart: true,
+            category: categories::ANALYTICS,
+            description: "Enable detailed click logging (writes to click_logs table)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_LOG_RETENTION_DAYS,
+            label_i18n_key: "config.keys.analytics.log_retention_days",
+            description_i18n_key: "config.descriptions.analytics.log_retention_days",
+            value_type: ConfigValueType::Number,
+            default_fn: default_analytics_log_retention_days,
+            normalize_fn: Some(normalize_unsigned_integer),
+            category: categories::ANALYTICS,
+            description: "Raw click log retention period in days (cleaned by DataRetentionTask)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_ENABLE_IP_LOGGING,
+            label_i18n_key: "config.keys.analytics.enable_ip_logging",
+            description_i18n_key: "config.descriptions.analytics.enable_ip_logging",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_analytics_enable_ip_logging,
+            category: categories::ANALYTICS,
+            description: "Enable IP address logging (disable for privacy compliance)",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_ENABLE_GEO_LOOKUP,
+            label_i18n_key: "config.keys.analytics.enable_geo_lookup",
+            description_i18n_key: "config.descriptions.analytics.enable_geo_lookup",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_analytics_enable_geo_lookup,
+            category: categories::ANALYTICS,
+            description: "Enable geographic location lookup for IP addresses",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_HOURLY_RETENTION_DAYS,
+            label_i18n_key: "config.keys.analytics.hourly_retention_days",
+            description_i18n_key: "config.descriptions.analytics.hourly_retention_days",
+            value_type: ConfigValueType::Number,
+            default_fn: default_analytics_hourly_retention_days,
+            normalize_fn: Some(normalize_unsigned_integer),
+            category: categories::ANALYTICS,
+            description: "Hourly rollup data retention period in days",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_DAILY_RETENTION_DAYS,
+            label_i18n_key: "config.keys.analytics.daily_retention_days",
+            description_i18n_key: "config.descriptions.analytics.daily_retention_days",
+            value_type: ConfigValueType::Number,
+            default_fn: default_analytics_daily_retention_days,
+            normalize_fn: Some(normalize_unsigned_integer),
+            category: categories::ANALYTICS,
+            description: "Daily rollup data retention period in days",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_ENABLE_AUTO_ROLLUP,
+            label_i18n_key: "config.keys.analytics.enable_auto_rollup",
+            description_i18n_key: "config.descriptions.analytics.enable_auto_rollup",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_analytics_enable_auto_rollup,
+            requires_restart: true,
+            category: categories::ANALYTICS,
+            description: "Enable automatic rollup aggregation and data cleanup",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_SAMPLE_RATE,
+            label_i18n_key: "config.keys.analytics.sample_rate",
+            description_i18n_key: "config.descriptions.analytics.sample_rate",
+            value_type: ConfigValueType::Number,
+            default_fn: default_analytics_sample_rate,
+            normalize_fn: Some(normalize_sample_rate),
+            category: categories::ANALYTICS,
+            description: "Click log sampling rate (0.0-1.0). 1.0 = log all clicks, 0.1 = log 10% of clicks",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_MAX_LOG_ROWS,
+            label_i18n_key: "config.keys.analytics.max_log_rows",
+            description_i18n_key: "config.descriptions.analytics.max_log_rows",
+            value_type: ConfigValueType::Number,
+            default_fn: default_analytics_max_log_rows,
+            normalize_fn: Some(normalize_unsigned_integer),
+            category: categories::ANALYTICS,
+            description: "Maximum rows in click_logs table. 0 = unlimited",
+            ..ConfigDefinition::private_system()
+        },
+        ConfigDefinition {
+            key: keys::ANALYTICS_MAX_ROWS_ACTION,
+            label_i18n_key: "config.keys.analytics.max_rows_action",
+            description_i18n_key: "config.descriptions.analytics.max_rows_action",
+            value_type: ConfigValueType::StringEnum,
+            default_fn: default_analytics_max_rows_action,
+            normalize_fn: Some(normalize_max_rows_action),
+            category: categories::ANALYTICS,
+            description: "Action when max_log_rows exceeded: 'cleanup' (delete oldest) or 'stop' (stop logging)",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== UTM 追踪 (analytics) ==========
+        ConfigDefinition {
+            key: keys::UTM_ENABLE_PASSTHROUGH,
+            label_i18n_key: "config.keys.utm.enable_passthrough",
+            description_i18n_key: "config.descriptions.utm.enable_passthrough",
+            value_type: ConfigValueType::Boolean,
+            default_fn: default_utm_enable_passthrough,
+            category: categories::ANALYTICS,
+            description: "Enable UTM parameter passthrough to target URL (utm_source/medium/campaign/term/content)",
+            ..ConfigDefinition::private_system()
+        },
+        // ========== 缓存配置 (cache) ==========
+        ConfigDefinition {
+            key: keys::CACHE_BLOOM_REBUILD_INTERVAL,
+            label_i18n_key: "config.keys.cache.bloom_rebuild_interval",
+            description_i18n_key: "config.descriptions.cache.bloom_rebuild_interval",
+            value_type: ConfigValueType::Number,
+            default_fn: default_bloom_rebuild_interval,
+            normalize_fn: Some(normalize_unsigned_integer),
+            requires_restart: true,
+            category: categories::CACHE,
+            description: "Bloom filter periodic rebuild interval in seconds (0 = disabled)",
+            ..ConfigDefinition::private_system()
+        },
+    ];
+    }
 }
+
+pub use registry::CONFIG_REGISTRY;
 
 /// Shortlinker 产品配置 action。
 pub fn action_for_key(key: &str) -> Option<ActionType> {

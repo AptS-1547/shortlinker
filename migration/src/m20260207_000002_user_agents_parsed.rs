@@ -1,6 +1,6 @@
-//! UserAgent 解析字段迁移
+//! `UserAgent` 解析字段迁移
 //!
-//! 扩展 user_agents 表，添加解析后的字段（浏览器、OS、设备类型等）
+//! 扩展 `user_agents` 表，添加解析后的字段（浏览器、OS、设备类型等）
 
 use sea_orm_migration::prelude::*;
 
@@ -9,6 +9,9 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
+    // Migration up() 是声明式的加列 + 回填 + 索引步骤序列，拆成子函数只会
+    // 打断步骤注释的线性阅读，不降低复杂度。
+    #[expect(clippy::too_many_lines, reason = "declarative migration step sequence")]
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // 添加解析字段
         manager

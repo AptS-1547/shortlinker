@@ -1,3 +1,5 @@
+//! 系统配置表 migration 测试：默认值写入与跨后端表结构。
+
 use aster_forge_config::{ConfigSource, ConfigValueType, ConfigVisibility};
 use aster_forge_db::system_config::{
     ActiveModel as ForgeSystemConfigActiveModel, Entity as ForgeSystemConfig, SystemConfigDbBinding,
@@ -28,23 +30,23 @@ async fn forge_system_config_migration_preserves_existing_rows_and_history() {
     migrate_to_legacy_schema(&db).await;
 
     db.execute_unprepared(
-        r#"
+        r"
         INSERT INTO system_config
             (key, value, value_type, requires_restart, is_sensitive, updated_at)
         VALUES
             ('analytics.sample_rate', '0.25', 'float', FALSE, FALSE, '2026-07-20T10:11:12Z'),
             ('api.jwt_secret', 'persisted-secret', 'string', TRUE, TRUE, '2026-07-20T10:12:13Z')
-        "#,
+        ",
     )
     .await
     .expect("legacy configuration rows should insert");
     db.execute_unprepared(
-        r#"
+        r"
         INSERT INTO config_history
             (config_key, old_value, new_value, changed_at, changed_by)
         VALUES
             ('api.jwt_secret', '[REDACTED]', '[REDACTED]', '2026-07-20T10:13:14Z', 'migration-test')
-        "#,
+        ",
     )
     .await
     .expect("legacy history row should insert");
@@ -64,9 +66,9 @@ async fn forge_system_config_migration_preserves_existing_rows_and_history() {
     assert!(!sample_rate.is_sensitive);
     assert_eq!(sample_rate.source, ConfigSource::System);
     assert_eq!(sample_rate.visibility, ConfigVisibility::Private);
-    assert!(sample_rate.namespace.is_empty());
-    assert!(sample_rate.category.is_empty());
-    assert!(sample_rate.description.is_empty());
+    assert_eq!(sample_rate.namespace, "");
+    assert_eq!(sample_rate.category, "");
+    assert_eq!(sample_rate.description, "");
     assert!(sample_rate.updated_by.is_none());
 
     let jwt_secret = SYSTEM_CONFIG_BINDING

@@ -8,6 +8,7 @@ use crate::client::LinkClient;
 use crate::services::ImportLinkItemRich;
 use crate::utils::csv_handler;
 
+/// Export all short links to a CSV file (defaults to a timestamped filename).
 pub async fn export_links(client: &LinkClient, file_path: Option<String>) -> Result<(), CliError> {
     let links = client.export_links().await?;
 
@@ -33,6 +34,7 @@ pub async fn export_links(client: &LinkClient, file_path: Option<String>) -> Res
     Ok(())
 }
 
+/// Import short links from a CSV file, optionally overwriting existing codes.
 pub async fn import_links(
     client: &LinkClient,
     file_path: String,

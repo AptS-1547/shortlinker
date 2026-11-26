@@ -329,11 +329,11 @@ mod click_manager_tests {
 
     #[tokio::test]
     async fn test_concurrent_increment_no_lost_clicks() {
-        let sink = Arc::new(MockSink::new());
-        let manager = Arc::new(create_test_manager(sink.clone(), 100000));
-
         const THREADS: usize = 8;
         const PER_THREAD: usize = 500;
+
+        let sink = Arc::new(MockSink::new());
+        let manager = Arc::new(create_test_manager(sink.clone(), 100_000));
 
         let mut handles = vec![];
         for _ in 0..THREADS {

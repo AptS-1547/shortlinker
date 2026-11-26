@@ -6,13 +6,32 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use actix_web::{App, http::StatusCode, test as actix_test, web};
-use aster_forge_metrics::{DbMetricBackend, DbQueryKind, DbQueryMetric};
-use shortlinker::metrics::{MetricsRecorder, NoopMetrics};
+use aster_forge_metrics::{DbMetricBackend, DbQueryKind, DbQueryMetric, MetricsProvider};
+use shortlinker::metrics::{MetricsRecorder, MetricsRuntime, NoopMetrics};
 
-static METRICS: OnceLock<Arc<dyn MetricsRecorder>> = OnceLock::new();
+static METRICS: OnceLock<MetricsRuntime> = OnceLock::new();
+
+fn runtime() -> &'static MetricsRuntime {
+    METRICS.get_or_init(shortlinker::metrics::create_metrics_runtime)
+}
 
 fn metrics() -> &'static Arc<dyn MetricsRecorder> {
-    METRICS.get_or_init(shortlinker::metrics::create_metrics_recorder)
+    let metrics: &'static Arc<dyn MetricsRecorder> = &runtime().recorder;
+    metrics
+}
+
+fn provider() -> &'static MetricsProvider {
+    runtime()
+        .provider
+        .as_ref()
+        .expect("metrics feature build should always expose a provider")
+}
+
+async fn export() -> String {
+    provider()
+        .export_prometheus(Duration::from_secs(5))
+        .await
+        .expect("Forge metrics export should succeed")
 }
 
 #[test]
@@ -34,10 +53,10 @@ fn noop_metrics_keeps_product_and_forge_paths_disabled() {
     ));
 }
 
-#[test]
-fn forge_and_product_metric_families_are_registered() {
+#[tokio::test]
+async fn forge_and_product_metric_families_are_registered() {
     let forge = metrics().forge_recorder();
-    forge.record_http_request("GET", "/health", 200, 0.001);
+    forge.record_http_request("GET", "http", "/health", 200, 0.001);
     aster_forge_metrics::DbMetricsRecorder::record_db_query(
         forge.as_ref(),
         &DbQueryMetric::new(
@@ -47,8 +66,7 @@ fn forge_and_product_metric_families_are_registered() {
             Duration::from_millis(1),
         ),
     );
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
 
     assert!(output.contains("http_requests_total"));
     assert!(output.contains("db_queries_total"));
@@ -58,36 +76,34 @@ fn forge_and_product_metric_families_are_registered() {
     assert!(output.contains("shortlinker_build_info"));
 }
 
-#[test]
-fn product_cache_metrics_record_with_stable_labels() {
+#[tokio::test]
+async fn product_cache_metrics_record_with_stable_labels() {
     let metrics = metrics();
     metrics.inc_cache_hit("object_cache");
     metrics.inc_cache_miss("bloom_filter");
     metrics.set_cache_entries("object_cache", 42.0);
     metrics.observe_cache_operation("get", "object_cache", 0.001);
 
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains("shortlinker_cache_hits_total{layer=\"object_cache\"}"));
     assert!(output.contains("shortlinker_cache_misses_total{layer=\"bloom_filter\"}"));
     assert!(output.contains("shortlinker_cache_entries{layer=\"object_cache\"} 42"));
 }
 
-#[test]
-fn forge_http_metrics_record_through_shared_recorder() {
+#[tokio::test]
+async fn forge_http_metrics_record_through_shared_recorder() {
     let forge = metrics().forge_recorder();
-    forge.record_http_request("GET", "/{code}", 307, 0.005);
+    forge.record_http_request("GET", "http", "/{code}", 307, 0.005);
 
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains("http_requests_total"));
     assert!(output.contains("method=\"GET\""));
     assert!(output.contains("route=\"/{code}\""));
     assert!(output.contains("status=\"307\""));
 }
 
-#[test]
-fn forge_database_metrics_use_backend_kind_and_status() {
+#[tokio::test]
+async fn forge_database_metrics_use_backend_kind_and_status() {
     let forge = metrics().forge_recorder();
     aster_forge_metrics::DbMetricsRecorder::record_db_query(
         forge.as_ref(),
@@ -99,36 +115,33 @@ fn forge_database_metrics_use_backend_kind_and_status() {
         ),
     );
 
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains("db_queries_total{backend=\"sqlite\",kind=\"select\",status=\"ok\"}"));
 }
 
-#[test]
-fn redirect_auth_and_bloom_metrics_remain_product_owned() {
+#[tokio::test]
+async fn redirect_auth_and_bloom_metrics_remain_product_owned() {
     let metrics = metrics();
     metrics.inc_redirect("307");
     metrics.inc_redirect("404");
     metrics.inc_auth_failure("bearer");
     metrics.inc_bloom_false_positive();
 
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains("shortlinker_redirects_total{status=\"307\"}"));
     assert!(output.contains("shortlinker_redirects_total{status=\"404\"}"));
     assert!(output.contains("shortlinker_auth_failures_total{method=\"bearer\"}"));
     assert!(output.contains("shortlinker_bloom_filter_false_positives_total"));
 }
 
-#[test]
-fn click_buffer_metrics_remain_product_owned() {
+#[tokio::test]
+async fn click_buffer_metrics_remain_product_owned() {
     let metrics = metrics();
     metrics.set_clicks_buffer_entries(10.0);
     metrics.inc_clicks_flush("interval", "success");
     metrics.inc_clicks_channel_dropped("full");
 
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains("shortlinker_clicks_buffer_entries 10"));
     assert!(output.contains("shortlinker_clicks_flush_total"));
     assert!(output.contains("trigger=\"interval\""));
@@ -136,11 +149,10 @@ fn click_buffer_metrics_remain_product_owned() {
     assert!(output.contains("shortlinker_clicks_channel_dropped_total{reason=\"full\"}"));
 }
 
-#[test]
-fn build_info_uses_package_version() {
+#[tokio::test]
+async fn build_info_uses_package_version() {
     let _ = metrics();
-    let output = aster_forge_metrics::prometheus::export_metrics()
-        .expect("Forge metrics export should succeed");
+    let output = export().await;
     assert!(output.contains(&format!(
         "shortlinker_build_info{{version=\"{}\"}} 1",
         env!("CARGO_PKG_VERSION")
@@ -150,9 +162,13 @@ fn build_info_uses_package_version() {
 #[actix_web::test]
 async fn health_scope_mounts_forge_prometheus_endpoint() {
     let _ = metrics();
-    let app = actix_test::init_service(App::new().service(
-        web::scope("/health").service(shortlinker::api::services::health::health_routes()),
-    ))
+    let app = actix_test::init_service(
+        App::new()
+            .app_data(web::Data::new(provider().clone()))
+            .service(
+                web::scope("/health").service(shortlinker::api::services::health::health_routes()),
+            ),
+    )
     .await;
 
     let response = actix_test::call_service(

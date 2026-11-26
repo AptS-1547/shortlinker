@@ -12,6 +12,7 @@ use tracing::trace;
 
 use crate::config::{get_runtime_config, keys};
 
+/// 管理面板静态资源守卫的 Transform 入口
 #[derive(Clone)]
 pub struct FrontendGuard;
 
@@ -33,6 +34,7 @@ where
     }
 }
 
+/// 静态资源请求守卫中间件，负责识别文件请求并处理 SPA fallback
 pub struct FrontendGuardMiddleware<S> {
     service: Rc<S>,
 }

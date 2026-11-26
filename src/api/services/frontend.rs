@@ -11,6 +11,7 @@ use crate::config::{get_runtime_config, keys};
 #[folder = "admin-panel/dist/"]
 struct FrontendAssets;
 
+/// 管理面板静态资源服务（内置嵌入产物 + 可选自定义前端目录）
 pub struct FrontendService;
 
 /// 自定义前端目录路径
@@ -106,12 +107,11 @@ impl FrontendService {
         // 优先尝试加载自定义前端静态资源
         let content = Self::load_frontend_file(&asset_path).await;
 
-        match content {
-            Some(data) => Ok(HttpResponse::Ok().content_type(content_type).body(data)),
-            None => {
-                debug!("Static file not found: {}", path);
-                Ok(HttpResponse::NotFound().body("File not found"))
-            }
+        if let Some(data) = content {
+            Ok(HttpResponse::Ok().content_type(content_type).body(data))
+        } else {
+            debug!("Static file not found: {}", path);
+            Ok(HttpResponse::NotFound().body("File not found"))
         }
     }
 
@@ -132,13 +132,17 @@ impl FrontendService {
     }
 
     /// 处理管理面板页面 - 重定向到根路径或直接服务
-    pub async fn handle_admin_panel(_req: HttpRequest) -> Result<HttpResponse> {
+    ///
+    /// 无内部 await，直接返回立即就绪的 Future 以满足 Actix handler 签名。
+    pub fn handle_admin_panel(
+        _req: HttpRequest,
+    ) -> impl std::future::Future<Output = Result<HttpResponse>> {
         trace!("Redirecting to admin panel");
 
         // 如果访问 /admin，重定向到根路径（前端路由会处理）
-        Ok(HttpResponse::Found()
+        std::future::ready(Ok(HttpResponse::Found()
             .append_header(("Location", "/"))
-            .finish())
+            .finish()))
     }
 
     /// 处理所有未匹配的路由，返回 index.html（用于 SPA 路由）
@@ -165,23 +169,20 @@ impl FrontendService {
         // 优先尝试加载自定义前端 PWA 资源
         let content = Self::load_frontend_file(file_name).await;
 
-        match content {
-            Some(data) => {
-                // 对 manifest.webmanifest 做配置注入
-                if file_name == "manifest.webmanifest" {
-                    let manifest_content = String::from_utf8_lossy(&data);
-                    let processed = manifest_content.replace("%BASE_PATH%", &frontend_prefix);
-                    Ok(HttpResponse::Ok()
-                        .content_type(content_type)
-                        .body(processed))
-                } else {
-                    Ok(HttpResponse::Ok().content_type(content_type).body(data))
-                }
+        if let Some(data) = content {
+            // 对 manifest.webmanifest 做配置注入
+            if file_name == "manifest.webmanifest" {
+                let manifest_content = String::from_utf8_lossy(&data);
+                let processed = manifest_content.replace("%BASE_PATH%", &frontend_prefix);
+                Ok(HttpResponse::Ok()
+                    .content_type(content_type)
+                    .body(processed))
+            } else {
+                Ok(HttpResponse::Ok().content_type(content_type).body(data))
             }
-            None => {
-                debug!("PWA asset not found: {}", file_name);
-                Ok(HttpResponse::NotFound().body("File not found"))
-            }
+        } else {
+            debug!("PWA asset not found: {}", file_name);
+            Ok(HttpResponse::NotFound().body("File not found"))
         }
     }
 
@@ -193,7 +194,7 @@ impl FrontendService {
             Some("json") => "application/json",
             Some("webmanifest") => "application/manifest+json",
             Some("png") => "image/png",
-            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("jpg" | "jpeg") => "image/jpeg",
             Some("gif") => "image/gif",
             Some("svg") => "image/svg+xml",
             Some("ico") => "image/x-icon",

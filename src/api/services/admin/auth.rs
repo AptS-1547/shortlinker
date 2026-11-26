@@ -1,9 +1,10 @@
 //! Admin API 认证相关端点
 
-use actix_governor::Governor;
 use actix_web::{HttpRequest, HttpResponse, Responder, Result as ActixResult, web};
+use aster_forge_middleware::actix::rate_limit::{
+    RateLimit, TrustedProxyIpKeyExtractor, build_ip_rate_limit_config_with_rejection_response,
+};
 use base64::Engine;
-use governor::middleware::NoOpMiddleware;
 use std::num::{NonZeroU32, NonZeroU64};
 use tracing::{debug, error, info, warn};
 
@@ -35,25 +36,28 @@ fn trusted_proxies() -> Vec<String> {
 ///
 /// 配置：每秒补充 2 个令牌，突发最多 5 次请求
 /// 超限返回 HTTP 429 Too Many Requests
-pub fn login_rate_limiter()
--> Governor<aster_forge_actix_middleware::rate_limit::TrustedProxyIpKeyExtractor, NoOpMiddleware> {
-    let config =
-        aster_forge_actix_middleware::rate_limit::build_ip_governor_config_with_rejection_response(
-            NonZeroU64::new(1).expect("login interval is non-zero"),
-            NonZeroU32::new(5).expect("login burst is non-zero"),
-            &trusted_proxies(),
-            |retry_after, mut response| {
-                response.status(actix_web::http::StatusCode::TOO_MANY_REQUESTS);
-                response.json(ApiResponse::<()> {
-                    code: ErrorCode::RateLimitExceeded as i32,
-                    message: format!("Too many requests, retry in {retry_after}s"),
-                    data: None,
-                })
-            },
-        );
+///
+/// # Panics
+///
+/// 仅当限流参数常量被改成 0 时 panic（`NonZeroU64::new(1)` / `NonZeroU32::new(5)`）；
+/// 当前常量恒为非零，不会触发。
+pub fn login_rate_limiter() -> RateLimit<TrustedProxyIpKeyExtractor> {
+    let config = build_ip_rate_limit_config_with_rejection_response(
+        NonZeroU64::new(1).expect("login interval is non-zero"),
+        NonZeroU32::new(5).expect("login burst is non-zero"),
+        &trusted_proxies(),
+        |retry_after, mut response| {
+            response.status(actix_web::http::StatusCode::TOO_MANY_REQUESTS);
+            response.json(ApiResponse::<()> {
+                code: ErrorCode::RateLimitExceeded as i32,
+                message: format!("Too many requests, retry in {retry_after}s"),
+                data: None,
+            })
+        },
+    );
 
     debug!("Login rate limiter created: 1 req/s, burst 5");
-    Governor::new(&config)
+    RateLimit::new(&config)
 }
 
 /// 创建 refresh token 限流器
@@ -61,25 +65,28 @@ pub fn login_rate_limiter()
 /// 配置：每 10 秒补充 1 个令牌，突发最多 10 次请求
 /// 比 login 限流更宽松，因为 refresh 是正常使用场景
 /// 超限返回 HTTP 429 Too Many Requests
-pub fn refresh_rate_limiter()
--> Governor<aster_forge_actix_middleware::rate_limit::TrustedProxyIpKeyExtractor, NoOpMiddleware> {
-    let config =
-        aster_forge_actix_middleware::rate_limit::build_ip_governor_config_with_rejection_response(
-            NonZeroU64::new(10).expect("refresh interval is non-zero"),
-            NonZeroU32::new(10).expect("refresh burst is non-zero"),
-            &trusted_proxies(),
-            |retry_after, mut response| {
-                response.status(actix_web::http::StatusCode::TOO_MANY_REQUESTS);
-                response.json(ApiResponse::<()> {
-                    code: ErrorCode::RateLimitExceeded as i32,
-                    message: format!("Too many requests, retry in {retry_after}s"),
-                    data: None,
-                })
-            },
-        );
+///
+/// # Panics
+///
+/// 仅当限流参数常量被改成 0 时 panic（`NonZeroU64::new(10)` / `NonZeroU32::new(10)`）；
+/// 当前常量恒为非零，不会触发。
+pub fn refresh_rate_limiter() -> RateLimit<TrustedProxyIpKeyExtractor> {
+    let config = build_ip_rate_limit_config_with_rejection_response(
+        NonZeroU64::new(10).expect("refresh interval is non-zero"),
+        NonZeroU32::new(10).expect("refresh burst is non-zero"),
+        &trusted_proxies(),
+        |retry_after, mut response| {
+            response.status(actix_web::http::StatusCode::TOO_MANY_REQUESTS);
+            response.json(ApiResponse::<()> {
+                code: ErrorCode::RateLimitExceeded as i32,
+                message: format!("Too many requests, retry in {retry_after}s"),
+                data: None,
+            })
+        },
+    );
 
     debug!("Refresh rate limiter created: 1 req/10s, burst 10");
-    Governor::new(&config)
+    RateLimit::new(&config)
 }
 
 /// 登录验证 - 检查管理员 token
@@ -108,16 +115,17 @@ pub async fn check_admin_token(
             .as_ref()
             .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
     });
-    let client_ip = peer
-        .map(|peer| {
-            aster_forge_actix_middleware::client_ip::real_ip_from_headers(
+    let client_ip = peer.map_or_else(
+        || "unknown".to_string(),
+        |peer| {
+            aster_forge_middleware::actix::client_ip::real_ip_from_headers(
                 req.headers(),
                 peer,
                 &trusted_proxies(),
             )
             .to_string()
-        })
-        .unwrap_or_else(|| "unknown".to_string());
+        },
+    );
     let rt = get_runtime_config();
     let admin_token = rt.get_or(keys::API_ADMIN_TOKEN, "");
 
@@ -207,15 +215,13 @@ pub async fn refresh_token(req: HttpRequest) -> ActixResult<impl Responder> {
     let cookie_builder = CookieBuilder::from_config();
 
     // Get refresh token from cookie
-    let refresh_token = match req.cookie(cookie_builder.refresh_cookie_name()) {
-        Some(cookie) => cookie.value().to_string(),
-        None => {
-            info!("Admin API: refresh token not found in cookie");
-            return Ok(error_from_shortlinker(
-                &ShortlinkerError::auth_token_invalid("Refresh token not found"),
-            ));
-        }
+    let Some(refresh_token) = req.cookie(CookieBuilder::refresh_cookie_name()) else {
+        info!("Admin API: refresh token not found in cookie");
+        return Ok(error_from_shortlinker(
+            &ShortlinkerError::auth_token_invalid("Refresh token not found"),
+        ));
     };
+    let refresh_token = refresh_token.value().to_string();
 
     // Validate refresh token using cached service
     let jwt_service = get_jwt_service();

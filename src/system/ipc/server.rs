@@ -14,6 +14,7 @@ use super::platform::{IpcPlatform, PlatformIpc};
 use super::protocol::{decode, encode};
 use super::types::{IpcCommand, IpcResponse};
 
+/// Run the IPC server loop, accepting CLI connections until shutdown is requested.
 pub async fn run_ipc_server(shutdown_token: CancellationToken) {
     let mut listener = match PlatformIpc::bind().await {
         Ok(listener) => {
@@ -29,7 +30,7 @@ pub async fn run_ipc_server(shutdown_token: CancellationToken) {
 
     loop {
         tokio::select! {
-            _ = shutdown_token.cancelled() => break,
+            () = shutdown_token.cancelled() => break,
             result = PlatformIpc::accept(&mut listener) => match result {
                 Ok(stream) => {
                     connections.spawn(handle_connection(stream));

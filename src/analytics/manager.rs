@@ -20,6 +20,7 @@ use tracing::{debug, error, trace, warn};
 use crate::analytics::{ClickDetail, ClickSink, DetailedClickSink, RawClickEvent};
 
 use crate::metrics::MetricsRecorder;
+use crate::utils::u64_to_f64;
 
 /// 点击缓冲区状态，封装所有可变状态
 struct ClickBuffer {
@@ -77,7 +78,7 @@ impl ClickBuffer {
         // 3. 更新总计数（使用 AcqRel 确保一致性）
         if total_removed > 0 {
             self.total_clicks
-                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                .try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                     Some(current.saturating_sub(total_removed))
                 })
                 .ok();
@@ -189,6 +190,13 @@ pub struct ClickManager {
 }
 
 impl ClickManager {
+    /// 创建仅处理点击计数的基础管理器（不含详细日志）
+    ///
+    /// # Arguments
+    /// - `sink`: 点击计数 Sink
+    /// - `flush_interval`: 自动刷盘间隔
+    /// - `max_clicks_before_flush`: 触发刷盘的最大点击数
+    /// - `metrics`: Metrics 记录器
     pub fn new(
         sink: Arc<dyn ClickSink>,
         flush_interval: Duration,
@@ -247,6 +255,11 @@ impl ClickManager {
     /// 记录详细点击信息（如果启用）
     ///
     /// 同时增加 click_count 和记录详细日志
+    ///
+    /// # Panics
+    ///
+    /// 当详细日志缓冲已启用（`detailed_buffer` 存在）而详细日志 sink 未启用时 panic；
+    /// 正常配置下两者同时初始化，不会触发。
     pub fn record_detailed(&self, detail: ClickDetail) {
         // 1. 始终增加 click_count（现有逻辑）
         self.increment(&detail.code);
@@ -355,7 +368,7 @@ impl ClickManager {
         let mut shutdown_rx = self.shutdown_rx.clone();
         loop {
             tokio::select! {
-                _ = sleep(self.flush_interval) => {
+                () = sleep(self.flush_interval) => {
                     debug!("ClickManager: Triggering scheduled flush");
                     // 定期触发刷盘
                     if let Ok(_guard) = self.buffer.flush_lock.try_lock() {
@@ -384,6 +397,11 @@ impl ClickManager {
     /// 启动原始事件处理器（消费 crossbeam channel 并生成 ClickDetail）
     ///
     /// 需要传入事件处理函数，用于将 RawClickEvent 转换为 ClickDetail
+    ///
+    /// # Panics
+    ///
+    /// 当详细日志缓冲已启用（`detailed_buffer` 存在）而详细日志 sink 未启用时 panic；
+    /// 正常配置下两者同时初始化，不会触发。
     pub async fn start_event_processor<F>(&self, rx: Receiver<RawClickEvent>, process_fn: F)
     where
         F: Fn(RawClickEvent) -> ClickDetail + Send + 'static,
@@ -501,7 +519,9 @@ impl ClickManager {
         let updates = buffer.drain();
 
         // Update buffer size gauge after drain
-        metrics.set_clicks_buffer_entries(buffer.data.len() as f64);
+        metrics.set_clicks_buffer_entries(u64_to_f64(
+            u64::try_from(buffer.data.len()).unwrap_or(u64::MAX),
+        ));
 
         if updates.is_empty() {
             trace!("ClickManager: No clicks to flush");
@@ -510,7 +530,7 @@ impl ClickManager {
 
         let count = updates.len();
         match sink.flush_clicks(updates.clone()).await {
-            Ok(_) => {
+            Ok(()) => {
                 debug!("ClickManager: Successfully flushed {} entries", count);
                 metrics.inc_clicks_flush(trigger, "success");
                 true
@@ -533,7 +553,9 @@ impl ClickManager {
                 );
                 metrics.inc_clicks_flush(trigger, "failed");
                 // Update gauge again after restore
-                metrics.set_clicks_buffer_entries(buffer.data.len() as f64);
+                metrics.set_clicks_buffer_entries(u64_to_f64(
+                    u64::try_from(buffer.data.len()).unwrap_or(u64::MAX),
+                ));
                 false
             }
         }
@@ -541,6 +563,8 @@ impl ClickManager {
 
     /// 执行详细日志刷盘操作（分批插入，避免超出 SQL 变量限制）
     async fn flush_detailed_buffer(buffer: &DetailedBuffer, sink: &Arc<dyn DetailedClickSink>) {
+        const BATCH_SIZE: usize = 500;
+
         let details = buffer.drain();
 
         if details.is_empty() {
@@ -549,13 +573,12 @@ impl ClickManager {
         }
 
         let total_count = details.len();
-        const BATCH_SIZE: usize = 500;
         let mut failed = Vec::new();
         let mut success_count = 0;
 
         for chunk in details.chunks(BATCH_SIZE) {
             match sink.log_clicks_batch(chunk.to_vec()).await {
-                Ok(_) => {
+                Ok(()) => {
                     success_count += chunk.len();
                 }
                 Err(e) => {
@@ -694,14 +717,14 @@ mod tests {
     /// 测试并发 increment 不会丢失点击
     #[tokio::test]
     async fn test_concurrent_increment() {
+        const NUM_THREADS: usize = 10;
+        const INCREMENTS_PER_THREAD: usize = 1000;
+
         let sink = Arc::new(MockSink::new());
         let manager = Arc::new(create_test_manager(
             Arc::clone(&sink) as Arc<dyn ClickSink>,
-            100000, // 高阈值，避免自动刷盘
+            100_000, // 高阈值，避免自动刷盘
         ));
-
-        const NUM_THREADS: usize = 10;
-        const INCREMENTS_PER_THREAD: usize = 1000;
 
         let mut handles = vec![];
         for _ in 0..NUM_THREADS {
@@ -729,15 +752,15 @@ mod tests {
     /// 测试并发 increment + drain 不会丢失数据
     #[tokio::test]
     async fn test_concurrent_increment_and_drain() {
-        let sink = Arc::new(MockSink::new());
-        let manager = Arc::new(create_test_manager(
-            Arc::clone(&sink) as Arc<dyn ClickSink>,
-            100000, // 高阈值，避免自动刷盘
-        ));
-
         const NUM_THREADS: usize = 10;
         const INCREMENTS_PER_THREAD: usize = 1000;
         const NUM_FLUSHES: usize = 5;
+
+        let sink = Arc::new(MockSink::new());
+        let manager = Arc::new(create_test_manager(
+            Arc::clone(&sink) as Arc<dyn ClickSink>,
+            100_000, // 高阈值，避免自动刷盘
+        ));
 
         // 启动 increment 线程
         let mut handles = vec![];

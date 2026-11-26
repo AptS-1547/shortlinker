@@ -1,9 +1,9 @@
-//! UserAgent 去重表迁移
+//! `UserAgent` 去重表迁移
 //!
-//! 创建 user_agents 查找表，用于存储 UA 字符串的 hash 映射，
-//! 并在 click_logs 表添加 user_agent_hash 列引用。
+//! 创建 `user_agents` 查找表，用于存储 UA 字符串的 hash 映射，
+//! 并在 `click_logs` 表添加 `user_agent_hash` 列引用。
 //!
-//! 注意：历史数据迁移在应用启动时由 UserAgentStore 自动处理。
+//! 注意：历史数据迁移在应用启动时由 `UserAgentStore` 自动处理。
 
 use sea_orm_migration::prelude::*;
 

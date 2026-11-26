@@ -35,8 +35,12 @@ pub use operations::upsert;
 /// 从数据库 URL 推断数据库类型
 pub fn infer_backend_from_url(database_url: &str) -> Result<String> {
     if database_url.starts_with("sqlite:")
-        || database_url.ends_with(".db")
-        || database_url.ends_with(".sqlite")
+        || std::path::Path::new(database_url)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("db"))
+        || std::path::Path::new(database_url)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("sqlite"))
         || database_url == ":memory:"
     {
         Ok("sqlite".to_string())
@@ -87,6 +91,12 @@ pub struct SeaOrmStorage {
 }
 
 impl SeaOrmStorage {
+    /// 连接数据库并运行迁移，初始化存储实例
+    ///
+    /// # Arguments
+    /// - `database_url`: 数据库连接串
+    /// - `backend_name`: 后端类型名（sqlite/mysql/postgresql）
+    /// - `metrics`: Metrics 记录器
     pub async fn new(
         database_url: &str,
         backend_name: &str,
@@ -157,13 +167,15 @@ impl SeaOrmStorage {
         &self.db
     }
 
-    pub async fn get_backend_config(&self) -> StorageConfig {
+    /// 返回当前存储后端的配置信息（类型与能力声明）
+    pub fn get_backend_config(&self) -> StorageConfig {
         StorageConfig {
             storage_type: self.backend_name.clone(),
             support_click: true,
         }
     }
 
+    /// 将存储实例包装为点击计数 Sink，供分析层批量落盘
     pub fn as_click_sink(&self) -> Option<Arc<dyn ClickSink>> {
         Some(Arc::new(self.clone()) as Arc<dyn ClickSink>)
     }

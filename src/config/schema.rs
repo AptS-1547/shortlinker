@@ -24,10 +24,15 @@ static SCHEMA_CACHE: OnceLock<Vec<ConfigSchema>> = OnceLock::new();
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct EnumOption {
+    /// 写入存储与提交校验使用的实际取值。
     pub value: String,
+    /// 前端展示文案（未接入 i18n 时的默认语言）。
     pub label: String,
+    /// label 对应的 i18n key；`None` 表示无翻译条目。
     pub label_i18n_key: Option<String>,
+    /// 选项的说明文案；`None` 表示无说明。
     pub description: Option<String>,
+    /// description 对应的 i18n key；`None` 表示无翻译条目。
     pub description_i18n_key: Option<String>,
 }
 
@@ -35,13 +40,21 @@ pub struct EnumOption {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(all(debug_assertions, feature = "openapi"), derive(utoipa::ToSchema))]
 pub struct ConfigSchema {
+    /// 配置 key，与 registry 注册名一致。
     pub key: String,
+    /// 值的类型分类，决定前端表单控件与后端校验方式。
     pub value_type: ValueType,
+    /// 默认值的字符串形式（由 registry 的 default_fn 生成）。
     pub default_value: String,
+    /// 配置项说明文案。
     pub description: String,
+    /// 所属配置分组（如 analytics、api）；`None` 表示未分组。
     pub category: Option<String>,
+    /// enum 类型的可选值列表；非 enum 类型为 `None`。
     pub enum_options: Option<Vec<EnumOption>>,
+    /// 修改后是否需要重启进程才能生效。
     pub requires_restart: bool,
+    /// 是否允许在运行时通过管理接口修改。
     pub editable: bool,
     /// 排序顺序（基于 Forge registry 中定义的顺序）
     pub order: usize,
@@ -104,7 +117,7 @@ fn same_site_options() -> Vec<EnumOption> {
                 value: value.clone(),
                 label: value.clone(),
                 label_i18n_key: Some(format!("enums.sameSite.{}.label", value_lower)),
-                description: v.get_message().map(|s| s.to_string()),
+                description: v.get_message().map(str::to_string),
                 description_i18n_key: Some(format!("enums.sameSite.{}.description", value_lower)),
             }
         })

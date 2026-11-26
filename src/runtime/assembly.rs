@@ -4,6 +4,7 @@ use aster_forge_tasks::background_task_component_from_shutdown;
 
 use crate::runtime::{components, startup, tasks};
 
+/// 组装 AsterRuntime 并运行 server mode，直到收到关闭信号
 pub async fn run_server() -> Result<()> {
     let startup = startup::prepare_server_startup()
         .await

@@ -76,7 +76,7 @@ pub fn encode<T: Serialize>(msg: &T) -> Result<Vec<u8>, ProtocolError> {
     }
 
     let mut buf = Vec::with_capacity(4 + json.len());
-    buf.put_u32(json.len() as u32);
+    buf.put_u32(u32::try_from(json.len()).unwrap_or(u32::MAX));
     buf.extend_from_slice(&json);
     Ok(buf)
 }
@@ -133,9 +133,9 @@ mod tests {
 
     #[test]
     fn test_encode_decode_roundtrip() {
-        init_test_config();
         use crate::system::ipc::types::IpcCommand;
 
+        init_test_config();
         let cmd = IpcCommand::Ping;
         let encoded = encode(&cmd).unwrap();
 
@@ -158,7 +158,7 @@ mod tests {
     fn test_message_too_large() {
         init_test_config();
         let mut buf = BytesMut::with_capacity(8);
-        buf.put_u32((DEFAULT_MAX_MESSAGE_SIZE + 1) as u32);
+        buf.put_u32(u32::try_from(DEFAULT_MAX_MESSAGE_SIZE + 1).unwrap_or(u32::MAX));
         buf.put_u32(0); // Dummy data
 
         let result: Result<Option<String>, _> = decode(&mut buf);

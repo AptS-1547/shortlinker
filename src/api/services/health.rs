@@ -15,7 +15,7 @@
 use actix_web::{HttpResponse, Responder, web};
 use aster_forge_runtime::{
     HealthCheckOptions, HealthCheckRegistry, HealthCheckScope, HealthCheckScopes,
-    HealthComponentReport, HealthStatus,
+    HealthComponentDetailValue, HealthComponentReport, HealthStatus, SystemHealthReport,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,14 +30,17 @@ use crate::storage::SeaOrmStorage;
 use crate::utils::TimeParser;
 
 // 应用启动时间结构体
+/// 应用启动时间（注入为 Actix app data，供健康报告计算 uptime）
 #[derive(Clone, Debug)]
 pub struct AppStartTime {
+    /// 应用启动的 UTC 时间
     pub start_datetime: chrono::DateTime<chrono::Utc>,
 }
 
+/// 健康/就绪/存活检查端点的 handler 集合
 pub struct HealthService;
 
-fn health_registry(storage: Arc<SeaOrmStorage>, cache: Arc<dyn LinkCache>) -> HealthCheckRegistry {
+fn health_registry(storage: &Arc<SeaOrmStorage>, cache: Arc<dyn LinkCache>) -> HealthCheckRegistry {
     HealthCheckRegistry::configured(|registry| {
         let storage = storage.clone();
         registry.register_with_options(
@@ -99,7 +102,77 @@ fn health_registry(storage: Arc<SeaOrmStorage>, cache: Arc<dyn LinkCache>) -> He
     })
 }
 
+/// 从健康报告中构建 storage 组件检查结果；组件缺失时视为 unhealthy
+fn build_storage_status(
+    report: &SystemHealthReport,
+    backend: HealthStorageBackend,
+) -> HealthStorageCheck {
+    match report
+        .components
+        .iter()
+        .find(|component| component.name == "storage")
+    {
+        Some(component) => HealthStorageCheck {
+            status: component.status.as_str().to_string(),
+            links_count: component
+                .detail("links_count")
+                .and_then(HealthComponentDetailValue::as_unsigned)
+                .and_then(|count| usize::try_from(count).ok()),
+            backend: backend.clone(),
+            error: component
+                .status
+                .is_issue()
+                .then(|| component.message.clone()),
+        },
+        None => HealthStorageCheck {
+            status: "unhealthy".to_string(),
+            links_count: None,
+            backend,
+            error: Some("storage health check missing".to_string()),
+        },
+    }
+}
+
+/// 从健康报告中构建 cache 组件检查结果；组件缺失时返回 `None`（响应中省略）
+fn build_cache_status(report: &SystemHealthReport) -> Option<HealthCacheCheck> {
+    report
+        .components
+        .iter()
+        .find(|component| component.name == "cache")
+        .map(|component| HealthCacheCheck {
+            status: component
+                .detail("reported_status")
+                .and_then(|value| value.as_text())
+                .unwrap_or_else(|| component.status.as_str())
+                .to_string(),
+            cache_type: component
+                .detail("cache_type")
+                .and_then(|value| value.as_text())
+                .unwrap_or("unknown")
+                .to_string(),
+            bloom_filter_enabled: component
+                .detail("bloom_filter_enabled")
+                .and_then(HealthComponentDetailValue::as_boolean)
+                .unwrap_or(false),
+            negative_cache_enabled: component
+                .detail("negative_cache_enabled")
+                .and_then(HealthComponentDetailValue::as_boolean)
+                .unwrap_or(false),
+            error: component
+                .detail("error")
+                .and_then(|value| value.as_text())
+                .map(str::to_string)
+                .or_else(|| {
+                    component
+                        .status
+                        .is_issue()
+                        .then(|| component.message.clone())
+                }),
+        })
+}
+
 impl HealthService {
+    /// 返回带各组件检查结果与运行时长统计的完整健康报告 JSON
     pub async fn health_check(
         storage: web::Data<Arc<SeaOrmStorage>>,
         cache: web::Data<Arc<dyn LinkCache>>,
@@ -107,72 +180,17 @@ impl HealthService {
     ) -> impl Responder {
         trace!("Received health check request");
 
-        let registry = health_registry(storage.get_ref().clone(), cache.get_ref().clone());
+        let registry = health_registry(storage.get_ref(), cache.get_ref().clone());
         let report = registry.run_scope(HealthCheckScope::Diagnostics).await;
 
-        let backend_config = storage.get_backend_config().await;
+        let backend_config = storage.get_backend_config();
         let backend = HealthStorageBackend {
             storage_type: backend_config.storage_type,
             support_click: backend_config.support_click,
         };
 
-        let storage_status = report
-            .components
-            .iter()
-            .find(|component| component.name == "storage")
-            .map(|component| HealthStorageCheck {
-                status: component.status.as_str().to_string(),
-                links_count: component
-                    .detail("links_count")
-                    .and_then(|value| value.as_unsigned())
-                    .and_then(|count| usize::try_from(count).ok()),
-                backend: backend.clone(),
-                error: component
-                    .status
-                    .is_issue()
-                    .then(|| component.message.clone()),
-            })
-            .unwrap_or_else(|| HealthStorageCheck {
-                status: "unhealthy".to_string(),
-                links_count: None,
-                backend,
-                error: Some("storage health check missing".to_string()),
-            });
-
-        let cache_status = report
-            .components
-            .iter()
-            .find(|component| component.name == "cache")
-            .map(|component| HealthCacheCheck {
-                status: component
-                    .detail("reported_status")
-                    .and_then(|value| value.as_text())
-                    .unwrap_or_else(|| component.status.as_str())
-                    .to_string(),
-                cache_type: component
-                    .detail("cache_type")
-                    .and_then(|value| value.as_text())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                bloom_filter_enabled: component
-                    .detail("bloom_filter_enabled")
-                    .and_then(|value| value.as_boolean())
-                    .unwrap_or(false),
-                negative_cache_enabled: component
-                    .detail("negative_cache_enabled")
-                    .and_then(|value| value.as_boolean())
-                    .unwrap_or(false),
-                error: component
-                    .detail("error")
-                    .and_then(|value| value.as_text())
-                    .map(str::to_string)
-                    .or_else(|| {
-                        component
-                            .status
-                            .is_issue()
-                            .then(|| component.message.clone())
-                    }),
-            });
+        let storage_status = build_storage_status(&report, backend);
+        let cache_status = build_cache_status(&report);
 
         let now = chrono::Utc::now();
 
@@ -231,13 +249,14 @@ impl HealthService {
             .json(health_response)
     }
 
+    /// 就绪检查：依赖组件（存储等）不可用时返回 503
     pub async fn readiness_check(
         storage: web::Data<Arc<SeaOrmStorage>>,
         cache: web::Data<Arc<dyn LinkCache>>,
     ) -> impl Responder {
         trace!("Received readiness check request");
 
-        let registry = health_registry(storage.get_ref().clone(), cache.get_ref().clone());
+        let registry = health_registry(storage.get_ref(), cache.get_ref().clone());
         let report = registry.run_scope(HealthCheckScope::Readiness).await;
         if matches!(report.status(), HealthStatus::Unhealthy) {
             HttpResponse::ServiceUnavailable()
@@ -250,11 +269,13 @@ impl HealthService {
         }
     }
 
-    // 活跃性检查，检查基本服务可用性
-    pub async fn liveness_check() -> impl Responder {
+    /// 活跃性检查，检查基本服务可用性
+    ///
+    /// 无内部 await，直接返回立即就绪的 Future 以满足 Actix handler 签名。
+    pub fn liveness_check() -> impl std::future::Future<Output = impl Responder> {
         trace!("Received liveness check request");
 
-        HttpResponse::NoContent().finish()
+        std::future::ready(HttpResponse::NoContent().finish())
     }
 }
 
@@ -268,5 +289,9 @@ pub fn health_routes() -> actix_web::Scope {
         .route("/live", web::get().to(HealthService::liveness_check))
         .route("/live", web::head().to(HealthService::liveness_check));
 
-    aster_forge_actix_observability::configure_prometheus_route(scope)
+    #[cfg(feature = "metrics")]
+    let scope = scope.service(aster_forge_observability::actix::prometheus_resource(
+        "/metrics",
+    ));
+    scope
 }

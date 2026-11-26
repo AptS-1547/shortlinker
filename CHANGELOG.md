@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.6.1] - 2026-11-26
+
+### Changed
+
+- **依赖全面升级** - 全部 crates.io 依赖升级并收紧为精确版本 req（`clap 4.6`、`actix-web 4.20`、`tokio 1.54`、`sea-orm 2.0.4`、`utoipa 6.0`、`jsonwebtoken 12`、`maxminddb 0.33` 等），依赖声明统一迁移到 `[workspace.dependencies]`，workspace 成员以 `workspace = true` 继承
+- **Forge 依赖切 crates.io 精钉** - 13 个 `aster_forge_*` 依赖从 git revision 切换到已发布批次（`aster_forge_middleware =0.1.0-alpha.6`、`aster_forge_db =0.1.0-alpha.5` 等）；原 `aster_forge_actix_middleware`/`aster_forge_actix_observability` 包已在上游移除
+- **workspace lints** - 启用 AsterACME 同款 `[workspace.lints]`：`unsafe_code = "deny"`（Windows Win32 FFI 以 `#[expect(unsafe_code, reason)]` 显式豁免）、clippy pedantic、`allow_attributes`/`cast_possible_truncation`/`cast_sign_loss`/undocumented unsafe 等 deny 项；测试代码为主的低信噪比项（`doc_markdown`/`uninlined_format_args`/`missing_errors_doc`/`must_use_candidate`）显式放行，并补齐全部公开项文档注释
+- **JWT secret 校验跟随 jsonwebtoken 12** - `JwtService::new` 现返回 `Result`（jsonwebtoken 12 拒绝空 HMAC key）；运行时路径由 `from_config` 保证非空 secret
+
+### Security
+
+- **依赖审计迁移 cargo-audit → cargo-deny** - 删除 `.cargo/audit.toml`，新增 `deny.toml`（licenses + bans + advisories + sources 四项检查），CI 使用锁定的 cargo-deny 0.22.0；前端 bun audit 保持不变
+- **GPL 限流依赖移除** - 删除 `actix-governor`（GPL-3.0-or-later），管理端 IP 限流改用 Forge `aster_forge_middleware` 的 GPL-free Actix 中间件；429 响应 envelope、burst/period 语义、trusted-proxy 分桶和跨 worker 共享配额行为不变
+- **url 升级 2.5.9** - 修复嵌套 `blob:` URL 在 `Url::origin()` 的栈溢出（RUSTSEC-2026-0592）
+- **advisory exceptions** - 按"只留当前命中"原则记录 4 项（cookie PrivateJar/fork、libsqlite3-sys bundled SQLite、h2 0.3.x、chrono 维护状态），各项写明移除条件
+
 ## [v0.6.0] - 2026-07-21
 
 ### 🎉 Release Highlights

@@ -62,10 +62,10 @@ impl ExternalApiProvider {
     }
 
     /// 从外部 API 获取 GeoIP 信息（同步，在 spawn_blocking 中调用）
-    fn fetch_from_api_sync(url: String) -> Option<GeoInfo> {
+    fn fetch_from_api_sync(url: &str) -> Option<GeoInfo> {
         let agent = get_agent();
 
-        let resp = match agent.get(&url).call() {
+        let resp = match agent.get(url).call() {
             Ok(r) => r,
             Err(e) => {
                 warn!("GeoIP API request to \"{}\" failed: {}", url, e);
@@ -110,7 +110,7 @@ impl ExternalApiProvider {
         let url = self.api_url_template.replace("{ip}", ip);
 
         // 使用 spawn_blocking 在线程池中执行同步 HTTP 请求
-        tokio::task::spawn_blocking(move || Self::fetch_from_api_sync(url))
+        tokio::task::spawn_blocking(move || Self::fetch_from_api_sync(&url))
             .await
             .unwrap_or_else(|e| {
                 warn!("GeoIP spawn_blocking failed: {}", e);
@@ -152,7 +152,7 @@ mod tests {
     /// 测试 ureq 基本 HTTP 请求
     /// 依赖外部网络服务，CI 环境可能失败
     #[test]
-    #[ignore]
+    #[ignore = "依赖外部网络服务，CI 环境可能失败"]
     fn test_ureq_basic_request() {
         let agent = get_agent();
 
@@ -171,12 +171,12 @@ mod tests {
     /// 测试 fetch_from_api_sync 解析 ip-api.com 格式
     /// 依赖外部网络服务，CI 环境可能失败
     #[test]
-    #[ignore]
+    #[ignore = "依赖外部网络服务，CI 环境可能失败"]
     fn test_fetch_from_api_sync_real() {
         // 用 Google DNS 的 IP 测试（稳定、公开）
         let url = "http://ip-api.com/json/8.8.8.8?fields=status,countryCode,city".to_string();
 
-        let result = ExternalApiProvider::fetch_from_api_sync(url);
+        let result = ExternalApiProvider::fetch_from_api_sync(&url);
 
         assert!(result.is_some(), "Should get GeoIP result for 8.8.8.8");
 
@@ -192,7 +192,7 @@ mod tests {
     /// 测试 ExternalApiProvider 完整流程（含缓存）
     /// 依赖外部网络服务，CI 环境可能失败
     #[tokio::test]
-    #[ignore]
+    #[ignore = "依赖外部网络服务，CI 环境可能失败"]
     async fn test_external_api_provider_lookup() {
         let provider =
             ExternalApiProvider::new("http://ip-api.com/json/{ip}?fields=status,countryCode,city");
@@ -211,7 +211,7 @@ mod tests {
     /// 测试无效 IP 的处理
     /// 依赖外部网络服务，CI 环境可能失败
     #[tokio::test]
-    #[ignore]
+    #[ignore = "依赖外部网络服务，CI 环境可能失败"]
     async fn test_external_api_provider_invalid_ip() {
         let provider =
             ExternalApiProvider::new("http://ip-api.com/json/{ip}?fields=status,countryCode,city");
@@ -226,12 +226,12 @@ mod tests {
     /// 测试超时处理
     /// 依赖外部网络服务，CI 环境可能失败
     #[test]
-    #[ignore]
+    #[ignore = "依赖外部网络服务，CI 环境可能失败"]
     fn test_timeout_handling() {
         // 用一个不存在的地址测试超时
         let url = "http://192.0.2.1/timeout-test".to_string(); // TEST-NET, 不可路由
 
-        let result = ExternalApiProvider::fetch_from_api_sync(url);
+        let result = ExternalApiProvider::fetch_from_api_sync(&url);
 
         // 应该在 2 秒内超时并返回 None
         assert!(result.is_none(), "Should timeout and return None");

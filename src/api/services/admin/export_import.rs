@@ -218,7 +218,10 @@ pub async fn export_links(
     };
 
     // 获取游标分页流式数据
-    let batch_stream = service.export_links_stream(filter, EXPORT_BATCH_SIZE as u64);
+    let batch_stream = service.export_links_stream(
+        &filter,
+        u64::try_from(EXPORT_BATCH_SIZE).unwrap_or(u64::MAX),
+    );
 
     // 行映射：ShortLink → CsvLinkRow
     let row_mapper = |link: ShortLink| CsvLinkRow {
@@ -271,77 +274,11 @@ pub async fn import_links(
 ) -> ActixResult<impl Responder> {
     info!("Admin API: import links request");
 
-    let mut csv_data: Option<Vec<u8>> = None;
-    let mut mode = ImportMode::Skip; // 默认模式
-
-    // 解析 multipart form data
-    while let Some(item) = payload.next().await {
-        let mut field = match item {
-            Ok(f) => f,
-            Err(e) => {
-                error!("Failed to parse multipart field: {}", e);
-                return Ok(error_from_shortlinker(
-                    &ShortlinkerError::invalid_multipart_data(format!(
-                        "Invalid multipart data: {}",
-                        e
-                    )),
-                ));
-            }
-        };
-
-        let field_name = field.name().unwrap_or("").to_string();
-
-        match field_name.as_str() {
-            "file" => {
-                // 读取文件内容（带大小限制）
-                let mut data = Vec::new();
-                while let Some(chunk) = field.next().await {
-                    match chunk {
-                        Ok(bytes) => {
-                            // 检查累积大小
-                            if data.len() + bytes.len() > MAX_IMPORT_FILE_SIZE {
-                                return Ok(error_response(
-                                    actix_web::http::StatusCode::BAD_REQUEST,
-                                    ErrorCode::FileTooLarge,
-                                    &format!(
-                                        "File size exceeds maximum {} MB",
-                                        MAX_IMPORT_FILE_SIZE / 1024 / 1024
-                                    ),
-                                ));
-                            }
-                            data.extend_from_slice(&bytes);
-                        }
-                        Err(e) => {
-                            error!("Failed to read file chunk: {}", e);
-                            return Ok(error_from_shortlinker(&ShortlinkerError::file_read_error(
-                                format!("Failed to read file: {}", e),
-                            )));
-                        }
-                    }
-                }
-                csv_data = Some(data);
-            }
-            "mode" => {
-                // 读取模式参数
-                let mut data = Vec::new();
-                while let Some(chunk) = field.next().await {
-                    if let Ok(bytes) = chunk {
-                        data.extend_from_slice(&bytes);
-                    }
-                }
-                let mode_str = String::from_utf8_lossy(&data).to_string();
-                mode = match mode_str.to_lowercase().as_str() {
-                    "skip" => ImportMode::Skip,
-                    "overwrite" => ImportMode::Overwrite,
-                    "error" => ImportMode::Error,
-                    _ => ImportMode::Skip,
-                };
-            }
-            _ => {
-                // 忽略未知字段
-            }
-        }
-    }
+    // 解析 multipart form data，提取 CSV 内容与导入模式
+    let (csv_data, mode) = match read_multipart_import(&mut payload).await {
+        Ok(parts) => parts,
+        Err(response) => return Ok(*response),
+    };
 
     // 验证文件存在
     let csv_data = match csv_data {
@@ -359,51 +296,8 @@ pub async fn import_links(
         csv_data.len()
     );
 
-    // 解析 CSV（单次解析，收集所有行）
-    let cursor = Cursor::new(&csv_data);
-    let mut csv_reader = ReaderBuilder::new()
-        .has_headers(true)
-        .flexible(true)
-        .trim(csv::Trim::All)
-        .from_reader(cursor);
-
-    let mut total_rows = 0;
-    let mut failed_items: Vec<ImportFailedItem> = Vec::new();
-    let mut raw_items: Vec<ImportLinkItemRaw> = Vec::new();
-    // 记录 code → CSV 行号映射，仅用于回填 service 层返回的冲突失败项行号
-    // （验证错误的行号由 ImportLinkItemRaw.row_num 直接携带，不受重复 code 影响）
-    let mut code_to_row: std::collections::HashMap<String, usize> =
-        std::collections::HashMap::new();
-
     // Step 1: CSV 解析，收集 raw items（CSV 解析错误留在这层）
-    for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
-        let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
-        total_rows += 1;
-
-        let row = match result {
-            Ok(row) => row,
-            Err(e) => {
-                failed_items.push(ImportFailedItem {
-                    row: Some(row_num),
-                    code: String::new(),
-                    error: format!("CSV parse error: {}", e),
-                    error_code: Some(ErrorCode::CsvParseError as i32),
-                });
-                continue;
-            }
-        };
-
-        code_to_row.insert(row.code.clone(), row_num);
-        raw_items.push(ImportLinkItemRaw {
-            code: row.code,
-            target: row.target,
-            created_at: row.created_at,
-            expires_at: row.expires_at,
-            password: row.password,
-            click_count: row.click_count,
-            row_num: Some(row_num),
-        });
-    }
+    let (raw_items, mut failed_items, code_to_row, total_rows) = parse_import_csv(&csv_data);
 
     // Step 2: 统一验证（URL、日期、密码、空 code）
     let (valid_items, row_errors) = validate_import_rows(raw_items);
@@ -462,4 +356,142 @@ pub async fn import_links(
         failed_count,
         failed_items,
     }))
+}
+
+/// 解析导入请求的 multipart 表单，返回 (CSV 内容, 导入模式)；
+/// multipart 错误时返回 `Err(响应)` 由调用方直接返回。
+async fn read_multipart_import(
+    payload: &mut Multipart,
+) -> Result<(Option<Vec<u8>>, ImportMode), Box<actix_web::HttpResponse>> {
+    let mut csv_data: Option<Vec<u8>> = None;
+    let mut mode = ImportMode::Skip; // 默认模式
+
+    while let Some(item) = payload.next().await {
+        let mut field = match item {
+            Ok(f) => f,
+            Err(e) => {
+                error!("Failed to parse multipart field: {}", e);
+                return Err(Box::new(error_from_shortlinker(
+                    &ShortlinkerError::invalid_multipart_data(format!(
+                        "Invalid multipart data: {}",
+                        e
+                    )),
+                )));
+            }
+        };
+
+        let field_name = field.name().unwrap_or("").to_string();
+
+        match field_name.as_str() {
+            "file" => {
+                // 读取文件内容（带大小限制）
+                let mut data = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => {
+                            // 检查累积大小
+                            if data.len() + bytes.len() > MAX_IMPORT_FILE_SIZE {
+                                return Err(Box::new(error_response(
+                                    actix_web::http::StatusCode::BAD_REQUEST,
+                                    ErrorCode::FileTooLarge,
+                                    &format!(
+                                        "File size exceeds maximum {} MB",
+                                        MAX_IMPORT_FILE_SIZE / 1024 / 1024
+                                    ),
+                                )));
+                            }
+                            data.extend_from_slice(&bytes);
+                        }
+                        Err(e) => {
+                            error!("Failed to read file chunk: {}", e);
+                            return Err(Box::new(error_from_shortlinker(
+                                &ShortlinkerError::file_read_error(format!(
+                                    "Failed to read file: {}",
+                                    e
+                                )),
+                            )));
+                        }
+                    }
+                }
+                csv_data = Some(data);
+            }
+            "mode" => {
+                // 读取模式参数
+                let mut data = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    if let Ok(bytes) = chunk {
+                        data.extend_from_slice(&bytes);
+                    }
+                }
+                let mode_str = String::from_utf8_lossy(&data).to_string();
+                // 未知模式回退为默认 Skip
+                mode = match mode_str.to_lowercase().as_str() {
+                    "overwrite" => ImportMode::Overwrite,
+                    "error" => ImportMode::Error,
+                    _ => ImportMode::Skip,
+                };
+            }
+            _ => {
+                // 忽略未知字段
+            }
+        }
+    }
+
+    Ok((csv_data, mode))
+}
+
+/// 解析 CSV 数据：返回 (raw items, CSV 解析失败项, code→行号映射, 总行数)
+fn parse_import_csv(
+    csv_data: &[u8],
+) -> (
+    Vec<ImportLinkItemRaw>,
+    Vec<ImportFailedItem>,
+    std::collections::HashMap<String, usize>,
+    usize,
+) {
+    let cursor = Cursor::new(csv_data);
+    let mut csv_reader = ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_reader(cursor);
+
+    let mut total_rows = 0;
+    let mut failed_items: Vec<ImportFailedItem> = Vec::new();
+    let mut raw_items: Vec<ImportLinkItemRaw> = Vec::new();
+    // 记录 code → CSV 行号映射，仅用于回填 service 层返回的冲突失败项行号
+    // （验证错误的行号由 ImportLinkItemRaw.row_num 直接携带，不受重复 code 影响）
+    let mut code_to_row: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+
+    for (row_idx, result) in csv_reader.deserialize::<CsvLinkRow>().enumerate() {
+        let row_num = row_idx + 2; // CSV 行号（1-based，跳过 header）
+        total_rows += 1;
+
+        let row = match result {
+            Ok(row) => row,
+            Err(e) => {
+                failed_items.push(ImportFailedItem {
+                    row: Some(row_num),
+                    code: String::new(),
+                    error: format!("CSV parse error: {}", e),
+                    error_code: Some(ErrorCode::CsvParseError as i32),
+                });
+                continue;
+            }
+        };
+
+        code_to_row.insert(row.code.clone(), row_num);
+        raw_items.push(ImportLinkItemRaw {
+            code: row.code,
+            target: row.target,
+            created_at: row.created_at,
+            expires_at: row.expires_at,
+            password: row.password,
+            click_count: row.click_count,
+            row_num: Some(row_num),
+        });
+    }
+
+    (raw_items, failed_items, code_to_row, total_rows)
 }

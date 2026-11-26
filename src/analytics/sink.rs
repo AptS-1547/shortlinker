@@ -3,6 +3,7 @@ use super::ClickDetail;
 /// 点击计数 Sink（聚合模式）
 #[async_trait::async_trait]
 pub trait ClickSink: Send + Sync {
+    /// 将一批短链接点击计数增量写入后端存储
     async fn flush_clicks(&self, updates: Vec<(String, usize)>) -> anyhow::Result<()>;
 }
 
@@ -16,6 +17,7 @@ pub trait DetailedClickSink: Send + Sync {
     async fn log_clicks_batch(&self, details: Vec<ClickDetail>) -> anyhow::Result<()>;
 }
 
+/// 将点击计数和详细日志打印到标准输出的调试用 Sink
 pub struct StdoutSink;
 
 #[async_trait::async_trait]

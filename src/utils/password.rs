@@ -5,6 +5,7 @@
 /// 密码哈希错误
 #[derive(Debug)]
 pub enum PasswordError {
+    /// Argon2 哈希计算失败
     HashError(String),
 }
 

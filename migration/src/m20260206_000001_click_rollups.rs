@@ -1,9 +1,9 @@
 //! 点击统计汇总表迁移
 //!
 //! 创建预聚合的汇总表，提升分析查询性能：
-//! - click_stats_hourly: 小时级链接点击汇总
-//! - click_stats_daily: 天级链接点击汇总
-//! - click_stats_global_hourly: 全局小时汇总
+//! - `click_stats_hourly`: 小时级链接点击汇总
+//! - `click_stats_daily`: 天级链接点击汇总
+//! - `click_stats_global_hourly`: 全局小时汇总
 
 use sea_orm_migration::prelude::*;
 
@@ -12,8 +12,11 @@ pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
+    // Migration up() 是声明式的表/索引创建步骤序列，拆成子函数只会打断
+    // 步骤注释的线性阅读，不降低复杂度。
+    #[expect(clippy::too_many_lines, reason = "declarative migration step sequence")]
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // 1. 创建 click_stats_hourly 表
+        // 1. 创建 `click_stats_hourly` 表
         manager
             .create_table(
                 Table::create()
@@ -82,7 +85,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 2. 创建 click_stats_daily 表
+        // 2. 创建 `click_stats_daily` 表
         manager
             .create_table(
                 Table::create()
@@ -149,7 +152,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 3. 创建 click_stats_global_hourly 表
+        // 3. 创建 `click_stats_global_hourly` 表
         manager
             .create_table(
                 Table::create()
@@ -209,7 +212,7 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // 删除 click_stats_global_hourly
+        // 删除 `click_stats_global_hourly`
         manager
             .drop_index(
                 Index::drop()
@@ -225,7 +228,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // 删除 click_stats_daily
+        // 删除 `click_stats_daily`
         manager
             .drop_index(Index::drop().name("idx_stats_daily_bucket").to_owned())
             .await?;
@@ -236,7 +239,7 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(ClickStatsDaily::Table).to_owned())
             .await?;
 
-        // 删除 click_stats_hourly
+        // 删除 `click_stats_hourly`
         manager
             .drop_index(Index::drop().name("idx_stats_hourly_bucket").to_owned())
             .await?;

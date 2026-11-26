@@ -42,9 +42,11 @@ pub trait PlatformOps {
     fn cleanup_lockfile();
 }
 
+/// Process-wide single-instance guard; cleans up the lock/PID file on drop.
 pub struct ProcessGuard;
 
 impl ProcessGuard {
+    /// Acquire the single-instance lock, failing if another instance is running.
     pub fn acquire() -> std::io::Result<Self> {
         #[cfg(unix)]
         unix::UnixPlatform::init_lockfile()?;

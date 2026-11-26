@@ -30,6 +30,7 @@ pub struct Cli {
     #[arg(long, short = 's', global = true)]
     pub socket: Option<String>,
 
+    /// Subcommand to execute. When omitted, starts the server.
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -116,6 +117,7 @@ pub enum Commands {
 
     /// Manage configuration.
     Config {
+        /// Configuration subcommand to run.
         #[command(subcommand)]
         action: ConfigCommands,
     },
@@ -198,10 +200,14 @@ impl Commands {
     }
 }
 
+/// Errors that can occur while executing a CLI command.
 #[derive(Debug)]
 pub enum CliError {
+    /// A storage (database) operation failed.
     StorageError(String),
+    /// Parsing user input or a file failed.
     ParseError(String),
+    /// The command could not be executed as requested.
     CommandError(String),
 }
 
@@ -318,10 +324,8 @@ pub async fn run_cli_command(cmd: Commands) -> Result<(), CliError> {
 
         Commands::Import { file_path, force } => import_links(&link_client, file_path, force).await,
 
-        Commands::Status => unreachable!("handled above"),
-
-        Commands::ResetPassword { .. } => unreachable!("handled above"),
-
-        Commands::Config { .. } => unreachable!("handled above"),
+        Commands::Status | Commands::ResetPassword { .. } | Commands::Config { .. } => {
+            unreachable!("handled above")
+        }
     }
 }

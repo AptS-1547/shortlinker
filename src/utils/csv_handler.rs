@@ -16,13 +16,19 @@ use crate::storage::ShortLink;
 /// CSV 行数据结构（用于序列化/反序列化）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CsvLinkRow {
+    /// 短码。
     pub code: String,
+    /// 目标 URL。
     pub target: String,
+    /// 创建时间，RFC 3339 格式字符串。
     pub created_at: String,
+    /// 过期时间，RFC 3339 格式字符串；缺失或 `null` 表示永不过期。
     #[serde(default)]
     pub expires_at: Option<String>,
+    /// 访问口令的哈希值（导出的是存储态哈希，不是明文）；缺失表示无密码保护。
     #[serde(default)]
     pub password: Option<String>,
+    /// 初始点击计数，缺失时默认 0。
     #[serde(default)]
     pub click_count: usize,
 }
@@ -30,12 +36,19 @@ pub struct CsvLinkRow {
 /// 点击日志 CSV 导出行（仅用于序列化）
 #[derive(Debug, Clone, Serialize)]
 pub struct ClickLogCsvRow {
+    /// 被点击的短码。
     pub short_code: String,
+    /// 点击时间，RFC 3339 格式字符串（UTC）。
     pub clicked_at: String,
+    /// 来源页面（Referer header）；无则为空字符串。
     pub referrer: String,
+    /// 流量来源（utm_source 参数、ref:{domain} 或 direct）；无则为空字符串。
     pub source: String,
+    /// 客户端 IP 地址；无则为空字符串。
     pub ip_address: String,
+    /// ISO 3166-1 alpha-2 国家代码；未解析则为空字符串。
     pub country: String,
+    /// 城市名称；未解析则为空字符串。
     pub city: String,
 }
 
@@ -227,6 +240,10 @@ mod tests {
     fn test_generate_export_filename() {
         let filename = generate_export_filename();
         assert!(filename.starts_with("shortlinks_export_"));
-        assert!(filename.ends_with(".csv"));
+        assert!(
+            std::path::Path::new(&filename)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("csv"))
+        );
     }
 }

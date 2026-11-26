@@ -33,9 +33,8 @@ impl IpcPlatform for UnixIpc {
             return false;
         }
 
-        let mut stream = match std::os::unix::net::UnixStream::connect(path) {
-            Ok(s) => s,
-            Err(_) => return false,
+        let Ok(mut stream) = std::os::unix::net::UnixStream::connect(path) else {
+            return false;
         };
 
         // 设置短超时，避免僵死进程阻塞检测
@@ -44,9 +43,8 @@ impl IpcPlatform for UnixIpc {
         let _ = stream.set_write_timeout(Some(timeout));
 
         // 发送 Ping 命令，验证服务器能实际响应
-        let ping_data = match encode(&IpcCommand::Ping) {
-            Ok(data) => data,
-            Err(_) => return false,
+        let Ok(ping_data) = encode(&IpcCommand::Ping) else {
+            return false;
         };
 
         if stream.write_all(&ping_data).is_err() {
@@ -58,28 +56,34 @@ impl IpcPlatform for UnixIpc {
         matches!(stream.read(&mut buf), Ok(n) if n > 4)
     }
 
-    async fn bind() -> io::Result<Self::Listener> {
+    // bind 本身是纯同步操作，用 ready future 满足 trait 的异步签名
+    fn bind() -> impl std::future::Future<Output = io::Result<Self::Listener>> + Send {
+        use std::future::ready;
+
         // Clean up any existing stale socket file first
         Self::cleanup();
 
         let path_str = Self::socket_path();
-        let listener = UnixListener::bind(&path_str)?;
 
-        // 设置 socket 文件权限为 0o600（仅属主可读写）
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
+        ready((|| -> io::Result<Self::Listener> {
+            let listener = UnixListener::bind(&path_str)?;
 
-            let socket_path = Path::new(&path_str);
-            if let Ok(metadata) = std::fs::metadata(socket_path) {
-                let mut permissions = metadata.permissions();
-                permissions.set_mode(0o600);
-                std::fs::set_permissions(socket_path, permissions)?;
-                tracing::debug!("IPC socket permissions set to 0600 (owner only)");
+            // 设置 socket 文件权限为 0o600（仅属主可读写）
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                let socket_path = Path::new(&path_str);
+                if let Ok(metadata) = std::fs::metadata(socket_path) {
+                    let mut permissions = metadata.permissions();
+                    permissions.set_mode(0o600);
+                    std::fs::set_permissions(socket_path, permissions)?;
+                    tracing::debug!("IPC socket permissions set to 0600 (owner only)");
+                }
             }
-        }
 
-        Ok(listener)
+            Ok(listener)
+        })())
     }
 
     async fn accept(listener: &mut Self::Listener) -> io::Result<Self::Stream> {

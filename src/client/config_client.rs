@@ -16,6 +16,7 @@ pub struct ConfigClient {
 }
 
 impl ConfigClient {
+    /// Create a client bound to the shared service context.
     pub fn new(ctx: Arc<ServiceContext>) -> Self {
         Self { ctx }
     }
@@ -33,7 +34,7 @@ impl ConfigClient {
                 IpcResponse::ConfigListResult { configs } => {
                     Ok(configs.into_iter().map(config_data_to_view).collect())
                 }
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_config_service().await?;
@@ -42,8 +43,7 @@ impl ConfigClient {
                     items.retain(|item| {
                         crate::config::definitions::CONFIG_REGISTRY
                             .get(&item.key)
-                            .map(|definition| definition.category == cat.as_str())
-                            .unwrap_or(false)
+                            .is_some_and(|definition| definition.category == cat.as_str())
                     });
                 }
                 Ok(items)
@@ -60,7 +60,7 @@ impl ConfigClient {
             ipc::config_get(key),
             |resp| match resp {
                 IpcResponse::ConfigGetResult { config } => Ok(config_data_to_view(config)),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_config_service().await?;
@@ -92,7 +92,7 @@ impl ConfigClient {
                     is_sensitive,
                     message,
                 }),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_config_service().await?;
@@ -122,7 +122,7 @@ impl ConfigClient {
                     is_sensitive,
                     message,
                 }),
-                other => Err(unexpected_response(other)),
+                other => Err(unexpected_response(&other)),
             },
             || async move {
                 let service = ctx.get_config_service().await?;
@@ -152,35 +152,34 @@ fn config_data_to_view(data: ConfigItemData) -> ConfigItemView {
         value_type: parse_value_type(&data.value_type),
         requires_restart: data.requires_restart,
         is_sensitive: data.sensitive,
-        updated_at: chrono::DateTime::parse_from_rfc3339(&data.updated_at)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|e| {
+        updated_at: chrono::DateTime::parse_from_rfc3339(&data.updated_at).map_or_else(
+            |e| {
                 tracing::warn!(
                     "Failed to parse 'updated_at' from IPC (value: '{}'): {}",
                     &data.updated_at,
                     e
                 );
                 chrono::DateTime::UNIX_EPOCH
-            }),
+            },
+            |dt| dt.with_timezone(&chrono::Utc),
+        ),
     }
 }
 
 fn parse_value_type(s: &str) -> crate::config::ValueType {
     match s.to_lowercase().as_str() {
-        "bool" => crate::config::ValueType::Bool,
-        "int" => crate::config::ValueType::Int,
+        "bool" | "boolean" => crate::config::ValueType::Bool,
+        "int" | "number" => crate::config::ValueType::Int,
         "float" => crate::config::ValueType::Float,
         "json" => crate::config::ValueType::Json,
         "enum" | "string_enum" => crate::config::ValueType::Enum,
         "stringarray" | "string_array" => crate::config::ValueType::StringArray,
         "enumarray" | "string_enum_set" => crate::config::ValueType::EnumArray,
-        "number" => crate::config::ValueType::Int,
-        "boolean" => crate::config::ValueType::Bool,
         _ => crate::config::ValueType::String,
     }
 }
 
-fn unexpected_response(resp: IpcResponse) -> ClientError {
+fn unexpected_response(resp: &IpcResponse) -> ClientError {
     ClientError::Ipc(crate::system::ipc::IpcError::ProtocolError(format!(
         "Unexpected response: {:?}",
         resp
@@ -205,7 +204,7 @@ mod tests {
             value: value.into(),
             category: key.split('.').next().unwrap_or("unknown").into(),
             value_type: value_type.into(),
-            default_value: "".into(),
+            default_value: String::new(),
             requires_restart,
             editable: true,
             sensitive,
@@ -393,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_unexpected_response_returns_ipc_error() {
-        let err = unexpected_response(IpcResponse::Pong {
+        let err = unexpected_response(&IpcResponse::Pong {
             version: "1.0".into(),
             uptime_secs: 0,
         });

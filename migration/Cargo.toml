@@ -2,7 +2,8 @@
 name = "migration"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95.0"
+license = "MIT"
 publish = false
 
 [lib]
@@ -10,22 +11,11 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-aster_forge_config = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_config", features = ["sea-orm"] }
-aster_forge_db = { git = "https://github.com/AsterCommunity/AsterForge", package = "aster_forge_db", features = ["system-config"] }
-tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+aster_forge_config = { workspace = true, features = ["sea-orm"] }
+aster_forge_db.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
 
-[dependencies.sea-orm]
-version = "~2.0.1"
-features = ["sqlx-mysql", "sqlx-postgres", "sqlx-sqlite", "macros", "runtime-tokio-rustls"]
-
-[dependencies.sea-orm-migration]
-version = "~2.0.1"
-features = [
-  # Enable at least one `ASYNC_RUNTIME` and `DATABASE_DRIVER` feature if you want to run migration via CLI.
-  # View the list of supported features at https://www.sea-ql.org/SeaORM/docs/install-and-config/database-and-async-runtime.
-  # e.g.
-  "runtime-tokio-rustls",  # `ASYNC_RUNTIME` feature
-  "sqlx-postgres",         # `DATABASE_DRIVER` feature
-  "sqlx-mysql",
-  "sqlx-sqlite",
-]
+[lints]
+workspace = true

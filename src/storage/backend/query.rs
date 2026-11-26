@@ -73,6 +73,7 @@ struct StatsResult {
 }
 
 impl SeaOrmStorage {
+    /// 按短码查询单条短链接记录（带重试）
     pub async fn get(&self, code: &str) -> Result<Option<ShortLink>> {
         let db = &self.db;
         let code_owned = code.to_string();
@@ -93,6 +94,7 @@ impl SeaOrmStorage {
         Ok(result.map(model_to_shortlink))
     }
 
+    /// 加载全部短链接记录，返回 短码 -> 短链接 的映射
     pub async fn load_all(&self) -> Result<HashMap<String, ShortLink>> {
         let models = short_link::Entity::find()
             .all(&self.db)
@@ -273,7 +275,7 @@ impl SeaOrmStorage {
         }
 
         let db = &self.db;
-        let codes_owned: Vec<String> = codes.iter().map(|s| s.to_string()).collect();
+        let codes_owned: Vec<String> = codes.iter().map(ToString::to_string).collect();
 
         let models =
             aster_forge_db::retry::with_sea_orm_retry("batch_get", self.retry_config, || async {
@@ -307,9 +309,9 @@ impl SeaOrmStorage {
         &self,
         page_size: u64,
     ) -> Pin<Box<dyn Stream<Item = Result<Vec<String>>> + Send + 'static>> {
-        let db = self.db.clone();
-
         use futures_util::stream;
+
+        let db = self.db.clone();
 
         Box::pin(stream::unfold(
             (None::<String>, db, page_size, false),
@@ -360,14 +362,14 @@ impl SeaOrmStorage {
     /// 使用 `short_code` 作为游标，避免 OFFSET 在大数据量下的性能问题。
     pub fn stream_all_filtered_cursor(
         &self,
-        filter: LinkFilter,
+        filter: &LinkFilter,
         page_size: u64,
     ) -> Pin<Box<dyn Stream<Item = Result<Vec<ShortLink>>> + Send + 'static>> {
+        use futures_util::stream;
+
         let db = self.db.clone();
         let now = Utc::now();
-        let condition = build_filter_condition(&filter, now);
-
-        use futures_util::stream;
+        let condition = build_filter_condition(filter, now);
 
         Box::pin(stream::unfold(
             (None::<String>, db, condition, page_size, false),

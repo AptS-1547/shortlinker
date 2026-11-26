@@ -8,6 +8,11 @@ use colored::Colorize;
 use crate::cli::CliError;
 
 /// Generate example configuration file
+///
+/// # Panics
+///
+/// 当 stdout flush 或 stdin 读取失败时 panic（交互确认路径）；
+/// CLI 交互场景下标准流不可用属于环境异常，直接终止。
 pub async fn config_generate(output_path: Option<String>, force: bool) -> Result<(), CliError> {
     let path = output_path.unwrap_or_else(|| "config.example.toml".to_string());
 

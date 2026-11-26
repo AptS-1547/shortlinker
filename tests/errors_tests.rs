@@ -1,3 +1,5 @@
+//! 领域错误类型与错误码映射测试。
+
 use shortlinker::errors::{Result, ShortlinkerError};
 use std::error::Error;
 
@@ -110,7 +112,7 @@ mod error_trait_tests {
 
         // Test Error trait implementation
         let error_trait: &dyn Error = &error;
-        assert!(!error_trait.to_string().is_empty());
+        assert_ne!(error_trait.to_string(), "");
 
         // Test source method (should return None as our error is top-level)
         assert!(error_trait.source().is_none());
@@ -326,16 +328,6 @@ mod integration_tests {
             Err(io_error.into())
         }
 
-        let result = simulate_file_operation();
-        assert!(result.is_err());
-
-        match result.unwrap_err() {
-            ShortlinkerError::FileOperation(msg) => {
-                assert!(msg.contains("config file not found"));
-            }
-            _ => panic!("expected file operation error"),
-        }
-
         // Scenario 2: Validation failure
         fn simulate_validation() -> Result<()> {
             let url = "invalid-url";
@@ -344,9 +336,6 @@ mod integration_tests {
             }
             Ok(())
         }
-
-        let result = simulate_validation();
-        assert!(result.is_err());
 
         // Scenario 3: Resource not found
         fn simulate_resource_lookup(id: &str) -> Result<String> {
@@ -358,6 +347,19 @@ mod integration_tests {
             }
             Ok("found".to_string())
         }
+
+        let result = simulate_file_operation();
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ShortlinkerError::FileOperation(msg) => {
+                assert!(msg.contains("config file not found"));
+            }
+            _ => panic!("expected file operation error"),
+        }
+
+        let result = simulate_validation();
+        assert!(result.is_err());
 
         let result = simulate_resource_lookup("nonexistent");
         assert!(result.is_err());

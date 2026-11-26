@@ -50,6 +50,7 @@ where
     }
 }
 
+/// 管理接口认证中间件的 Actix 服务封装
 pub struct AdminAuthMiddleware<S> {
     service: Rc<S>,
     admin_prefix: String,
@@ -102,7 +103,7 @@ where
             .get("Authorization")
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.strip_prefix("Bearer "))
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
     }
 
     /// 验证 Bearer token（使用 JWT）
@@ -198,8 +199,7 @@ where
             // Extract metrics from app data
             let metrics: Arc<dyn MetricsRecorder> = req
                 .app_data::<web::Data<Arc<dyn MetricsRecorder>>>()
-                .map(|d| d.get_ref().clone())
-                .unwrap_or_else(|| crate::metrics::NoopMetrics::arc());
+                .map_or_else(crate::metrics::NoopMetrics::arc, |d| d.get_ref().clone());
 
             // Check if admin token is configured
             if admin_token.is_empty() {
